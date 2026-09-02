@@ -1,0 +1,223 @@
+@import "tailwindcss";
+
+@layer utilities {
+  /* ----------------------------------------------------
+     GLOWING NEON BORDER SYSTEM (ระบบกรอบนีออนเรืองแสง)
+     ความสว่างและรัศมีแสงแปรผันตามระดับเลเวล (Level 1 - 100)
+     ---------------------------------------------------- */
+
+  /* Base Glowing Neon Border Container */
+  .neon-border-base {
+    position: relative;
+    border-radius: 1rem;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Role Specific Color Variables */
+  .neon-role-driver {
+    --neon-primary: #00D2FF;
+    --neon-secondary: #FFD700;
+    --neon-tertiary: #3B82F6;
+    --neon-accent-rgba: 0, 210, 255;
+    --neon-gold-rgba: 255, 215, 0;
+  }
+
+  .neon-role-passenger {
+    --neon-primary: #00F0FF;
+    --neon-secondary: #10B981;
+    --neon-tertiary: #A855F7;
+    --neon-accent-rgba: 0, 240, 255;
+    --neon-gold-rgba: 16, 185, 129;
+  }
+
+  .neon-role-merchant {
+    --neon-primary: #FFD700;
+    --neon-secondary: #F59E0B;
+    --neon-tertiary: #10B981;
+    --neon-accent-rgba: 255, 215, 0;
+    --neon-gold-rgba: 245, 158, 11;
+  }
+
+  /* ----------------------------------------------------
+     LEVEL-BASED GLOW INTENSITY TIERS (ระดับความสว่างตามเลเวล)
+     ---------------------------------------------------- */
+
+  /* Tier 1: Level 1 - 19 (Novice / Apprentice) - แสงนีออนระดับเริ่มต้น (ลดความสว่างลง 50%) */
+  .neon-tier-1 {
+    box-shadow: 
+      0 0 5px rgba(var(--neon-accent-rgba, 0, 210, 255), 0.2),
+      inset 0 0 3px rgba(var(--neon-accent-rgba, 0, 210, 255), 0.12);
+    border: 1px solid rgba(var(--neon-accent-rgba, 0, 210, 255), 0.4);
+  }
+
+  /* Tier 2: Level 20 - 49 (Adept / Veteran) - แสงนีออนคมชัด เพิ่มรัศมี (ลดความสว่างลง 50%) */
+  .neon-tier-2 {
+    box-shadow: 
+      0 0 8px 1px rgba(var(--neon-accent-rgba, 0, 210, 255), 0.3),
+      0 0 14px rgba(var(--neon-accent-rgba, 0, 210, 255), 0.15),
+      inset 0 0 5px rgba(var(--neon-accent-rgba, 0, 210, 255), 0.2);
+    border: 1.5px solid rgba(var(--neon-accent-rgba, 0, 210, 255), 0.55);
+  }
+
+  /* Tier 3: Level 50 - 79 (Elite / Master) - แสงนีออนเข้มข้น ผสานแสงทอง/มรกต (ลดความสว่างลง 50%) */
+  .neon-tier-3 {
+    box-shadow: 
+      0 0 11px 2px rgba(var(--neon-accent-rgba, 0, 210, 255), 0.38),
+      0 0 22px 4px rgba(var(--neon-gold-rgba, 255, 215, 0), 0.2),
+      inset 0 0 7px rgba(var(--neon-accent-rgba, 0, 210, 255), 0.25);
+    border: 1.5px solid rgba(var(--neon-accent-rgba, 0, 210, 255), 0.6);
+    animation: neon-pulse-slow 3.5s ease-in-out infinite alternate;
+  }
+
+  /* Tier 4: Level 80 - 99 (Grand Master / Champion) - รัศมีความสว่างสูง ออร่ารอบตัว (ลดความสว่างลง 50%) */
+  .neon-tier-4 {
+    box-shadow: 
+      0 0 15px 3px rgba(var(--neon-accent-rgba, 0, 210, 255), 0.42),
+      0 0 30px 6px rgba(var(--neon-gold-rgba, 255, 215, 0), 0.3),
+      0 0 45px 10px rgba(var(--neon-accent-rgba, 0, 210, 255), 0.18),
+      inset 0 0 9px rgba(var(--neon-gold-rgba, 255, 215, 0), 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    animation: neon-pulse-vibrant 2.2s ease-in-out infinite alternate;
+  }
+
+  /* Tier 5: Level 100 MAX (Godlike Sovereign / ปลดล็อคระดับเทพเจ้าสูงสุด) - มหาอลังการเรืองแสงขั้นสุด (ลดความสว่างลง 50%) */
+  .neon-tier-100, .neon-tier-godlike {
+    box-shadow: 
+      0 0 18px 4px rgba(0, 210, 255, 0.5),
+      0 0 35px 9px rgba(255, 215, 0, 0.5),
+      0 0 55px 14px rgba(0, 210, 255, 0.4),
+      0 0 70px 20px rgba(255, 215, 0, 0.25),
+      inset 0 0 12px rgba(255, 215, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    animation: neon-godlike-pulse 1.8s ease-in-out infinite alternate;
+  }
+
+  /* Dynamic Conic Spinning Border Beam */
+  .neon-conic-spin {
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: conic-gradient(from 0deg, var(--neon-primary, #00D2FF), var(--neon-secondary, #FFD700), var(--neon-tertiary, #3B82F6), #FFFFFF, var(--neon-primary, #00D2FF));
+    animation: neon-spin 3s linear infinite;
+    filter: blur(1.5px);
+    z-index: 0;
+  }
+
+  /* Neon Ambient Backdrop Aura */
+  .neon-backdrop-aura {
+    position: absolute;
+    inset: -6px;
+    border-radius: inherit;
+    background: radial-gradient(circle, var(--neon-secondary, #FFD700) 0%, var(--neon-primary, #00D2FF) 50%, transparent 80%);
+    opacity: 0.42;
+    filter: blur(8px);
+    pointer-events: none;
+    z-index: -1;
+    animation: neon-aura-breathe 2.5s ease-in-out infinite alternate;
+  }
+}
+
+/* ----------------------------------------------------
+   KEYFRAME ANIMATIONS FOR NEON GLOW (50% REDUCED BRIGHTNESS)
+   ---------------------------------------------------- */
+@keyframes neon-pulse-slow {
+  0% {
+    filter: drop-shadow(0 0 4px rgba(0, 210, 255, 0.25));
+    transform: scale(1);
+  }
+  100% {
+    filter: drop-shadow(0 0 9px rgba(0, 210, 255, 0.42));
+    transform: scale(1.01);
+  }
+}
+
+@keyframes neon-pulse-vibrant {
+  0% {
+    filter: drop-shadow(0 0 7px rgba(0, 210, 255, 0.35)) drop-shadow(0 0 12px rgba(255, 215, 0, 0.25));
+    transform: scale(1);
+  }
+  100% {
+    filter: drop-shadow(0 0 14px rgba(0, 210, 255, 0.48)) drop-shadow(0 0 22px rgba(255, 215, 0, 0.38));
+    transform: scale(1.015);
+  }
+}
+
+@keyframes neon-godlike-pulse {
+  0% {
+    filter: drop-shadow(0 0 10px rgba(0, 210, 255, 0.5)) drop-shadow(0 0 18px rgba(255, 215, 0, 0.5));
+    transform: scale(1);
+  }
+  100% {
+    filter: drop-shadow(0 0 20px rgba(0, 210, 255, 0.5)) drop-shadow(0 0 32px rgba(255, 215, 0, 0.5)) drop-shadow(0 0 45px rgba(255, 255, 255, 0.45));
+    transform: scale(1.02);
+  }
+}
+
+@keyframes neon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes neon-aura-breathe {
+  0% {
+    opacity: 0.32;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 0.48;
+    transform: scale(1.03);
+  }
+}
+
+/* ----------------------------------------------------
+   3D RADAR FLOATING & LEVITATION KEYFRAMES
+   ---------------------------------------------------- */
+@keyframes levitate-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes levitate-float-delayed {
+  0%, 100% {
+    transform: translateY(-4px);
+  }
+  50% {
+    transform: translateY(4px);
+  }
+}
+
+@keyframes radar-pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.animate-levitate {
+  animation: levitate-float 3s ease-in-out infinite;
+}
+
+.animate-levitate-delayed {
+  animation: levitate-float-delayed 3.5s ease-in-out infinite;
+}
+
+.animate-radar-ring {
+  animation: radar-pulse-ring 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+

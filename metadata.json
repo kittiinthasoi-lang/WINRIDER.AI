@@ -1,0 +1,6 @@
+{
+  "name": "WINRIDER.AI Empire Codex",
+    "description": "ระบบปฏิบัติการยุทธศาสตร์จักรวรรดิ WINRIDER.AI: จำลองแผนที่ 3 มิติความละเอียดสูงและเส้นทางซับซ้อน (Bangkok Capillary Network) ทั้งฝั่งพี่วินและลูกค้า พร้อมระบบคลังชุดเกราะอัศวินเลเวล 1-70, หน้าจอเรดาร์สแตนด์บาย 3 มิติ, เสียง AI นำทางบอกระยะทางและเวลาถึงจุดหมาย, ราง BTS, คลองแสนแสบ และตึก 3D แลนด์มาร์ก",
+  "requestFramePermissions": ["microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
