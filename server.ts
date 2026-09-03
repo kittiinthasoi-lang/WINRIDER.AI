@@ -55,12 +55,11 @@ Core Tenets:
 Tone: Respectful, tactical, brotherly (เรียกผู้ใช้ว่า "พี่อัศวิน" หรือ "ท่านไนท์"), swift, highly efficient, and infused with Universal Logic & cosmic wisdom.
 Respond concisely in Thai (unless asked otherwise) with clear tactical actions or advice for riders on the road.`;
 
-    // Modern supported models from @google/genai guidelines
+    // Modern supported models from @google/genai guidelines prioritized for real-time speed & availability
     const candidateModels = [
-      "gemini-3.7-flash",
-      "gemini-3.6-flash",
       "gemini-3.1-flash-lite",
       "gemini-flash-latest",
+      "gemini-3.8-flash",
     ];
     let aiResponseText: string | null = null;
     let usedModel = "local-tactical-engine";
@@ -68,7 +67,8 @@ Respond concisely in Thai (unless asked otherwise) with clear tactical actions o
     if (ai) {
       for (const modelName of candidateModels) {
         try {
-          const response = await ai.models.generateContent({
+          // Guard each model attempt with a 6-second timeout to guarantee swift copilot response
+          const modelCallPromise = ai.models.generateContent({
             model: modelName,
             contents: `Context: ${JSON.stringify(context || {})}\nRider Voice Input: "${message}"`,
             config: {
@@ -76,13 +76,19 @@ Respond concisely in Thai (unless asked otherwise) with clear tactical actions o
               temperature: 0.7,
             },
           });
+
+          const timeoutPromise = new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error("Model request timeout")), 6000)
+          );
+
+          const response = await Promise.race([modelCallPromise, timeoutPromise]);
           if (response && response.text) {
             aiResponseText = response.text;
             usedModel = modelName;
             break;
           }
         } catch (modelErr: any) {
-          console.warn(`[WIN Buddy AI] Model ${modelName} unavailable (${modelErr?.message || modelErr}), trying fallback...`);
+          console.log(`[WIN Buddy AI] Model ${modelName} unavailable (${modelErr?.message || modelErr?.status || 'temporary'}), trying next...`);
         }
       }
     }

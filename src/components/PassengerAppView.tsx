@@ -68,6 +68,7 @@ import {
   TrendingUp,
   Coins,
   Award,
+  AudioWaveform,
   Mic,
   Package,
   UserCheck,
@@ -883,7 +884,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 className="relative p-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-[#00D2FF] border border-[#00D2FF]/40 cursor-pointer active:scale-95 transition-all shadow-[0_0_10px_rgba(0,210,255,0.25)]"
                 title="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป (Customer Voice AI)"
               >
-                <Mic className="w-4 h-4 animate-pulse text-[#00D2FF]" />
+                <AudioWaveform className="w-4 h-4 animate-pulse text-[#00D2FF]" />
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#00D2FF]" />
               </button>
 

@@ -3,22 +3,10 @@ import { playTactileBlip, speakThaiText } from '../utils/audio';
 import { AppMode } from '../types';
 import { 
   Mic, 
-  MicOff, 
   X, 
   Sparkles, 
-  Compass, 
-  Bike, 
-  Activity, 
-  ShoppingBag, 
-  User, 
-  HeartHandshake, 
-  AlertTriangle,
-  ArrowRight,
-  Volume2,
-  VolumeX,
-  Send,
-  Radio,
-  CheckCircle2
+  AudioWaveform,
+  Send
 } from 'lucide-react';
 
 interface CustomerVoiceCommandModalProps {
@@ -263,11 +251,6 @@ export const CustomerVoiceCommandModal: React.FC<CustomerVoiceCommandModalProps>
     }, 2200);
   };
 
-  const handleExecuteQuickCommand = (cmd: CommandAction) => {
-    setSpokenText(cmd.phrase);
-    processVoiceQuery(cmd.phrase);
-  };
-
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-[#070D1E] border border-cyan-500/50 rounded-3xl flex flex-col shadow-[0_0_50px_rgba(0,210,255,0.35)] overflow-hidden">
@@ -276,7 +259,7 @@ export const CustomerVoiceCommandModal: React.FC<CustomerVoiceCommandModalProps>
         <div className="p-4 bg-gradient-to-r from-[#0A1A3A] via-[#091530] to-[#070D1E] border-b border-cyan-500/30 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 flex items-center justify-center text-slate-950 font-black shadow-[0_0_15px_rgba(0,210,255,0.5)]">
-              <span className="text-xl">🌸</span>
+              <AudioWaveform className="w-5 h-5 text-slate-950 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -353,49 +336,20 @@ export const CustomerVoiceCommandModal: React.FC<CustomerVoiceCommandModalProps>
                 }`}
               >
                 {isListening ? (
-                  <Mic className="w-9 h-9 animate-bounce text-white" />
+                  <AudioWaveform className="w-10 h-10 animate-bounce text-white" />
                 ) : (
-                  <Mic className="w-9 h-9 text-slate-950" />
+                  <AudioWaveform className="w-10 h-10 text-slate-950" />
                 )}
               </button>
             </div>
 
             <div className="text-center">
               <span className="text-xs font-black text-white block">
-                {isListening ? 'กำลังรับฟังเสียงของคุณ...' : 'แตะไมค์เพื่อพูดสั่งการแอป'}
+                {isListening ? 'กำลังรับฟังคลื่นเสียงของคุณ...' : 'แตะคลื่นเสียงเพื่อพูดสั่งการแอป'}
               </span>
               <p className="text-[11px] text-slate-400">
                 รองรับภาษาไทย พูดสั่งเรียกรถ ช้อปปิ้ง หรือเปิดเมนูต่างๆ ได้ทันที
               </p>
-            </div>
-          </div>
-
-          {/* Quick Voice Command Chips (ลูกค้าแตะเพื่อสั่งงานได้ทันที) */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-300 font-bold flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>คำสั่งเสียงยอดนิยมของลูกค้า (แตะเพื่อสั่งทันที):</span>
-              </span>
-              <span className="text-[10px] text-cyan-400">8 คำสั่งพร้อมใช้</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {commandLibrary.map((cmd) => (
-                <button
-                  key={cmd.id}
-                  onClick={() => handleExecuteQuickCommand(cmd)}
-                  className="p-2.5 rounded-xl bg-[#09152C] hover:bg-[#0E2045] border border-cyan-500/20 hover:border-cyan-400/50 text-left transition-all flex items-center justify-between group active:scale-98 cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-base group-hover:scale-110 transition-transform">{cmd.icon}</span>
-                    <span className="text-xs font-bold text-slate-200 group-hover:text-cyan-300">
-                      "{cmd.phrase}"
-                    </span>
-                  </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all" />
-                </button>
-              ))}
             </div>
           </div>
 

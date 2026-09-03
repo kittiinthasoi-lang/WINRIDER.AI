@@ -242,16 +242,66 @@ export default function App() {
             if (audioEnabled) playTactileBlip(1200);
             setIsBuddyModalOpen(true);
           }}
-          className="relative group p-3.5 sm:p-4 rounded-2xl font-black transition-all flex items-center gap-2 border border-amber-400/40 cursor-pointer shadow-2xl hover:scale-105 active:scale-95 bg-gradient-to-br from-[#FFD700] via-amber-500 to-[#070D1E] text-slate-950 shadow-[0_0_25px_rgba(255,215,0,0.5)] hover:shadow-[0_0_35px_rgba(255,215,0,0.8)]"
+          className={`relative group p-3.5 sm:p-4 rounded-2xl font-black transition-all flex items-center gap-2 border cursor-pointer shadow-2xl hover:scale-105 active:scale-95 bg-gradient-to-br from-[#FFD700] via-amber-500 to-[#070D1E] text-slate-950 ${
+            isBuddyModalOpen
+              ? 'border-amber-300 ring-2 ring-amber-300/80 ring-offset-2 ring-offset-[#070D1E] shadow-[0_0_35px_rgba(255,215,0,0.85)]'
+              : 'border-amber-400/40 shadow-[0_0_25px_rgba(255,215,0,0.5)] hover:shadow-[0_0_35px_rgba(255,215,0,0.8)]'
+          }`}
           title="สั่งการด้วยเสียงของพี่วิน (หุ่นยนต์ WIN Buddy AI)"
         >
-          <div className="relative">
-            <Bot className="w-6 h-6 text-slate-950 animate-bounce" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#070D1E] animate-ping" />
+          {/* Subtle Audio/Voice Wave Ripples radiating from button when listening */}
+          {isBuddyModalOpen && (
+            <div className="absolute inset-0 rounded-2xl pointer-events-none overflow-visible">
+              <span className="absolute -inset-1 rounded-2xl border-2 border-amber-300/60 animate-voice-ripple-1 pointer-events-none" />
+              <span className="absolute -inset-2 rounded-2xl border border-amber-400/40 animate-voice-ripple-2 pointer-events-none" />
+              <span className="absolute -inset-3 rounded-2xl border border-amber-400/20 animate-voice-ripple-3 pointer-events-none" />
+            </div>
+          )}
+
+          <div className="relative flex items-center justify-center">
+            {/* Concentric voice wave ripples around the robot icon */}
+            {isBuddyModalOpen && (
+              <>
+                <span className="absolute -inset-2 rounded-full border border-amber-950/40 animate-voice-ripple-1 pointer-events-none" />
+                <span className="absolute -inset-3.5 rounded-full border border-amber-950/20 animate-voice-ripple-2 pointer-events-none" />
+              </>
+            )}
+
+            {/* Robot Icon: subtle speaking animation when WinBuddy modal is open */}
+            <Bot
+              className={`w-6 h-6 text-slate-950 transition-all ${
+                isBuddyModalOpen
+                  ? 'animate-speaking-robot drop-shadow-[0_0_6px_rgba(0,0,0,0.35)]'
+                  : 'animate-bounce'
+              }`}
+            />
+
+            {/* Voice Feedback: Animated Speech Waves / Equalizer under the robot when listening */}
+            {isBuddyModalOpen ? (
+              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 flex items-center justify-center gap-0.5 bg-slate-950/90 px-1 py-0.5 rounded-full border border-amber-300/60 shadow-sm pointer-events-none">
+                <span className="w-0.5 h-2 bg-amber-400 rounded-full animate-[pulse_0.6s_ease-in-out_infinite]" />
+                <span className="w-0.5 h-3 bg-amber-300 rounded-full animate-[pulse_0.4s_ease-in-out_infinite_0.15s]" />
+                <span className="w-0.5 h-3.5 bg-white rounded-full animate-[pulse_0.5s_ease-in-out_infinite_0.3s]" />
+                <span className="w-0.5 h-2 bg-amber-400 rounded-full animate-[pulse_0.45s_ease-in-out_infinite_0.1s]" />
+              </div>
+            ) : (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#070D1E] animate-ping" />
+            )}
           </div>
-          <span className="hidden sm:inline text-xs text-slate-950 font-black tracking-wider">
-            หุ่นยนต์พี่วิน AI
-          </span>
+
+          <div className="hidden sm:flex flex-col text-left">
+            <span className="text-xs text-slate-950 font-black tracking-wider leading-none flex items-center gap-1">
+              หุ่นยนต์พี่วิน AI
+              {isBuddyModalOpen && (
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-700 animate-ping" />
+              )}
+            </span>
+            {isBuddyModalOpen && (
+              <span className="text-[9px] text-slate-950 font-bold tracking-tight mt-0.5">
+                กำลังฟัง/โต้ตอบ...
+              </span>
+            )}
+          </div>
         </button>
       </div>
 

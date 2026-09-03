@@ -13,7 +13,7 @@ import {
   Volume2, 
   VolumeX, 
   Fingerprint,
-  Mic,
+  AudioWaveform,
   User,
   Sparkles,
   Smartphone,
@@ -184,7 +184,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="relative p-2 rounded-xl bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-[#00D2FF] border border-[#00D2FF]/40 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,210,255,0.3)] active:scale-95 flex items-center justify-center group"
               title="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป (Customer Voice AI)"
             >
-              <Mic className="w-4 h-4 animate-pulse text-[#00D2FF] group-hover:scale-110 transition-transform" />
+              <AudioWaveform className="w-4 h-4 animate-pulse text-[#00D2FF] group-hover:scale-110 transition-transform" />
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00D2FF]" />
             </button>
 
