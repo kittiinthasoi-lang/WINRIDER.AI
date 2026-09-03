@@ -71,23 +71,148 @@ import {
   Mic,
   Package,
   UserCheck,
+  User,
   QrCode
 } from 'lucide-react';
 
+// 8 Core Services Color Palette Themes for Neon Contrast on Deep Navy
+export interface ServiceThemeInfo {
+  id: string;
+  name: string;
+  colorTitle: string; // e.g. 'Knight-Silver'
+  colorName: string;  // e.g. 'Silver'
+  hex: string;        // e.g. '#E2E8F0'
+  glowRgba: string;   // e.g. 'rgba(226, 232, 240, 0.7)'
+  darkRgba: string;   // e.g. 'rgba(226, 232, 240, 0.15)'
+  accentTextClass: string;
+  accentBorderClass: string;
+  accentBgClass: string;
+}
+
+export const SERVICE_THEMES: Record<string, ServiceThemeInfo> = {
+  knight: {
+    id: 'knight',
+    name: 'WIN KNIGHT',
+    colorTitle: 'Knight-NeonBlue',
+    colorName: 'Neon Blue',
+    hex: '#00D2FF',
+    glowRgba: 'rgba(0, 210, 255, 0.8)',
+    darkRgba: 'rgba(0, 210, 255, 0.18)',
+    accentTextClass: 'text-cyan-400',
+    accentBorderClass: 'border-[#00D2FF]',
+    accentBgClass: 'bg-[#00D2FF] text-slate-950',
+  },
+  express: {
+    id: 'express',
+    name: 'WIN Express',
+    colorTitle: 'Express-Orange',
+    colorName: 'Orange',
+    hex: '#FF6B00',
+    glowRgba: 'rgba(255, 107, 0, 0.8)',
+    darkRgba: 'rgba(255, 107, 0, 0.18)',
+    accentTextClass: 'text-orange-400',
+    accentBorderClass: 'border-[#FF6B00]',
+    accentBgClass: 'bg-[#FF6B00] text-slate-950',
+  },
+  pet: {
+    id: 'pet',
+    name: 'WIN-Pet Care',
+    colorTitle: 'Pet-Green',
+    colorName: 'Green',
+    hex: '#10B981',
+    glowRgba: 'rgba(16, 185, 129, 0.8)',
+    darkRgba: 'rgba(16, 185, 129, 0.18)',
+    accentTextClass: 'text-emerald-400',
+    accentBorderClass: 'border-[#10B981]',
+    accentBgClass: 'bg-[#10B981] text-slate-950',
+  },
+  mu: {
+    id: 'mu',
+    name: 'WIN MU BUDDY',
+    colorTitle: 'MU-Purple',
+    colorName: 'Purple',
+    hex: '#A855F7',
+    glowRgba: 'rgba(168, 85, 247, 0.8)',
+    darkRgba: 'rgba(168, 85, 247, 0.18)',
+    accentTextClass: 'text-purple-400',
+    accentBorderClass: 'border-[#A855F7]',
+    accentBgClass: 'bg-[#A855F7] text-slate-950',
+  },
+  lifestyle: {
+    id: 'lifestyle',
+    name: 'WIN Lifestyle',
+    colorTitle: 'Lifestyle-Pink',
+    colorName: 'Pink',
+    hex: '#EC4899',
+    glowRgba: 'rgba(236, 72, 153, 0.8)',
+    darkRgba: 'rgba(236, 72, 153, 0.18)',
+    accentTextClass: 'text-pink-400',
+    accentBorderClass: 'border-[#EC4899]',
+    accentBgClass: 'bg-[#EC4899] text-slate-950',
+  },
+  spirit: {
+    id: 'spirit',
+    name: 'WIN Spirit',
+    colorTitle: 'Spirit-Yellow',
+    colorName: 'Yellow',
+    hex: '#FACC15',
+    glowRgba: 'rgba(250, 204, 21, 0.8)',
+    darkRgba: 'rgba(250, 204, 21, 0.18)',
+    accentTextClass: 'text-yellow-400',
+    accentBorderClass: 'border-[#FACC15]',
+    accentBgClass: 'bg-[#FACC15] text-slate-950',
+  },
+  family: {
+    id: 'family',
+    name: 'WIN Family',
+    colorTitle: 'Family-SkyBlue',
+    colorName: 'SkyBlue',
+    hex: '#38BDF8',
+    glowRgba: 'rgba(56, 189, 248, 0.8)',
+    darkRgba: 'rgba(56, 189, 248, 0.18)',
+    accentTextClass: 'text-sky-400',
+    accentBorderClass: 'border-[#38BDF8]',
+    accentBgClass: 'bg-[#38BDF8] text-slate-950',
+  },
+  link: {
+    id: 'link',
+    name: 'WIN Link',
+    colorTitle: 'Link-Lime',
+    colorName: 'Lime',
+    hex: '#84CC16',
+    glowRgba: 'rgba(132, 204, 22, 0.8)',
+    darkRgba: 'rgba(132, 204, 22, 0.18)',
+    accentTextClass: 'text-lime-400',
+    accentBorderClass: 'border-[#84CC16]',
+    accentBgClass: 'bg-[#84CC16] text-slate-950',
+  }
+};
+
 interface PassengerAppViewProps {
   audioEnabled: boolean;
+  onOpenCustomerVoice?: () => void;
   onOpenWinBuddy?: () => void;
   onNavigateToMarket?: () => void;
   onAddNewCustomerItem?: (item: any) => void;
+  activeTab?: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile';
+  onTabChange?: (tab: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile') => void;
 }
 
 export const PassengerAppView: React.FC<PassengerAppViewProps> = ({ 
   audioEnabled, 
+  onOpenCustomerVoice,
   onOpenWinBuddy,
   onNavigateToMarket,
-  onAddNewCustomerItem
+  onAddNewCustomerItem,
+  activeTab: propActiveTab,
+  onTabChange
 }) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile'>('home');
+  const [internalActiveTab, setInternalActiveTab] = useState<'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile'>('home');
+  const activeTab = propActiveTab !== undefined ? propActiveTab : internalActiveTab;
+  const setActiveTab = (tab: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile') => {
+    setInternalActiveTab(tab);
+    if (onTabChange) onTabChange(tab);
+  };
   const [selectedPetHospital, setSelectedPetHospital] = useState<PetHospitalClinic | null>(null);
   const [selectedPetType, setSelectedPetType] = useState<'dog' | 'cat' | 'exotic'>('dog');
   const [selectedDreamRide, setSelectedDreamRide] = useState<DreamRideVehicle>(DREAM_RIDES_FLEET[0]);
@@ -273,147 +398,185 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [passengerAiVerified, setPassengerAiVerified] = useState<AIVerificationResult | null>(null);
   const [earnings, setEarnings] = useState(12750);
 
-  // New Comprehensive Services Array based on User Specifications with clear Action vs Info separation
+  // 8 Pillars Core Services Array with Neon Contrast Color IDs & Outer Glowing Icons
   const services = [
     {
       id: 'knight',
       name: 'WIN KNIGHT',
       nameEn: 'WIN KNIGHT (อัศวินขับขี่)',
+      colorTitle: 'Knight-NeonBlue',
+      colorName: 'Neon Blue',
+      colorHex: '#00D2FF',
+      colorGlow: 'rgba(0, 210, 255, 0.8)',
       desc: 'อัศวินประจำตัวพร้อมพาหนะที่คุณเลือก ทั่วกรุงเทพฯ เริ่มต้น 15฿ ปลอดภัย 100%',
-      icon: <Shield className="w-6 h-6 text-[#00D2FF]" />,
+      icon: <Shield className="w-6 h-6 text-[#00D2FF] drop-shadow-[0_0_10px_rgba(0,210,255,0.95)]" />,
       badge: 'เริ่ม 15฿',
-      bgGlow: 'from-[#00D2FF]/20 to-transparent',
+      bgGlow: 'from-[#00D2FF]/25 to-transparent',
       eta: '2-3 นาที',
       priceEstimate: '฿15 - ฿85',
       iconEmoji: '🛡️ 🏍️',
       actionText: '⚡ กดเรียกอัศวินทันที',
-      actionGradient: 'from-cyan-400 via-blue-500 to-indigo-600',
-      actionTextGlow: 'shadow-[0_0_12px_rgba(0,210,255,0.4)]',
+      actionGradient: 'from-[#00D2FF] to-blue-600',
+      actionTextGlow: 'shadow-[0_0_14px_rgba(0,210,255,0.6)]',
       infoData: 'ℹ️ ข้อมูล: มาตรฐานความปลอดภัย 100% • เริ่ม 15฿'
     },
     {
       id: 'express',
       name: 'WIN Express',
       nameEn: 'WIN Express (พัสดุ/เอกสาร/อาหาร)',
+      colorTitle: 'Express-Orange',
+      colorName: 'Orange',
+      colorHex: '#FF6B00',
+      colorGlow: 'rgba(255, 107, 0, 0.8)',
       desc: 'ส่งด่วนใน 30 นาที ปรับลดค่ากล่องเหลือ 5฿ เพื่อประชาชน พี่วินเลเวล 10+ พร้อมกล่องควบคุมอุณหภูมิและกันกระแทก',
-      icon: <Zap className="w-6 h-6 text-emerald-400" />,
+      icon: <Zap className="w-6 h-6 text-orange-400 drop-shadow-[0_0_10px_rgba(255,107,0,0.95)]" />,
       badge: '+5฿ ค่ากล่อง (LV.10+)',
-      bgGlow: 'from-emerald-400/20 to-transparent',
+      bgGlow: 'from-orange-500/25 to-transparent',
       eta: '1-3 นาที',
       priceEstimate: '฿20 - ฿75',
       iconEmoji: '📦 ⚡',
       actionText: '📦 กดส่งพัสดุด่วน 30น.',
-      actionGradient: 'from-emerald-400 to-teal-600',
-      actionTextGlow: 'shadow-[0_0_12px_rgba(16,185,129,0.4)]',
+      actionGradient: 'from-[#FF6B00] to-amber-500',
+      actionTextGlow: 'shadow-[0_0_14px_rgba(255,107,0,0.6)]',
       infoData: 'ℹ️ ข้อมูล: พี่วิน LV.10+ • ค่ากล่องคุมอุณหภูมิ 5฿'
+    },
+    {
+      id: 'pet',
+      name: 'WIN-Pet Care',
+      nameEn: 'WIN-Pet Care (รพ.สัตว์ & คลินิก 24 ชม.)',
+      colorTitle: 'Pet-Green',
+      colorName: 'Green',
+      colorHex: '#10B981',
+      colorGlow: 'rgba(16, 185, 129, 0.8)',
+      desc: 'เบาะนิรภัยสำหรับสัตว์เลี้ยง ส่งตรงโรงพยาบาลสัตว์และคลินิกฉุกเฉิน 24 ชม. ตลอดวัน',
+      icon: <Dog className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.95)]" />,
+      badge: '24H VET CARE',
+      bgGlow: 'from-emerald-400/25 to-transparent',
+      eta: '4-7 นาที',
+      priceEstimate: '฿35 - ฿120',
+      iconEmoji: '🐾 🐶',
+      actionText: '🐾 กดเข้าศูนย์ รพ.สัตว์ 24 ชม.',
+      actionGradient: 'from-emerald-400 to-teal-500',
+      actionTextGlow: 'shadow-[0_0_14px_rgba(16,185,129,0.6)]',
+      infoData: 'ℹ️ ข้อมูล: เบาะนิรภัยสัตว์เลี้ยง • ส่ง รพ.สัตว์ 24 ชม.'
     },
     {
       id: 'mu',
       name: 'WIN MU BUDDY',
       nameEn: 'WIN MU BUDDY (เพื่อนร่วมทริปสายมู)',
-      desc: 'ระบบแนะนำและจับคู่พี่วินผู้หญิงที่เหมาะสม เลเวล 15+ พร้อมเส้นทางสายมูและบทสวด (ถ้าลูกค้าเป็นผู้ชายระบบจะแนะนำพี่วินผู้ชายให้ หรือเลือกเองพร้อมระบบขอความสมัครใจและคุยรายละเอียดก่อนเริ่มงาน)',
-      icon: <Sparkles className="w-6 h-6 text-[#FFD700]" />,
-      badge: 'พี่วินผู้หญิง LV.15+ (ชายจับคู่ชาย)',
-      bgGlow: 'from-[#FFD700]/20 to-transparent',
+      colorTitle: 'MU-Purple',
+      colorName: 'Purple',
+      colorHex: '#A855F7',
+      colorGlow: 'rgba(168, 85, 247, 0.8)',
+      desc: 'ระบบแนะนำและจับคู่พี่วินผู้หญิงที่เหมาะสม เลเวล 15+ พร้อมเส้นทางสายมูและบทสวด (ชายจับคู่ชาย หรือเลือกเองพร้อมระบบขอความสมัครใจ)',
+      icon: <Sparkles className="w-6 h-6 text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.95)]" />,
+      badge: 'พี่วินหญิง LV.15+ (ชายคู่ชาย)',
+      bgGlow: 'from-purple-500/25 to-transparent',
       eta: '4-8 นาที',
       priceEstimate: '฿45 - ฿180',
       iconEmoji: '⛩️ 🪔',
       actionText: '⛩️ กดจับคู่ทริปสายมู',
-      actionGradient: 'from-amber-400 to-yellow-500',
-      actionTextGlow: 'shadow-[0_0_12px_rgba(255,215,0,0.4)]',
+      actionGradient: 'from-purple-400 to-fuchsia-600',
+      actionTextGlow: 'shadow-[0_0_14px_rgba(168,85,247,0.6)]',
       infoData: 'ℹ️ ข้อมูล: คัดกรองพี่วินหญิง LV.15+ (ชายคู่ชาย) • พร้อมบทสวด'
     },
     {
       id: 'lifestyle',
       name: 'WIN Lifestyle',
       nameEn: 'WIN Lifestyle (กิน ดื่ม เที่ยว คาเฟ่)',
-      desc: 'แนะนำร้านอาหารเด็ด คาเฟ่ ผับบาร์ ร้านนั่งชิว คาเฟ่หมาแมว และจุดเช็คอินยอดนิยม',
-      icon: <Coffee className="w-6 h-6 text-purple-400" />,
+      colorTitle: 'Lifestyle-Pink',
+      colorName: 'Pink',
+      colorHex: '#EC4899',
+      colorGlow: 'rgba(236, 72, 153, 0.8)',
+      desc: 'แนะนำร้านอาหารเด็ด คาเฟ่ ผับบาร์ ร้านนั่งชิว คาเฟ่หมาแมว และจุดเช็คอินยอดนิยม พร้อมบริการถ่ายรูป',
+      icon: <Coffee className="w-6 h-6 text-pink-400 drop-shadow-[0_0_10px_rgba(236,72,153,0.95)]" />,
       badge: 'CAFE & BAR GUIDE',
-      bgGlow: 'from-purple-400/20 to-transparent',
+      bgGlow: 'from-pink-500/25 to-transparent',
       eta: '2-4 นาที',
       priceEstimate: '฿25 - ฿120',
       iconEmoji: '☕ ⭐',
       actionText: '☕ กดสำรวจร้าน & เรียกรถ',
-      actionGradient: 'from-purple-400 to-pink-600',
-      actionTextGlow: 'shadow-[0_0_12px_rgba(192,132,252,0.4)]',
+      actionGradient: 'from-pink-400 to-rose-600',
+      actionTextGlow: 'shadow-[0_0_14px_rgba(236,72,153,0.6)]',
       infoData: 'ℹ️ ข้อมูล: รวมพิกัดสตรีทฟู้ด คาเฟ่ และร้านนั่งชิว'
     },
     {
       id: 'spirit',
       name: 'WIN Spirit',
       nameEn: 'WIN Spirit (ดูแลผู้สูงอายุ & พาทำศาสนกิจทุกศาสนา)',
-      desc: 'คัดกรองพี่วินเลเวล 20+ ที่ผ่านการอบรมดูแลผู้สูงอายุโดยเฉพาะ พร้อมบริการพาผู้สูงอายุไปทำศาสนกิจทุกศาสนา เช่น พาคุณตาไปละหมาดที่มัสยิด, พาคุณยายไปทำบุญตักบาตร, พาไปโบสถ์คริสต์ หรือศาลเจ้า พร้อมดูแลรอรับกลับ',
-      icon: <Heart className="w-6 h-6 text-rose-400" />,
+      colorTitle: 'Spirit-Yellow',
+      colorName: 'Yellow',
+      colorHex: '#FACC15',
+      colorGlow: 'rgba(250, 204, 21, 0.8)',
+      desc: 'คัดกรองพี่วินเลเวล 20+ อบรมดูแลผู้สูงอายุ พาไปทำศาสนกิจทุกศาสนา (มัสยิด, วัด, โบสถ์, ศาลเจ้า) พร้อมรอรับกลับ',
+      icon: <Heart className="w-6 h-6 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.95)]" />,
       badge: 'อบรมพิเศษ LV.20+ (ทุกศาสนา)',
-      bgGlow: 'from-rose-400/20 to-transparent',
+      bgGlow: 'from-yellow-400/25 to-transparent',
       eta: '3-5 นาที',
       priceEstimate: '฿35 - ฿110',
       iconEmoji: '👵 🤲',
       actionText: '👵 กดจองดูแลผู้สูงอายุ',
-      actionGradient: 'from-rose-400 to-red-600',
-      actionTextGlow: 'shadow-[0_0_12px_rgba(244,63,94,0.4)]',
+      actionGradient: 'from-yellow-400 to-amber-500',
+      actionTextGlow: 'shadow-[0_0_14px_rgba(250,204,21,0.6)]',
       infoData: 'ℹ️ ข้อมูล: อบรมดูแลผู้สูงอายุ LV.20+ • ดูแลรอรับกลับ'
     },
     {
       id: 'family',
       name: 'WIN Family',
       nameEn: 'WIN Family (รับส่งเด็ก & ครอบครัว)',
+      colorTitle: 'Family-SkyBlue',
+      colorName: 'SkyBlue',
+      colorHex: '#38BDF8',
+      colorGlow: 'rgba(56, 189, 248, 0.8)',
       desc: 'พี่วินเลเวล 15+ ผ่านการอบรมดูแลเด็ก รับส่งไปโรงเรียน หมวกกันน็อกเด็ก พร้อมติดตาม GPS สด',
-      icon: <Users className="w-6 h-6 text-blue-400" />,
+      icon: <Users className="w-6 h-6 text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.95)]" />,
       badge: 'อบรมดูแลเด็ก LV.15+',
-      bgGlow: 'from-blue-400/20 to-transparent',
+      bgGlow: 'from-sky-400/25 to-transparent',
       eta: '3-5 นาที',
       priceEstimate: '฿30 - ฿95',
       iconEmoji: '👨‍👩‍👧 🤝',
       actionText: '👨‍👩‍👧 กดจองรับส่งเด็ก/ครอบครัว',
-      actionGradient: 'from-blue-400 to-indigo-600',
-      actionTextGlow: 'shadow-[0_0_12px_rgba(96,165,250,0.4)]',
+      actionGradient: 'from-sky-400 to-blue-600',
+      actionTextGlow: 'shadow-[0_0_14px_rgba(56,189,248,0.6)]',
       infoData: 'ℹ️ ข้อมูล: หมวกกันน็อกเด็ก • GPS สด • อบรม LV.15+'
     },
     {
       id: 'link',
       name: 'WIN Link',
-      nameEn: 'WIN Link (เชื่อมต่อ BTS/MRT/รถไฟ/รถเมล์/เรือ/รถทัวร์)',
-      desc: 'เชื่อมต่อสถานีรถไฟฟ้าทั้งหมด (BTS/MRT ทุกสาย), สถานีรถไฟ, ป้ายรถเมล์, รถทัวร์, ท่าเรือ และส่งด่วนระยะสั้น-กลาง',
-      icon: <Share2 className="w-6 h-6 text-cyan-300" />,
-      badge: 'BTS/MRT/รถไฟ/รถเมล์/เรือ/รถทัวร์',
-      bgGlow: 'from-cyan-300/20 to-transparent',
+      nameEn: 'WIN Link (จองตั๋วคอนเสิร์ต/กีฬา & เชื่อมต่อ BTS/MRT/รถไฟ)',
+      colorTitle: 'Link-Lime',
+      colorName: 'Lime',
+      colorHex: '#84CC16',
+      colorGlow: 'rgba(132, 204, 22, 0.8)',
+      desc: 'พี่วินช่วยจองตั๋วคอนเสิร์ต กีฬา อีเวนต์ ต่อคิวรับบัตรจริง & เชื่อมต่อสถานีรถไฟฟ้า BTS/MRT ทุกสาย รถไฟ รถเมล์ เรือ ทั่วกรุงเทพฯ',
+      icon: <Share2 className="w-6 h-6 text-lime-400 drop-shadow-[0_0_10px_rgba(132,204,22,0.95)]" />,
+      badge: 'จองตั๋วคอนเสิร์ต/กีฬา & BTS/MRT',
+      bgGlow: 'from-lime-400/25 to-transparent',
       eta: '2-3 นาที',
       priceEstimate: '฿15 - ฿65',
-      iconEmoji: '🚝 🚇',
-      actionText: '🚝 กดจองต่อรถไฟฟ้า/เรือ/รถไฟ',
-      actionGradient: 'from-cyan-400 to-teal-500',
-      actionTextGlow: 'shadow-[0_0_12px_rgba(6,182,212,0.4)]',
-      infoData: 'ℹ️ ข้อมูล: ซิงค์รอบเวลา BTS/MRT/รถเมล์/เรือ/รถไฟ'
-    },
-    {
-      id: 'pet',
-      name: 'WIN-Pet Care',
-      nameEn: 'WIN-Pet Care (รพ.สัตว์ & คลินิก 24 ชม.)',
-      desc: 'เบาะนิรภัยสำหรับสัตว์เลี้ยง ส่งตรงโรงพยาบาลสัตว์และคลินิกฉุกเฉิน 24 ชม. ตลอดวัน',
-      icon: <Dog className="w-6 h-6 text-amber-400" />,
-      badge: '24H VET CARE',
-      bgGlow: 'from-amber-400/20 to-transparent',
-      eta: '4-7 นาที',
-      priceEstimate: '฿35 - ฿120',
-      iconEmoji: '🐾 🐶',
-      actionText: '🐾 กดเข้าศูนย์ รพ.สัตว์ 24 ชม.',
-      actionGradient: 'from-amber-400 via-orange-500 to-yellow-500',
-      actionTextGlow: 'shadow-[0_0_12px_rgba(251,191,36,0.4)]',
-      infoData: 'ℹ️ ข้อมูล: เบาะนิรภัยสัตว์เลี้ยง • ส่ง รพ.สัตว์ 24 ชม.'
-    },
+      iconEmoji: '🎫 🚝',
+      actionText: '🎫 จองตั๋วคอนเสิร์ต/กีฬา & รถไฟฟ้า',
+      actionGradient: 'from-lime-400 to-emerald-500',
+      actionTextGlow: 'shadow-[0_0_14px_rgba(132,204,22,0.6)]',
+      infoData: 'ℹ️ ข้อมูล: ช่วยจองตั๋ว/กดบัตร/ต่อคิว • ซิงค์รอบเวลา BTS/MRT'
+    }
   ];
 
+  // Dynamic Theme state based on selected service's Color ID (Neon Contrast on Deep Navy)
+  const currentTheme = useMemo(() => {
+    return SERVICE_THEMES[activeServiceId] || SERVICE_THEMES['knight'];
+  }, [activeServiceId]);
+
   const destinations = [
+    { title: 'อิมแพ็ค อารีน่า เมืองทองธานี (IMPACT Arena)', sub: 'เมืองทองธานี • 14.5 กม.', icon: '🎤', tag: 'WIN Link คอนเสิร์ต' },
+    { title: 'ราชมังคลากีฬาสถาน (Rajamangala Stadium)', sub: 'หัวหมาก • 8.9 กม.', icon: '⚽', tag: 'WIN Link ฟุตบอล/คอนเสิร์ต' },
+    { title: 'UOB Live Bangkok (EMSUSPHERE)', sub: 'พร้อมพงษ์ • 3.2 กม.', icon: '🎵', tag: 'WIN Link ฮอลล์คอนเสิร์ต' },
+    { title: 'สนามมวยเวทีลุมพินี (ONE Lumpinee)', sub: 'รามอินทรา • 12.0 กม.', icon: '🥊', tag: 'WIN Link ศึกมวยสด' },
     { title: 'BTS สยาม / สยามพารากอน (Interchange)', sub: 'ปทุมวัน • 1.8 กม.', icon: '🚝', tag: 'WIN Link BTS' },
     { title: 'สถานีกลางกรุงเทพอภิวัฒน์ / รถไฟ SRT', sub: 'จตุจักร • 6.2 กม.', icon: '🚆', tag: 'WIN Link Train' },
     { title: 'ท่าเรือสาทร (Central Pier) / BTS ตากสิน', sub: 'สาทรใต้ • 1.9 กม.', icon: '🚢', tag: 'WIN Link Pier' },
-    { title: 'ป้ายรถเมล์อนุสาวรีย์ชัยสมรภูมิ (เกาะพญาไท)', sub: 'ราชวิถี • 3.4 กม.', icon: '🚌', tag: 'WIN Link Bus' },
+    { title: 'ศูนย์การประชุมแห่งชาติสิริกิติ์ (QSNCC)', sub: 'รัชดา-คลองเตย • 2.1 กม.', icon: '📚', tag: 'WIN Link แฟนมีต/งานหนังสือ' },
     { title: 'ร้านกาแฟ ซัมเมอร์เรน คาเฟ่ (Summer Rain Cafe)', sub: 'สุขุมวิท 39 • 2.4 กม.', icon: '☕', tag: 'Cafe & Chill' },
-    { title: 'ร้านตามสั่งป้าสมร (Street Legend)', sub: 'ตลาดพลู • 1.1 กม.', icon: '🍲', tag: 'Michelin Local' },
-    { title: 'หอพักนักศึกษาจุฬาฯ U-Center', sub: 'สามย่าน • 1.8 กม.', icon: '🏢', tag: 'WIN Link ส่งข้าว' },
-    { title: 'วัดกัลยาณมิตร วรมหาวิหาร (หลวงพ่อโต)', sub: 'ริมแม่น้ำเจ้าพระยา • 3.5 กม.', icon: '⛩️', tag: 'Mu-Te-Lu' },
     { title: 'โรงพยาบาลสัตว์ทองหล่อ 24 ชม.', sub: 'พระราม 9 • 3.2 กม.', icon: '🏥', tag: '24H Pet Vet' },
   ];
 
@@ -443,12 +606,16 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       return;
     }
 
-    // Specialized services pre-matching modal intercept
-    if (['express', 'mu', 'lifestyle', 'spirit', 'family'].includes(svc.id)) {
+    // Specialized services pre-matching modal intercept (Express, Mu, Lifestyle, Spirit, Family, Link)
+    if (['express', 'mu', 'lifestyle', 'spirit', 'family', 'link'].includes(svc.id)) {
       setPreMatchingServiceId(svc.id);
       setShowPreMatchingModal(true);
       if (audioEnabled) {
-        speakThaiText(`กรุณากรอกข้อมูลเฉพาะสำหรับบริการ ${svc.name} ก่อนเริ่มค้นหาอัศวิน`);
+        if (svc.id === 'link') {
+          speakThaiText("ยินดีต้อนรับสู่ WIN Link บริการช่วยจองตั๋วคอนเสิร์ต แข่งกีฬา และต่อรถไฟฟ้า");
+        } else {
+          speakThaiText(`กรุณากรอกข้อมูลเฉพาะสำหรับบริการ ${svc.name} ก่อนเริ่มค้นหาอัศวิน`);
+        }
       }
       return;
     }
@@ -615,8 +782,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         </div>
       )}
 
-      {/* Floating Mode Toggle Bar */}
-      <div className="flex items-center justify-between p-3 rounded-2xl bg-[#0B1528] border border-cyan-500/30 text-xs">
+      {/* Desktop Mode Toggle Bar (hidden on mobile for native app feel) */}
+      <div className="hidden sm:flex items-center justify-between p-3 rounded-2xl bg-[#0B1528] border border-cyan-500/30 text-xs">
         <div className="flex items-center gap-2">
           <span className="text-[#00D2FF] font-mono font-bold">📱 โหมดหน้าจอ:</span>
           <button
@@ -650,37 +817,85 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         </div>
       </div>
 
-      {/* Outer Mockup Wrapper */}
-      <div className={`mx-auto transition-all ${deviceFrameMode ? 'max-w-md' : 'max-w-4xl'}`}>
-        <div className="relative rounded-[40px] bg-gradient-to-b from-[#0B1528] via-[#070D1E] to-[#040813] border-4 border-slate-700/60 p-4 shadow-[0_0_50px_rgba(0,210,255,0.2)]">
+      {/* Outer Mobile App Container */}
+      <div className={`mx-auto transition-all ${deviceFrameMode ? 'w-full sm:max-w-md' : 'w-full max-w-4xl'}`}>
+        <div 
+          className={`relative bg-gradient-to-b from-[#071126] via-[#050C1B] to-[#030710] transition-all duration-300 ${
+            deviceFrameMode 
+              ? 'rounded-2xl sm:rounded-[40px] border border-cyan-500/30 sm:border-4 sm:border-slate-700/60 p-2.5 sm:p-4' 
+              : 'rounded-2xl sm:rounded-3xl border border-white/10 p-2.5 sm:p-6'
+          }`}
+          style={{ boxShadow: `0 0 50px ${currentTheme.glowRgba}` }}
+        >
           
-          {/* Phone Speaker Notch in frame mode */}
+          {/* Phone Speaker Notch in frame mode (only on desktop preview) */}
           {deviceFrameMode && (
-            <div className="w-36 h-4 bg-slate-900 mx-auto rounded-full mb-3 flex items-center justify-center gap-2">
+            <div className="hidden sm:flex w-36 h-4 bg-slate-900 mx-auto rounded-full mb-3 items-center justify-center gap-2">
               <div className="w-10 h-1 bg-slate-700 rounded-full" />
               <div className="w-2.5 h-2.5 rounded-full bg-slate-800 border border-slate-700" />
             </div>
           )}
 
-          {/* Internal App Header */}
+          {/* Internal App Header with Dynamic Accent Glow */}
           <div className="flex items-center justify-between pb-3 border-b border-white/10 px-2">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#00D2FF] to-blue-600 flex items-center justify-center shadow-[0_0_10px_rgba(0,210,255,0.5)]">
+              <div 
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300"
+                style={{ 
+                  backgroundColor: currentTheme.hex, 
+                  boxShadow: `0 0 15px ${currentTheme.glowRgba}` 
+                }}
+              >
                 <span className="text-sm font-black text-slate-950">W</span>
               </div>
               <div>
-                <span className="text-xs font-black tracking-wider text-white">WINRIDER<span className="text-[#00D2FF]">.AI</span></span>
-                <span className="block text-[9px] text-cyan-400 font-mono">ระบบเรียกรถ & รถในฝัน</span>
+                <span className="text-xs font-black tracking-wider text-white">
+                  WINRIDER<span style={{ color: currentTheme.hex }}>.AI</span>
+                </span>
+                <span className="block text-[9px] font-mono text-slate-300">
+                  ระบบเรียกรถ & รถในฝัน
+                </span>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Active Color ID Indicator Badge */}
+              <div 
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-mono font-bold transition-all duration-300 shadow-sm"
+                style={{ 
+                  borderColor: currentTheme.hex, 
+                  backgroundColor: currentTheme.darkRgba, 
+                  color: currentTheme.hex,
+                  boxShadow: `0 0 12px ${currentTheme.glowRgba}`
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ backgroundColor: currentTheme.hex }} />
+                <span>{currentTheme.colorTitle}</span>
+              </div>
+
+              {/* Voice Command Button: Customer Voice Command */}
               <button 
+                id="passenger-voice-command-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(1200);
+                  if (onOpenCustomerVoice) onOpenCustomerVoice();
+                }}
+                className="relative p-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-[#00D2FF] border border-[#00D2FF]/40 cursor-pointer active:scale-95 transition-all shadow-[0_0_10px_rgba(0,210,255,0.25)]"
+                title="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป (Customer Voice AI)"
+              >
+                <Mic className="w-4 h-4 animate-pulse text-[#00D2FF]" />
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#00D2FF]" />
+              </button>
+
+              {/* Notification Bell */}
+              <button 
+                id="passenger-notification-bell-btn"
                 onClick={() => {
                   if (audioEnabled) playTactileBlip(1000);
                   alert("🔔 การแจ้งเตือน: อัศวิน กิตติ อินทะสร้อย (Level 100 Sovereign) ประจำสถานีใกล้คุณ, มีโปรโมชั่นคอนเสิร์ตลด 20%");
                 }}
-                className="relative p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
+                className="relative p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer active:scale-95 transition-all"
+                title="การแจ้งเตือน"
               >
                 <Bell className="w-4 h-4 text-cyan-400" />
                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 text-[9px] text-white font-bold flex items-center justify-center">
@@ -688,14 +903,20 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 </span>
               </button>
 
+              {/* Profile Icon */}
               <button 
-                onClick={() => setActiveTab('profile')}
-                className="flex items-center gap-1.5 p-1 rounded-lg bg-[#FFD700]/10 border border-[#FFD700]/30 hover:bg-[#FFD700]/20"
+                id="passenger-profile-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setActiveTab('profile');
+                }}
+                className="relative p-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-[#FFD700] border border-[#FFD700]/30 cursor-pointer active:scale-95 transition-all flex items-center gap-1 shadow-[0_0_10px_rgba(255,215,0,0.15)]"
+                title="โปรไฟล์พลเมือง (Citizen Profile)"
               >
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-500 flex items-center justify-center text-[10px] font-bold text-slate-950 shadow-[0_0_8px_#00D2FF]">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-500 flex items-center justify-center text-[10px] font-bold text-slate-950 shadow-[0_0_4px_#00D2FF]">
                   🦥
                 </div>
-                <span className="text-[11px] font-semibold text-cyan-300 pr-1 hidden xs:inline">สลอต จิตใจ</span>
+                <User className="w-3.5 h-3.5 text-[#FFD700]" />
               </button>
             </div>
           </div>
@@ -706,9 +927,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             {/* 1. HOME TAB */}
             {activeTab === 'home' && (
               <div className="space-y-5">
-                {/* Search Bar */}
+                {/* Search Bar with Dynamic Accent Border & Glow */}
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-[#00D2FF]">
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none" style={{ color: currentTheme.hex }}>
                     <MapPin className="w-4 h-4" />
                   </div>
                   <input
@@ -716,7 +937,11 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="📍 วันนี้ไปไหนดี? (แตะเพื่อปักหมุดปลายทางทริปของคุณ)"
-                    className="w-full pl-9 pr-10 py-3 rounded-2xl bg-[#0F1D38] border border-[#00D2FF]/40 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#00D2FF] focus:ring-2 focus:ring-[#00D2FF]/30 shadow-inner"
+                    style={{ 
+                      borderColor: currentTheme.hex,
+                      boxShadow: `0 0 16px ${currentTheme.darkRgba}`
+                    }}
+                    className="w-full pl-9 pr-10 py-3 rounded-2xl bg-[#061022] border text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all shadow-inner"
                   />
                   <button 
                     onClick={() => {
@@ -726,7 +951,11 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                         setShowBookingModal(true);
                       }
                     }}
-                    className="absolute inset-y-1.5 right-1.5 px-2.5 rounded-xl bg-[#00D2FF] hover:bg-cyan-400 text-slate-950 text-xs font-bold flex items-center gap-1"
+                    style={{ 
+                      backgroundColor: currentTheme.hex, 
+                      boxShadow: `0 0 14px ${currentTheme.glowRgba}` 
+                    }}
+                    className="absolute inset-y-1.5 right-1.5 px-2.5 rounded-xl text-slate-950 text-xs font-black flex items-center gap-1 hover:brightness-110 transition-all active:scale-95"
                   >
                     <Search className="w-3.5 h-3.5" />
                   </button>
@@ -772,102 +1001,193 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     if (audioEnabled) playTactileBlip(950);
                     setShowCustomerRadarModal(true);
                   }}
-                  className="p-3.5 rounded-2xl bg-gradient-to-r from-[#071E3D] via-[#092B54] to-[#051429] border-2 border-[#00D2FF] flex items-center justify-between cursor-pointer hover:border-cyan-300 transition-all shadow-[0_0_20px_rgba(0,210,255,0.3)] group active:scale-98"
+                  style={{ 
+                    borderColor: currentTheme.hex,
+                    boxShadow: `0 0 24px ${currentTheme.glowRgba}`
+                  }}
+                  className="p-3.5 rounded-2xl bg-gradient-to-r from-[#061429] via-[#081C38] to-[#040E1E] border-2 flex items-center justify-between cursor-pointer hover:brightness-110 transition-all group active:scale-98"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center text-slate-950 font-black text-xl shadow-[0_0_12px_#00D2FF] group-hover:scale-110 transition-transform">
+                    <div 
+                      className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-950 font-black text-xl transition-transform group-hover:scale-110"
+                      style={{ 
+                        backgroundColor: currentTheme.hex,
+                        boxShadow: `0 0 16px ${currentTheme.glowRgba}`
+                      }}
+                    >
                       <Radio className="w-6 h-6 animate-pulse" />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 font-bold border border-cyan-400/40">
+                        <span 
+                          className="text-[9px] font-mono px-2 py-0.5 rounded-full font-bold border"
+                          style={{ 
+                            backgroundColor: currentTheme.darkRgba, 
+                            borderColor: currentTheme.hex, 
+                            color: currentTheme.hex 
+                          }}
+                        >
                           HOLOGRAPHIC RADAR (2.5 KM)
                         </span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: currentTheme.hex }} />
                       </div>
                       <h4 className="text-xs font-black text-white leading-tight mt-1">
                         เรดาร์ 3D สแกนพี่วิน, ร้านค้า & พาร์ทเนอร์รอบตัว
                       </h4>
-                      <p className="text-[10px] text-cyan-200 font-mono">
+                      <p className="text-[10px] text-slate-300 font-mono">
                         ตรวจจับแบบเรียลไทม์ 360° รัศมี 2.5 กม. ในพิกัดของคุณ
                       </p>
                     </div>
                   </div>
 
-                  <span className="px-3 py-1.5 rounded-xl bg-cyan-400 text-slate-950 font-black text-xs font-mono shadow-md group-hover:scale-105 transition-transform flex items-center gap-1 flex-shrink-0">
+                  <span 
+                    className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs font-mono shadow-md group-hover:scale-105 transition-transform flex items-center gap-1 flex-shrink-0"
+                    style={{ 
+                      backgroundColor: currentTheme.hex,
+                      boxShadow: `0 0 12px ${currentTheme.glowRgba}`
+                    }}
+                  >
                     <span>เปิดเรดาร์</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
 
-                {/* 8 CORE SERVICES ARCHITECTURE (Compact, Tidy & Neatly Organized with Clear Action vs Info Differentiation) */}
-                <div className="space-y-2">
+                {/* 8 CORE SERVICES ARCHITECTURE (Neon Contrast on Deep Navy with Unique Color IDs & Outer Glow) */}
+                <div className="space-y-2.5">
                   <div className="flex items-center justify-between px-1">
                     <div className="flex items-center gap-1.5">
-                      <Compass className="w-4 h-4 text-cyan-400" />
+                      <Compass className="w-4 h-4" style={{ color: currentTheme.hex }} />
                       <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                        8 บริการหลัก (CORE SERVICES)
+                        8 เสาหลัก WINRIDER (CORE SERVICES)
                       </h3>
                     </div>
                     <div className="flex items-center gap-1.5 text-[9px] font-mono">
-                      <span className="text-cyan-400 font-bold">⚡ กดได้</span>
-                      <span className="text-slate-500">|</span>
-                      <span className="text-slate-400">ℹ️ ข้อมูล</span>
+                      <span className="font-bold px-1.5 py-0.2 rounded" style={{ color: currentTheme.hex, backgroundColor: currentTheme.darkRgba }}>
+                        {currentTheme.colorTitle}
+                      </span>
                     </div>
                   </div>
 
-                  {/* COMPACT & TIDY 2x4 (OR 4x2 ON DESKTOP) GRID */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                  {/* QUICK NEON COLOR ID SWITCHER STRIP (Instant Accent Change Across All 8 Pillars) */}
+                  <div className="p-2 rounded-2xl bg-[#040C1A] border border-white/10 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                    <span className="text-[9px] font-mono text-slate-400 font-bold whitespace-nowrap pl-1">
+                      🎨 COLOR ID:
+                    </span>
                     {services.map((svc) => (
-                      <div
-                        key={svc.id}
-                        id={`service-card-${svc.id}`}
-                        onClick={() => handleBookService(svc)}
-                        className="group relative p-2.5 rounded-xl bg-[#0B1528] border border-white/10 hover:border-[#00D2FF]/80 hover:bg-[#0E1E3A] transition-all cursor-pointer shadow-sm overflow-hidden flex flex-col justify-between active:scale-[0.98]"
+                      <button
+                        key={`chip-${svc.id}`}
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(800);
+                          setActiveServiceId(svc.id);
+                          setSelectedService(svc.name);
+                        }}
+                        style={{
+                          borderColor: svc.colorHex,
+                          backgroundColor: activeServiceId === svc.id ? svc.colorHex : 'rgba(255, 255, 255, 0.05)',
+                          color: activeServiceId === svc.id ? '#050B17' : svc.colorHex,
+                          boxShadow: activeServiceId === svc.id ? `0 0 12px ${svc.colorGlow}` : 'none'
+                        }}
+                        className="px-2 py-1 rounded-xl text-[9px] font-mono font-black border transition-all whitespace-nowrap active:scale-95"
                       >
-                        <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${svc.bgGlow} rounded-full blur-lg pointer-events-none`} />
-
-                        <div>
-                          {/* Top: Icon + Info Badge */}
-                          <div className="flex items-center justify-between gap-1 mb-1.5">
-                            <div className="w-7 h-7 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center group-hover:border-[#00D2FF]/50 transition-colors">
-                              {svc.icon}
-                            </div>
-                            {/* [ข้อมูล/เงื่อนไข] - สไตล์เรียบ สะอาด สบายตา */}
-                            <span 
-                              title={svc.infoData}
-                              className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700/60 truncate max-w-[90px]"
-                            >
-                              ℹ️ {svc.badge}
-                            </span>
-                          </div>
-
-                          {/* Title & Short Details */}
-                          <h4 className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors leading-tight truncate">
-                            {svc.name}
-                          </h4>
-                          <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5 leading-snug">
-                            {svc.desc}
-                          </p>
-                        </div>
-
-                        {/* Bottom: Price/ETA + Compact Action Pill */}
-                        <div className="mt-2 pt-1.5 border-t border-white/5 flex items-center justify-between gap-1">
-                          <div className="text-[9px] font-mono">
-                            <span className="text-emerald-400 font-bold">{svc.priceEstimate.split(' ')[0]}</span>
-                            <span className="text-slate-500 text-[8px] ml-1">({svc.eta})</span>
-                          </div>
-
-                          {/* [ปุ่มกดเข้าได้] - ขนาดกะทัดรัด สีสดชัดเจน */}
-                          <div 
-                            className={`px-2 py-0.5 rounded-lg bg-gradient-to-r ${svc.actionGradient} text-slate-950 font-black text-[9px] font-mono shadow-sm flex items-center gap-0.5 group-hover:brightness-110`}
-                          >
-                            <span>เรียก</span>
-                            <ChevronRight className="w-2.5 h-2.5" />
-                          </div>
-                        </div>
-                      </div>
+                        {svc.colorTitle}
+                      </button>
                     ))}
+                  </div>
+
+                  {/* 8 CORE SERVICES GRID (2x4 on Mobile, 4x2 on Large Screen) with Neon Glow & Glass Buttons */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                    {services.map((svc) => {
+                      const isActive = svc.id === activeServiceId;
+                      return (
+                        <div
+                          key={svc.id}
+                          id={`service-card-${svc.id}`}
+                          onClick={() => handleBookService(svc)}
+                          style={{
+                            borderColor: isActive ? svc.colorHex : `${svc.colorHex}45`,
+                            borderWidth: isActive ? '2px' : '1px',
+                            boxShadow: isActive ? `0 0 24px ${svc.colorGlow}` : `0 0 10px ${svc.colorGlow.replace('0.8', '0.15').replace('0.75', '0.12')}`,
+                            background: isActive 
+                              ? `linear-gradient(135deg, ${svc.colorHex}22 0%, #050E1F 100%)` 
+                              : '#061022'
+                          }}
+                          className="group relative p-3 rounded-2xl transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <div 
+                            className="absolute top-0 right-0 w-20 h-20 rounded-full blur-xl pointer-events-none transition-opacity"
+                            style={{ 
+                              background: `radial-gradient(circle, ${svc.colorHex}30 0%, transparent 70%)`,
+                              opacity: isActive ? 1 : 0.6
+                            }}
+                          />
+
+                          <div>
+                            {/* Top: Outer Glowing Icon + Color ID Badge */}
+                            <div className="flex items-center justify-between gap-1 mb-2">
+                              {/* Glowing Icon Container */}
+                              <div 
+                                className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+                                style={{
+                                  backgroundColor: `${svc.colorHex}1A`,
+                                  borderColor: `${svc.colorHex}90`,
+                                  borderWidth: '1.5px',
+                                  boxShadow: `0 0 16px ${svc.colorGlow}`
+                                }}
+                              >
+                                {svc.icon}
+                              </div>
+
+                              {/* Unique Color ID Pill */}
+                              <span 
+                                className="text-[8px] font-mono font-black px-2 py-0.5 rounded-full truncate max-w-[100px] transition-all"
+                                style={{ 
+                                  backgroundColor: `${svc.colorHex}20`, 
+                                  color: svc.colorHex, 
+                                  border: `1px solid ${svc.colorHex}60` 
+                                }}
+                              >
+                                {svc.colorTitle}
+                              </span>
+                            </div>
+
+                            {/* Service Title & Details */}
+                            <h4 
+                              className="text-xs font-black transition-colors leading-tight truncate text-white"
+                              style={{ color: isActive ? svc.colorHex : '#FFFFFF' }}
+                            >
+                              {svc.name}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+                              {svc.desc}
+                            </p>
+                          </div>
+
+                          {/* Bottom: Price/ETA + Semi-transparent Glass Button with Intense Colored Border */}
+                          <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between gap-1">
+                            <div className="text-[9px] font-mono">
+                              <span className="font-black text-[10px]" style={{ color: svc.colorHex }}>
+                                {svc.priceEstimate.split(' ')[0]}
+                              </span>
+                              <span className="text-slate-400 text-[8px] ml-1">({svc.eta})</span>
+                            </div>
+
+                            {/* Semi-transparent Glass Action Button (กระจกใส + ขอบสีนีออนเข้มข้น) */}
+                            <div 
+                              style={{ 
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                borderColor: svc.colorHex,
+                                borderWidth: '2px',
+                                boxShadow: `0 0 12px ${svc.colorGlow}`
+                              }}
+                              className="px-2.5 py-1 rounded-xl backdrop-blur-md text-white font-black text-[9px] font-mono flex items-center gap-1 transition-all group-hover:brightness-125"
+                            >
+                              <span>{isActive ? '✓ ใช้งาน' : 'เลือก'}</span>
+                              <ChevronRight className="w-2.5 h-2.5" style={{ color: svc.colorHex }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1772,7 +2092,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     </div>
                   </div>
 
-                  <button
+                    <button
                     onClick={handleExpandRideCredit}
                     className="w-full py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 font-bold text-xs font-mono transition-all"
                   >
@@ -1781,39 +2101,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* BOTTOM NAVIGATION BAR (Replaced petCare with dreamRide) */}
-          <div className="grid grid-cols-5 gap-1 p-1 bg-black/80 backdrop-blur-md rounded-2xl border border-white/10 text-center font-mono text-[9px]">
-            {[
-              { id: 'home', label: 'หน้าหลัก', icon: <Compass className="w-4 h-4 mx-auto" /> },
-              { id: 'dreamRide', label: 'รถในฝัน', icon: <Bike className="w-4 h-4 mx-auto text-[#00D2FF]" />, isHot: true },
-              { id: 'ride', label: 'รอพี่วิน (3D)', icon: <Activity className="w-4 h-4 mx-auto" /> },
-              { id: 'shop', label: 'WIN SHOP', icon: <ShoppingBag className="w-4 h-4 mx-auto" /> },
-              { id: 'profile', label: 'โปรไฟล์', icon: <Users className="w-4 h-4 mx-auto" /> }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                id={`passenger-tab-${tab.id}`}
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(800);
-                  setActiveTab(tab.id as any);
-                }}
-                className={`relative py-1.5 rounded-xl transition-all ${
-                  activeTab === tab.id
-                    ? 'text-[#00D2FF] bg-[#00D2FF]/10 font-bold'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {tab.isHot && (
-                  <span className="absolute -top-1 right-1 px-1 py-0.2 rounded-full bg-[#FFD700] text-slate-950 font-black text-[7px] leading-tight">
-                    NEW
-                  </span>
-                )}
-                {tab.icon}
-                <span className="block text-[9px] mt-0.5">{tab.label}</span>
-              </button>
-            ))}
           </div>
         </div>
       </div>

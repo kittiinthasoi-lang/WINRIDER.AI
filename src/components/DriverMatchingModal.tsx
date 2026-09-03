@@ -1032,6 +1032,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
               const filteredStations = BANGKOK_TRANSIT_STATIONS.filter(station => {
                 const matchesCategory = 
                   activeTransitCategory === 'all' ||
+                  (activeTransitCategory === 'concert_event' && (station.category === 'concert_arena' || station.category === 'sports_stadium' || station.category === 'entertainment_event' || station.ticketServiceAvailable)) ||
                   (activeTransitCategory === 'bts' && station.category === 'bts') ||
                   (activeTransitCategory === 'mrt' && station.category === 'mrt') ||
                   (activeTransitCategory === 'train_srt' && (station.category === 'train_srt' || station.category === 'train' || station.category === 'srt_red' || station.category === 'arl')) ||
@@ -1046,7 +1047,8 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                   station.nameEn.toLowerCase().includes(q) ||
                   station.lineName.toLowerCase().includes(q) ||
                   station.highlight.toLowerCase().includes(q) ||
-                  station.popularConnections.some(c => c.toLowerCase().includes(q));
+                  station.popularConnections.some(c => c.toLowerCase().includes(q)) ||
+                  (station.upcomingEvents && station.upcomingEvents.some(ev => ev.title.toLowerCase().includes(q) || ev.tag.toLowerCase().includes(q)));
 
                 return matchesCategory && matchesQuery;
               });
@@ -1055,7 +1057,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                 return (
                   <div className="py-8 text-center bg-black/40 rounded-2xl border border-white/10 space-y-2">
                     <span className="text-3xl">🔍</span>
-                    <p className="text-xs text-slate-300 font-mono">ไม่พบสถานีที่ตรงกับคำค้นหา "{transitSearchQuery}"</p>
+                    <p className="text-xs text-slate-300 font-mono">ไม่พบสถานี/ฮอลล์ที่ตรงกับคำค้นหา "{transitSearchQuery}"</p>
                     <button
                       onClick={() => { setTransitSearchQuery(''); setActiveTransitCategory('all'); }}
                       className="px-3 py-1 rounded-xl bg-white/10 text-[10px] text-cyan-300 hover:bg-white/20 font-mono"
@@ -1071,7 +1073,11 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                   {filteredStations.map((st) => (
                     <div
                       key={st.id}
-                      className="p-3 rounded-2xl bg-black/40 border border-white/10 hover:border-cyan-400/60 transition-all space-y-2"
+                      className={`p-3 rounded-2xl bg-black/40 border transition-all space-y-2 ${
+                        st.ticketServiceAvailable 
+                          ? 'border-cyan-500/40 bg-gradient-to-br from-cyan-950/20 to-black/60 shadow-[0_0_15px_rgba(6,182,212,0.15)]' 
+                          : 'border-white/10 hover:border-cyan-400/60'
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2.5">
@@ -1084,6 +1090,11 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                               <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                                 {st.badge}
                               </span>
+                              {st.ticketServiceAvailable && (
+                                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                                  🎫 จองตั๋ว & ต่อคิวได้
+                                </span>
+                              )}
                             </div>
                             <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
                               {st.lineName}
@@ -1098,6 +1109,30 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                       </div>
 
                       <p className="text-[11px] text-slate-300 leading-tight">{st.highlight}</p>
+
+                      {/* Upcoming Events for Concerts and Sports */}
+                      {st.upcomingEvents && st.upcomingEvents.length > 0 && (
+                        <div className="p-2 rounded-xl bg-[#06182B] border border-cyan-500/30 space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="font-bold text-cyan-300 flex items-center gap-1">
+                              <span>🔥</span> อีเวนต์ & การแข่งขันเร็วๆ นี้ (พี่วินช่วยกดตั๋ว/ต่อคิวได้):
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {st.upcomingEvents.map((ev, eIdx) => (
+                              <div key={eIdx} className="p-1.5 rounded-lg bg-black/40 border border-white/5 flex items-center justify-between gap-1 text-[9px]">
+                                <div className="truncate">
+                                  <span className="font-bold text-white block truncate">{ev.icon} {ev.title}</span>
+                                  <span className="text-slate-400 font-mono text-[8px]">{ev.date} • {ev.tag}</span>
+                                </div>
+                                <span className="text-amber-300 font-mono font-bold flex-shrink-0">
+                                  {ev.priceThb > 0 ? `฿${ev.priceThb}` : 'เข้าฟรี'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Transfer and Popular Connections Chips */}
                       <div className="flex flex-wrap gap-1 pt-1 border-t border-white/5">
@@ -1128,7 +1163,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                           className="px-3 py-1 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-[10px] font-mono flex items-center gap-1 shadow-md transition-all"
                         >
                           <MapPin className="w-3 h-3" />
-                          <span>ปักหมุดไปสถานีนี้ & จับคู่วิน</span>
+                          <span>ปักหมุดไปสถานที่นี้ & จับคู่วิน</span>
                         </button>
                       </div>
                     </div>

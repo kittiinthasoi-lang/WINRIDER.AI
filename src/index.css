@@ -221,3 +221,22 @@
   animation: radar-pulse-ring 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
 }
 
+/* ----------------------------------------------------
+   NATIVE MOBILE PHONE APP UTILITIES & TOUCH FEEL
+   ---------------------------------------------------- */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+}
+
+/* Native Mobile Safe Area Inset Support */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 1rem);
+}
+
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top, 0px), 0.5rem);
+}
+

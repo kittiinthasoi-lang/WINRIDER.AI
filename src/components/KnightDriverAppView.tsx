@@ -413,7 +413,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ audioE
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2">
           <button
             onClick={() => setDeviceFrameMode(!deviceFrameMode)}
             className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/15 transition-all flex items-center gap-1.5"
@@ -425,9 +425,9 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ audioE
       </div>
 
       {/* Main Container */}
-      <div className={`mx-auto transition-all ${deviceFrameMode ? 'max-w-md' : 'max-w-5xl'}`}>
-        <div className={`relative bg-[#070D1E] text-slate-100 overflow-hidden shadow-2xl border border-[#00D2FF]/30 ${
-          deviceFrameMode ? 'rounded-[40px] p-3 ring-8 ring-slate-800/80 shadow-[0_0_50px_rgba(0,210,255,0.25)]' : 'rounded-3xl p-6'
+      <div className={`mx-auto transition-all ${deviceFrameMode ? 'w-full sm:max-w-md' : 'w-full max-w-5xl'}`}>
+        <div className={`relative bg-[#070D1E] text-slate-100 overflow-hidden shadow-2xl border border-[#00D2FF]/30 transition-all ${
+          deviceFrameMode ? 'rounded-2xl sm:rounded-[40px] p-2.5 sm:p-4 ring-0 sm:ring-8 sm:ring-slate-800/80 shadow-[0_0_50px_rgba(0,210,255,0.25)]' : 'rounded-2xl sm:rounded-3xl p-3 sm:p-6'
         }`}>
 
           {/* Color Palette Indicators on top right */}
@@ -439,9 +439,9 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ audioE
             <div className="flex items-center gap-2 text-slate-400">
               <span className="text-slate-300">70% Navy</span>
               <span>•</span>
-              <span className="text-cyan-400">20% Neon Blue</span>
+              <span className="text-cyan-400">27% Neon Blue</span>
               <span>•</span>
-              <span className="text-amber-400 font-bold">10% Gold Rank</span>
+              <span className="text-amber-400 font-bold">3% Gold Rank</span>
             </div>
           </div>
 

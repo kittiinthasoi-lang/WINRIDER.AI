@@ -2,7 +2,7 @@ export interface TransitStation {
   id: string;
   name: string;
   nameEn: string;
-  category: 'bts' | 'mrt' | 'train_srt' | 'srt_red' | 'arl' | 'train' | 'bus_stop' | 'bus_terminal' | 'pier' | 'airport' | 'other';
+  category: 'bts' | 'mrt' | 'train_srt' | 'srt_red' | 'arl' | 'train' | 'bus_stop' | 'bus_terminal' | 'pier' | 'airport' | 'concert_arena' | 'sports_stadium' | 'entertainment_event' | 'other';
   categoryLabel: string;
   lineName: string;
   lineCode?: string;
@@ -16,10 +16,13 @@ export interface TransitStation {
   highlight: string;
   locationDetails: string;
   popularConnections: string[];
+  ticketServiceAvailable?: boolean;
+  upcomingEvents?: { title: string; date: string; tag: string; priceThb: number; icon: string }[];
 }
 
 export const TRANSIT_CATEGORIES = [
   { id: 'all', label: 'ทั้งหมด (All Hubs)', icon: '🌐' },
+  { id: 'concert_event', label: '🎫 จองตั๋วคอนเสิร์ต & แข่งกีฬา & อีเวนต์', icon: '🎟️' },
   { id: 'bts', label: '🚝 รถไฟฟ้า BTS (ทุกสาย)', icon: '🟢' },
   { id: 'mrt', label: '🚇 รถไฟฟ้า MRT (น้ำเงิน/ม่วง/เหลือง/ชมพู)', icon: '🔵' },
   { id: 'train_srt', label: '🚆 รถไฟ & SRT สีแดง & ARL', icon: '🔴' },
@@ -688,5 +691,200 @@ export const BANGKOK_TRANSIT_STATIONS: TransitStation[] = [
     highlight: 'ศูนย์กลางการบินนานาชาติหลัก มีสถานีรถไฟฟ้า ARL ใต้อาคารผู้โดยสาร',
     locationDetails: 'ถนนบางนา-ตราด กม.15 / มอเตอร์เวย์',
     popularConnections: ['เที่ยวบินระหว่างประเทศทั่วโลก', 'โรงแรมโนโวเทล สุวรรณภูมิ', 'ARL มุ่งหน้าพญาไท']
+  },
+
+  // 🎫 🏟️ CONCERT ARENAS, SPORTS STADIUMS & ENTERTAINMENT EVENTS (จองตั๋วคอนเสิร์ต การแข่งขันกีฬา และอีเวนต์ทั้งหมด)
+  {
+    id: 'venue-impact-arena',
+    name: 'อิมแพ็ค อารีน่า & ชาเลนเจอร์ เมืองทองธานี (IMPACT Arena)',
+    nameEn: 'IMPACT Arena & Challenger Muang Thong Thani',
+    category: 'concert_arena',
+    categoryLabel: 'ฮับคอนเสิร์ตระดับโลก & งานอีเวนต์ใหญ่',
+    lineName: 'MRT สายสีชมพู (ส่วนต่อขยายสถานีอิมแพ็ค เมืองทองธานี MT01/MT02)',
+    lineCode: 'IMPACT-CONCERT',
+    icon: '🎤',
+    badge: '🎫 รับจองตั๋ว & ต่อคิว & รับส่งคอนเสิร์ต',
+    color: 'from-pink-600 via-purple-600 to-indigo-700',
+    distanceKm: 16.5,
+    transferLines: ['MRT สายสีชมพู สถานีอิมแพ็ค เมืองทองธานี', 'Shuttle Bus เมืองทองธานี', 'จุดจอดวินอัศวินหน้า Impact Hall'],
+    winStandCount: 35,
+    estimatedFareThb: 150,
+    highlight: 'ฮับจัดคอนเสิร์ตศิลปินระดับโลก K-POP, World Tour, มอเตอร์โชว์ และงานแสดงสินค้านานาชาติ พี่วินช่วยไปรับตั๋วตัวจริง/กดตั๋ว/ต่อคิวหน้าฮอลล์ล่วงหน้า',
+    locationDetails: 'ถนนป๊อปปูล่า ตำบลบ้านใหม่ อำเภอปากเกร็ด นนทบุรี',
+    popularConnections: ['คอนเสิร์ต K-POP & World Tour', 'อิมแพ็ค ชาเลนเจอร์', 'ธันเดอร์โดม (Thunder Dome)', 'Cosmo Bazaar'],
+    ticketServiceAvailable: true,
+    upcomingEvents: [
+      { title: 'World Tour Mega Concert 2026', date: 'เสาร์-อาทิตย์ นี้', tag: 'K-POP / Pop', priceThb: 2500, icon: '🌟' },
+      { title: 'Thailand International Motor Expo', date: 'สัปดาห์หน้า', tag: 'Exhibition', priceThb: 100, icon: '🏎️' },
+      { title: 'Anime & Game Comic Con Live', date: 'ปลายเดือนนี้', tag: 'Festival', priceThb: 350, icon: '🎮' }
+    ]
+  },
+  {
+    id: 'venue-rajamangala-stadium',
+    name: 'ราชมังคลากีฬาสถาน / การกีฬาแห่งประเทศไทย (กกท. หัวหมาก)',
+    nameEn: 'Rajamangala National Stadium / SAT Sports Complex',
+    category: 'sports_stadium',
+    categoryLabel: 'สนามกีฬาแห่งชาติ & คอนเสิร์ตสเตเดียม 50,000+ ที่นั่ง',
+    lineName: 'MRT สายสีส้ม (สถานี กกท. OR17) & ท่าเรือ ม.รามคำแหง',
+    lineCode: 'RAJA-STADIUM',
+    icon: '⚽',
+    badge: '🏟️ รับจองตั๋วฟุตบอลทีมชาติ & คอนเสิร์ตใหญ่',
+    color: 'from-amber-500 via-red-600 to-rose-700',
+    distanceKm: 9.8,
+    transferLines: ['MRT สายสีส้ม สถานีราชมังคลา / กกท.', 'เรือคลองแสนแสบ ท่าเรือ ม.รามคำแหง', 'ถนนรามคำแหง'],
+    winStandCount: 40,
+    estimatedFareThb: 95,
+    highlight: 'สเตเดียมฟุตบอลทีมชาติไทย นัดชิงชนะเลิศ บอลกระชับมิตรระดับโลก และสเตเดียมทัวร์คอนเสิร์ตใหญ่ พี่วินช่วยจองตั๋ว/รับบัตรแข็ง/ฝากของ/ลัดคิวรับส่ง',
+    locationDetails: 'ถนนรามคำแหง แขวงหัวหมาก เขตบางกะปิ',
+    popularConnections: ['ฟุตบอลทีมชาติไทย ช้างศึก', 'สเตเดียมคอนเสิร์ตระดับโลก', 'มหาวิทยาลัยรามคำแหง', 'อินดอร์สเตเดียม หัวหมาก'],
+    ticketServiceAvailable: true,
+    upcomingEvents: [
+      { title: 'ฟุตบอลโลก 2026 รอบคัดเลือก ช้างศึก vs ญี่ปุ่น', date: 'วันศุกร์นี้ 19:30 น.', tag: 'World Cup Qualifier', priceThb: 500, icon: '⚽' },
+      { title: 'Stadium Rock Fest Global Tour', date: 'เสาร์หน้า', tag: 'Live Music', priceThb: 1800, icon: '🎸' }
+    ]
+  },
+  {
+    id: 'venue-supachalasai-stadium',
+    name: 'สนามศุภชลาศัย / สนามกีฬาแห่งชาติ (National Stadium)',
+    nameEn: 'Supachalasai National Stadium (BTS National Stadium)',
+    category: 'sports_stadium',
+    categoryLabel: 'สนามกีฬาแห่งชาติ & มหกรรมกีฬา & มวยไทย',
+    lineName: 'BTS สายสีลม (สถานีสนามกีฬาแห่งชาติ W1)',
+    lineCode: 'NAT-STADIUM',
+    icon: '🥊',
+    badge: '🎟️ จองตั๋วฟุตบอล/กรีฑา/มวยเวที',
+    color: 'from-emerald-600 via-teal-600 to-cyan-700',
+    distanceKm: 2.2,
+    transferLines: ['BTS สนามกีฬาแห่งชาติ (W1)', 'MBK Center Skywalk', 'สยามสแควร์'],
+    winStandCount: 20,
+    estimatedFareThb: 30,
+    highlight: 'ศูนย์กลางการแข่งขันกีฬาแห่งชาติ กรีฑา มวยสากล มวยไทย และงานประเพณีใจกลางปทุมวัน สะดวกเชื่อมต่อ BTS ทันที',
+    locationDetails: 'ถนนพระราม 1 แขวงวังใหม่ เขตปทุมวัน',
+    popularConnections: ['MBK Center', 'หอศิลปวัฒนธรรมแห่งกรุงเทพฯ (BACC)', 'สยามดิสคัฟเวอรี', 'จุฬาลงกรณ์มหาวิทยาลัย'],
+    ticketServiceAvailable: true,
+    upcomingEvents: [
+      { title: 'ศึกมวยไทย แชมเปียนชิพ นานาชาติ', date: 'เสาร์นี้ 18:00 น.', tag: 'Muay Thai Pro', priceThb: 600, icon: '🥊' },
+      { title: 'การแข่งขันกรีฑาชิงแชมป์ประเทศไทย', date: 'วันอาทิตย์', tag: 'Athletics', priceThb: 150, icon: '🏃' }
+    ]
+  },
+  {
+    id: 'venue-uob-live-emsphere',
+    name: 'UOB LIVE @ Emsphere (เอ็มสเฟียร์ สุขุมวิท)',
+    nameEn: 'UOB LIVE Bangkok (EMSPHERE Sukhumvit)',
+    category: 'concert_arena',
+    categoryLabel: 'ฮอลล์คอนเสิร์ตรูปแบบใหม่ใจกลางสุขุมวิท (6,000 ที่นั่ง)',
+    lineName: 'BTS สายสุขุมวิท (สถานีพร้อมพงษ์ E5 Skywalk)',
+    lineCode: 'UOB-LIVE',
+    icon: '🎵',
+    badge: '🎫 ช่วยกดตั๋ว UOB Live & รับบัตรหน้างาน',
+    color: 'from-blue-600 via-indigo-600 to-purple-600',
+    distanceKm: 1.5,
+    transferLines: ['BTS พร้อมพงษ์ (E5 Skywalk เชื่อมตรงเข้า Hall)', 'EM District (Emporium / EmQuartier)'],
+    winStandCount: 18,
+    estimatedFareThb: 25,
+    highlight: 'ฮอลล์คอนเสิร์ตมาตรฐานระดับโลกใหม่ล่าสุด เสียงระดับพรีเมียม จัดคอนเสิร์ต ศิลปินเอเชียและระดับสากลทุกสัปดาห์',
+    locationDetails: 'ชั้น 6 ศูนย์การค้า EMSPHERE ถนนสุขุมวิท',
+    popularConnections: ['EMSPHERE', 'EmQuartier', 'Emporium', 'สวนเบญจสิริ'],
+    ticketServiceAvailable: true,
+    upcomingEvents: [
+      { title: 'Acoustic Soul Night Live in Bangkok', date: 'พฤหัสบดีนี้', tag: 'Live Concert', priceThb: 1500, icon: '🎙️' },
+      { title: 'EDM Electronic Neon Beats 2026', date: 'ศุกร์-เสาร์นี้', tag: 'DJ & EDM', priceThb: 1800, icon: '🎧' }
+    ]
+  },
+  {
+    id: 'venue-bangkok-arena',
+    name: 'บางกอก อารีนา หนองจอก (Bangkok Futsal Arena)',
+    nameEn: 'Bangkok Arena Sports Complex (Nong Chok)',
+    category: 'sports_stadium',
+    categoryLabel: 'สนามกีฬาในร่มขนาดใหญ่ 12,000 ที่นั่ง (ฟุตซอล & อีสปอร์ต)',
+    lineName: 'เชื่อมต่อจุดรับส่งรถบัส / วินด่วนมีนบุรี',
+    lineCode: 'BKK-ARENA',
+    icon: '🏆',
+    badge: '🎮 จองตั๋วแข่งอีสปอร์ต & ฟุตซอลลีก',
+    color: 'from-cyan-600 to-blue-800',
+    distanceKm: 22.0,
+    transferLines: ['จุดเชื่อมต่อรถตู้มีนบุรี', 'วินมอเตอร์ไซค์พิเศษ WIN Link Express'],
+    winStandCount: 15,
+    estimatedFareThb: 220,
+    highlight: 'สนามแข่งขันฟุตซอลระดับโลก การแข่งขันอีสปอร์ต E-Sports Pro League และการแข่งขันวอลเลย์บอลระดับทวีป',
+    locationDetails: 'ถนนเชื่อมสัมพันธ์ แขวงโคกแฝด เขตหนองจอก',
+    popularConnections: ['สนามแข่งขันฟุตซอลลีก', 'ทัวร์นาเมนต์ E-Sports', 'สวนสาธารณะหนองจอก'],
+    ticketServiceAvailable: true,
+    upcomingEvents: [
+      { title: 'Thailand E-Sports Champions Final 2026', date: 'เสาร์นี้ 13:00 น.', tag: 'E-Sports Final', priceThb: 300, icon: '🏆' },
+      { title: 'Futsal Super League Matchday', date: 'วันอาทิตย์', tag: 'Futsal League', priceThb: 150, icon: '⚽' }
+    ]
+  },
+  {
+    id: 'venue-lumpinee-boxing',
+    name: 'สนามมวยเวทีลุมพินี (Lumpinee Boxing Stadium รามอินทรา)',
+    nameEn: 'World Famous Lumpinee Boxing Stadium',
+    category: 'sports_stadium',
+    categoryLabel: 'เวทีมวยไทยระดับโลก ONE Championship',
+    lineName: 'MRT สายสีชมพู (สถานีลาดปลาเค้า PK18 / รามอินทรา 3)',
+    lineCode: 'LUMPINEE-BOX',
+    icon: '🥊',
+    badge: '🥊 จองตั๋ว ONE Lumpinee & มวยไทยไฟต์',
+    color: 'from-red-600 via-orange-600 to-amber-600',
+    distanceKm: 12.0,
+    transferLines: ['MRT สายสีชมพู สถานีลาดปลาเค้า', 'ถนนรามอินทรา กม.2'],
+    winStandCount: 22,
+    estimatedFareThb: 120,
+    highlight: 'สนามมวยเวทีระดับตำนาน ศูนย์กลางศึก ONE Lumpinee ถ่ายทอดสดทั่วโลกทุกวันศุกร์ พี่วินช่วยจองตั๋วริงไซด์/รับตั๋วตัวจริงล่วงหน้า',
+    locationDetails: 'ถนนรามอินทรา แขวงอนุสาวรีย์ เขตบางเขน',
+    popularConnections: ['ศึก ONE Lumpinee', 'เวทีมวยไทยไฟต์', 'ศูนย์พัฒนากีฬากองทัพบก'],
+    ticketServiceAvailable: true,
+    upcomingEvents: [
+      { title: 'ONE Friday Fights Live World Broadcast', date: 'ทุกวันศุกร์ 19:30 น.', tag: 'ONE Championship', priceThb: 1200, icon: '🥊' },
+      { title: 'World Muay Thai Championship', date: 'วันเสาร์ 18:00 น.', tag: 'Championship', priceThb: 800, icon: '🥇' }
+    ]
+  },
+  {
+    id: 'venue-queen-sirikit-center',
+    name: 'ศูนย์การประชุมแห่งชาติสิริกิติ์ (QSNCC)',
+    nameEn: 'Queen Sirikit National Convention Center',
+    category: 'entertainment_event',
+    categoryLabel: 'ศูนย์นิทรรศการ งานหนังสือ คอนเสิร์ต & แฟนมีต',
+    lineName: 'MRT สายสีน้ำเงิน (สถานีศูนย์การประชุมแห่งชาติสิริกิติ์ BL23)',
+    lineCode: 'QSNCC-EVENT',
+    icon: '🎭',
+    badge: '📚 จองตั๋วแฟนมีต & รับหนังสือ & อีเวนต์',
+    color: 'from-teal-600 via-emerald-600 to-green-700',
+    distanceKm: 2.1,
+    transferLines: ['MRT ศูนย์การประชุมแห่งชาติสิริกิติ์ (BL23 ทางออก 3 เชื่อมตรงเข้าโถงชั้น LG)', 'สวนป่าเบญจกิติ'],
+    winStandCount: 25,
+    estimatedFareThb: 25,
+    highlight: 'ศูนย์การประชุมและจัดแสดงระดับโลก สัปดาห์หนังสือแห่งชาติ งานแฟนมีตติ้งศิลปิน และการประชุมนานาชาติ APEC',
+    locationDetails: 'ถนนรัชดาภิเษก แขวงคลองเตย เขตคลองเตย',
+    popularConnections: ['งานสัปดาห์หนังสือแห่งชาติ', 'สวนป่าเบญจกิติ Skywalk', 'งานแฟนมีตติ้งศิลปิน', 'The PARQ'],
+    ticketServiceAvailable: true,
+    upcomingEvents: [
+      { title: 'Asian Star Fan Meeting Live 2026', date: 'วันอาทิตย์นี้', tag: 'Fan Meeting', priceThb: 2200, icon: '🌟' },
+      { title: 'National Book Fair & Tech Expo', date: 'ทั้งสัปดาห์นี้', tag: 'Book & Tech Expo', priceThb: 0, icon: '📚' }
+    ]
+  },
+  {
+    id: 'venue-bitec-bangna',
+    name: 'ศูนย์นิทรรศการและการประชุมไบเทค บางนา (BITEC Bangna)',
+    nameEn: 'BITEC Bangna Exhibition & Convention Center',
+    category: 'entertainment_event',
+    categoryLabel: 'ฮับคอนเสิร์ต & มหกรรมอีเวนต์ฝั่งตะวันออก',
+    lineName: 'BTS สายสุขุมวิท (สถานีบางนา E13 Skywalk)',
+    lineCode: 'BITEC-HALL',
+    icon: '🎪',
+    badge: '🎟️ จองตั๋วคอนเสิร์ตไบเทค & แฟร์ใหญ่',
+    color: 'from-blue-600 via-sky-600 to-cyan-600',
+    distanceKm: 8.5,
+    transferLines: ['BTS บางนา (E13 Skywalk เชื่อมเข้าอาคาร EH98-104)', 'ถนนสุขุมวิท-บางนาตราด'],
+    winStandCount: 20,
+    estimatedFareThb: 80,
+    highlight: 'ฮอลล์จัดแสดงงานระดับประเทศ งานแสดงสินค้า คอนเสิร์ตเฟสติวัล EDM และงานรับปริญญา',
+    locationDetails: 'ถนนสุขุมวิท แขวงบางนาใต้ เขตบางนา',
+    popularConnections: ['BITEC Hall EH98-EH104', 'Bhiraj Tower at BITEC', 'เมกา บางนา Shuttle'],
+    ticketServiceAvailable: true,
+    upcomingEvents: [
+      { title: 'Mega EDM Sound Splash Festival', date: 'ศุกร์-เสาร์นี้', tag: 'EDM Fest', priceThb: 1600, icon: '🎆' },
+      { title: 'Home & Furniture Living Expo', date: 'สุดสัปดาห์นี้', tag: 'Home Expo', priceThb: 0, icon: '🛋️' }
+    ]
   }
 ];

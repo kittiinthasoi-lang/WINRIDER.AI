@@ -13,8 +13,8 @@ import {
   Volume2, 
   VolumeX, 
   Fingerprint,
-  Menu,
-  X,
+  Mic,
+  User,
   Sparkles,
   Smartphone,
   Bike,
@@ -23,7 +23,8 @@ import {
   BookOpen,
   UserPlus,
   ShoppingBag,
-  Flame
+  Flame,
+  Bell
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -33,7 +34,9 @@ interface NavbarProps {
   onSelectChapter: (id: ChapterId) => void;
   audioEnabled: boolean;
   onToggleAudio: () => void;
-  onOpenWinBuddy: () => void;
+  onOpenCustomerVoice: () => void;
+  onOpenWinBuddy?: () => void;
+  onOpenProfile?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -43,9 +46,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectChapter,
   audioEnabled,
   onToggleAudio,
+  onOpenCustomerVoice,
   onOpenWinBuddy,
+  onOpenProfile,
 }) => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [nfcSynced, setNfcSynced] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
 
@@ -96,8 +100,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-50 bg-[#070D1E]/95 backdrop-blur-md border-b border-[#00D2FF]/20 shadow-2xl">
-      {/* Top micro banner */}
-      <div className="bg-gradient-to-r from-[#070D1E] via-[#0A1838] to-[#070D1E] border-b border-white/5 py-1 px-4 text-xs">
+      {/* Top micro banner (desktop/tablet only) */}
+      <div className="hidden sm:block bg-gradient-to-r from-[#070D1E] via-[#0A1838] to-[#070D1E] border-b border-white/5 py-1 px-4 text-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between text-slate-300">
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-[#FFD700]/10 text-[#FFD700] border border-[#FFD700]/30">
@@ -168,34 +172,71 @@ export const Navbar: React.FC<NavbarProps> = ({
             })}
           </nav>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          {/* Action Buttons: Voice Command, Notification, Profile (Side-by-side) */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* 1. ไอคอนสั่งการด้วยเสียงของลูกค้าเพื่อใช้งานแอป (Customer Voice Command) */}
+            <button
+              id="navbar-voice-command-btn"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(1200);
+                onOpenCustomerVoice();
+              }}
+              className="relative p-2 rounded-xl bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-[#00D2FF] border border-[#00D2FF]/40 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,210,255,0.3)] active:scale-95 flex items-center justify-center group"
+              title="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป (Customer Voice AI)"
+            >
+              <Mic className="w-4 h-4 animate-pulse text-[#00D2FF] group-hover:scale-110 transition-transform" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00D2FF]" />
+            </button>
+
+            {/* 2. ไอคอนแจ้งเตือน (Notifications) */}
+            <button
+              id="navbar-notification-btn"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(1000);
+                alert("🔔 การแจ้งเตือน: อัศวิน กิตติ อินทะสร้อย (Level 100 Sovereign) ประจำสถานีใกล้คุณ, มีโปรโมชั่นคอนเสิร์ตลด 20%");
+              }}
+              className="relative p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors cursor-pointer active:scale-95"
+              title="การแจ้งเตือน"
+            >
+              <Bell className="w-4 h-4 text-[#00D2FF]" />
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 text-[9px] text-white font-bold flex items-center justify-center">
+                3
+              </span>
+            </button>
+
+            {/* 3. ไอคอนโปรไฟล์ (Citizen Profile) */}
+            <button
+              id="navbar-profile-btn"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(800);
+                if (onOpenProfile) {
+                  onOpenProfile();
+                } else {
+                  onSelectMode('passenger');
+                }
+              }}
+              className="relative p-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-[#FFD700] border border-[#FFD700]/40 transition-all cursor-pointer shadow-[0_0_12px_rgba(255,215,0,0.2)] flex items-center gap-1 active:scale-95"
+              title="โปรไฟล์พลเมือง (Citizen Profile)"
+            >
+              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-500 flex items-center justify-center text-[10px] font-bold text-slate-950 shadow-[0_0_6px_#00D2FF]">
+                🦥
+              </div>
+              <User className="w-3.5 h-3.5 text-[#FFD700]" />
+            </button>
+
             {/* NFC Quick Sync button */}
             <button
               id="nfc-quick-sync-btn"
               onClick={handleNfcQuickTap}
               title="แตะเพื่อจำลองการ Sync ข้อมูลอัศวินผ่าน Identity Badge NFC"
-              className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border ${
+              className={`relative px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border ${
                 nfcSynced 
                   ? 'bg-[#FFD700] text-slate-950 border-[#FFD700] shadow-[0_0_15px_#FFD700]' 
                   : 'bg-[#FFD700]/10 text-[#FFD700] border-[#FFD700]/30 hover:bg-[#FFD700]/20'
               }`}
             >
               <Fingerprint className="w-4 h-4" />
-              <span className="hidden sm:inline">{nfcSynced ? 'ซิงก์ข้อมูลสำเร็จ!' : 'แตะ NFC'}</span>
-            </button>
-
-            {/* WIN Buddy AI Copilot trigger */}
-            <button
-              id="open-buddy-top-btn"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(1200);
-                onOpenWinBuddy();
-              }}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-[#00D2FF] to-[#0070F3] text-slate-950 hover:brightness-110 shadow-[0_0_12px_rgba(0,210,255,0.4)] flex items-center gap-1.5 transition-all"
-            >
-              <Radio className="w-3.5 h-3.5 animate-pulse" />
-              <span>WIN BUDDY AI</span>
+              <span className="hidden sm:inline">{nfcSynced ? 'ซิงก์สำเร็จ!' : 'NFC'}</span>
             </button>
 
             {/* Audio SFX Toggle */}
@@ -206,18 +247,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onToggleAudio();
               }}
               title={audioEnabled ? 'ปิดเอฟเฟกต์เสียง' : 'เปิดเอฟเฟกต์เสียงยุทธวิธี'}
-              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-white/10 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-white/10 transition-colors"
             >
-              {audioEnabled ? <Volume2 className="w-4 h-4 text-[#00D2FF]" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-
-            {/* Mobile menu trigger */}
-            <button
-              id="mobile-menu-btn"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="xl:hidden p-2 rounded-lg text-slate-300 hover:bg-white/10"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {audioEnabled ? <Volume2 className="w-4 h-4 text-[#00D2FF]" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
             </button>
           </div>
         </div>
@@ -250,36 +282,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               ))}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="xl:hidden bg-[#070D1E]/98 border-b border-cyan-500/20 px-4 py-3 space-y-2">
-          <div className="text-[10px] font-mono text-cyan-400 font-bold uppercase mb-1 pt-1">
-            โหมดและหน้าจอการใช้งาน
-          </div>
-          {appModes.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(800);
-                onSelectMode(item.id);
-                setMobileMenuOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold ${
-                activeMode === item.id
-                  ? 'text-[#00D2FF] bg-[#00D2FF]/20 border border-[#00D2FF]/40'
-                  : 'text-slate-300 hover:bg-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {item.icon}
-                <span>{item.label}</span>
-              </div>
-              <span className="text-[9px] font-mono text-amber-400">{item.badge}</span>
-            </button>
-          ))}
         </div>
       )}
     </header>
