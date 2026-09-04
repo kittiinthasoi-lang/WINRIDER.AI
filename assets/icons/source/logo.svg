@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" rx="160" fill="#070D1E"/>
+  <g transform="translate(0, -60)">
+    <circle cx="512" cy="460" r="380" stroke="#00D2FF" stroke-width="36" fill="none" opacity="0.95"/>
+    <circle cx="512" cy="460" r="240" fill="#0D2246" stroke="#FFD700" stroke-width="20"/>
+    <!-- Simple stylized emblem in gold -->
+    <path d="M512 300 L556 420 L660 440 L598 510 L620 640 L512 580 L404 640 L426 510 L364 440 L468 420 Z" fill="#FFD700" opacity="0.95"/>
+    <text x="512" y="860" font-family="Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial" font-weight="800" font-size="56" fill="#00D2FF" text-anchor="middle" letter-spacing="4">WINRIDER.AI</text>
+  </g>
+</svg>
