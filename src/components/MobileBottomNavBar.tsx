@@ -22,8 +22,12 @@ import {
   Globe2,
   Rocket,
   Bot,
-  AudioWaveform
+  AudioWaveform,
+  LogOut,
+  Lock,
+  User
 } from 'lucide-react';
+import { UserSession } from '../utils/userSession';
 
 export type MainTabType = 'home' | 'dreamRide' | 'ride' | 'shop' | 'modes';
 
@@ -37,6 +41,8 @@ interface MobileBottomNavBarProps {
   onOpenWinBuddy: () => void;
   activeChapter: ChapterId;
   onSelectChapter: (id: ChapterId) => void;
+  currentUserSession?: UserSession | null;
+  onSignOut?: () => void;
 }
 
 export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
@@ -48,9 +54,16 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   onOpenCustomerVoice,
   onOpenWinBuddy,
   activeChapter,
-  onSelectChapter
+  onSelectChapter,
+  currentUserSession,
+  onSignOut,
 }) => {
   const [isModesDrawerOpen, setIsModesDrawerOpen] = useState(false);
+
+  // If user is not logged in, do not render bottom navigation
+  if (!currentUserSession) {
+    return null;
+  }
 
   // Determine current active tab
   const getIsTabActive = (tabId: string) => {
@@ -178,6 +191,16 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     },
   ];
 
+  const allowedModesForRole = currentUserSession?.role === 'customer'
+    ? ['passenger', 'market', 'codex']
+    : currentUserSession?.role === 'driver'
+    ? ['driver', 'codex']
+    : currentUserSession?.role === 'merchant'
+    ? ['merchant', 'codex']
+    : ['partner', 'hospital', 'codex'];
+
+  const filteredAppModesList = appModesList.filter(mode => allowedModesForRole.includes(mode.id));
+
   const codexChapters = [
     { id: 'soul' as ChapterId, label: '01 จิตวิญญาณสลอต & สิงโต', icon: <Crown className="w-3.5 h-3.5" /> },
     { id: 'finance' as ChapterId, label: '02 การเงินอธิปไตย $10B', icon: <Coins className="w-3.5 h-3.5" /> },
@@ -228,29 +251,35 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
             <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#FFD700]/15 via-amber-500/10 to-transparent border border-[#FFD700]/40 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-500 flex items-center justify-center text-lg font-bold text-slate-950 shadow-[0_0_10px_#00D2FF]">
-                  🦥
+                  {currentUserSession.avatarEmoji}
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-black text-white text-sm">โปรไฟล์พลเมือง</span>
+                    <span className="font-black text-white text-sm">{currentUserSession.name}</span>
                     <span className="px-1.5 py-0.2 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 text-[9px] font-bold font-mono">
-                      LV.100 SOVEREIGN
+                      LV.{currentUserSession.level}
                     </span>
                   </div>
-                  <p className="text-xs text-cyan-300">จิตใจ (ไอ้สลอต) • วงเงินเครดิต ฿5,000</p>
+                  <p className="text-xs text-cyan-300">
+                    🔒 {currentUserSession.roleTitleTh} • {currentUserSession.id}
+                  </p>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(800);
-                  setIsModesDrawerOpen(false);
-                  onSelectMode('passenger');
-                  onSelectPassengerTab('profile');
-                }}
-                className="px-3 py-1.5 rounded-xl bg-[#FFD700] text-slate-950 font-bold text-xs hover:brightness-110 shadow-[0_0_10px_#FFD700] cursor-pointer"
-              >
-                เปิดโปรไฟล์
-              </button>
+              {onSignOut && (
+                <button
+                  onClick={() => {
+                    if (audioEnabled) playTactileBlip(800);
+                    setIsModesDrawerOpen(false);
+                    if (window.confirm(`ต้องการออกจากระบบบัญชี "${currentUserSession.name}" ใช่หรือไม่?`)) {
+                      onSignOut();
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/50 text-rose-300 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>ออก</span>
+                </button>
+              )}
             </div>
 
             {/* Voice Assistant Section: Separated for Customer and Knight Driver */}
@@ -313,11 +342,17 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
               </div>
             </div>
 
-            {/* All Application Modes List */}
+            {/* Role-Restricted Application Modes List */}
             <div className="space-y-2.5">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">โหมดและหน้าจอการใช้งานทั้งหมด</h4>
+              <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <span>หน้าจอที่ได้รับอนุญาต ({currentUserSession.roleTitleTh})</span>
+                <span className="flex items-center gap-1 text-[10px] text-cyan-400 font-mono normal-case">
+                  <Lock className="w-2.5 h-2.5" />
+                  <span>Role-Locked</span>
+                </span>
+              </div>
               <div className="grid grid-cols-1 gap-2.5">
-                {appModesList.map((modeItem) => {
+                {filteredAppModesList.map((modeItem) => {
                   const isCurrent = activeMode === modeItem.id;
                   return (
                     <button

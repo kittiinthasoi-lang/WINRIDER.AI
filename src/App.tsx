@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChapterId, AppMode } from './types';
 import { Navbar } from './components/Navbar';
 import { PassengerAppView } from './components/PassengerAppView';
@@ -8,6 +8,8 @@ import { HospitalCommandCenter } from './components/HospitalCommandCenter';
 import { PartnerProfileView } from './components/PartnerProfileView';
 import { WinStreetMarketView } from './components/WinStreetMarketView';
 import { RegisterAppView } from './components/RegisterAppView';
+import { SovereignAuthGateway } from './components/SovereignAuthGateway';
+import { UserSession, getCurrentUserSession, clearUserSession, getDefaultModeForRole } from './utils/userSession';
 import { MarketItem } from './types';
 import { SovereignSoulSection } from './components/SovereignSoulSection';
 import { FinancialEngineSection } from './components/FinancialEngineSection';
@@ -36,11 +38,18 @@ import {
   Bike,
   Store,
   Building2,
-  BookOpen
+  BookOpen,
+  Lock,
+  LogOut
 } from 'lucide-react';
 
 export default function App() {
-  const [activeMode, setActiveMode] = useState<AppMode>('passenger');
+  const [currentUserSession, setCurrentUserSession] = useState<UserSession | null>(() => getCurrentUserSession());
+  const [showRegistrationFlow, setShowRegistrationFlow] = useState<boolean>(false);
+  const [activeMode, setActiveMode] = useState<AppMode>(() => {
+    const session = getCurrentUserSession();
+    return session ? getDefaultModeForRole(session.role) : 'passenger';
+  });
   const [passengerTab, setPassengerTab] = useState<'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile'>('home');
   const [activeChapter, setActiveChapter] = useState<ChapterId>('soul');
   const [audioEnabled, setAudioEnabled] = useState<boolean>(true);
@@ -48,6 +57,19 @@ export default function App() {
   const [isCustomerVoiceOpen, setIsCustomerVoiceOpen] = useState<boolean>(false);
   const [isWebhookModalOpen, setIsWebhookModalOpen] = useState<boolean>(false);
   const [customerListedItems, setCustomerListedItems] = useState<MarketItem[]>([]);
+
+  // Listen to external session changes (e.g. from modals or storage events)
+  useEffect(() => {
+    const handleSessionChanged = () => {
+      const current = getCurrentUserSession();
+      setCurrentUserSession(current);
+      if (current) {
+        setActiveMode(getDefaultModeForRole(current.role));
+      }
+    };
+    window.addEventListener('winrider:session_changed', handleSessionChanged);
+    return () => window.removeEventListener('winrider:session_changed', handleSessionChanged);
+  }, []);
 
   const handleAddCustomerItem = (item: MarketItem) => {
     setCustomerListedItems(prev => [item, ...prev]);
@@ -60,9 +82,81 @@ export default function App() {
   };
 
   const handleSelectMode = (mode: AppMode) => {
+    if (!currentUserSession) {
+      setActiveMode(mode);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Role-Lock Boundary Enforcement: Protect users from entering other roles' private spaces
+    if (currentUserSession.role === 'driver' && mode !== 'driver' && mode !== 'codex') {
+      alert("🔒 ระบบความปลอดภัย Role-Locked: บัญชีของคุณคือ 'อัศวิน วินมอเตอร์ไซค์' ระบบล็อกการแสดงผลเฉพาะอู่อัศวินและคัมภีร์ยุทธศาสตร์เท่านั้น");
+      setActiveMode('driver');
+      return;
+    }
+    if (currentUserSession.role === 'customer' && mode !== 'passenger' && mode !== 'market' && mode !== 'codex') {
+      alert("🔒 ระบบความปลอดภัย Role-Locked: บัญชีของคุณคือ 'ลูกค้า/ผู้โดยสาร' ระบบล็อกการแสดงผลเฉพาะแอปเรียกรถและตลาดชุมชนเท่านั้น");
+      setActiveMode('passenger');
+      return;
+    }
+    if (currentUserSession.role === 'merchant' && mode !== 'merchant' && mode !== 'codex') {
+      alert("🔒 ระบบความปลอดภัย Role-Locked: บัญชีของคุณคือ 'ร้านค้า/ภัตตาคาร' ระบบล็อกการแสดงผลเฉพาะศูนย์รับออเดอร์ร้านค้าเท่านั้น");
+      setActiveMode('merchant');
+      return;
+    }
+    if (currentUserSession.role === 'partner' && mode !== 'partner' && mode !== 'hospital' && mode !== 'codex') {
+      alert("🔒 ระบบความปลอดภัย Role-Locked: บัญชีของคุณคือ 'พาร์ทเนอร์สถาบัน' ระบบล็อกการแสดงผลเฉพาะศูนย์พันธมิตรและกู้ชีพเท่านั้น");
+      setActiveMode('partner');
+      return;
+    }
+
     setActiveMode(mode);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const handleSignOut = () => {
+    clearUserSession();
+    setCurrentUserSession(null);
+    setShowRegistrationFlow(false);
+    setActiveMode('passenger');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // If user is not logged in: display the Role-Locked Gateway or Registration flow
+  if (!currentUserSession) {
+    if (showRegistrationFlow) {
+      return (
+        <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans selection:bg-[#00D2FF] selection:text-slate-950 p-2 sm:p-6">
+          <RegisterAppView 
+            audioEnabled={audioEnabled} 
+            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+            onCancel={() => setShowRegistrationFlow(false)}
+            onRegisteredUserSession={(session) => {
+              setCurrentUserSession(session);
+              setShowRegistrationFlow(false);
+              setActiveMode(getDefaultModeForRole(session.role));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <SovereignAuthGateway
+        audioEnabled={audioEnabled}
+        onAuthenticated={(session) => {
+          setCurrentUserSession(session);
+          setActiveMode(getDefaultModeForRole(session.role));
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onStartRegistration={() => {
+          setShowRegistrationFlow(true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans selection:bg-[#00D2FF] selection:text-slate-950">
@@ -77,9 +171,19 @@ export default function App() {
         onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
         onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
         onOpenWebhookModal={() => setIsWebhookModalOpen(true)}
+        currentUserSession={currentUserSession}
+        onSignOut={handleSignOut}
         onOpenProfile={() => {
-          setActiveMode('passenger');
-          setPassengerTab('profile');
+          if (currentUserSession.role === 'customer') {
+            setActiveMode('passenger');
+            setPassengerTab('profile');
+          } else if (currentUserSession.role === 'driver') {
+            setActiveMode('driver');
+          } else if (currentUserSession.role === 'merchant') {
+            setActiveMode('merchant');
+          } else {
+            setActiveMode('partner');
+          }
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />
@@ -352,6 +456,8 @@ export default function App() {
         onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
         activeChapter={activeChapter}
         onSelectChapter={handleSelectChapter}
+        currentUserSession={currentUserSession}
+        onSignOut={handleSignOut}
       />
     </div>
   );

@@ -10,6 +10,12 @@ import {
 import { db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { 
+  UserSession, 
+  saveUserSession, 
+  getRoleTitleTh, 
+  getRoleAvatarEmoji 
+} from '../utils/userSession';
+import { 
   UserPlus, 
   Bike, 
   User, 
@@ -40,6 +46,8 @@ interface RegisterAppViewProps {
   audioEnabled: boolean;
   onOpenWinBuddy?: () => void;
   onNavigateToMode?: (mode: 'passenger' | 'driver' | 'merchant' | 'hospital') => void;
+  onRegisteredUserSession?: (session: UserSession) => void;
+  onCancel?: () => void;
 }
 
 type RoleType = 'driver' | 'customer' | 'merchant' | 'partner';
@@ -47,7 +55,9 @@ type RoleType = 'driver' | 'customer' | 'merchant' | 'partner';
 export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
   audioEnabled,
   onOpenWinBuddy,
-  onNavigateToMode
+  onNavigateToMode,
+  onRegisteredUserSession,
+  onCancel,
 }) => {
   const [selectedRole, setSelectedRole] = useState<RoleType>('driver');
   const [formStep, setFormStep] = useState<number>(1);
@@ -174,14 +184,28 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
           </div>
 
           {/* Quick Stats Pillar */}
-          <div className="grid grid-cols-2 gap-2.5 flex-shrink-0 bg-black/40 p-3.5 rounded-2xl border border-white/10 text-center font-mono">
-            <div className="p-2 rounded-xl bg-blue-950/40 border border-blue-500/30">
-              <span className="text-[10px] text-slate-400 block">อัศวินในระบบ</span>
-              <strong className="text-cyan-300 text-sm">48,500+ นาย</strong>
-            </div>
-            <div className="p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
-              <span className="text-[10px] text-slate-400 block">ร้านค้า & ลูกค้า</span>
-              <strong className="text-emerald-300 text-sm">1.2M+ บัญชี</strong>
+          <div className="flex flex-col sm:flex-row items-center gap-2.5">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(700);
+                  onCancel();
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-slate-200 text-xs font-mono font-bold transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>← กลับหน้าเข้าสู่ระบบ</span>
+              </button>
+            )}
+            <div className="grid grid-cols-2 gap-2.5 flex-shrink-0 bg-black/40 p-3.5 rounded-2xl border border-white/10 text-center font-mono">
+              <div className="p-2 rounded-xl bg-blue-950/40 border border-blue-500/30">
+                <span className="text-[10px] text-slate-400 block">อัศวินในระบบ</span>
+                <strong className="text-cyan-300 text-sm">48,500+ นาย</strong>
+              </div>
+              <div className="p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
+                <span className="text-[10px] text-slate-400 block">ร้านค้า & ลูกค้า</span>
+                <strong className="text-emerald-300 text-sm">1.2M+ บัญชี</strong>
+              </div>
             </div>
           </div>
         </div>
@@ -884,21 +908,39 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
               + ลงทะเบียนบทบาทอื่นเพิ่ม
             </button>
 
-            {onNavigateToMode && (
-              <button
-                onClick={() => {
-                  if (audioEnabled) playRadarScan();
+            <button
+              onClick={async () => {
+                if (audioEnabled) playRadarScan();
+                const newSession: UserSession = {
+                  id: issuedCitizenId || `WIN-${selectedRole === 'driver' ? 'KGT' : selectedRole === 'customer' ? 'CTZ' : selectedRole === 'merchant' ? 'MCH' : 'PTN'}-${Math.floor(100000 + Math.random() * 900000)}`,
+                  role: selectedRole,
+                  name: selectedRole === 'driver' ? driverForm.fullName : selectedRole === 'customer' ? customerForm.fullName : selectedRole === 'merchant' ? merchantForm.shopName : partnerForm.companyName,
+                  phone: selectedRole === 'driver' ? driverForm.phone : selectedRole === 'customer' ? customerForm.phone : selectedRole === 'merchant' ? merchantForm.phone : partnerForm.contactPhone,
+                  roleTitleTh: getRoleTitleTh(selectedRole),
+                  level: 1,
+                  xp: 100,
+                  rating: 5.0,
+                  avatarEmoji: getRoleAvatarEmoji(selectedRole),
+                  registeredAt: new Date().toISOString(),
+                  plateNumber: selectedRole === 'driver' ? driverForm.licensePlate : undefined,
+                  shopName: selectedRole === 'merchant' ? merchantForm.shopName : undefined,
+                  companyName: selectedRole === 'partner' ? partnerForm.companyName : undefined,
+                };
+                await saveUserSession(newSession);
+                if (onRegisteredUserSession) {
+                  onRegisteredUserSession(newSession);
+                } else if (onNavigateToMode) {
                   if (selectedRole === 'driver') onNavigateToMode('driver');
                   else if (selectedRole === 'merchant') onNavigateToMode('merchant');
                   else if (selectedRole === 'partner') onNavigateToMode('hospital');
                   else onNavigateToMode('passenger');
-                }}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold text-xs shadow-md flex items-center gap-2 transition-all hover:brightness-110"
-              >
-                <span>เข้าสู่แอปพลิเคชัน ({selectedRole === 'driver' ? 'อู่อัศวิน' : selectedRole === 'merchant' ? 'ศูนย์ร้านค้า' : selectedRole === 'partner' ? 'ศูนย์พันธมิตร' : 'แอปผู้โดยสาร'})</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            )}
+                }
+              }}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold text-xs shadow-md flex items-center gap-2 transition-all hover:brightness-110"
+            >
+              <span>เข้าสู่แอปพลิเคชัน ({selectedRole === 'driver' ? 'อู่อัศวิน' : selectedRole === 'merchant' ? 'ศูนย์ร้านค้า' : selectedRole === 'partner' ? 'ศูนย์พันธมิตร' : 'แอปผู้โดยสาร'})</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

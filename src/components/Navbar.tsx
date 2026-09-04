@@ -26,9 +26,13 @@ import {
   Flame,
   Bell,
   Zap,
-  Compass
+  Compass,
+  LogOut,
+  Lock,
+  CheckCircle2
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
+import { UserSession } from '../utils/userSession';
 
 interface NavbarProps {
   activeMode: AppMode;
@@ -43,6 +47,8 @@ interface NavbarProps {
   onOpenWebhookModal?: () => void;
   onOpenNotificationModal?: () => void;
   onOpenGpsModal?: () => void;
+  currentUserSession?: UserSession | null;
+  onSignOut?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -58,6 +64,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenWebhookModal,
   onOpenNotificationModal,
   onOpenGpsModal,
+  currentUserSession,
+  onSignOut,
 }) => {
   const [nfcSynced, setNfcSynced] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -153,33 +161,119 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Mode Switcher on Desktop */}
-          <nav className="hidden xl:flex items-center gap-1">
-            {appModes.map((item) => {
-              const isActive = activeMode === item.id;
-              return (
+          {/* Role-Locked Navigation on Desktop */}
+          {currentUserSession ? (
+            <div className="hidden lg:flex items-center gap-3">
+              {/* Role Badge and Identification */}
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-[#0B1736] border border-cyan-500/40 shadow-[0_0_18px_rgba(0,210,255,0.15)] font-mono">
+                <span className="text-xl p-1 rounded-xl bg-black/40 border border-white/10">
+                  {currentUserSession.avatarEmoji}
+                </span>
+                <div className="text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white tracking-tight">
+                      {currentUserSession.name}
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                      LV.{currentUserSession.level}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-cyan-300">
+                    <Lock className="w-2.5 h-2.5 text-cyan-400" />
+                    <span>{currentUserSession.roleTitleTh}</span>
+                    <span className="text-slate-500">•</span>
+                    <span className="text-slate-400 font-mono">{currentUserSession.id}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Role-allowed Navigation links */}
+              {currentUserSession.role === 'customer' && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(700);
+                      onSelectMode('passenger');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      activeMode === 'passenger'
+                        ? 'text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 shadow-[0_0_12px_rgba(0,210,255,0.3)]'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>เรียกรถ / สั่งของ</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(700);
+                      onSelectMode('market');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      activeMode === 'market'
+                        ? 'text-pink-300 bg-pink-500/20 border border-pink-400/40 shadow-[0_0_12px_rgba(236,72,153,0.3)]'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>WIN Street Market</span>
+                  </button>
+                </div>
+              )}
+
+              {currentUserSession.role === 'driver' && (
+                <div className="flex items-center gap-1">
+                  <div className="px-3 py-1.5 rounded-xl text-xs font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-400/40 flex items-center gap-1.5">
+                    <Bike className="w-3.5 h-3.5" />
+                    <span>อู่อัศวิน 3D เรดาร์ & แผนที่</span>
+                  </div>
+                </div>
+              )}
+
+              {currentUserSession.role === 'merchant' && (
+                <div className="flex items-center gap-1">
+                  <div className="px-3 py-1.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-400/40 flex items-center gap-1.5">
+                    <Store className="w-3.5 h-3.5" />
+                    <span>ศูนย์ร้านค้า & รับออเดอร์</span>
+                  </div>
+                </div>
+              )}
+
+              {currentUserSession.role === 'partner' && (
+                <div className="flex items-center gap-1">
+                  <div className="px-3 py-1.5 rounded-xl text-xs font-bold text-pink-300 bg-pink-500/15 border border-pink-400/40 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>ศูนย์พาร์ทเนอร์ & โรงพยาบาล</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Sign Out Button */}
+              {onSignOut && (
                 <button
-                  key={item.id}
-                  id={`mode-btn-${item.id}`}
+                  type="button"
                   onClick={() => {
-                    if (audioEnabled) playTactileBlip(isActive ? 700 : 900);
-                    onSelectMode(item.id);
+                    if (audioEnabled) playTactileBlip(800);
+                    if (window.confirm(`ต้องการออกจากระบบบัญชี "${currentUserSession.name}" ใช่หรือไม่?`)) {
+                      onSignOut();
+                    }
                   }}
-                  className={`relative px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    isActive
-                      ? 'text-[#00D2FF] bg-[#00D2FF]/15 border border-[#00D2FF]/40 shadow-[0_0_15px_rgba(0,210,255,0.3)]'
-                      : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
-                  }`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-mono font-bold transition-all shadow-[0_0_10px_rgba(244,63,94,0.15)] active:scale-95 cursor-pointer"
+                  title="ออกจากระบบ เพื่อสลับบัญชีหรือบทบาท"
                 >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
-                  {isActive && (
-                    <span className="absolute -bottom-[9px] left-1/2 -translate-x-1/2 w-8 h-[2px] bg-[#00D2FF] rounded-full shadow-[0_0_8px_#00D2FF]" />
-                  )}
+                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                  <span>ออกจากระบบ</span>
                 </button>
-              );
-            })}
-          </nav>
+              )}
+            </div>
+          ) : (
+            <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-slate-400 bg-black/40 px-3 py-1.5 rounded-xl border border-white/10">
+              <Lock className="w-3.5 h-3.5 text-cyan-400" />
+              <span>โหมดความปลอดภัย: กรุณาลงทะเบียนหรือเข้าสู่ระบบ</span>
+            </div>
+          )}
 
           {/* Action Buttons: Voice Command, Notification, Profile (Side-by-side) */}
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -225,13 +319,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }
               }}
               className="relative p-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-[#FFD700] border border-[#FFD700]/40 transition-all cursor-pointer shadow-[0_0_12px_rgba(255,215,0,0.2)] flex items-center gap-1 active:scale-95"
-              title="โปรไฟล์พลเมือง (Citizen Profile)"
+              title={currentUserSession ? `โปรไฟล์: ${currentUserSession.name} (${currentUserSession.roleTitleTh})` : "โปรไฟล์พลเมือง"}
             >
               <div className="w-5 h-5 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-500 flex items-center justify-center text-[10px] font-bold text-slate-950 shadow-[0_0_6px_#00D2FF]">
-                🦥
+                {currentUserSession?.avatarEmoji || '🦥'}
               </div>
               <User className="w-3.5 h-3.5 text-[#FFD700]" />
             </button>
+
+            {/* Mobile Sign Out Button */}
+            {currentUserSession && onSignOut && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  if (window.confirm(`ต้องการออกจากระบบบัญชี "${currentUserSession.name}" ใช่หรือไม่?`)) {
+                    onSignOut();
+                  }
+                }}
+                className="lg:hidden p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all cursor-pointer active:scale-95"
+                title="ออกจากระบบ"
+              >
+                <LogOut className="w-4 h-4 text-rose-400" />
+              </button>
+            )}
 
             {/* No-Code Webhook Bridge Button */}
             {onOpenWebhookModal && (
