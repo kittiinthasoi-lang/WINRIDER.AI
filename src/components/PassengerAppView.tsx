@@ -17,11 +17,16 @@ import { VoiceAssistantModal } from './VoiceAssistantModal';
 import { SovereignQuestCenter } from './SovereignQuestCenter';
 import { LIFESTYLE_PLACES } from '../data/lifestyleData';
 import { REAL_BANGKOK_LOCATIONS, RealBangkokLocation } from '../data/realBangkokLocations';
-import { playTactileBlip, playRadarScan, playEngineRev, speakThaiText } from '../utils/audio';
+import { playTactileBlip, playRadarScan, playEngineRev, playLevelUpFanfare, speakThaiText } from '../utils/audio';
 import { AIProductPhotoVerifier, AIVerificationResult } from './AIProductPhotoVerifier';
 import { SpecializedServicePreMatchingModal, SpecializedPreMatchingData } from './SpecializedServicePreMatchingModal';
 import { ServicePhotoVerificationModal } from './ServicePhotoVerificationModal';
 import { CustomerPaymentQrCodeModal } from './CustomerPaymentQrCodeModal';
+import { createLiveOrder, subscribeToLiveOrders, LiveRideOrder } from '../utils/dispatchSync';
+import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
+import { PromptPayPaymentModal } from './PromptPayPaymentModal';
+import { InRideDirectChatModal } from './InRideDirectChatModal';
+import { RealGpsMapModal } from './RealGpsMapModal';
 import confetti from 'canvas-confetti';
 import { 
   Shield, 
@@ -66,14 +71,14 @@ import {
   Info,
   CreditCard,
   TrendingUp,
+  QrCode,
   Coins,
   Award,
   AudioWaveform,
   Mic,
   Package,
   UserCheck,
-  User,
-  QrCode
+  User
 } from 'lucide-react';
 
 // 8 Core Services Color Palette Themes for Neon Contrast on Deep Navy
@@ -242,7 +247,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [deviceFrameMode, setDeviceFrameMode] = useState(true);
   const [currentMatchedDriver, setCurrentMatchedDriver] = useState<MatchedDriver | null>(null);
 
-  // --- Real-Time Active Ride & AI Voice Announcer System ---
+  // --- Real-Time Active Ride, AI Voice Announcer & Live Dispatch Sync ---
+  const [activeLiveOrder, setActiveLiveOrder] = useState<LiveRideOrder | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
+  const [showPromptPayModal, setShowPromptPayModal] = useState<boolean>(false);
+  const [showInRideChatModal, setShowInRideChatModal] = useState<boolean>(false);
+  const [showRealGpsModal, setShowRealGpsModal] = useState<boolean>(false);
   const [ridePhase, setRidePhase] = useState<'picking_up' | 'arrived_pickup' | 'in_transit' | 'arrived_destination'>('picking_up');
   const [pickupEtaMinutes, setPickupEtaMinutes] = useState<number>(2.2);
   const [destEtaMinutes, setDestEtaMinutes] = useState<number>(5.8);
@@ -250,6 +260,68 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [isAiSpeaking, setIsAiSpeaking] = useState<boolean>(false);
   const [isAutoVoiceAnnounce, setIsAutoVoiceAnnounce] = useState<boolean>(true);
   const [aiSpeechText, setAiSpeechText] = useState<string>('พี่วินกิตติ (LV.100) กำลังเดินทางมารับคุณที่คอนโดสุขุมวิท 39 อีกประมาณ 2.2 นาทีถึงค่ะ');
+
+  // Cross-tab Live Dispatch Listener: updates passenger UI when Knight accepts or advances trip
+  React.useEffect(() => {
+    const unsubscribe = subscribeToLiveOrders((order, type) => {
+      if (type === 'accepted') {
+        setActiveLiveOrder(order);
+        if (order.driverName) {
+          setCurrentMatchedDriver({
+            name: order.driverName,
+            level: order.driverLevel || 100,
+            rating: 4.98,
+            plate: order.driverPlate || '1กข 7789 กทม.',
+            phone: '081-998-3344',
+            vehicle: order.driverVehicle || 'Honda ADV350 Stealth',
+            photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+            totalRides: 2840,
+            currentLocation: 'ปากซอยสุขุมวิท 23 (ห่าง 200ม.)',
+            etaMinutes: 2.0,
+            distanceMeters: 200,
+            specialBadges: ['⚡ อัศวินตอบสนองไว', '🛡️ กองทุน 2 บาทสมบูรณ์'],
+            armorsEquipped: ['The Guardian Zipper', 'Smart HUD Helmet']
+          });
+          setRidePhase('picking_up');
+          if (audioEnabled) {
+            playLevelUpFanfare();
+            speakThaiText(`พี่วิน ${order.driverName} กดรับงานแล้วค่ะ กำลังเดินทางมารับคุณ`);
+          }
+          confetti({ particleCount: 50, spread: 70, colors: ['#00D2FF', '#10B981', '#FFD700'] });
+        }
+      } else if (type === 'step_changed') {
+        setActiveLiveOrder(order);
+        if (order.status === 'heading_pickup') setRidePhase('picking_up');
+        if (order.status === 'picked_up') {
+          setRidePhase('arrived_pickup');
+          if (audioEnabled) {
+            playTactileBlip(1000);
+            speakThaiText("พี่วินเดินทางมาถึงจุดรับแล้วค่ะ กรุณาสวมหมวกนิรภัยเพื่อความปลอดภัย");
+          }
+        }
+        if (order.status === 'in_transit') {
+          setRidePhase('in_transit');
+          if (audioEnabled) {
+            playEngineRev();
+            speakThaiText("กำลังออกเดินทางสู่จุดหมายปลายทาง ขับขี่ปลอดภัยด้วยเกราะและกองทุนวินค่ะ");
+          }
+        }
+        if (order.status === 'completed') {
+          setRidePhase('arrived_destination');
+          setShowReceiptModal(true);
+          if (audioEnabled) {
+            playLevelUpFanfare();
+            speakThaiText("เดินทางถึงจุดหมายปลายทางเรียบร้อยแล้วค่ะ ขอบคุณที่ร่วมเดินทางกับวินไรเดอร์นะคะ");
+          }
+        }
+      } else if (type === 'completed') {
+        setActiveLiveOrder(order);
+        setRidePhase('arrived_destination');
+        setShowReceiptModal(true);
+      }
+    });
+    return () => unsubscribe();
+  }, [audioEnabled]);
 
   // AI Voice Announcement Dispatcher
   const speakRideAiAnnouncement = (phaseOverride?: 'picking_up' | 'arrived_pickup' | 'in_transit' | 'arrived_destination') => {
@@ -676,7 +748,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     }
   };
 
-  const handleConfirmRide = () => {
+  const handleConfirmRide = async () => {
     if (audioEnabled) {
       playRadarScan();
     }
@@ -688,6 +760,25 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       origin: { y: 0.6 },
       colors: ['#00D2FF', '#FFD700', '#FFFFFF']
     });
+
+    // Create live order for cross-tab sync and No-Code webhook dispatch
+    try {
+      const liveOrder = await createLiveOrder({
+        serviceId: activeServiceId || 'knight',
+        serviceTitle: selectedService ? `WIN ${selectedService.toUpperCase()}` : 'WIN KNIGHT',
+        serviceIconEmoji: selectedDreamRide?.icon || '🛵',
+        passengerName: 'คุณอารียา สุขสวัสดิ์ (Citizen LV.91)',
+        passengerPhone: '089-445-1234',
+        pickupLocation: 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)',
+        dropoffLocation: selectedDestination || 'อาคาร Exchange Tower อโศก',
+        distanceKm: tripDistanceKm,
+        fare: totalCalculatedFare || 45
+      });
+      setActiveLiveOrder(liveOrder);
+    } catch (err) {
+      console.error('Failed to create live order:', err);
+    }
+
     setTimeout(() => {
       setActiveTab('ride');
     }, 600);
@@ -1643,6 +1734,60 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       >
                         <span className="block text-[11px]">4. 🏁 ถึงปลายทาง</span>
                         <span className="text-[9px] text-amber-300">เสร็จสิ้นทริป</span>
+                      </button>
+                    </div>
+
+                    {/* In-Ride Tactical Actions: Chat, PromptPay QR, Real GPS Navigation */}
+                    <div className="grid grid-cols-3 gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(880);
+                          setShowInRideChatModal(true);
+                        }}
+                        className="p-2.5 rounded-2xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(0,210,255,0.15)]"
+                      >
+                        <MessageSquare className="w-4 h-4 text-cyan-400" />
+                        <span className="text-[11px] whitespace-nowrap">แชทกับพี่วิน</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(920);
+                          setShowPromptPayModal(true);
+                        }}
+                        className="p-2.5 rounded-2xl bg-gradient-to-r from-blue-600/20 to-cyan-500/20 hover:from-blue-600/30 hover:to-cyan-500/30 border border-blue-400/40 text-blue-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(59,130,246,0.15)]"
+                      >
+                        <QrCode className="w-4 h-4 text-cyan-300" />
+                        <span className="text-[11px] whitespace-nowrap">พร้อมเพย์ QR</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(950);
+                          setShowRealGpsModal(true);
+                        }}
+                        className="p-2.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                      >
+                        <Compass className="w-4 h-4 text-emerald-400" />
+                        <span className="text-[11px] whitespace-nowrap">GPS จริง</span>
+                      </button>
+                    </div>
+
+                    {/* Trip Summary & 2-Baht Fund Receipt Launcher */}
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(950);
+                          setShowReceiptModal(true);
+                        }}
+                        className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-[#FFD700]/20 to-amber-500/20 hover:from-amber-500/30 hover:to-amber-500/30 border border-[#FFD700]/40 text-[#FFD700] text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,215,0,0.15)] active:scale-98 transition-all"
+                      >
+                        <Sparkles className="w-4 h-4 text-[#FFD700]" />
+                        <span>🧾 ดูใบเสร็จ & การจัดสรรเงินเข้ากองทุน 2 บาท (Receipt Breakdown)</span>
                       </button>
                     </div>
                   </div>
@@ -3075,6 +3220,70 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         customerName="คุณลูกค้า (ผู้ขายชุมชน C2C)"
         defaultItemTitle={customerQrTitle}
         defaultAmount={customerQrAmount}
+        audioEnabled={audioEnabled}
+      />
+
+      {/* TRIP SUMMARY & 2-BAHT WELFARE FUND RECEIPT MODAL */}
+      <TripSummaryReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        order={activeLiveOrder || {
+          id: 'LIVE-' + Date.now().toString().slice(-4),
+          serviceId: activeServiceId || 'knight',
+          serviceTitle: selectedService ? `WIN ${selectedService.toUpperCase()}` : 'WIN KNIGHT',
+          serviceIconEmoji: selectedDreamRide?.icon || '🛵',
+          passengerName: 'คุณอารียา สุขสวัสดิ์ (Citizen LV.91)',
+          passengerPhone: '089-445-1234',
+          pickupLocation: 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)',
+          dropoffLocation: selectedDestination || 'อาคาร Exchange Tower อโศก',
+          distanceKm: tripDistanceKm,
+          fare: totalCalculatedFare || 45,
+          welfareFund2Baht: 2.0,
+          netFare: (totalCalculatedFare || 45) - 2.0,
+          estMinutes: 6.5,
+          status: 'completed',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          driverName: currentMatchedDriver?.name || 'พี่กิตติ อินทะสร้อย',
+          driverLevel: currentMatchedDriver?.level || 100,
+          driverPlate: currentMatchedDriver?.plate || '1กข 7789 กทม.',
+          driverAvatarEmoji: currentMatchedDriver?.avatarEmoji || '🦁'
+        }}
+        audioEnabled={audioEnabled}
+      />
+
+      {/* PROMPTPAY EMVCo PAYMENT MODAL */}
+      <PromptPayPaymentModal
+        isOpen={showPromptPayModal}
+        onClose={() => setShowPromptPayModal(false)}
+        orderId={activeLiveOrder?.id || 'RIDE-' + Date.now().toString().slice(-4)}
+        payeeName={currentMatchedDriver?.name || 'พี่กิตติ อินทะสร้อย (อัศวิน)'}
+        promptPayId={activeLiveOrder?.driverPhone?.replace(/[^0-9]/g, '') || '0894451234'}
+        amount={activeLiveOrder?.fare || totalCalculatedFare || 45}
+        tipAmount={activeLiveOrder?.tipAmount || 0}
+        audioEnabled={audioEnabled}
+        onPaymentConfirmed={() => {
+          setShowPromptPayModal(false);
+          setShowReceiptModal(true);
+        }}
+      />
+
+      {/* IN-RIDE DIRECT CHAT MODAL */}
+      <InRideDirectChatModal
+        isOpen={showInRideChatModal}
+        onClose={() => setShowInRideChatModal(false)}
+        orderId={activeLiveOrder?.id || 'ACTIVE-RIDE'}
+        currentUserRole="passenger"
+        currentUserName="คุณอารียา (ผู้โดยสาร)"
+        otherPartyName={currentMatchedDriver?.name || 'พี่วินอัศวิน'}
+        audioEnabled={audioEnabled}
+      />
+
+      {/* REAL GPS SATELLITE MAP MODAL */}
+      <RealGpsMapModal
+        isOpen={showRealGpsModal}
+        onClose={() => setShowRealGpsModal(false)}
+        destinationTitle={selectedDestination || 'อาคาร Exchange Tower อโศก'}
         audioEnabled={audioEnabled}
       />
     </div>

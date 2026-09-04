@@ -7,6 +7,8 @@ import {
   CITIZEN_10_TIERS, 
   MERCHANT_10_TIERS 
 } from '../data/tierHierarchyData';
+import { db } from '../lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { 
   UserPlus, 
   Bike, 
@@ -121,6 +123,23 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
     const newId = `${prefix}-${randNum}`;
     setIssuedCitizenId(newId);
     setIsSubmitted(true);
+
+    // Persist to Firebase Firestore
+    try {
+      const profileData = {
+        id: newId,
+        role: selectedRole,
+        name: selectedRole === 'driver' ? driverForm.fullName : selectedRole === 'customer' ? customerForm.fullName : selectedRole === 'merchant' ? merchantForm.shopName : partnerForm.companyName,
+        phone: selectedRole === 'driver' ? driverForm.phone : selectedRole === 'customer' ? customerForm.phone : selectedRole === 'merchant' ? merchantForm.phone : partnerForm.contactPhone,
+        level: 1,
+        xp: 100,
+        rating: 5.0,
+        armorTier: selectedRole === 'driver' ? 1 : 0,
+        promptPayId: selectedRole === 'driver' ? driverForm.phone.replace(/[^0-9]/g, '') : '',
+        updatedAt: new Date().toISOString(),
+      };
+      setDoc(doc(db, 'users', newId), profileData).catch((err) => console.warn('Firebase user save err:', err));
+    } catch {}
 
     confetti({
       particleCount: 100,

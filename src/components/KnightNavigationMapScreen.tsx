@@ -94,6 +94,8 @@ import {
 } from '../utils/audio';
 import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { DriverPaymentQrCodeModal } from './DriverPaymentQrCodeModal';
+import { InRideDirectChatModal } from './InRideDirectChatModal';
+import { RealGpsMapModal } from './RealGpsMapModal';
 import confetti from 'canvas-confetti';
 import {
   BANGKOK_COMPLEX_ROUTES,
@@ -236,6 +238,8 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   const [showRadarModal, setShowRadarModal] = useState<boolean>(false);
   const [showQrPayModal, setShowQrPayModal] = useState<boolean>(false);
   const [showRandomSimModal, setShowRandomSimModal] = useState<boolean>(false);
+  const [showDirectChatModal, setShowDirectChatModal] = useState<boolean>(false);
+  const [showRealGpsModal, setShowRealGpsModal] = useState<boolean>(false);
 
   // Job Completion Workflow States (Proof of Delivery, QR Payment, Rating)
   const [showDeliveryProofModal, setShowDeliveryProofModal] = useState<boolean>(false);
@@ -1235,6 +1239,30 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
           </button>
 
           <button
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(880);
+              setShowDirectChatModal(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 text-xs font-mono font-bold flex items-center gap-1 shadow-[0_0_10px_rgba(0,210,255,0.2)]"
+            title="แชทสดกับลูกค้า (In-Ride Direct Chat)"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+            <span>แชทลูกค้า</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(920);
+              setShowRealGpsModal(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-xs font-mono font-bold flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+            title="พิกัดดาวเทียม GPS จริง & นำทางเลี้ยวต่อเลี้ยว (Turn-by-Turn GPS)"
+          >
+            <Compass className="w-3.5 h-3.5 text-emerald-400" />
+            <span>GPS จริง</span>
+          </button>
+
+          <button
             onClick={() => setShowQrPayModal(true)}
             className="px-2.5 py-1.5 rounded-xl bg-[#FFD700]/20 hover:bg-[#FFD700]/30 text-[#FFD700] border border-[#FFD700]/40 text-xs font-mono font-bold flex items-center gap-1"
           >
@@ -1966,6 +1994,25 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
           audioEnabled={audioEnabled}
         />
       )}
+
+      {/* DIRECT IN-RIDE CHAT WITH PASSENGER */}
+      <InRideDirectChatModal
+        isOpen={showDirectChatModal}
+        onClose={() => setShowDirectChatModal(false)}
+        orderId={selectedJob.id}
+        currentUserRole="driver"
+        currentUserName="พี่กิตติ (อัศวิน LV.100)"
+        otherPartyName={selectedJob.customerName}
+        audioEnabled={audioEnabled}
+      />
+
+      {/* REAL GPS SATELLITE MAP & TURN-BY-TURN GUIDANCE */}
+      <RealGpsMapModal
+        isOpen={showRealGpsModal}
+        onClose={() => setShowRealGpsModal(false)}
+        destinationTitle={selectedJob.dropoffLocation}
+        audioEnabled={audioEnabled}
+      />
     </div>
   );
 };

@@ -26,7 +26,9 @@ import {
   Map,
   Globe,
   Sliders,
-  Filter
+  Filter,
+  Sun,
+  SunMedium
 } from 'lucide-react';
 import { Vehicle } from '../types';
 import { ThreeDimensionalDriverRadar, Radar3DPing } from './ThreeDimensionalDriverRadar';
@@ -37,6 +39,9 @@ import {
   RealBangkokLocation,
   getGoogleMapsNavigationUrl
 } from '../data/realBangkokLocations';
+import { useWakeLock } from '../hooks/useWakeLock';
+import { subscribeToLiveOrders, acceptLiveOrder, advanceLiveOrderStep, LiveRideOrder } from '../utils/dispatchSync';
+import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 
 export interface IncomingJobData {
   id: string;
@@ -241,6 +246,53 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string>('all');
   const [showGoogleMapsModal, setShowGoogleMapsModal] = useState<boolean>(false);
 
+  // Screen Wake Lock & Trip Receipt States
+  const { isLocked: isScreenAwake, isSupported: isWakeLockSupported, toggleWakeLock } = useWakeLock();
+  const [completedOrderForReceipt, setCompletedOrderForReceipt] = useState<LiveRideOrder | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
+
+  // Live Order Listener (Real-Time Passenger <-> Driver Cross-Screen Sync)
+  useEffect(() => {
+    const unsubscribe = subscribeToLiveOrders((order, type) => {
+      if (type === 'created' && order.status === 'pending' && isOnDuty) {
+        const incomingJob: IncomingJobData = {
+          id: order.id,
+          serviceId: (order.serviceId as any) || 'knight',
+          serviceTitle: order.serviceTitle,
+          serviceIconEmoji: order.serviceIconEmoji || '🛵',
+          customerName: order.passengerName,
+          customerGender: 'female',
+          customerRating: 4.95,
+          customerPhone: order.passengerPhone,
+          customerAvatarEmoji: '👩‍💼',
+          customerNote: `รออยู่ที่ ${order.pickupLocation}`,
+          pickupLocation: order.pickupLocation,
+          dropoffLocation: order.dropoffLocation,
+          distanceKm: order.distanceKm,
+          driverDistanceToPickupKm: 0.25,
+          fairDispatchQueueRank: 1,
+          totalCandidatesInRadius: 4,
+          estMinutes: order.estMinutes,
+          baseFare: order.fare,
+          tips: 0,
+          netFare: order.netFare,
+          platformFee: 2,
+          xpReward: 250,
+          specialBadges: ['🚨 งานสดเรียลไทม์ (Live Passenger)', '⚡ 2-Baht Sovereign Fund', '📍 ใกล้จุดรับที่สุด'],
+          vehicleRequested: activeVehicle?.name || 'Honda Wave 125i',
+          urgency: 'high'
+        };
+        setActiveIncomingJob(incomingJob);
+        setCountdownSeconds(30);
+        if (audioEnabled) {
+          playRadarScan();
+          speakThaiText(`มีงานใหม่เข้ามาจากผู้โดยสาร ${order.passengerName} จุดรับ ${order.pickupLocation} ค่าโดยสาร ${order.fare} บาท`);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [isOnDuty, audioEnabled, activeVehicle]);
+
   // Online minutes counter
   useEffect(() => {
     if (!isOnDuty) return;
@@ -353,6 +405,15 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
     setTripStep('heading_pickup');
     setActiveIncomingJob(null);
     onAcceptJob(job);
+
+    // Sync accept order to passenger and webhook
+    acceptLiveOrder(job.id, {
+      driverName: 'พี่สมศักดิ์ ไนท์สายฟ้า',
+      driverLevel: driverLevel || 100,
+      driverPlate: '1กข 7789 กทม.',
+      driverAvatarEmoji: '🦁',
+      driverVehicle: activeVehicle?.name || 'Honda Wave 125i'
+    });
   };
 
   const handleDeclineJob = () => {
@@ -368,9 +429,11 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
     if (tripStep === 'heading_pickup') {
       if (audioEnabled) playTactileBlip(1000);
       setTripStep('picked_up');
+      advanceLiveOrderStep(currentActiveTrip.id, 'picked_up');
     } else if (tripStep === 'picked_up') {
       if (audioEnabled) playEngineRev();
       setTripStep('navigating');
+      advanceLiveOrderStep(currentActiveTrip.id, 'in_transit');
     } else if (tripStep === 'navigating') {
       // Complete Trip!
       if (audioEnabled) playLevelUpFanfare();
@@ -382,6 +445,33 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
 
       onAddEarnings(currentActiveTrip.netFare);
       onGainXp(currentActiveTrip.xpReward, `ส่งงานสำเร็จ: ${currentActiveTrip.serviceTitle}`);
+
+      advanceLiveOrderStep(currentActiveTrip.id, 'completed');
+
+      const receiptOrder: LiveRideOrder = {
+        id: currentActiveTrip.id,
+        serviceId: currentActiveTrip.serviceId,
+        serviceTitle: currentActiveTrip.serviceTitle,
+        serviceIconEmoji: currentActiveTrip.serviceIconEmoji,
+        passengerName: currentActiveTrip.customerName,
+        passengerPhone: currentActiveTrip.customerPhone || '089-445-1234',
+        pickupLocation: currentActiveTrip.pickupLocation,
+        dropoffLocation: currentActiveTrip.dropoffLocation,
+        distanceKm: currentActiveTrip.distanceKm,
+        fare: currentActiveTrip.baseFare,
+        welfareFund2Baht: 2.0,
+        netFare: currentActiveTrip.netFare,
+        estMinutes: currentActiveTrip.estMinutes,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        driverName: 'พี่สมศักดิ์ ไนท์สายฟ้า',
+        driverLevel: driverLevel || 100,
+        driverPlate: '1กข 7789 กทม.',
+        driverAvatarEmoji: '🦁'
+      };
+      setCompletedOrderForReceipt(receiptOrder);
+      setShowReceiptModal(true);
 
       setTripStep('completed');
       setTimeout(() => {
@@ -444,8 +534,28 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
             </div>
           </div>
 
-          {/* Toggle Switch & Map HUD Launcher */}
+          {/* Toggle Switch, Wake Lock & Map HUD Launcher */}
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
+            {/* Screen Always-On / WakeLock Button */}
+            {isWakeLockSupported && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (audioEnabled) playTactileBlip(950);
+                  await toggleWakeLock();
+                }}
+                className={`px-3 py-2.5 rounded-2xl font-mono text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                  isScreenAwake
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                    : 'bg-black/40 text-slate-400 border-white/10 hover:border-white/20'
+                }`}
+                title="ป้องกันหน้าจอดับขณะขับขี่บนแฮนด์มอเตอร์ไซค์ (Screen Always-On)"
+              >
+                <Sun className={`w-3.5 h-3.5 ${isScreenAwake ? 'text-amber-400 animate-pulse' : 'text-slate-400'}`} />
+                <span>{isScreenAwake ? 'จอสว่างตลอด ✓' : 'กันจอดับ'}</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -964,6 +1074,14 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
           </div>
         </div>
       )}
+
+      {/* Trip Summary & 2-Baht Fund Receipt Modal */}
+      <TripSummaryReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        order={completedOrderForReceipt}
+        audioEnabled={audioEnabled}
+      />
     </div>
   );
 };

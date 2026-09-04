@@ -24,8 +24,11 @@ import {
   UserPlus,
   ShoppingBag,
   Flame,
-  Bell
+  Bell,
+  Zap,
+  Compass
 } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   activeMode: AppMode;
@@ -37,6 +40,9 @@ interface NavbarProps {
   onOpenCustomerVoice: () => void;
   onOpenWinBuddy?: () => void;
   onOpenProfile?: () => void;
+  onOpenWebhookModal?: () => void;
+  onOpenNotificationModal?: () => void;
+  onOpenGpsModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -49,6 +55,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCustomerVoice,
   onOpenWinBuddy,
   onOpenProfile,
+  onOpenWebhookModal,
+  onOpenNotificationModal,
+  onOpenGpsModal,
 }) => {
   const [nfcSynced, setNfcSynced] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -223,6 +232,61 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
               <User className="w-3.5 h-3.5 text-[#FFD700]" />
             </button>
+
+            {/* No-Code Webhook Bridge Button */}
+            {onOpenWebhookModal && (
+              <button
+                id="navbar-webhook-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(900);
+                  onOpenWebhookModal();
+                }}
+                className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/15 to-blue-600/15 hover:from-cyan-500/25 hover:to-blue-600/25 text-cyan-300 border border-cyan-400/40 text-xs font-mono font-bold transition-all shadow-[0_0_12px_rgba(0,210,255,0.2)] active:scale-95"
+                title="เชื่อมต่อ Low-Code Webhook (Google Sheets, Make.com, Zapier, LINE OA)"
+              >
+                <Zap className="w-3.5 h-3.5 text-[#00D2FF]" />
+                <span>Webhook</span>
+              </button>
+            )}
+
+            {/* Real GPS Satellite Map Launcher */}
+            {onOpenGpsModal && (
+              <button
+                type="button"
+                id="gps-map-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(950);
+                  onOpenGpsModal();
+                }}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 text-xs font-mono font-semibold transition-all active:scale-95"
+                title="เปิดแผนที่พิกัดดาวเทียม GPS จริง & นำทาง Google Maps"
+              >
+                <Compass className="w-3.5 h-3.5 text-cyan-400" />
+                <span>GPS จริง</span>
+              </button>
+            )}
+
+            {/* Web Push & LINE Notify Launcher */}
+            {onOpenNotificationModal && (
+              <button
+                type="button"
+                id="push-notif-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(900);
+                  onOpenNotificationModal();
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-400/30 text-xs font-mono font-semibold transition-all active:scale-95"
+                title="ตั้งค่าการแจ้งเตือน Web Push & LINE Notify"
+              >
+                <Bell className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">แจ้งเตือน</span>
+              </button>
+            )}
+
+            {/* PWA Install Button */}
+            <div className="hidden sm:block">
+              <PWAInstallButton />
+            </div>
 
             {/* NFC Quick Sync button */}
             <button

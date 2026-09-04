@@ -35,6 +35,187 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", empire: "WINRIDER.AI", timestamp: new Date().toISOString() });
 });
 
+// In-memory active orders store for cross-device & cross-tab sync
+interface ServerOrder {
+  id: string;
+  serviceId: string;
+  serviceTitle: string;
+  serviceIconEmoji: string;
+  passengerName: string;
+  passengerPhone: string;
+  pickupLocation: string;
+  dropoffLocation: string;
+  distanceKm: number;
+  fare: number;
+  welfareFund2Baht: number;
+  netFare: number;
+  estMinutes: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  driverName?: string;
+  driverLevel?: number;
+  driverPhone?: string;
+  driverPlate?: string;
+  driverAvatarEmoji?: string;
+  driverVehicle?: string;
+  tipAmount?: number;
+}
+
+let activeOrders: ServerOrder[] = [
+  {
+    id: "WIN-7782",
+    serviceId: "knight",
+    serviceTitle: "WIN KNIGHT (หลบรถติดซอยสุขุมวิท)",
+    serviceIconEmoji: "🛵",
+    passengerName: "คุณอารียา สุขสวัสดิ์",
+    passengerPhone: "089-445-1234",
+    pickupLocation: "ซอยสุขุมวิท 23 (แยก 4)",
+    dropoffLocation: "อาคาร Exchange Tower BTS อโศก",
+    distanceKm: 2.4,
+    fare: 45,
+    welfareFund2Baht: 2.0,
+    netFare: 43,
+    estMinutes: 7,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
+
+// Orders API
+app.get("/api/orders", (_req, res) => {
+  res.json({ orders: activeOrders });
+});
+
+app.post("/api/orders", (req, res) => {
+  const newOrder = req.body as ServerOrder;
+  if (!newOrder || !newOrder.id) {
+    return res.status(400).json({ error: "Invalid order data" });
+  }
+  activeOrders.unshift(newOrder);
+  if (activeOrders.length > 50) activeOrders.pop();
+  res.json({ success: true, order: newOrder });
+});
+
+app.post("/api/orders/:id/accept", (req, res) => {
+  const { id } = req.params;
+  const driverInfo = req.body;
+  const order = activeOrders.find(o => o.id === id);
+  if (!order) {
+    return res.status(404).json({ error: "Order not found" });
+  }
+  order.status = "accepted";
+  order.updatedAt = new Date().toISOString();
+  order.driverName = driverInfo.driverName || "พี่สมศักดิ์ ไนท์สายฟ้า";
+  order.driverLevel = driverInfo.driverLevel || 100;
+  order.driverPhone = driverInfo.driverPhone || "081-998-3344";
+  order.driverPlate = driverInfo.driverPlate || "1กข 7789 กทม.";
+  order.driverAvatarEmoji = driverInfo.driverAvatarEmoji || "🦁";
+  res.json({ success: true, order });
+});
+
+app.post("/api/orders/:id/step", (req, res) => {
+  const { id } = req.params;
+  const { status, tipAmount } = req.body;
+  const order = activeOrders.find(o => o.id === id);
+  if (!order) {
+    return res.status(404).json({ error: "Order not found" });
+  }
+  if (status) order.status = status;
+  if (tipAmount !== undefined) order.tipAmount = tipAmount;
+  order.updatedAt = new Date().toISOString();
+  res.json({ success: true, order });
+});
+
+// Low-Code Webhook Dispatch Proxy (bypasses browser CORS for Make.com / Zapier / Google Sheets)
+app.post("/api/webhooks/dispatch", async (req, res) => {
+  try {
+    const { webhookUrl, event, payload } = req.body;
+    if (!webhookUrl) {
+      return res.json({
+        success: true,
+        simulated: true,
+        message: "No Webhook URL provided. Simulated dispatch succeeded."
+      });
+    }
+
+    const startTime = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "WINRIDER-Sovereign-Webhook/1.0"
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    const latencyMs = Date.now() - startTime;
+    let responseData = null;
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      try {
+        responseData = await response.json();
+      } catch {
+        responseData = "JSON Parse Error";
+      }
+    } else {
+      try {
+        responseData = await response.text();
+      } catch {
+        responseData = "";
+      }
+    }
+
+    return res.json({
+      success: response.ok,
+      statusCode: response.status,
+      latencyMs,
+      responseData
+    });
+  } catch (err: any) {
+    console.error("[Webhook Dispatch Error]:", err?.message);
+    return res.status(500).json({
+      success: false,
+      error: err?.message || "Webhook dispatch failed",
+      simulatedFallback: true
+    });
+  }
+});
+
+// LINE Notify Proxy Endpoint
+app.post("/api/notifications/line", async (req, res) => {
+  try {
+    const { message, token } = req.body;
+    if (!token) {
+      return res.status(400).json({ status: "error", message: "Missing LINE Notify Token" });
+    }
+
+    const params = new URLSearchParams();
+    params.append("message", message || "WINRIDER.AI notification alert");
+
+    const lineRes = await fetch("https://notify-api.line.me/api/notify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Bearer ${token}`
+      },
+      body: params.toString()
+    });
+
+    const data = await lineRes.json();
+    return res.json({ status: lineRes.ok ? "ok" : "error", lineResponse: data });
+  } catch (err: any) {
+    console.error("[LINE Notify Error]:", err?.message);
+    return res.status(500).json({ status: "error", message: err?.message || "LINE Notify request failed" });
+  }
+});
+
 // WIN Buddy AI NLP & Tactical Voice Endpoint
 app.post("/api/win-buddy/chat", async (req, res) => {
   try {

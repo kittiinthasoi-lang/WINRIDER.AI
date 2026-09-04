@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json.schemastore.org/firebase-blueprint.json",
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile for riders and passengers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "role": { "type": "string", "enum": ["passenger", "driver", "merchant", "hospital"] },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "level": { "type": "number" },
+        "xp": { "type": "number" },
+        "rating": { "type": "number" },
+        "armorTier": { "type": "number" },
+        "promptPayId": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "role", "name"]
+    },
+    "RideOrder": {
+      "title": "RideOrder",
+      "description": "Persistent ride orders and sovereign fund allocations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "pickupLocation": { "type": "string" },
+        "dropoffLocation": { "type": "string" },
+        "fare": { "type": "number" },
+        "sovereignFundCut": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "arrived_pickup", "in_transit", "completed", "cancelled"] },
+        "serviceType": { "type": "string" },
+        "driverName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "customerName", "pickupLocation", "fare", "status"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "UserProfile",
+      "description": "Collection of user profiles"
+    },
+    "rides": {
+      "schema": "RideOrder",
+      "description": "Collection of ride orders"
+    }
+  }
+}

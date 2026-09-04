@@ -18,6 +18,7 @@ import { EcosystemGovernanceSection } from './components/EcosystemGovernanceSect
 import { WinHubGalacticSection } from './components/WinHubGalacticSection';
 import { WinBuddyModal } from './components/WinBuddyModal';
 import { CustomerVoiceCommandModal } from './components/CustomerVoiceCommandModal';
+import { NoCodeWebhookBridgeModal } from './components/NoCodeWebhookBridgeModal';
 import { MobileBottomNavBar } from './components/MobileBottomNavBar';
 import { playTactileBlip } from './utils/audio';
 import { 
@@ -45,6 +46,7 @@ export default function App() {
   const [audioEnabled, setAudioEnabled] = useState<boolean>(true);
   const [isBuddyModalOpen, setIsBuddyModalOpen] = useState<boolean>(false);
   const [isCustomerVoiceOpen, setIsCustomerVoiceOpen] = useState<boolean>(false);
+  const [isWebhookModalOpen, setIsWebhookModalOpen] = useState<boolean>(false);
   const [customerListedItems, setCustomerListedItems] = useState<MarketItem[]>([]);
 
   const handleAddCustomerItem = (item: MarketItem) => {
@@ -74,6 +76,7 @@ export default function App() {
         onToggleAudio={() => setAudioEnabled(!audioEnabled)}
         onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
         onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+        onOpenWebhookModal={() => setIsWebhookModalOpen(true)}
         onOpenProfile={() => {
           setActiveMode('passenger');
           setPassengerTab('profile');
@@ -324,6 +327,13 @@ export default function App() {
       <WinBuddyModal 
         isOpen={isBuddyModalOpen} 
         onClose={() => setIsBuddyModalOpen(false)} 
+        audioEnabled={audioEnabled}
+      />
+
+      {/* 3. No-Code Webhook Bridge Modal (Google Sheets / Make.com / Zapier / LINE OA) */}
+      <NoCodeWebhookBridgeModal
+        isOpen={isWebhookModalOpen}
+        onClose={() => setIsWebhookModalOpen(false)}
         audioEnabled={audioEnabled}
       />
 
