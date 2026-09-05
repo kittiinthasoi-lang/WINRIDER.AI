@@ -12,7 +12,6 @@ import {
   Rocket, 
   Volume2, 
   VolumeX, 
-  Fingerprint,
   AudioWaveform,
   User,
   Sparkles,
@@ -398,21 +397,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="hidden sm:block">
               <PWAInstallButton />
             </div>
-
-            {/* NFC Quick Sync button */}
-            <button
-              id="nfc-quick-sync-btn"
-              onClick={handleNfcQuickTap}
-              title="แตะเพื่อจำลองการ Sync ข้อมูลอัศวินผ่าน Identity Badge NFC"
-              className={`relative px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border ${
-                nfcSynced 
-                  ? 'bg-[#FFD700] text-slate-950 border-[#FFD700] shadow-[0_0_15px_#FFD700]' 
-                  : 'bg-[#FFD700]/10 text-[#FFD700] border-[#FFD700]/30 hover:bg-[#FFD700]/20'
-              }`}
-            >
-              <Fingerprint className="w-4 h-4" />
-              <span className="hidden sm:inline">{nfcSynced ? 'ซิงก์สำเร็จ!' : 'NFC'}</span>
-            </button>
 
             {/* Audio SFX Toggle */}
             <button

@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 import { Vehicle } from '../types';
 import { playTactileBlip, playRadarScan, playEngineRev } from '../utils/audio';
+import { useRealtimeGps } from './GpsRealTimeTracker';
+import { GoogleMapsLiveView } from './GoogleMapsLiveView';
 
 export type RadarCategory = 'all' | 'customer' | 'shop' | 'partner' | 'driver';
 
@@ -338,6 +340,11 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
   const [radarSweepAngle, setRadarSweepAngle] = useState<number>(0);
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
 
+  // Realtime Live GPS Hook
+  const { gpsState } = useRealtimeGps(true);
+  // Toggle between 3D Radar and Google Maps
+  const [radarDisplayMode, setRadarDisplayMode] = useState<'3d_radar' | 'google_maps'>('3d_radar');
+
   // Radar continuous sweep rotation
   useEffect(() => {
     if (!isOnDuty) return;
@@ -393,8 +400,56 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
 
   return (
     <div className="space-y-3 font-mono">
-      {/* 3D RADAR CANVAS CONTAINER */}
-      <div className="relative w-full h-[400px] sm:h-[450px] rounded-3xl bg-gradient-to-b from-[#060D1E] via-[#040813] to-[#02040A] border-2 border-cyan-500/40 shadow-[0_0_40px_rgba(0,210,255,0.25)] overflow-hidden flex items-center justify-center select-none">
+      {/* TOP VIEW SWITCHER: 3D RADAR VS GOOGLE MAPS */}
+      <div className="flex items-center justify-between bg-black/80 p-1.5 rounded-2xl border border-cyan-400/40 shadow-[0_0_15px_rgba(0,210,255,0.2)]">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(850);
+              setRadarDisplayMode('3d_radar');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              radarDisplayMode === '3d_radar'
+                ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-md font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Radio className={`w-3.5 h-3.5 ${radarDisplayMode === '3d_radar' ? 'animate-pulse' : ''}`} />
+            <span>3D Cyber Radar</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(850);
+              setRadarDisplayMode('google_maps');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              radarDisplayMode === 'google_maps'
+                ? 'bg-gradient-to-r from-[#FFD700] to-amber-500 text-slate-950 shadow-md font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
+            <span>Google Maps GPS สด</span>
+          </button>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 pr-2 text-[10px] text-cyan-300">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          <span>GPS สด: {gpsState.latitude.toFixed(4)}, {gpsState.longitude.toFixed(4)}</span>
+        </div>
+      </div>
+
+      {radarDisplayMode === 'google_maps' ? (
+        <GoogleMapsLiveView
+          gpsLocation={gpsState}
+          height="430px"
+          audioEnabled={audioEnabled}
+        />
+      ) : (
+        /* 3D RADAR CANVAS CONTAINER */
+        <div className="relative w-full h-[400px] sm:h-[450px] rounded-3xl bg-gradient-to-b from-[#060D1E] via-[#040813] to-[#02040A] border-2 border-cyan-500/40 shadow-[0_0_40px_rgba(0,210,255,0.25)] overflow-hidden flex items-center justify-center select-none">
         
         {/* Background Nebula & Sci-Fi Depth Grid Lines */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,210,255,0.15)_0,transparent_75%)] pointer-events-none" />
@@ -822,6 +877,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
           </div>
         </div>
       </div>
+      )}
 
       {/* CATEGORY FILTER TABS: ลูกค้า • ร้านค้า • พาร์ทเนอร์ • ทั้งหมด */}
       <div className="p-2 rounded-2xl bg-[#061126] border border-cyan-500/30 flex items-center justify-between gap-2 overflow-x-auto text-xs">

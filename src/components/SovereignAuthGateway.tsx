@@ -25,20 +25,40 @@ import {
 } from 'lucide-react';
 
 interface SovereignAuthGatewayProps {
-  onLoginSuccess: (session: UserSession) => void;
-  onOpenRegister: () => void;
+  onLoginSuccess?: (session: UserSession) => void;
+  onAuthenticated?: (session: UserSession) => void;
+  onOpenRegister?: () => void;
+  onStartRegistration?: () => void;
   audioEnabled: boolean;
 }
 
 export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
   onLoginSuccess,
+  onAuthenticated,
   onOpenRegister,
+  onStartRegistration,
   audioEnabled,
 }) => {
   const [activeTab, setActiveTab] = useState<'quick' | 'phone'>('quick');
   const [phoneOrIdInput, setPhoneOrIdInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSuccess = (session: UserSession) => {
+    if (typeof onLoginSuccess === 'function') {
+      onLoginSuccess(session);
+    } else if (typeof onAuthenticated === 'function') {
+      onAuthenticated(session);
+    }
+  };
+
+  const handleRegisterClick = () => {
+    if (typeof onOpenRegister === 'function') {
+      onOpenRegister();
+    } else if (typeof onStartRegistration === 'function') {
+      onStartRegistration();
+    }
+  };
 
   const handleSelectPreset = async (account: UserSession) => {
     if (audioEnabled) playLevelUpFanfare();
@@ -49,7 +69,7 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
       colors: ['#00D2FF', '#FFD700', '#10B981'],
     });
     await saveUserSession(account);
-    onLoginSuccess(account);
+    handleSuccess(account);
   };
 
   const handlePhoneLogin = async (e: React.FormEvent) => {

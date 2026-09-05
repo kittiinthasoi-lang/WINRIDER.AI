@@ -27,6 +27,7 @@ import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
+import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import confetti from 'canvas-confetti';
 import { 
   Shield, 
@@ -253,6 +254,14 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [showPromptPayModal, setShowPromptPayModal] = useState<boolean>(false);
   const [showInRideChatModal, setShowInRideChatModal] = useState<boolean>(false);
   const [showRealGpsModal, setShowRealGpsModal] = useState<boolean>(false);
+  const [showProfileCustomizerModal, setShowProfileCustomizerModal] = useState<boolean>(false);
+  const [passengerProfileData, setPassengerProfileData] = useState<ProfileCustomizationData>({
+    displayName: 'คุณ จิตใจ สล็อต',
+    bioStatus: 'พลเมืองสายชิลล์ • เน้นปลอดภัย อุดหนุนร้านชุมชน 🦥✨',
+    avatarEmoji: '🦥',
+    themeColor: '#00D2FF',
+    bannerGlow: 'from-[#0C1E40] via-[#091530] to-[#070D1E]'
+  });
   const [ridePhase, setRidePhase] = useState<'picking_up' | 'arrived_pickup' | 'in_transit' | 'arrived_destination'>('picking_up');
   const [pickupEtaMinutes, setPickupEtaMinutes] = useState<number>(2.2);
   const [destEtaMinutes, setDestEtaMinutes] = useState<number>(5.8);
@@ -1957,38 +1966,72 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             {activeTab === 'profile' && (
               <div className="space-y-4">
                 {/* Profile Header Card */}
-                <div className="p-5 rounded-3xl bg-gradient-to-r from-[#0C1E40] via-[#091530] to-[#070D1E] border border-[#FFD700]/40 space-y-3">
+                <div 
+                  className={`p-5 rounded-3xl bg-gradient-to-r ${passengerProfileData.bannerGlow || 'from-[#0C1E40] via-[#091530] to-[#070D1E]'} border border-[#FFD700]/40 space-y-3 shadow-xl transition-all`}
+                  style={{ borderColor: passengerProfileData.themeColor }}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <NeonProfileAvatar 
-                        level={citizenLevel} 
-                        emoji="🦥" 
-                        role="citizen" 
-                        size="md" 
-                      />
+                      {passengerProfileData.avatarUrl ? (
+                        <div className="relative">
+                          <img 
+                            src={passengerProfileData.avatarUrl} 
+                            alt={passengerProfileData.displayName}
+                            className="w-14 h-14 rounded-2xl object-cover border-2 shadow-lg"
+                            style={{ borderColor: passengerProfileData.themeColor }}
+                          />
+                          <div className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-black/80 rounded-full text-[9px] font-bold text-cyan-300 border border-cyan-400">
+                            LV.{citizenLevel}
+                          </div>
+                        </div>
+                      ) : (
+                        <NeonProfileAvatar 
+                          level={citizenLevel} 
+                          emoji={passengerProfileData.avatarEmoji || "🦥"} 
+                          role="citizen" 
+                          size="md" 
+                        />
+                      )}
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-white">คุณสลอต จิตใจ</h3>
+                          <h3 className="text-sm font-bold text-white">{passengerProfileData.displayName}</h3>
                           <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 font-bold">
                             {currentCitizenTier.badge} {currentCitizenTier.title}
                           </span>
                         </div>
+                        <p className="text-[10px] text-cyan-200/90 font-mono mt-0.5 line-clamp-1">
+                          {passengerProfileData.bioStatus}
+                        </p>
                         <p className="text-[10px] text-slate-300 font-mono mt-0.5">
                           ID: <strong className="text-cyan-300">CTZ-SLOTH-999</strong> • เขตคลองสาน-เจริญนคร
                         </p>
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        if (audioEnabled) playTactileBlip(950);
-                        setTiersModalInitialRole('citizen');
-                        setShowTiersModal(true);
-                      }}
-                      className="px-2.5 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-bold"
-                    >
-                      ยศ 10 ระดับ
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(950);
+                          setShowProfileCustomizerModal(true);
+                        }}
+                        className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-cyan-500/30 to-blue-600/30 text-cyan-300 border border-cyan-400/60 text-[10px] font-mono font-bold flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all shadow-md"
+                        title="แต่งรูปโปรไฟล์ & ธีมสี"
+                      >
+                        <Camera className="w-3 h-3 text-cyan-400" />
+                        <span>แต่งโปรไฟล์</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(950);
+                          setTiersModalInitialRole('citizen');
+                          setShowTiersModal(true);
+                        }}
+                        className="px-2.5 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-bold"
+                      >
+                        ยศ 10 ระดับ
+                      </button>
+                    </div>
                   </div>
 
                   {/* Level Progress Bar */}
@@ -3284,6 +3327,16 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         isOpen={showRealGpsModal}
         onClose={() => setShowRealGpsModal(false)}
         destinationTitle={selectedDestination || 'อาคาร Exchange Tower อโศก'}
+        audioEnabled={audioEnabled}
+      />
+
+      {/* PROFILE CUSTOMIZER MODAL */}
+      <ProfileCustomizerModal
+        isOpen={showProfileCustomizerModal}
+        onClose={() => setShowProfileCustomizerModal(false)}
+        currentData={passengerProfileData}
+        role="customer"
+        onSave={(updated) => setPassengerProfileData(updated)}
         audioEnabled={audioEnabled}
       />
     </div>

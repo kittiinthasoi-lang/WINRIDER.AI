@@ -83,7 +83,7 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
 
   // 2. Customer Form State
   const [customerForm, setCustomerForm] = useState({
-    fullName: 'วิภาดา รัตนกุล',
+    fullName: 'คุณ จิตใจ สล็อต',
     phone: '081-445-5667',
     emergencyContact: '089-776-5432 (คุณแม่)',
     district: 'คลองเตย, กรุงเทพมหานคร',

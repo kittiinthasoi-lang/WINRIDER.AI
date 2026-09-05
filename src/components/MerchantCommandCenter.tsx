@@ -5,6 +5,7 @@ import { SovereignTiersModal } from './SovereignTiersModal';
 import { SovereignQuestCenter } from './SovereignQuestCenter';
 import { WinScanAndPayModal } from './WinScanAndPayModal';
 import { MerchantParcelPickupMapModal } from './MerchantParcelPickupMapModal';
+import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { AIProductPhotoVerifier, AIVerificationResult } from './AIProductPhotoVerifier';
 import { getMerchantTier, MERCHANT_10_TIERS, calculateLevelMaxXp, getLevelDifficultyMetrics } from '../data/tierHierarchyData';
@@ -52,6 +53,14 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({ au
   const [tiersModalInitialRole, setTiersModalInitialRole] = useState<'knight' | 'citizen' | 'merchant'>('merchant');
   const [showScanAndPayModal, setShowScanAndPayModal] = useState<boolean>(false);
   const [showPickupMapModal, setShowPickupMapModal] = useState<boolean>(false);
+  const [showProfileCustomizerModal, setShowProfileCustomizerModal] = useState<boolean>(false);
+  const [merchantProfileData, setMerchantProfileData] = useState<ProfileCustomizationData>({
+    displayName: 'ร้านออร่าเซนโก้ (Aura Zenco)',
+    bioStatus: 'ของฝากงานฝีมือคุณภาพ • กาแฟสด • ส่งด่วนทันใจผ่านอัศวิน 🏪✨',
+    avatarEmoji: '🏪',
+    themeColor: '#FFD700',
+    bannerGlow: 'from-[#0D1E3A] via-[#09152B] to-[#060D1E]'
+  });
 
   const currentMerchantTier = useMemo(() => getMerchantTier(merchantLevel), [merchantLevel]);
   const merchantDifficultyMetrics = useMemo(() => getLevelDifficultyMetrics(merchantLevel), [merchantLevel]);
@@ -189,22 +198,38 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({ au
       )}
 
       {/* Header Banner */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-[#0C1E40] via-[#091530] to-[#070D1E] border border-[#FFD700]/40 shadow-2xl relative overflow-hidden space-y-4">
+      <div 
+        className={`p-6 rounded-3xl bg-gradient-to-r ${merchantProfileData.bannerGlow || 'from-[#0C1E40] via-[#091530] to-[#070D1E]'} border border-[#FFD700]/40 shadow-2xl relative overflow-hidden space-y-4 transition-all`}
+        style={{ borderColor: merchantProfileData.themeColor }}
+      >
         <div className="absolute top-0 right-0 w-80 h-80 bg-[#FFD700]/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <NeonProfileAvatar 
-              level={merchantLevel} 
-              emoji="🏪" 
-              role="merchant" 
-              size="lg" 
-            />
+            {merchantProfileData.avatarUrl ? (
+              <div className="relative">
+                <img 
+                  src={merchantProfileData.avatarUrl} 
+                  alt={merchantProfileData.displayName}
+                  className="w-16 h-16 rounded-2xl object-cover border-2 shadow-lg"
+                  style={{ borderColor: merchantProfileData.themeColor }}
+                />
+                <div className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-black/80 rounded-full text-[9px] font-bold text-amber-400 border border-amber-400">
+                  LV.{merchantLevel}
+                </div>
+              </div>
+            ) : (
+              <NeonProfileAvatar 
+                level={merchantLevel} 
+                emoji={merchantProfileData.avatarEmoji || "🏪"} 
+                role="merchant" 
+                size="lg" 
+              />
+            )}
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-xl font-black text-white flex items-center gap-1.5">
-                  <span>ร้านออร่าเซนโก้</span>
-                  <span className="text-xs font-mono text-amber-300 font-normal">(Aura Zenco)</span>
+                  <span>{merchantProfileData.displayName}</span>
                 </h2>
                 <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 shadow-[0_0_10px_rgba(255,215,0,0.3)] flex items-center gap-1">
                   <span>{currentMerchantTier.badge}</span>
@@ -217,6 +242,16 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({ au
                 <button
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(950);
+                    setShowProfileCustomizerModal(true);
+                  }}
+                  className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/30 to-blue-600/30 hover:brightness-110 text-cyan-300 border border-cyan-400/60 text-[10px] font-mono font-bold flex items-center gap-1 transition-all shadow-sm"
+                >
+                  <Camera className="w-3 h-3 text-cyan-400" />
+                  <span>แต่งโปรไฟล์ร้าน</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (audioEnabled) playTactileBlip(950);
                     setTiersModalInitialRole('merchant');
                     setShowTiersModal(true);
                   }}
@@ -226,6 +261,9 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({ au
                   <span>ดูทำเนียบ 10 ระดับยศ</span>
                 </button>
               </div>
+              <p className="text-xs text-amber-200/90 font-mono mt-0.5 line-clamp-1">
+                {merchantProfileData.bioStatus}
+              </p>
               <p className="text-xs text-slate-300 font-mono mt-0.5">
                 รหัสบัญชีร้านค้า: <strong className="text-amber-300">MCH-AURA-ZENCO-001</strong> • โซนเจริญรัถ-คลองสาน • วงเงินหมุนเวียน ฿{workingCapitalAvailable.toLocaleString()}
               </p>
@@ -909,6 +947,16 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({ au
         onClose={() => setShowPickupMapModal(false)}
         audioEnabled={audioEnabled}
         onGainMerchantXp={(amt, rsn) => handleGainMerchantXp(amt, rsn)}
+      />
+
+      {/* PROFILE CUSTOMIZER MODAL FOR MERCHANT */}
+      <ProfileCustomizerModal
+        isOpen={showProfileCustomizerModal}
+        onClose={() => setShowProfileCustomizerModal(false)}
+        currentData={merchantProfileData}
+        role="shop"
+        onSave={(updated) => setMerchantProfileData(updated)}
+        audioEnabled={audioEnabled}
       />
     </div>
   );

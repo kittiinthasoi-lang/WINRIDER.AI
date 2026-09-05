@@ -88,26 +88,35 @@ export default function App() {
       return;
     }
 
-    // Role-Lock Boundary Enforcement: Protect users from entering other roles' private spaces
-    if (currentUserSession.role === 'driver' && mode !== 'driver' && mode !== 'codex') {
-      alert("🔒 ระบบความปลอดภัย Role-Locked: บัญชีของคุณคือ 'อัศวิน วินมอเตอร์ไซค์' ระบบล็อกการแสดงผลเฉพาะอู่อัศวินและคัมภีร์ยุทธศาสตร์เท่านั้น");
-      setActiveMode('driver');
-      return;
+    // Role-Lock Boundary Enforcement:
+    // 1. Driver & Customer: CANNOT see each other's private profile/screens.
+    //    CAN access: Merchant profile/shop, Partner profile/discounts, and Hospital Command Center freely!
+    if (currentUserSession.role === 'driver') {
+      if (mode === 'passenger') {
+        alert("🔒 ระบบความปลอดภัย Role-Locked: พี่วินไม่สามารถเข้าดูโปรไฟล์หรือหน้าจอส่วนตัวของลูกค้าได้ แต่สามารถเข้าดูโปรไฟล์ร้านค้า พาร์ทเนอร์ และศูนย์กู้ชีพได้อิสระ");
+        return;
+      }
     }
-    if (currentUserSession.role === 'customer' && mode !== 'passenger' && mode !== 'market' && mode !== 'codex') {
-      alert("🔒 ระบบความปลอดภัย Role-Locked: บัญชีของคุณคือ 'ลูกค้า/ผู้โดยสาร' ระบบล็อกการแสดงผลเฉพาะแอปเรียกรถและตลาดชุมชนเท่านั้น");
-      setActiveMode('passenger');
-      return;
+    if (currentUserSession.role === 'customer') {
+      if (mode === 'driver') {
+        alert("🔒 ระบบความปลอดภัย Role-Locked: ลูกค้าไม่สามารถเข้าดูโปรไฟล์หรืออู่ของพี่วินได้ แต่สามารถเข้าดูโปรไฟล์ร้านค้า พาร์ทเนอร์ และศูนย์กู้ชีพได้อิสระ");
+        return;
+      }
     }
-    if (currentUserSession.role === 'merchant' && mode !== 'merchant' && mode !== 'codex') {
-      alert("🔒 ระบบความปลอดภัย Role-Locked: บัญชีของคุณคือ 'ร้านค้า/ภัตตาคาร' ระบบล็อกการแสดงผลเฉพาะศูนย์รับออเดอร์ร้านค้าเท่านั้น");
-      setActiveMode('merchant');
-      return;
+
+    // 2. Merchant & Partner: Restricted to only Merchant and Partner profiles and Hospital Command Center.
+    //    CANNOT see driver or customer private profiles/screens.
+    if (currentUserSession.role === 'merchant') {
+      if (mode !== 'merchant' && mode !== 'partner' && mode !== 'hospital' && mode !== 'codex') {
+        alert("🔒 ระบบความปลอดภัย Role-Locked: ร้านค้าสามารถเข้าดูเฉพาะโปรไฟล์ร้านค้า โปรไฟล์พาร์ทเนอร์ และศูนย์โรงพยาบาลกู้ชีพเท่านั้น");
+        return;
+      }
     }
-    if (currentUserSession.role === 'partner' && mode !== 'partner' && mode !== 'hospital' && mode !== 'codex') {
-      alert("🔒 ระบบความปลอดภัย Role-Locked: บัญชีของคุณคือ 'พาร์ทเนอร์สถาบัน' ระบบล็อกการแสดงผลเฉพาะศูนย์พันธมิตรและกู้ชีพเท่านั้น");
-      setActiveMode('partner');
-      return;
+    if (currentUserSession.role === 'partner') {
+      if (mode !== 'partner' && mode !== 'merchant' && mode !== 'hospital' && mode !== 'codex') {
+        alert("🔒 ระบบความปลอดภัย Role-Locked: พาร์ทเนอร์สามารถเข้าดูเฉพาะโปรไฟล์ร้านค้า โปรไฟล์พาร์ทเนอร์ และศูนย์โรงพยาบาลกู้ชีพเท่านั้น");
+        return;
+      }
     }
 
     setActiveMode(mode);

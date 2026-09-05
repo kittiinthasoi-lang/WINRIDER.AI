@@ -38,7 +38,7 @@ export const PRESET_ACCOUNTS: UserSession[] = [
   },
   {
     id: 'WIN-CTZ-204551',
-    name: 'คุณอารียา สุขสมบูรณ์',
+    name: 'คุณ จิตใจ สล็อต',
     phone: '081-992-5678',
     role: 'customer',
     roleTitleTh: 'พลเมืองผู้โดยสาร (Citizen Passenger)',

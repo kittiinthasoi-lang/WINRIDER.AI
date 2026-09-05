@@ -15,6 +15,7 @@ import { KnightNavigationMapScreen } from './KnightNavigationMapScreen';
 import { SovereignQuestCenter } from './SovereignQuestCenter';
 import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { DriverPaymentQrCodeModal } from './DriverPaymentQrCodeModal';
+import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { calculateLevelMaxXp, getLevelDifficultyMetrics } from '../data/tierHierarchyData';
 import { 
   Shield, 
@@ -157,6 +158,14 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ audioE
   const [equippedSuitId, setEquippedSuitId] = useState<string>('suit-v10');
   const [selectedInspectSuit, setSelectedInspectSuit] = useState<ArmorSuit | null>(null);
   const [selectedInspectVehicle, setSelectedInspectVehicle] = useState<Vehicle | null>(null);
+  const [showProfileCustomizerModal, setShowProfileCustomizerModal] = useState<boolean>(false);
+  const [driverProfileData, setDriverProfileData] = useState<ProfileCustomizationData>({
+    displayName: 'กิตติ อินทะสร้อย',
+    bioStatus: 'อัศวินส้มสายเลือดแท้ • ปลอดภัย ว่องไว มีน้ำใจ เลเวล 100 🏍️🔥',
+    avatarEmoji: '🦁',
+    themeColor: '#FF6B00',
+    bannerGlow: 'from-[#0D1C3D] via-[#09142B] to-[#070D1E]'
+  });
 
   const equippedSuit = KNIGHT_ARMOR_SUITS.find(s => s.id === equippedSuitId) || KNIGHT_ARMOR_SUITS[9];
 
@@ -453,27 +462,55 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ audioE
           )}
 
           {/* DRIVER PROFILE CARD WITH ACTIVE ARMOR SUIT & ACTIVE DISPATCH VEHICLE */}
-          <div className="my-4 p-4 rounded-3xl bg-gradient-to-br from-[#0D1C3D] via-[#09142B] to-[#070D1E] border border-[#FFD700]/40 shadow-[0_0_25px_rgba(255,215,0,0.15)] relative overflow-hidden">
+          <div 
+            className={`my-4 p-4 rounded-3xl bg-gradient-to-br ${driverProfileData.bannerGlow || 'from-[#0D1C3D] via-[#09142B] to-[#070D1E]'} border border-[#FFD700]/40 shadow-[0_0_25px_rgba(255,215,0,0.15)] relative overflow-hidden transition-all`}
+            style={{ borderColor: driverProfileData.themeColor }}
+          >
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#FFD700]/10 rounded-full blur-2xl pointer-events-none" />
 
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3.5">
-                <NeonProfileAvatar 
-                  level={driverLevel} 
-                  emoji="🦁" 
-                  role="driver" 
-                  size="lg" 
-                />
+                {driverProfileData.avatarUrl ? (
+                  <div className="relative">
+                    <img 
+                      src={driverProfileData.avatarUrl} 
+                      alt={driverProfileData.displayName}
+                      className="w-16 h-16 rounded-2xl object-cover border-2 shadow-lg"
+                      style={{ borderColor: driverProfileData.themeColor }}
+                    />
+                    <div className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-black/80 rounded-full text-[9px] font-bold text-amber-400 border border-amber-400">
+                      LV.{driverLevel}
+                    </div>
+                  </div>
+                ) : (
+                  <NeonProfileAvatar 
+                    level={driverLevel} 
+                    emoji={driverProfileData.avatarEmoji || "🦁"} 
+                    role="driver" 
+                    size="lg" 
+                  />
+                )}
 
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-black text-white flex items-center gap-1.5">
-                      <span>กิตติ อินทะสร้อย</span>
-                      <span className="text-[10px] font-mono text-cyan-300 font-normal">(Kitti Inthasoi)</span>
+                      <span>{driverProfileData.displayName}</span>
                       <Crown className="w-4 h-4 text-[#FFD700] fill-[#FFD700] animate-pulse" />
                     </h3>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                  <p className="text-[10px] text-amber-200/90 font-mono mt-0.5 line-clamp-1">
+                    {driverProfileData.bioStatus}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <button
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(950);
+                        setShowProfileCustomizerModal(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 hover:bg-cyan-500/30 transition-all cursor-pointer shadow-sm"
+                    >
+                      <span>🎨 แต่งโปรไฟล์</span>
+                    </button>
                     <button
                       onClick={() => {
                         if (audioEnabled) playTactileBlip(950);
@@ -2212,6 +2249,16 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ audioE
           handleEquipSuit(suit);
           setShowArmorShowcaseModal(false);
         }}
+        audioEnabled={audioEnabled}
+      />
+
+      {/* PROFILE CUSTOMIZER MODAL FOR KNIGHT DRIVER */}
+      <ProfileCustomizerModal
+        isOpen={showProfileCustomizerModal}
+        onClose={() => setShowProfileCustomizerModal(false)}
+        currentData={driverProfileData}
+        role="driver"
+        onSave={(updated) => setDriverProfileData(updated)}
         audioEnabled={audioEnabled}
       />
     </div>

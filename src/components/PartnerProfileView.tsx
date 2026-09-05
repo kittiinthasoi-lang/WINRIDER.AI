@@ -34,6 +34,7 @@ import {
 import { playTactileBlip, playLevelUpFanfare, playRadarScan } from '../utils/audio';
 import { WinScanAndPayModal } from './WinScanAndPayModal';
 import { DensityRadarOverlay } from './DensityRadarOverlay';
+import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import confetti from 'canvas-confetti';
 
 interface PartnerProfileViewProps {
@@ -231,6 +232,16 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   const [selectedPartner, setSelectedPartner] = useState<PartnerProfile>(SAMPLE_PARTNERS[0]);
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'promotions' | 'radar3d'>('overview');
+  const [showProfileCustomizerModal, setShowProfileCustomizerModal] = useState<boolean>(false);
+  const [partnerCustomizations, setPartnerCustomizations] = useState<Record<string, ProfileCustomizationData>>({
+    'partner-bar-01': {
+      displayName: 'THE KNIGHT ROOFTOP & SPEAKEASY BAR',
+      bioStatus: 'บาร์รูฟท็อปวิวพาโนรามา 360 องศา • ค็อกเทลสูตรพิเศษ • พี่วินจอดส่งถึงลิฟต์ 🍸🌃',
+      avatarEmoji: '🍸',
+      themeColor: '#00D2FF',
+      bannerGlow: 'from-purple-900/60 via-[#070D1E] to-[#0A1A3F]'
+    }
+  });
   
   // 3D Live Customer Radar Simulation
   const [incomingCustomers, setIncomingCustomers] = useState<{ id: string; name: string; riderName: string; etaMin: number; x: number; y: number; vehicle: string }[]>([
@@ -292,53 +303,96 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
       </section>
 
       {/* Main Profile Header Card */}
-      <section className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${selectedPartner.coverGradient} border border-cyan-500/30 p-6 sm:p-8 shadow-2xl space-y-6`}>
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-          <div className="flex items-start gap-4">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-black/60 border-2 border-cyan-400/80 p-1 flex items-center justify-center text-3xl sm:text-4xl shadow-[0_0_20px_rgba(0,210,255,0.4)] flex-shrink-0">
-              {selectedPartner.icon}
-            </div>
+      {(() => {
+        const custom = partnerCustomizations[selectedPartner.id] || {
+          displayName: selectedPartner.name,
+          bioStatus: selectedPartner.description,
+          avatarEmoji: selectedPartner.icon,
+          themeColor: '#00D2FF',
+          bannerGlow: selectedPartner.coverGradient
+        };
 
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-bold">
-                  {selectedPartner.categoryLabel}
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 text-[10px] font-mono font-bold">
-                  LEVEL {selectedPartner.level} • {selectedPartner.tierName}
-                </span>
+        return (
+          <section 
+            className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${custom.bannerGlow || selectedPartner.coverGradient} border border-cyan-500/30 p-6 sm:p-8 shadow-2xl space-y-6 transition-all`}
+            style={{ borderColor: custom.themeColor }}
+          >
+            <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+              <div className="flex items-start gap-4">
+                {custom.avatarUrl ? (
+                  <div className="relative flex-shrink-0">
+                    <img 
+                      src={custom.avatarUrl} 
+                      alt={custom.displayName}
+                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl object-cover border-2 shadow-[0_0_20px_rgba(0,210,255,0.4)]"
+                      style={{ borderColor: custom.themeColor }}
+                    />
+                    <div className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-black/80 rounded-full text-[9px] font-bold text-amber-400 border border-amber-400">
+                      LV.{selectedPartner.level}
+                    </div>
+                  </div>
+                ) : (
+                  <div 
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-black/60 border-2 border-cyan-400/80 p-1 flex items-center justify-center text-3xl sm:text-4xl shadow-[0_0_20px_rgba(0,210,255,0.4)] flex-shrink-0"
+                    style={{ borderColor: custom.themeColor }}
+                  >
+                    {custom.avatarEmoji || selectedPartner.icon}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-bold">
+                      {selectedPartner.categoryLabel}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 text-[10px] font-mono font-bold">
+                      LEVEL {selectedPartner.level} • {selectedPartner.tierName}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(950);
+                        setShowProfileCustomizerModal(true);
+                      }}
+                      className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/50 text-[10px] font-mono font-bold flex items-center gap-1 transition-all shadow-sm cursor-pointer"
+                    >
+                      <span>🎨 แต่งโปรไฟล์พาร์ทเนอร์</span>
+                    </button>
+                  </div>
+
+                  <h1 className="text-xl sm:text-3xl font-black text-white tracking-wide">
+                    {custom.displayName}
+                  </h1>
+
+                  <p className="text-xs text-cyan-200/90 font-mono line-clamp-2 max-w-2xl">
+                    {custom.bioStatus}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 font-mono pt-1">
+                    <span className="flex items-center gap-1 text-amber-400 font-bold">
+                      <Star className="w-3.5 h-3.5 fill-current" /> {selectedPartner.rating} ({selectedPartner.reviewCount} รีวิว)
+                    </span>
+                    <span className="flex items-center gap-1 text-cyan-300">
+                      <MapPin className="w-3.5 h-3.5" /> {selectedPartner.address} ({selectedPartner.distanceKm} กม.)
+                    </span>
+                    <span className="text-slate-400">🕒 {selectedPartner.openHours}</span>
+                  </div>
+                </div>
               </div>
 
-              <h1 className="text-xl sm:text-3xl font-black text-white tracking-wide">
-                {selectedPartner.name}
-              </h1>
-
-              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 font-mono">
-                <span className="flex items-center gap-1 text-amber-400 font-bold">
-                  <Star className="w-3.5 h-3.5 fill-current" /> {selectedPartner.rating} ({selectedPartner.reviewCount} รีวิว)
-                </span>
-                <span className="flex items-center gap-1 text-cyan-300">
-                  <MapPin className="w-3.5 h-3.5" /> {selectedPartner.address} ({selectedPartner.distanceKm} กม.)
-                </span>
-                <span className="text-slate-400">🕒 {selectedPartner.openHours}</span>
+              {/* Partner Action Stats */}
+              <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                <button
+                  onClick={() => {
+                    if (audioEnabled) playTactileBlip(1100);
+                    setIsQrModalOpen(true);
+                  }}
+                  className="px-5 py-3 rounded-2xl bg-cyan-500 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm shadow-[0_0_20px_rgba(0,210,255,0.5)] active:scale-95 transition-all flex items-center gap-2"
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>WIN Scan & Pay (สร้าง QR รับเงิน)</span>
+                </button>
               </div>
             </div>
-          </div>
-
-          {/* Partner Action Stats */}
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <button
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(1100);
-                setIsQrModalOpen(true);
-              }}
-              className="px-5 py-3 rounded-2xl bg-cyan-500 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm shadow-[0_0_20px_rgba(0,210,255,0.5)] active:scale-95 transition-all flex items-center gap-2"
-            >
-              <QrCode className="w-4 h-4" />
-              <span>WIN Scan & Pay (สร้าง QR รับเงิน)</span>
-            </button>
-          </div>
-        </div>
 
         {/* Level & XP Progress Bar for Partner */}
         <div className="relative z-10 p-4 rounded-2xl bg-black/50 border border-white/10 space-y-2 text-xs">
@@ -379,6 +433,8 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
           </div>
         </div>
       </section>
+        );
+      })()}
 
       {/* Tabs Navigation */}
       <section className="flex items-center gap-2 p-1.5 rounded-2xl bg-black/40 border border-white/10 overflow-x-auto text-xs">
@@ -606,6 +662,27 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
         entityCategoryLabel={selectedPartner.categoryLabel}
         defaultAmount={250}
         qrWalletAddress={selectedPartner.walletQrAddress}
+        audioEnabled={audioEnabled}
+      />
+
+      {/* PROFILE CUSTOMIZER MODAL FOR PARTNER */}
+      <ProfileCustomizerModal
+        isOpen={showProfileCustomizerModal}
+        onClose={() => setShowProfileCustomizerModal(false)}
+        currentData={partnerCustomizations[selectedPartner.id] || {
+          displayName: selectedPartner.name,
+          bioStatus: selectedPartner.description,
+          avatarEmoji: selectedPartner.icon,
+          themeColor: '#00D2FF',
+          bannerGlow: selectedPartner.coverGradient
+        }}
+        role="partner"
+        onSave={(updated) => {
+          setPartnerCustomizations(prev => ({
+            ...prev,
+            [selectedPartner.id]: updated
+          }));
+        }}
         audioEnabled={audioEnabled}
       />
     </div>

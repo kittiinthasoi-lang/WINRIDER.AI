@@ -191,13 +191,17 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     },
   ];
 
+  // Role-based allowed modes:
+  // 1. Driver & Customer: CANNOT see each other's profiles/screens.
+  //    CAN access: Merchant, Partner, Hospital, and Market freely.
+  // 2. Merchant & Partner: can ONLY see Merchant, Partner, and Hospital (and Codex).
   const allowedModesForRole = currentUserSession?.role === 'customer'
-    ? ['passenger', 'market', 'codex']
+    ? ['passenger', 'market', 'merchant', 'partner', 'hospital', 'codex']
     : currentUserSession?.role === 'driver'
-    ? ['driver', 'codex']
+    ? ['driver', 'market', 'merchant', 'partner', 'hospital', 'codex']
     : currentUserSession?.role === 'merchant'
-    ? ['merchant', 'codex']
-    : ['partner', 'hospital', 'codex'];
+    ? ['merchant', 'partner', 'hospital', 'codex']
+    : ['partner', 'merchant', 'hospital', 'codex'];
 
   const filteredAppModesList = appModesList.filter(mode => allowedModesForRole.includes(mode.id));
 
