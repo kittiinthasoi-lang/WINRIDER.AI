@@ -18,6 +18,9 @@ export interface UserSession {
   rating: number;
   avatarEmoji: string;
   registeredAt: string;
+  faceImageUrl?: string;
+  faceHash?: string;
+  biometricVerified?: boolean;
 }
 
 const STORAGE_KEY = 'WINRIDER_ACTIVE_USER_SESSION';
@@ -236,3 +239,32 @@ export function getDefaultModeForRole(role: UserRole): AppMode {
       return 'passenger';
   }
 }
+
+// Full application state reset: clears old orders, dispatch queues, chats, and initializes fresh session
+export async function resetEntireApplicationState(newSession: UserSession): Promise<void> {
+  try {
+    // Clear all existing storage keys (order histories, chats, market caches)
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key !== STORAGE_KEY) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    });
+
+    // Save newly registered user session as fresh Level 1 sovereign profile
+    await saveUserSession(newSession);
+
+    // Notify application of full reset
+    window.dispatchEvent(new CustomEvent('winrider:full_reset', { detail: newSession }));
+    window.dispatchEvent(new CustomEvent('winrider:session_changed', { detail: newSession }));
+  } catch (err) {
+    console.error('[UserSession] Full reset error:', err);
+  }
+}
+

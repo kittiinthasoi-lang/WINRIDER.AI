@@ -254,8 +254,18 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
             {/* Quick Profile Feature Item */}
             <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#FFD700]/15 via-amber-500/10 to-transparent border border-[#FFD700]/40 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-500 flex items-center justify-center text-lg font-bold text-slate-950 shadow-[0_0_10px_#00D2FF]">
-                  {currentUserSession.avatarEmoji}
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-cyan-400 shadow-[0_0_10px_#00D2FF] flex-shrink-0">
+                  <img 
+                    src={
+                      currentUserSession.role === 'driver' ? '/avatars/knight.jpg' :
+                      currentUserSession.role === 'merchant' ? '/avatars/merchant.jpg' :
+                      currentUserSession.role === 'partner' ? '/avatars/partner.jpg' :
+                      '/avatars/citizen.jpg'
+                    }
+                    alt={currentUserSession.name}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">

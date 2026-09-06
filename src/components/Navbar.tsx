@@ -94,14 +94,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const appModes: { id: AppMode; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: 'register', label: '📝 ลงทะเบียน 4 บทบาท', icon: <UserPlus className="w-3.5 h-3.5" />, badge: 'ใหม่' },
-    { id: 'passenger', label: '📱 ผู้โดยสาร', icon: <Smartphone className="w-3.5 h-3.5" />, badge: 'แอปหลัก' },
-    { id: 'driver', label: '🏍️ อู่อัศวิน', icon: <Bike className="w-3.5 h-3.5" />, badge: 'โรงรถ & แผนที่' },
-    { id: 'merchant', label: '🏬 ศูนย์ร้านค้า', icon: <Store className="w-3.5 h-3.5" />, badge: 'รับพัสดุ & ดีล' },
-    { id: 'partner', label: '👑 โปรไฟล์พาร์ทเนอร์', icon: <Building2 className="w-3.5 h-3.5" />, badge: 'โรงแรม/ผับบาร์/บุฟเฟต์' },
-    { id: 'market', label: '🛍️ WIN Shop & WIN Street Market', icon: <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />, badge: 'ร้านค้า & สินค้าชุมชน' },
-    { id: 'hospital', label: '🏥 ศูนย์โรงพยาบาล', icon: <Building2 className="w-3.5 h-3.5" />, badge: 'หน่วยฉุกเฉิน' },
-    { id: 'codex', label: '📜 คัมภีร์ 7 บท', icon: <BookOpen className="w-3.5 h-3.5" />, badge: 'คัมภีร์หลัก' },
+    { id: 'register', label: 'ลงทะเบียน 4 บทบาท', icon: <UserPlus className="w-3.5 h-3.5" />, badge: 'ใหม่' },
+    { id: 'passenger', label: 'ผู้โดยสาร', icon: <Smartphone className="w-3.5 h-3.5" />, badge: 'แอปหลัก' },
+    { id: 'driver', label: 'อู่อัศวิน', icon: <Bike className="w-3.5 h-3.5" />, badge: 'โรงรถ & แผนที่' },
+    { id: 'merchant', label: 'ศูนย์ร้านค้า', icon: <Store className="w-3.5 h-3.5" />, badge: 'รับพัสดุ & ดีล' },
+    { id: 'partner', label: 'โปรไฟล์พาร์ทเนอร์', icon: <Building2 className="w-3.5 h-3.5" />, badge: 'โรงแรม/ผับบาร์/บุฟเฟต์' },
+    { id: 'market', label: 'WIN Shop & Market', icon: <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />, badge: 'ร้านค้า & สินค้าชุมชน' },
+    { id: 'hospital', label: 'ศูนย์โรงพยาบาล', icon: <Building2 className="w-3.5 h-3.5" />, badge: 'หน่วยฉุกเฉิน' },
+    { id: 'codex', label: 'คัมภีร์ 7 บท', icon: <BookOpen className="w-3.5 h-3.5" />, badge: 'คัมภีร์หลัก' },
   ];
 
   const codexChapters: { id: ChapterId; label: string; icon: React.ReactNode; num: string }[] = [
@@ -146,11 +146,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             }}
             className="flex items-center gap-3 cursor-pointer group"
           >
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#00D2FF] via-[#0052CC] to-[#070D1E] p-[1.5px] shadow-[0_0_15px_rgba(0,210,255,0.4)] group-hover:shadow-[0_0_25px_rgba(0,210,255,0.7)] transition-all">
-              <div className="w-full h-full bg-[#070D1E] rounded-[10px] flex items-center justify-center relative overflow-hidden">
-                <span className="text-xl">🦁</span>
-                <div className="absolute inset-0 bg-gradient-to-t from-[#00D2FF]/20 to-transparent pointer-events-none" />
-              </div>
+            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-cyan-400 to-[#070D1E] p-[1.5px] shadow-[0_0_18px_rgba(0,210,255,0.5)] group-hover:shadow-[0_0_28px_rgba(0,210,255,0.8)] transition-all overflow-hidden flex-shrink-0">
+              <img 
+                src="/app-logo.png" 
+                alt="WINRIDER.AI Official Logo" 
+                className="w-full h-full object-cover rounded-[9px]"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -165,9 +167,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="hidden lg:flex items-center gap-3">
               {/* Role Badge and Identification */}
               <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-[#0B1736] border border-cyan-500/40 shadow-[0_0_18px_rgba(0,210,255,0.15)] font-mono">
-                <span className="text-xl p-1 rounded-xl bg-black/40 border border-white/10">
-                  {currentUserSession.avatarEmoji}
-                </span>
+                <div className="w-8 h-8 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
+                  <img 
+                    src={
+                      currentUserSession.role === 'driver' ? '/avatars/knight.jpg' :
+                      currentUserSession.role === 'merchant' ? '/avatars/merchant.jpg' :
+                      currentUserSession.role === 'partner' ? '/avatars/partner.jpg' :
+                      '/avatars/citizen.jpg'
+                    }
+                    alt={currentUserSession.name}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
                 <div className="text-left">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-white tracking-tight">
@@ -320,8 +332,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="relative p-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-[#FFD700] border border-[#FFD700]/40 transition-all cursor-pointer shadow-[0_0_12px_rgba(255,215,0,0.2)] flex items-center gap-1 active:scale-95"
               title={currentUserSession ? `โปรไฟล์: ${currentUserSession.name} (${currentUserSession.roleTitleTh})` : "โปรไฟล์พลเมือง"}
             >
-              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-500 flex items-center justify-center text-[10px] font-bold text-slate-950 shadow-[0_0_6px_#00D2FF]">
-                {currentUserSession?.avatarEmoji || '🦥'}
+              <div className="w-5 h-5 rounded-full overflow-hidden border border-cyan-400/50 shadow-[0_0_6px_#00D2FF] flex-shrink-0">
+                <img 
+                  src={
+                    currentUserSession?.role === 'driver' ? '/avatars/knight.jpg' :
+                    currentUserSession?.role === 'merchant' ? '/avatars/merchant.jpg' :
+                    currentUserSession?.role === 'partner' ? '/avatars/partner.jpg' :
+                    '/avatars/citizen.jpg'
+                  }
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <User className="w-3.5 h-3.5 text-[#FFD700]" />
             </button>

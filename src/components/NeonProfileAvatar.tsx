@@ -3,7 +3,8 @@ import { Crown, Sparkles, Zap, Shield, Star } from 'lucide-react';
 
 interface NeonProfileAvatarProps {
   level: number;
-  emoji: string;
+  emoji?: string;
+  imageUrl?: string;
   role: 'driver' | 'passenger' | 'merchant';
   size?: 'sm' | 'md' | 'lg' | 'xl';
   customBadge?: string;
@@ -13,6 +14,7 @@ interface NeonProfileAvatarProps {
 export const NeonProfileAvatar: React.FC<NeonProfileAvatarProps> = ({
   level,
   emoji,
+  imageUrl,
   role,
   size = 'lg',
   customBadge,
@@ -25,6 +27,14 @@ export const NeonProfileAvatar: React.FC<NeonProfileAvatarProps> = ({
   const isGrandTier = normalizedLevel >= 80;
   const isMasterTier = normalizedLevel >= 50;
   const isAdeptTier = normalizedLevel >= 20;
+
+  const defaultImage = role === 'driver' 
+    ? '/avatars/knight.jpg' 
+    : role === 'merchant'
+    ? '/avatars/merchant.jpg'
+    : '/avatars/citizen.jpg';
+
+  const resolvedImage = imageUrl || defaultImage;
 
   // Determine CSS Tier Class
   const tierClass = isGodTier 
@@ -130,10 +140,19 @@ export const NeonProfileAvatar: React.FC<NeonProfileAvatarProps> = ({
             }}
           />
 
-          {/* Avatar Emoji */}
-          <span className="relative z-10 filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] transform transition-transform hover:scale-110">
-            {emoji}
-          </span>
+          {/* Avatar Image or Fallback Emoji */}
+          {resolvedImage ? (
+            <img 
+              src={resolvedImage} 
+              alt={role} 
+              className="w-full h-full object-cover rounded-[13px] relative z-10 transform transition-transform hover:scale-105"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <span className="relative z-10 filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] transform transition-transform hover:scale-110">
+              {emoji || '✨'}
+            </span>
+          )}
 
           {/* Godlike particle sparkles overlay (50% reduced opacity) */}
           {isGodTier && (

@@ -281,6 +281,15 @@ export interface PartnerPromotion {
   badge: string;
 }
 
+export interface PartnerParkingInfo {
+  motorcycleSpots: number;
+  carSpots: number;
+  winDropoffLane: string;
+  parkingFeePolicy: string;
+  valetService?: boolean;
+  evCharging?: boolean;
+}
+
 export interface PartnerProfile {
   id: string;
   name: string;
@@ -306,6 +315,8 @@ export interface PartnerProfile {
   promotionsToday: PartnerPromotion[];
   specialHighlights: string[];
   walletQrAddress: string;
+  parkingInfo?: PartnerParkingInfo;
+  estimatedWinFare?: number;
 }
 
 export type EmergencyServiceType = 'hospital' | 'fire_station' | 'rescue_volunteer';

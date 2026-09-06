@@ -127,8 +127,17 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Security Crest Header */}
+        {/* Security Crest Header & Official App Logo */}
         <div className="text-center space-y-3 relative z-10">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto rounded-3xl p-[2px] bg-gradient-to-br from-amber-400 via-cyan-400 to-blue-600 shadow-[0_0_35px_rgba(0,210,255,0.6)] relative overflow-hidden group">
+            <img 
+              src="/app-logo.png" 
+              alt="WINRIDER.AI Official Logo" 
+              className="w-full h-full object-cover rounded-[22px] transition-transform duration-500 group-hover:scale-105"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/40 text-xs font-mono font-bold shadow-[0_0_15px_rgba(0,210,255,0.2)]">
             <Lock className="w-3.5 h-3.5 text-cyan-400" />
             <span>ROLE-LOCKED SECURE GATEWAY</span>
@@ -212,9 +221,19 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl p-1.5 rounded-xl bg-black/40 border border-white/10">
-                          {acc.avatarEmoji}
-                        </span>
+                        <div className="w-11 h-11 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 shadow-inner">
+                          <img 
+                            src={
+                              isDriver ? '/avatars/knight.jpg' :
+                              isMerchant ? '/avatars/merchant.jpg' :
+                              isPartner ? '/avatars/partner.jpg' :
+                              '/avatars/citizen.jpg'
+                            }
+                            alt={acc.name}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
                         <div>
                           <h4 className="text-sm font-black text-white group-hover:text-cyan-300 transition-colors">
                             {acc.name}

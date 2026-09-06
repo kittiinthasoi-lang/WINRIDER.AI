@@ -33,6 +33,7 @@ import { playTactileBlip, playLevelUpFanfare, playRadarScan } from '../utils/aud
 import { WinScanAndPayModal } from './WinScanAndPayModal';
 import { CustomerPaymentQrCodeModal } from './CustomerPaymentQrCodeModal';
 import { AIProductPhotoVerifier, AIVerificationResult } from './AIProductPhotoVerifier';
+import { CyberGraphic } from './CyberGraphic';
 import confetti from 'canvas-confetti';
 
 interface WinStreetMarketViewProps {
@@ -811,7 +812,7 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
                   : 'bg-black/30 text-slate-300 border-white/10 hover:border-white/30 hover:bg-white/5'
               }`}
             >
-              <span>{cat.icon}</span>
+              <CyberGraphic emoji={cat.icon} size="xs" rounded="rounded-md" />
               <span>{cat.label}</span>
             </button>
           ))}
@@ -832,7 +833,9 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
 
         {filteredItems.length === 0 ? (
           <div className="p-12 text-center rounded-3xl bg-[#070D1E] border border-white/10 space-y-3">
-            <div className="text-4xl">🔍</div>
+            <div className="flex justify-center">
+              <CyberGraphic emoji="🔍" size="xl" />
+            </div>
             <h3 className="text-base font-bold text-white">ไม่พบสินค้าตามที่ระบุ</h3>
             <p className="text-xs text-slate-400">ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่นดูสิครับ</p>
             <button
@@ -867,18 +870,14 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
                 {/* Main Product Display */}
                 <div className="space-y-2.5">
                   <div className="relative w-full h-36 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/40 border border-white/5 flex items-center justify-center overflow-hidden">
-                    {item.imageUrl ? (
-                      <img 
-                        src={item.imageUrl} 
-                        alt={item.title} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <span className="text-5xl group-hover:scale-110 transition-transform duration-300">
-                        {item.imageIcon}
-                      </span>
-                    )}
+                    <CyberGraphic 
+                      src={item.imageUrl} 
+                      emoji={item.imageIcon} 
+                      alt={item.title}
+                      size="2xl"
+                      rounded="rounded-none"
+                      className="w-full h-full"
+                    />
 
                     {/* AI Verified Badge Overlay */}
                     {item.isAiVerified && (
@@ -913,7 +912,7 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
                   {/* Seller Info */}
                   <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-white/5">
                     <div className="flex items-center gap-1.5 truncate">
-                      <span>{item.sellerAvatar}</span>
+                      <CyberGraphic emoji={item.sellerAvatar} size="xs" rounded="rounded-full" />
                       <span className="truncate text-slate-300">{item.sellerName}</span>
                     </div>
                     <div className="flex items-center gap-1 text-amber-400 font-mono font-bold flex-shrink-0">
@@ -994,9 +993,7 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
                     className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-cyan-950/50 border border-cyan-500/30 flex items-center justify-center text-xl">
-                        {item.imageIcon}
-                      </div>
+                      <CyberGraphic src={item.imageUrl} emoji={item.imageIcon} size="md" rounded="rounded-xl" />
                       <div>
                         <h5 className="text-xs font-bold text-white line-clamp-1">{item.title}</h5>
                         <span className="text-[10px] text-slate-400 font-mono">฿{item.price} × {quantity} = ฿{item.price * quantity}</span>
@@ -1347,16 +1344,14 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
             </div>
 
             <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-cyan-500/30 bg-black/60 flex items-center justify-center">
-              {inspectingCertItem.imageUrl ? (
-                <img 
-                  src={inspectingCertItem.imageUrl} 
-                  alt={inspectingCertItem.title} 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span className="text-6xl">{inspectingCertItem.imageIcon}</span>
-              )}
+              <CyberGraphic 
+                src={inspectingCertItem.imageUrl} 
+                emoji={inspectingCertItem.imageIcon} 
+                alt={inspectingCertItem.title} 
+                size="2xl" 
+                className="w-full h-full" 
+                rounded="rounded-none" 
+              />
               <div className="absolute top-2 right-2 px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-400 text-emerald-300 text-[10px] font-mono font-bold flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                 <span>AI Passed {inspectingCertItem.aiQualityScore || 98}%</span>

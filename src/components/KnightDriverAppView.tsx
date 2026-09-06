@@ -406,8 +406,13 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ audioE
       {/* Top Banner Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-[#0A1428] border border-[#00D2FF]/30 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FFD700] to-amber-700 flex items-center justify-center text-slate-950 font-black shadow-[0_0_15px_rgba(255,215,0,0.4)]">
-            🏍️
+          <div className="w-10 h-10 rounded-xl overflow-hidden border border-[#00D2FF]/40 shadow-[0_0_15px_rgba(0,210,255,0.4)] flex-shrink-0">
+            <img 
+              src="/avatars/knight.jpg" 
+              alt="Knight Driver" 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">

@@ -67,12 +67,40 @@ export default function App() {
         setActiveMode(getDefaultModeForRole(current.role));
       }
     };
+
+    const handleFullReset = (e: any) => {
+      const newSession = e.detail || getCurrentUserSession();
+      setCurrentUserSession(newSession);
+      setShowRegistrationFlow(false);
+      setCustomerListedItems([]);
+      setPassengerTab('home');
+      if (newSession) {
+        setActiveMode(getDefaultModeForRole(newSession.role));
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     window.addEventListener('winrider:session_changed', handleSessionChanged);
-    return () => window.removeEventListener('winrider:session_changed', handleSessionChanged);
+    window.addEventListener('winrider:full_reset', handleFullReset);
+    return () => {
+      window.removeEventListener('winrider:session_changed', handleSessionChanged);
+      window.removeEventListener('winrider:full_reset', handleFullReset);
+    };
   }, []);
 
   const handleAddCustomerItem = (item: MarketItem) => {
     setCustomerListedItems(prev => [item, ...prev]);
+  };
+
+  const handleRideToDestination = (name: string, address?: string, distanceKm?: number) => {
+    setActiveMode('passenger');
+    setPassengerTab('ride');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('winrider:set_destination', {
+        detail: { name, address, distanceKm: distanceKm || 2.4 }
+      }));
+    }, 150);
   };
 
   const handleSelectChapter = (id: ChapterId) => {
@@ -206,6 +234,12 @@ export default function App() {
             audioEnabled={audioEnabled} 
             onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
             onNavigateToMode={handleSelectMode}
+            onRegisteredUserSession={(session) => {
+              setCurrentUserSession(session);
+              setCustomerListedItems([]);
+              setActiveMode(getDefaultModeForRole(session.role));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
@@ -231,14 +265,16 @@ export default function App() {
         {activeMode === 'merchant' && (
           <MerchantCommandCenter 
             audioEnabled={audioEnabled} 
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)} 
+            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+            onRideToStore={(name, addr, dist) => handleRideToDestination(name, addr, dist)}
           />
         )}
 
         {activeMode === 'partner' && (
           <PartnerProfileView 
             audioEnabled={audioEnabled} 
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)} 
+            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+            onRideToPartner={(name, addr, dist) => handleRideToDestination(name, addr, dist)}
           />
         )}
 

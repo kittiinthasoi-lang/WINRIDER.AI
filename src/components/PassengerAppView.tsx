@@ -28,6 +28,7 @@ import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
+import { CyberGraphic } from './CyberGraphic';
 import confetti from 'canvas-confetti';
 import { 
   Shield, 
@@ -332,6 +333,31 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     return () => unsubscribe();
   }, [audioEnabled]);
 
+  // Destination listener for Shop / Partner Pinning ("ปักหมุดเรียกพี่วินมาที่ร้าน/พาร์ทเนอร์")
+  React.useEffect(() => {
+    const handleSetDest = (e: Event) => {
+      const customEvent = e as CustomEvent<{ name: string; address?: string; distanceKm?: number }>;
+      if (customEvent.detail?.name) {
+        const destStr = customEvent.detail.name + (customEvent.detail.address ? ` (${customEvent.detail.address})` : '');
+        setSelectedDestination(destStr);
+        if (customEvent.detail.distanceKm) {
+          setTripDistanceKm(customEvent.detail.distanceKm);
+        }
+        if (onTabChange) {
+          onTabChange('ride');
+        } else {
+          setActiveTab('ride');
+        }
+        setShowBookingModal(true);
+        if (audioEnabled) {
+          playTactileBlip(1000);
+        }
+      }
+    };
+    window.addEventListener('winrider:set_destination', handleSetDest);
+    return () => window.removeEventListener('winrider:set_destination', handleSetDest);
+  }, [onTabChange, audioEnabled]);
+
   // AI Voice Announcement Dispatcher
   const speakRideAiAnnouncement = (phaseOverride?: 'picking_up' | 'arrived_pickup' | 'in_transit' | 'arrived_destination') => {
     const targetPhase = phaseOverride || ridePhase;
@@ -492,6 +518,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(0, 210, 255, 0.8)',
       desc: 'อัศวินประจำตัวพร้อมพาหนะที่คุณเลือก ทั่วกรุงเทพฯ เริ่มต้น 15฿ ปลอดภัย 100%',
       icon: <Shield className="w-6 h-6 text-[#00D2FF] drop-shadow-[0_0_10px_rgba(0,210,255,0.95)]" />,
+      imageUrl: '/images/knight_ride.jpg',
       badge: 'เริ่ม 15฿',
       bgGlow: 'from-[#00D2FF]/25 to-transparent',
       eta: '2-3 นาที',
@@ -512,6 +539,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(255, 107, 0, 0.8)',
       desc: 'ส่งด่วนใน 30 นาที ปรับลดค่ากล่องเหลือ 5฿ เพื่อประชาชน พี่วินเลเวล 10+ พร้อมกล่องควบคุมอุณหภูมิและกันกระแทก',
       icon: <Zap className="w-6 h-6 text-orange-400 drop-shadow-[0_0_10px_rgba(255,107,0,0.95)]" />,
+      imageUrl: '/images/express_parcel.jpg',
       badge: '+5฿ ค่ากล่อง (LV.10+)',
       bgGlow: 'from-orange-500/25 to-transparent',
       eta: '1-3 นาที',
@@ -532,6 +560,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(16, 185, 129, 0.8)',
       desc: 'เบาะนิรภัยสำหรับสัตว์เลี้ยง ส่งตรงโรงพยาบาลสัตว์และคลินิกฉุกเฉิน 24 ชม. ตลอดวัน',
       icon: <Dog className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.95)]" />,
+      imageUrl: '/images/pet_care.jpg',
       badge: '24H VET CARE',
       bgGlow: 'from-emerald-400/25 to-transparent',
       eta: '4-7 นาที',
@@ -552,6 +581,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(168, 85, 247, 0.8)',
       desc: 'ระบบแนะนำและจับคู่พี่วินผู้หญิงที่เหมาะสม เลเวล 15+ พร้อมเส้นทางสายมูและบทสวด (ชายจับคู่ชาย หรือเลือกเองพร้อมระบบขอความสมัครใจ)',
       icon: <Sparkles className="w-6 h-6 text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.95)]" />,
+      imageUrl: '/images/mu_buddy.jpg',
       badge: 'พี่วินหญิง LV.15+ (ชายคู่ชาย)',
       bgGlow: 'from-purple-500/25 to-transparent',
       eta: '4-8 นาที',
@@ -572,6 +602,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(236, 72, 153, 0.8)',
       desc: 'แนะนำร้านอาหารเด็ด คาเฟ่ ผับบาร์ ร้านนั่งชิว คาเฟ่หมาแมว และจุดเช็คอินยอดนิยม พร้อมบริการถ่ายรูป',
       icon: <Coffee className="w-6 h-6 text-pink-400 drop-shadow-[0_0_10px_rgba(236,72,153,0.95)]" />,
+      imageUrl: '/images/lifestyle_cafe.jpg',
       badge: 'CAFE & BAR GUIDE',
       bgGlow: 'from-pink-500/25 to-transparent',
       eta: '2-4 นาที',
@@ -592,6 +623,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(250, 204, 21, 0.8)',
       desc: 'คัดกรองพี่วินเลเวล 20+ อบรมดูแลผู้สูงอายุ พาไปทำศาสนกิจทุกศาสนา (มัสยิด, วัด, โบสถ์, ศาลเจ้า) พร้อมรอรับกลับ',
       icon: <Heart className="w-6 h-6 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.95)]" />,
+      imageUrl: '/images/elderly_spirit.jpg',
       badge: 'อบรมพิเศษ LV.20+ (ทุกศาสนา)',
       bgGlow: 'from-yellow-400/25 to-transparent',
       eta: '3-5 นาที',
@@ -612,6 +644,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(56, 189, 248, 0.8)',
       desc: 'พี่วินเลเวล 15+ ผ่านการอบรมดูแลเด็ก รับส่งไปโรงเรียน หมวกกันน็อกเด็ก พร้อมติดตาม GPS สด',
       icon: <Users className="w-6 h-6 text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.95)]" />,
+      imageUrl: '/images/family_school.jpg',
       badge: 'อบรมดูแลเด็ก LV.15+',
       bgGlow: 'from-sky-400/25 to-transparent',
       eta: '3-5 นาที',
@@ -632,6 +665,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(132, 204, 22, 0.8)',
       desc: 'พี่วินช่วยจองตั๋วคอนเสิร์ต กีฬา อีเวนต์ ต่อคิวรับบัตรจริง & เชื่อมต่อสถานีรถไฟฟ้า BTS/MRT ทุกสาย รถไฟ รถเมล์ เรือ ทั่วกรุงเทพฯ',
       icon: <Share2 className="w-6 h-6 text-lime-400 drop-shadow-[0_0_10px_rgba(132,204,22,0.95)]" />,
+      imageUrl: '/images/transit_train.jpg',
       badge: 'จองตั๋วคอนเสิร์ต/กีฬา & BTS/MRT',
       bgGlow: 'from-lime-400/25 to-transparent',
       eta: '2-3 นาที',
@@ -941,13 +975,17 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           <div className="flex items-center justify-between pb-3 border-b border-white/10 px-2">
             <div className="flex items-center gap-2">
               <div 
-                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 overflow-hidden"
                 style={{ 
-                  backgroundColor: currentTheme.hex, 
                   boxShadow: `0 0 15px ${currentTheme.glowRgba}` 
                 }}
               >
-                <span className="text-sm font-black text-slate-950">W</span>
+                <img 
+                  src="/app-logo.png" 
+                  alt="WINRIDER.AI" 
+                  className="w-full h-full object-cover rounded-lg"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <div>
                 <span className="text-xs font-black tracking-wider text-white">
@@ -1225,9 +1263,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           <div>
                             {/* Top: Outer Glowing Icon + Color ID Badge */}
                             <div className="flex items-center justify-between gap-1 mb-2">
-                              {/* Glowing Icon Container */}
+                              {/* Glowing 3D Service Image Container */}
                               <div 
-                                className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+                                className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-300 group-hover:scale-110 flex-shrink-0"
                                 style={{
                                   backgroundColor: `${svc.colorHex}1A`,
                                   borderColor: `${svc.colorHex}90`,
@@ -1235,7 +1273,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                                   boxShadow: `0 0 16px ${svc.colorGlow}`
                                 }}
                               >
-                                {svc.icon}
+                                <img 
+                                  src={svc.imageUrl} 
+                                  alt={svc.name} 
+                                  className="w-full h-full object-cover" 
+                                  referrerPolicy="no-referrer"
+                                />
                               </div>
 
                               {/* Unique Color ID Pill */}
@@ -1375,7 +1418,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                         className="flex-shrink-0 w-44 p-3 rounded-2xl bg-[#0E1B36] border border-white/10 hover:border-cyan-400/50 transition-all cursor-pointer snap-start"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xl">{dest.icon}</span>
+                          <CyberGraphic emoji={dest.icon} size="sm" rounded="rounded-lg" />
                           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
                             {dest.tag}
                           </span>
