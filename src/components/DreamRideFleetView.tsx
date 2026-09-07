@@ -3,6 +3,7 @@ import { DREAM_RIDES_FLEET } from '../data/dreamRidesData';
 import { DreamRideVehicle, DreamRideCategory } from '../types';
 import { getAmenityPrice, isHelmetAmenity } from '../data/amenitiesData';
 import { playTactileBlip, speakThaiText } from '../utils/audio';
+import { DreamRideVehicleImage, getDreamRideImage } from './CyberGraphic';
 import confetti from 'canvas-confetti';
 import { 
   Sparkles, 
@@ -76,32 +77,32 @@ export const DreamRideFleetView: React.FC<DreamRideFleetViewProps> = ({
   };
 
   // The 3 Requested Main Categories + All
-  const categories: { id: DreamRideCategory; label: string; icon: string; count: number; description: string }[] = [
+  const categories: { id: DreamRideCategory; label: string; imageUrl: string; count: number; description: string }[] = [
     { 
       id: 'all', 
       label: 'ทั้งหมด (All Motorcycles)', 
-      icon: '✨', 
+      imageUrl: '/images/cyber_vehicle.jpg', 
       count: DREAM_RIDES_FLEET.length,
       description: 'รวมมอเตอร์ไซค์ทุกแบรนด์ ทุกประเภท ทุกขนาดความจุ' 
     },
     { 
       id: 'standard', 
       label: '1. รถทั่วไป Standard (ใช้งานทั่วไปในชีวิตประจำวัน)', 
-      icon: '🛵', 
+      imageUrl: '/images/ride_standard.jpg', 
       count: DREAM_RIDES_FLEET.filter(v => v.category === 'standard').length,
       description: 'รถครอบครัว สกู๊ตเตอร์ในเมือง บิ๊กสกู๊ตเตอร์ ประหยัดน้ำมัน คล่องตัว ทนทาน (Wave, PCX, Grand Filano, Lead, Forza, XMAX, Smash, Drone)' 
     },
     { 
       id: 'sport', 
       label: '2. รถสายสปอร์ต Sport (ซูเปอร์ไบค์ & สปอร์ตบิ๊กไบค์)', 
-      icon: '⚡', 
+      imageUrl: '/images/ride_sport.jpg', 
       count: DREAM_RIDES_FLEET.filter(v => v.category === 'sport').length,
       description: 'สุดยอดยานยนต์ความเร็วสูงระดับเวิลด์คลาส 190-240 แรงม้า (Ducati Panigale V4 S, BMW S1000RR, Yamaha R1M, Honda CBR1000RR-R, Kawasaki Ninja H2, Hayabusa 1340, RSV4)' 
     },
     { 
       id: 'classic', 
       label: '3. รถสายคลาสสิค Classic (ครุยเซอร์ ฮาเลย์ ชอปเปอร์)', 
-      icon: '🦅', 
+      imageUrl: '/images/ride_classic.jpg', 
       count: DREAM_RIDES_FLEET.filter(v => v.category === 'classic').length,
       description: 'ตำนานเหนือกาลเวลา ครุยเซอร์ ชอปเปอร์ บ็อบเบอร์ วินเทจหรูหรา (Harley-Davidson Fat Boy 114, Breakout 117, Triumph Bonneville, Royal Enfield 350, Vespa 946, BMW R18, Rebel 1100)' 
     },
@@ -233,9 +234,7 @@ export const DreamRideFleetView: React.FC<DreamRideFleetViewProps> = ({
 
           {/* Current Selected Active Dream Ride Badge */}
           <div className="p-3 rounded-2xl bg-black/60 border border-[#00D2FF]/40 flex items-center gap-3 flex-shrink-0">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00D2FF] to-blue-700 flex items-center justify-center text-2xl shadow-[0_0_15px_rgba(0,210,255,0.4)]">
-              {selectedDreamRide.iconEmoji.split(' ')[0]}
-            </div>
+            <DreamRideVehicleImage vehicle={selectedDreamRide} size="lg" rounded="rounded-xl" glowColor="#00D2FF" />
             <div>
               <span className="text-[9px] font-mono text-cyan-300 uppercase block">รถที่คุณเลือกใช้งานปัจจุบัน:</span>
               <span className="text-xs font-bold text-white block line-clamp-1">{selectedDreamRide.thaiName}</span>
@@ -295,8 +294,8 @@ export const DreamRideFleetView: React.FC<DreamRideFleetViewProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-lg">{cat.icon}</span>
+                  <div className="flex items-center gap-2">
+                    <DreamRideVehicleImage category={cat.id} size="sm" rounded="rounded-lg" />
                     <span className="text-xs font-bold leading-tight">{cat.label.split('(')[0]}</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
@@ -437,9 +436,13 @@ export const DreamRideFleetView: React.FC<DreamRideFleetViewProps> = ({
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-2xl bg-black/60 border border-white/15 flex items-center justify-center text-3xl shadow-inner flex-shrink-0 group-hover:scale-105 transition-transform">
-                      {vehicle.iconEmoji.split(' ')[0]}
-                    </div>
+                    <DreamRideVehicleImage 
+                      vehicle={vehicle} 
+                      size="xl" 
+                      rounded="rounded-2xl" 
+                      className="group-hover:scale-105 transition-transform"
+                      glowColor={vehicle.category === 'sport' ? '#FF4500' : vehicle.category === 'classic' ? '#FFD700' : '#00D2FF'}
+                    />
                     <div>
                       {/* Brand & Model Badges */}
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -764,9 +767,12 @@ export const DreamRideFleetView: React.FC<DreamRideFleetViewProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-black/60 border border-white/20 flex items-center justify-center text-3xl shadow-inner">
-                  {detailModalVehicle.iconEmoji.split(' ')[0]}
-                </div>
+                <DreamRideVehicleImage 
+                  vehicle={detailModalVehicle} 
+                  size="xl" 
+                  rounded="rounded-2xl" 
+                  glowColor="#00D2FF" 
+                />
                 <div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 font-bold">

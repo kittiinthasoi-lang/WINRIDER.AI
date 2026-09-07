@@ -21,7 +21,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   QrCode,
-  Fingerprint
+  Fingerprint,
+  UserPlus,
+  ChevronRight
 } from 'lucide-react';
 
 interface SovereignAuthGatewayProps {
@@ -93,7 +95,7 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
           spread: 80,
           colors: ['#00D2FF', '#FFD700'],
         });
-        onLoginSuccess(session);
+        handleSuccess(session);
       } else {
         // Fallback: If not found in DB, auto-provision temporary citizen passenger
         const cleanPhone = phoneOrIdInput.replace(/[^0-9]/g, '');
@@ -106,12 +108,13 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
           level: 1,
           xp: 100,
           rating: 5.0,
-          avatarEmoji: '🦥',
+          avatarEmoji: '👤',
+          faceImageUrl: '/avatars/citizen.jpg',
           registeredAt: new Date().toISOString(),
         };
         await saveUserSession(newCitizen);
         if (audioEnabled) playLevelUpFanfare();
-        onLoginSuccess(newCitizen);
+        handleSuccess(newCitizen);
       }
     } catch (err) {
       setErrorMessage('ไม่สามารถตรวจสอบข้อมูลได้ กรุณาลองใหม่อีกครั้ง');
@@ -126,6 +129,29 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
         {/* Glow ambient background */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Top Header Bar with Instant Register Action */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pb-3 border-b border-white/10 relative z-10">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-[10px] font-mono text-cyan-300 font-bold tracking-wider">
+              WINRIDER SECURE ACCESS • VERSION 2.0
+            </span>
+          </div>
+
+          <button
+            type="button"
+            id="top-register-direct-btn"
+            onClick={() => {
+              if (audioEnabled) playNfcSyncSound();
+              handleRegisterClick();
+            }}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-[#FFD700] via-amber-400 to-yellow-500 hover:brightness-110 text-slate-950 font-black text-xs font-mono shadow-[0_0_15px_rgba(255,215,0,0.4)] flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-slate-950" />
+            <span>ลงทะเบียนผู้ใช้งานใหม่ (เริ่ม Level 1)</span>
+          </button>
+        </div>
 
         {/* Security Crest Header & Official App Logo */}
         <div className="text-center space-y-3 relative z-10">
@@ -152,6 +178,45 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
           <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
             ระบบป้องกันการสวมบทบาท (Role-Lock): เมื่อเข้าสู่ระบบแล้วคุณจะเข้าถึงได้เฉพาะหน้าจอของบทบาทตนเอง เพื่อความปลอดภัยและการใช้งานจริง
           </p>
+        </div>
+
+        {/* PROMINENT REGISTRATION HERO BANNER & BUTTON */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-cyan-500/20 border-2 border-amber-400/60 shadow-[0_0_30px_rgba(255,215,0,0.25)] relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5 text-left w-full sm:w-auto">
+            <div className="w-12 h-12 rounded-2xl bg-[#FFD700]/20 border border-[#FFD700]/40 flex items-center justify-center text-amber-300 flex-shrink-0 shadow-md">
+              <UserPlus className="w-6 h-6 text-[#FFD700]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black">
+                  NEW REGISTRATION
+                </span>
+                <span className="text-xs text-amber-300 font-mono font-bold">
+                  สิทธิ์เจ้าของบัญชีใหม่ 100%
+                </span>
+              </div>
+              <h3 className="text-sm sm:text-base font-black text-white mt-0.5">
+                ยังไม่มีบัญชี? ลงทะเบียนเลือกบทบาท (เริ่มนับเลเวล 1 ใหม่)
+              </h3>
+              <p className="text-[11px] text-slate-300 font-mono">
+                ครอบคลุม 4 บทบาท (พี่วิน, ผู้โดยสาร, ร้านค้า, พาร์ทเนอร์) พร้อมแสกนหน้ายืนยันตัวตนด้วย AI
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            id="gateway-register-hero-btn"
+            onClick={() => {
+              if (audioEnabled) playNfcSyncSound();
+              handleRegisterClick();
+            }}
+            className="w-full sm:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-[#FFD700] via-amber-400 to-yellow-500 hover:brightness-110 text-slate-950 font-black text-xs font-mono shadow-[0_0_20px_rgba(255,215,0,0.5)] flex items-center justify-center gap-2 transition-all transform active:scale-95 whitespace-nowrap cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4 text-slate-950" />
+            <span>ลงทะเบียนผู้ใช้งานใหม่ทันที</span>
+            <ChevronRight className="w-4 h-4 text-slate-950" />
+          </button>
         </div>
 
         {/* Mode Selector Tabs (Quick Preset vs Phone Login) */}
@@ -319,7 +384,7 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
             type="button"
             onClick={() => {
               if (audioEnabled) playNfcSyncSound();
-              onOpenRegister();
+              handleRegisterClick();
             }}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-300 text-xs font-mono font-bold transition-all shadow-[0_0_12px_rgba(255,215,0,0.15)] active:scale-95"
           >

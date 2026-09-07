@@ -37,6 +37,8 @@ export interface ArmorSuit {
   };
   designLore: string;
   visualTag: string;
+  imageUrl?: string;
+  subVariantImages?: string[];
   specialCondition?: string;
   subVariants?: string[];
 }
@@ -59,6 +61,7 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(0, 210, 255, 0.4)',
     bgGradient: 'from-[#0A1838] via-[#070D1E] to-[#040814]',
     borderColor: 'border-cyan-500/50',
+    imageUrl: '/images/armor_standard.jpg',
     jacket: {
       name: 'เสื้อเกราะรุ่น Standard (Standard Tech Armor Hoodie)',
       material: 'Cordura 600D + ผ้าระบายความร้อน Honeycomb Mesh ซับในกันความร้อน',
@@ -100,6 +103,7 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(205, 127, 50, 0.5)',
     bgGradient: 'from-[#2A170A] via-[#150D06] to-[#040814]',
     borderColor: 'border-amber-700/60',
+    imageUrl: '/images/armor_goldentree.jpg',
     jacket: {
       name: 'เสื้อเกราะรุ่น Bronze Edition (Bronze Biker Armor)',
       material: 'Cordura หนาพิเศษ เสริมการ์ดป้องกันจุดสำคัญ D3O Level 1 และแถบทองแดงขัดเงา',
@@ -141,6 +145,7 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(224, 230, 237, 0.6)',
     bgGradient: 'from-[#1A2638] via-[#0F1726] to-[#040814]',
     borderColor: 'border-slate-300',
+    imageUrl: '/images/armor_standard.jpg',
     jacket: {
       name: 'เสื้อเกราะรุ่น Silver Edition (Silver Cyber Armor)',
       material: 'ผ้ายืด Kevlar ผสมแผ่นคอมโพสิตและแผ่นสะท้อนแสงซิลเวอร์เมทัลลิก ป้องกันแรงเฉือน',
@@ -182,6 +187,7 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(255, 215, 0, 0.6)',
     bgGradient: 'from-[#261E0A] via-[#141208] to-[#040814]',
     borderColor: 'border-[#FFD700]',
+    imageUrl: '/images/armor_goldentree.jpg',
     jacket: {
       name: 'เสื้อเกราะรุ่น Gold Edition (Gold Quilted Armor)',
       material: 'หนังวัวแท้พรีเมียมบุเย็บลายข้าวหลามตัด (Diamond Quilt) สลักด้ายทองคำ 3%',
@@ -223,6 +229,7 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(160, 232, 255, 0.7)',
     bgGradient: 'from-[#0E2A44] via-[#09172B] to-[#040814]',
     borderColor: 'border-cyan-300',
+    imageUrl: '/images/armor_circuit.jpg',
     jacket: {
       name: 'เสื้อเกราะรุ่น Platinum Edition (Platinum Kinetic Armor)',
       material: 'Carbon Fiber Multi-Layer + Luminescent Plasma Fiber น้ำหนักเบาพิเศษ',
@@ -264,6 +271,7 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(103, 232, 249, 0.8)',
     bgGradient: 'from-[#102D52] via-[#091A36] to-[#040814]',
     borderColor: 'border-cyan-400 shadow-[0_0_15px_rgba(103,232,249,0.3)]',
+    imageUrl: '/images/armor_circuit.jpg',
     jacket: {
       name: 'เสื้อเกราะรุ่น Diamond Edition (Diamond Mesh Guardian)',
       material: 'Gore-Tex Pro + แผ่นโพลีคาร์บอเนตขึ้นรูปโครงสร้างรังผึ้งเพชร',
@@ -305,6 +313,13 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(239, 68, 68, 0.7)',
     bgGradient: 'from-[#380E0E] via-[#1E0808] to-[#040814]',
     borderColor: 'border-red-500',
+    imageUrl: '/images/armor_lightning.jpg',
+    subVariantImages: [
+      '/images/armor_lightning.jpg',
+      '/images/armor_circuit.jpg',
+      '/images/armor_goldentree.jpg',
+      '/images/armor_standard.jpg'
+    ],
     jacket: {
       name: 'เสื้อเกราะรุ่น "อัศวินวินไรเดอร์ผู้พิชิต" (4 แบบสะสมตามซีซัน)',
       material: 'Carbon Fiber 3K Weave + ลายปีกสายฟ้าความเร็วสูง (Lightning Strike Wings)',
@@ -346,6 +361,7 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(245, 158, 11, 0.8)',
     bgGradient: 'from-[#3A2206] via-[#1F1303] to-[#040814]',
     borderColor: 'border-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.4)]',
+    imageUrl: '/images/armor_goldentree.jpg',
     classifiedNotice: 'สภาอัศวิน WINRIDER.AI ยังไม่เปิดเผยตัวอย่างชุดเกราะเลเวล 71-80 ต่อสาธารณะ เพื่อรักษาความลับทางยุทธศาสตร์และเอกสิทธิ์ขั้นสูงสุดของผู้นำวิก',
     specialCondition: '✦ เงื่อนไขพิเศษ: ต้องสะสมชุด "ผู้พิชิต" (Level 61-70) ให้ครบทั้ง 4 แบบก่อน ถึงจะเริ่มปลดล็อกได้!',
     jacket: {
@@ -388,6 +404,12 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(168, 85, 247, 0.85)',
     bgGradient: 'from-[#2A0C42] via-[#140621] to-[#040814]',
     borderColor: 'border-purple-400 shadow-[0_0_30px_rgba(168,85,247,0.4)]',
+    imageUrl: '/images/armor_lightning.jpg',
+    subVariantImages: [
+      '/images/armor_lightning.jpg',
+      '/images/armor_circuit.jpg',
+      '/images/armor_goldentree.jpg'
+    ],
     classifiedNotice: 'ชุดเกราะระดับตำนาน 3 แบบแรร์สุดพิเศษ ถูกเก็บรักษาไว้ในห้องนิรภัยอธิปไตยคลาวด์ ยังไม่เปิดเผยดีไซน์ภายนอก',
     specialCondition: '✦ เงื่อนไขพิเศษ: บรรลุเลเวล 81+ และผ่านการทดสอบสมรรถนะขั้น Master Trainer',
     jacket: {
@@ -431,6 +453,7 @@ export const KNIGHT_ARMOR_SUITS: ArmorSuit[] = [
     glowColor: 'rgba(255, 215, 0, 0.95)',
     bgGradient: 'from-[#332204] via-[#170E3A] to-[#040814]',
     borderColor: 'border-amber-300 shadow-[0_0_40px_rgba(255,215,0,0.6)]',
+    imageUrl: '/images/armor_lightning.jpg',
     classifiedNotice: 'สุดยอดผลงาน 1 เดียวในโลก ออกแบบเฉพาะตัวร่วมกับดีไซเนอร์ระดับโลกสำหรับผู้พิชิตเลเวล 100 เท่านั้น จึงยังไม่เปิดเผยต่อสาธารณะ',
     specialCondition: '✦ เอกสิทธิ์ขั้นสุดยอด: สามารถร่วมออกแบบเองได้ และมีเพียงตัวเดียวในโลก! งบประมาณสนับสนุนสั่งตัด 100,000 บาท',
     jacket: {

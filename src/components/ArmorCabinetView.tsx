@@ -25,7 +25,8 @@ import {
   Sliders,
   BatteryCharging,
   Grid,
-  AlertTriangle
+  AlertTriangle,
+  Camera
 } from 'lucide-react';
 
 interface ArmorCabinetViewProps {
@@ -44,6 +45,7 @@ export const ArmorCabinetView: React.FC<ArmorCabinetViewProps> = ({
   const [activeCabinetSection, setActiveCabinetSection] = useState<'pod' | 'suits' | 'lab'>(initialCabinetSection);
   const [selectedCabinetId, setSelectedCabinetId] = useState<string>(equippedSuitId || 'suit-v3');
   const [selectedPart, setSelectedPart] = useState<'all' | 'helmet' | 'jacket' | 'pads' | 'gloves' | 'core'>('all');
+  const [podViewMode, setPodViewMode] = useState<'photo' | 'parts'>('photo');
   const [isPolishing, setIsPolishing] = useState(false);
   const [polishCount, setPolishCount] = useState(1);
   const [chamberLighting, setChamberLighting] = useState<'neon' | 'tactical' | 'stealth'>('neon');
@@ -88,8 +90,8 @@ export const ArmorCabinetView: React.FC<ArmorCabinetViewProps> = ({
       {/* Top Banner: Cyber Armor Armory Locker with Sub-Section Navigator */}
       <div className="p-4 rounded-3xl bg-gradient-to-r from-[#0C1E42] via-[#091530] to-[#070D1E] border-2 border-cyan-400/60 shadow-[0_0_25px_rgba(0,210,255,0.2)] flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center text-slate-950 font-black text-2xl shadow-[0_0_15px_rgba(0,210,255,0.4)]">
-            🚪
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center text-slate-950 font-black shadow-[0_0_15px_rgba(0,210,255,0.4)]">
+            <Shield className="w-6 h-6 text-slate-950" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -196,28 +198,40 @@ export const ArmorCabinetView: React.FC<ArmorCabinetViewProps> = ({
                       if (audioEnabled) playTactileBlip(850 + idx * 40);
                       setSelectedCabinetId(suit.id);
                     }}
-                    className={`p-2.5 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between ${
+                    className={`p-2 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between ${
                       isSelected
                         ? 'border-[#00D2FF] bg-[#0E2248] ring-2 ring-[#00D2FF]/50 shadow-[0_0_15px_rgba(0,210,255,0.35)] scale-[1.02]'
                         : 'border-white/10 bg-[#070D1E] hover:border-cyan-500/40 hover:bg-white/5'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/40 text-cyan-300 border border-white/10">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/40 text-cyan-300 border border-white/10">
                         POD-0{idx + 1}
                       </span>
                       {isEquipped ? (
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" title="กำลังสวมใส่" />
                       ) : (
-                        <span className="text-[9px] font-mono text-slate-400">LV.{suit.levelRequired}</span>
+                        <span className="text-[8px] font-mono text-slate-400">LV.{suit.levelRequired}</span>
                       )}
                     </div>
 
-                    <div className="text-xs font-bold text-white line-clamp-1">
+                    {suit.imageUrl && (
+                      <div className="w-full h-12 rounded-lg overflow-hidden my-1 border border-white/10 relative">
+                        <img
+                          src={suit.imageUrl}
+                          alt={suit.name}
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      </div>
+                    )}
+
+                    <div className="text-[11px] font-bold text-white line-clamp-1">
                       {suit.name.split('(')[0]}
                     </div>
 
-                    <div className="mt-1 flex items-center justify-between text-[9px] font-mono text-slate-400">
+                    <div className="mt-1 flex items-center justify-between text-[8px] font-mono text-slate-400">
                       <span>{suit.tier}</span>
                       {isEquipped ? (
                         <span className="text-emerald-400 font-bold">ใส่ใช้งาน</span>
@@ -237,116 +251,192 @@ export const ArmorCabinetView: React.FC<ArmorCabinetViewProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Left Column: Glass Capsule Display & Mannequin (5 cols) */}
             <div className="lg:col-span-5 space-y-3">
-              <div className="p-4 rounded-3xl bg-gradient-to-b from-[#0B1A38] via-[#071126] to-[#040814] border-2 border-cyan-500/50 shadow-[0_0_30px_rgba(0,210,255,0.25)] relative overflow-hidden flex flex-col items-center justify-between min-h-[460px]">
+              <div className="p-4 rounded-3xl bg-gradient-to-b from-[#0B1A38] via-[#071126] to-[#040814] border-2 border-cyan-500/50 shadow-[0_0_30px_rgba(0,210,255,0.25)] relative overflow-hidden flex flex-col items-center justify-between min-h-[480px]">
                 {/* Top Chamber Header & Atmospheric Vent Lights */}
-                <div className="w-full flex items-center justify-between pb-2 border-b border-white/10 text-[10px] font-mono">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                    <span className="text-cyan-300 font-bold uppercase">{activeSuit.code} CHAMBER</span>
+                <div className="w-full flex flex-col gap-2 pb-2.5 border-b border-white/10 text-[10px] font-mono">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                      <span className="text-cyan-300 font-bold uppercase">{activeSuit.code} CHAMBER</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {(['neon', 'tactical', 'stealth'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => {
+                            if (audioEnabled) playTactileBlip(900);
+                            setChamberLighting(mode);
+                          }}
+                          className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-bold border ${
+                            chamberLighting === mode
+                              ? 'bg-cyan-400 text-slate-950 border-cyan-300'
+                              : 'bg-black/40 text-slate-400 border-white/10'
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {(['neon', 'tactical', 'stealth'] as const).map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => {
-                          if (audioEnabled) playTactileBlip(900);
-                          setChamberLighting(mode);
-                        }}
-                        className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-bold border ${
-                          chamberLighting === mode
-                            ? 'bg-cyan-400 text-slate-950 border-cyan-300'
-                            : 'bg-black/40 text-slate-400 border-white/10'
-                        }`}
-                      >
-                        {mode}
-                      </button>
-                    ))}
+
+                  {/* View Mode Switcher: Photo vs Parts */}
+                  <div className="flex items-center justify-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10">
+                    <button
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(800);
+                        setPodViewMode('photo');
+                      }}
+                      className={`flex-1 py-1 px-2 rounded-lg text-[9px] font-bold font-mono transition-all flex items-center justify-center gap-1.5 ${
+                        podViewMode === 'photo'
+                          ? 'bg-cyan-400 text-slate-950 shadow-[0_0_10px_rgba(0,210,255,0.4)]'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Camera className="w-3 h-3" />
+                      <span>ตัวอย่างเกราะจริง (PHOTO)</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(800);
+                        setPodViewMode('parts');
+                      }}
+                      className={`flex-1 py-1 px-2 rounded-lg text-[9px] font-bold font-mono transition-all flex items-center justify-center gap-1.5 ${
+                        podViewMode === 'parts'
+                          ? 'bg-amber-400 text-slate-950 shadow-[0_0_10px_rgba(255,215,0,0.4)]'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Layers className="w-3 h-3" />
+                      <span>ชิ้นส่วนยุทธวิธี (PARTS)</span>
+                    </button>
                   </div>
                 </div>
 
                 {/* Glowing Capsule Background Aura */}
                 <div
-                  className="absolute inset-0 pointer-events-none opacity-20 transition-all duration-700"
+                  className="absolute inset-0 pointer-events-none opacity-25 transition-all duration-700"
                   style={{
-                    background: `radial-gradient(circle at 50% 40%, ${activeSuit.accentColor || '#00D2FF'}, transparent 70%)`
+                    background: `radial-gradient(circle at 50% 40%, ${
+                      chamberLighting === 'tactical' ? '#FFD700' :
+                      chamberLighting === 'stealth' ? '#334155' :
+                      activeSuit.accentColor || '#00D2FF'
+                    }, transparent 70%)`
                   }}
                 />
 
-                {/* Interactive Mannequin Pod Display */}
-                <div className="relative my-4 w-full flex flex-col items-center justify-center py-4">
-                  {/* Top: Helmet Pod */}
-                  <button
-                    onClick={() => {
-                      if (audioEnabled) playTactileBlip(1000);
-                      setSelectedPart(selectedPart === 'helmet' ? 'all' : 'helmet');
-                    }}
-                    className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center relative group ${
-                      selectedPart === 'helmet'
-                        ? 'border-[#00D2FF] bg-cyan-500/20 shadow-[0_0_20px_rgba(0,210,255,0.5)] scale-105'
-                        : 'border-white/15 bg-black/40 hover:border-cyan-400/50'
-                    }`}
-                  >
-                    <HardHat className="w-9 h-9 text-[#00D2FF]" />
-                    <span className="text-[9px] font-mono font-bold text-white mt-1">🪖 HUD HELMET</span>
-                    <span className="text-[8px] text-cyan-300 font-mono">{activeSuit.helmet.name.slice(0, 18)}...</span>
-                  </button>
-
-                  {/* Vertical Power Spine Beam */}
-                  <div className="w-1 h-6 bg-gradient-to-b from-cyan-400 to-amber-400 my-1 animate-pulse" />
-
-                  {/* Middle: Armor Jacket Torso */}
-                  <button
-                    onClick={() => {
-                      if (audioEnabled) playTactileBlip(900);
-                      setSelectedPart(selectedPart === 'jacket' ? 'all' : 'jacket');
-                    }}
-                    className={`p-4 rounded-3xl border-2 transition-all flex flex-col items-center justify-center w-48 relative ${
-                      selectedPart === 'jacket'
-                        ? 'border-[#FFD700] bg-amber-500/20 shadow-[0_0_25px_rgba(255,215,0,0.5)] scale-105'
-                        : 'border-white/15 bg-black/50 hover:border-amber-400/50'
-                    }`}
-                  >
-                    <Shirt className="w-14 h-14 text-[#FFD700]" />
-                    <span className="text-[10px] font-mono font-bold text-white mt-1">🧥 ARMOR JACKET</span>
-                    <span className="text-[8px] text-amber-300 font-mono text-center line-clamp-1">{activeSuit.jacket.name}</span>
-                  </button>
-
-                  {/* Vertical Power Spine Beam */}
-                  <div className="w-1 h-5 bg-gradient-to-b from-amber-400 to-cyan-400 my-1" />
-
-                  {/* Bottom: Protective Gauntlets & Knee Pads */}
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        if (audioEnabled) playTactileBlip(800);
-                        setSelectedPart(selectedPart === 'gloves' ? 'all' : 'gloves');
+                {/* Interactive Mannequin Pod OR Realistic Photo Display */}
+                {podViewMode === 'photo' ? (
+                  <div className="relative my-3 w-full flex flex-col items-center justify-center py-2">
+                    <div 
+                      className="relative w-full max-w-[280px] h-64 rounded-3xl overflow-hidden border-2 shadow-2xl group transition-all duration-500"
+                      style={{
+                        borderColor: chamberLighting === 'tactical' ? '#FFD700' : activeSuit.accentColor || '#00D2FF',
+                        boxShadow: `0 0 30px ${
+                          chamberLighting === 'tactical' ? 'rgba(255,215,0,0.4)' :
+                          chamberLighting === 'stealth' ? 'rgba(15,23,42,0.6)' :
+                          'rgba(0,210,255,0.4)'
+                        }`
                       }}
-                      className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center justify-center text-center ${
-                        selectedPart === 'gloves'
-                          ? 'border-cyan-400 bg-cyan-500/20 shadow-[0_0_15px_rgba(0,210,255,0.4)]'
-                          : 'border-white/10 bg-black/40 hover:border-white/20'
-                      }`}
                     >
-                      <span className="text-base">🧤</span>
-                      <span className="text-[8px] font-mono text-slate-300 font-bold">ถุงมือคาร์บอน</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if (audioEnabled) playTactileBlip(800);
-                        setSelectedPart(selectedPart === 'pads' ? 'all' : 'pads');
-                      }}
-                      className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center justify-center text-center ${
-                        selectedPart === 'pads'
-                          ? 'border-amber-400 bg-amber-500/20 shadow-[0_0_15px_rgba(255,215,0,0.4)]'
-                          : 'border-white/10 bg-black/40 hover:border-white/20'
-                      }`}
-                    >
-                      <Shield className="w-4 h-4 text-[#FFD700]" />
-                      <span className="text-[8px] font-mono text-slate-300 font-bold">สนับเข่า D3O</span>
-                    </button>
+                      <img
+                        src={activeSuit.imageUrl || '/images/armor_lightning.jpg'}
+                        alt={activeSuit.name}
+                        className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#040814]/90 via-transparent to-black/30 pointer-events-none" />
+                      
+                      {/* Live HUD Telemetry Tags */}
+                      <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-sm border border-cyan-400/40 text-[9px] font-mono text-cyan-300 font-bold">
+                        {activeSuit.code}
+                      </div>
+                      <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-sm border border-amber-400/40 text-[9px] font-mono text-amber-300 font-bold">
+                        DEF {activeSuit.stats.defense}%
+                      </div>
+                      <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-[10px] font-mono text-white/95">
+                        <div className="font-bold drop-shadow-md truncate max-w-[170px]">{activeSuit.name}</div>
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/70 text-cyan-300 border border-cyan-500/30">
+                          POD SCAN OK
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="relative my-4 w-full flex flex-col items-center justify-center py-4">
+                    {/* Top: Helmet Pod */}
+                    <button
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(1000);
+                        setSelectedPart(selectedPart === 'helmet' ? 'all' : 'helmet');
+                      }}
+                      className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center relative group ${
+                        selectedPart === 'helmet'
+                          ? 'border-[#00D2FF] bg-cyan-500/20 shadow-[0_0_20px_rgba(0,210,255,0.5)] scale-105'
+                          : 'border-white/15 bg-black/40 hover:border-cyan-400/50'
+                      }`}
+                    >
+                      <HardHat className="w-9 h-9 text-[#00D2FF]" />
+                      <span className="text-[9px] font-mono font-bold text-white mt-1">HUD HELMET</span>
+                      <span className="text-[8px] text-cyan-300 font-mono">{activeSuit.helmet.name.slice(0, 18)}...</span>
+                    </button>
+
+                    {/* Vertical Power Spine Beam */}
+                    <div className="w-1 h-6 bg-gradient-to-b from-cyan-400 to-amber-400 my-1 animate-pulse" />
+
+                    {/* Middle: Armor Jacket Torso */}
+                    <button
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(900);
+                        setSelectedPart(selectedPart === 'jacket' ? 'all' : 'jacket');
+                      }}
+                      className={`p-4 rounded-3xl border-2 transition-all flex flex-col items-center justify-center w-48 relative ${
+                        selectedPart === 'jacket'
+                          ? 'border-[#FFD700] bg-amber-500/20 shadow-[0_0_25px_rgba(255,215,0,0.5)] scale-105'
+                          : 'border-white/15 bg-black/50 hover:border-amber-400/50'
+                      }`}
+                    >
+                      <Shirt className="w-14 h-14 text-[#FFD700]" />
+                      <span className="text-[10px] font-mono font-bold text-white mt-1">ARMOR JACKET</span>
+                      <span className="text-[8px] text-amber-300 font-mono text-center line-clamp-1">{activeSuit.jacket.name}</span>
+                    </button>
+
+                    {/* Vertical Power Spine Beam */}
+                    <div className="w-1 h-5 bg-gradient-to-b from-amber-400 to-cyan-400 my-1" />
+
+                    {/* Bottom: Protective Gauntlets & Knee Pads */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(800);
+                          setSelectedPart(selectedPart === 'gloves' ? 'all' : 'gloves');
+                        }}
+                        className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center justify-center text-center ${
+                          selectedPart === 'gloves'
+                            ? 'border-cyan-400 bg-cyan-500/20 shadow-[0_0_15px_rgba(0,210,255,0.4)]'
+                            : 'border-white/10 bg-black/40 hover:border-white/20'
+                        }`}
+                      >
+                        <Shield className="w-4 h-4 text-cyan-300" />
+                        <span className="text-[8px] font-mono text-slate-300 font-bold mt-0.5">ถุงมือคาร์บอน</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(800);
+                          setSelectedPart(selectedPart === 'pads' ? 'all' : 'pads');
+                        }}
+                        className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center justify-center text-center ${
+                          selectedPart === 'pads'
+                            ? 'border-amber-400 bg-amber-500/20 shadow-[0_0_15px_rgba(255,215,0,0.4)]'
+                            : 'border-white/10 bg-black/40 hover:border-white/20'
+                        }`}
+                      >
+                        <Shield className="w-4 h-4 text-[#FFD700]" />
+                        <span className="text-[8px] font-mono text-slate-300 font-bold mt-0.5">สนับเข่า D3O</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Bottom Chamber Controls & Action Bar */}
                 <div className="w-full pt-3 border-t border-white/10 flex items-center justify-between gap-2">

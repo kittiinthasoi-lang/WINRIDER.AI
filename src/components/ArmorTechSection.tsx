@@ -197,10 +197,13 @@ export const ArmorTechSection: React.FC<Props> = ({ audioEnabled }) => {
         {/* Currently Equipped Armor Showcase Box */}
         <div className="p-5 rounded-xl bg-gradient-to-r from-[#0B1E48] via-[#07132F] to-[#070D1E] border border-cyan-500/40 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-700 p-0.5 flex items-center justify-center shadow-[0_0_15px_rgba(0,210,255,0.4)]">
-              <div className="w-full h-full bg-[#070D1E] rounded-[14px] flex items-center justify-center text-2xl">
-                🛡️
-              </div>
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-700 p-0.5 flex items-center justify-center shadow-[0_0_15px_rgba(0,210,255,0.4)] overflow-hidden">
+              <img
+                src="/images/armor_lightning.jpg"
+                alt="Equipped Armor"
+                className="w-full h-full object-cover rounded-[14px]"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
               <span className="text-[10px] font-mono text-cyan-300 uppercase">สวมใส่อยู่: {equippedTier.badge}</span>

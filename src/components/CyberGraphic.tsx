@@ -12,14 +12,17 @@ export interface CyberGraphicProps {
 }
 
 export const EMOJI_IMAGE_MAP: Record<string, string> = {
-  // Vehicles & Rides
-  '🏍': '/images/knight_ride.jpg',
-  '🏍️': '/images/knight_ride.jpg',
-  '🛵': '/images/knight_ride.jpg',
-  '🚲': '/images/knight_ride.jpg',
-  '🚗': '/images/knight_ride.jpg',
-  '🏎': '/images/knight_ride.jpg',
-  '🏎️': '/images/knight_ride.jpg',
+  // Vehicles & Rides (Mapped to generated high-res realistic vehicles)
+  '🏍': '/images/ride_sport.jpg',
+  '🏍️': '/images/ride_sport.jpg',
+  '🛵': '/images/ride_standard.jpg',
+  '🚲': '/images/ride_standard.jpg',
+  '🚗': '/images/ride_classic.jpg',
+  '🏎': '/images/ride_sport.jpg',
+  '🏎️': '/images/ride_sport.jpg',
+  '🚘': '/images/ride_classic.jpg',
+  '🚙': '/images/ride_classic.jpg',
+  '🛺': '/images/ride_standard.jpg',
   '🚌': '/images/transit_train.jpg',
   '🚝': '/images/transit_train.jpg',
   '🚆': '/images/transit_train.jpg',
@@ -32,11 +35,11 @@ export const EMOJI_IMAGE_MAP: Record<string, string> = {
   '🛫': '/images/transit_train.jpg',
   '🚢': '/images/transit_train.jpg',
   '🚤': '/images/transit_train.jpg',
-  '🛸': '/images/cyber_armor.jpg',
-  '🚁': '/images/cyber_armor.jpg',
-  '🚀': '/images/cyber_armor.jpg',
-  '🛣': '/images/knight_ride.jpg',
-  '🛣️': '/images/knight_ride.jpg',
+  '🛸': '/images/cyber_vehicle.jpg',
+  '🚁': '/images/cyber_vehicle.jpg',
+  '🚀': '/images/cyber_vehicle.jpg',
+  '🛣': '/images/cyber_vehicle.jpg',
+  '🛣️': '/images/cyber_vehicle.jpg',
   '🚏': '/images/transit_train.jpg',
   '🚐': '/images/transit_train.jpg',
 
@@ -97,7 +100,7 @@ export const EMOJI_IMAGE_MAP: Record<string, string> = {
   '🦐': '/images/pet_care.jpg',
   '🐟': '/images/pet_care.jpg',
   '🦮': '/images/pet_care.jpg',
-  '🦥': '/images/avatar_citizen.jpg',
+  '🦥': '/images/person_commuter.jpg',
   '🦈': '/images/pet_care.jpg',
   '🐘': '/images/pet_care.jpg',
   '🐝': '/images/pet_care.jpg',
@@ -145,78 +148,85 @@ export const EMOJI_IMAGE_MAP: Record<string, string> = {
   '🌃': '/images/lifestyle_cafe.jpg',
 
   // Food, Street Market & Dishes
-  '🍜': '/images/cyber_food.jpg',
-  '🍲': '/images/cyber_food.jpg',
-  '🌶': '/images/cyber_food.jpg',
-  '🌶️': '/images/cyber_food.jpg',
-  '🍪': '/images/cyber_food.jpg',
-  '🥐': '/images/cyber_food.jpg',
-  '🍔': '/images/cyber_food.jpg',
-  '🍕': '/images/cyber_food.jpg',
-  '🥗': '/images/cyber_food.jpg',
-  '🍱': '/images/cyber_food.jpg',
-  '🍛': '/images/cyber_food.jpg',
-  '🥩': '/images/cyber_food.jpg',
-  '🍗': '/images/cyber_food.jpg',
+  '🍜': '/images/street_market_food.jpg',
+  '🍲': '/images/street_market_food.jpg',
+  '🌶': '/images/street_market_food.jpg',
+  '🌶️': '/images/street_market_food.jpg',
+  '🍪': '/images/cookie_box.jpg',
+  '🥐': '/images/cookie_box.jpg',
+  '🍔': '/images/street_market_food.jpg',
+  '🍕': '/images/street_market_food.jpg',
+  '🥗': '/images/street_market_food.jpg',
+  '🍱': '/images/street_market_food.jpg',
+  '🍛': '/images/street_market_food.jpg',
+  '🥩': '/images/street_market_food.jpg',
+  '🍗': '/images/street_market_food.jpg',
   '🍊': '/images/cyber_food.jpg',
-  '🍽': '/images/cyber_food.jpg',
-  '🍽️': '/images/cyber_food.jpg',
-  '🥢': '/images/cyber_food.jpg',
-  '🍫': '/images/cyber_food.jpg',
+  '🍽': '/images/street_market_food.jpg',
+  '🍽️': '/images/street_market_food.jpg',
+  '🥢': '/images/street_market_food.jpg',
+  '🍫': '/images/cookie_box.jpg',
   '🥭': '/images/cyber_food.jpg',
   '🍎': '/images/cyber_food.jpg',
-  '🧁': '/images/cyber_food.jpg',
-  '🥟': '/images/cyber_food.jpg',
-  '🥬': '/images/cyber_food.jpg',
-  '🍞': '/images/cyber_food.jpg',
-  '🍯': '/images/cyber_food.jpg',
-  '🍳': '/images/cyber_food.jpg',
-  '🥚': '/images/cyber_food.jpg',
-  '🍰': '/images/cyber_food.jpg',
+  '🧁': '/images/cookie_box.jpg',
+  '🥟': '/images/street_market_food.jpg',
+  '🥬': '/images/street_market_food.jpg',
+  '🍞': '/images/cookie_box.jpg',
+  '🍯': '/images/cookie_box.jpg',
+  '🍳': '/images/street_market_food.jpg',
+  '🥚': '/images/street_market_food.jpg',
+  '🍰': '/images/cookie_box.jpg',
 
   // Spirit, Elderly, Medical & Hospitals
   '👵': '/images/elderly_spirit.jpg',
   '🧓': '/images/elderly_spirit.jpg',
   '🤲': '/images/elderly_spirit.jpg',
-  '🩺': '/images/elderly_spirit.jpg',
-  '🏥': '/images/elderly_spirit.jpg',
-  '💊': '/images/elderly_spirit.jpg',
-  '🚑': '/images/elderly_spirit.jpg',
+  '🩺': '/images/hospital_clinic.jpg',
+  '🏥': '/images/hospital_clinic.jpg',
+  '💊': '/images/hospital_clinic.jpg',
+  '🚑': '/images/ambulance_vehicle.jpg',
   '❤': '/images/elderly_spirit.jpg',
   '❤️': '/images/elderly_spirit.jpg',
   '💖': '/images/elderly_spirit.jpg',
   '💙': '/images/elderly_spirit.jpg',
-  '🩸': '/images/elderly_spirit.jpg',
-  '💉': '/images/elderly_spirit.jpg',
-  '🔬': '/images/elderly_spirit.jpg',
-  '🚨': '/images/elderly_spirit.jpg',
-  '🚒': '/images/elderly_spirit.jpg',
+  '🩸': '/images/hospital_clinic.jpg',
+  '💉': '/images/hospital_clinic.jpg',
+  '🔬': '/images/hospital_clinic.jpg',
+  '🚨': '/images/ambulance_vehicle.jpg',
+  '🚒': '/images/cyber_vehicle.jpg',
   '📞': '/images/elderly_spirit.jpg',
-  '😷': '/images/elderly_spirit.jpg',
+  '😷': '/images/hospital_clinic.jpg',
   '♿': '/images/elderly_spirit.jpg',
-  '⚕': '/images/elderly_spirit.jpg',
-  '⚕️': '/images/elderly_spirit.jpg',
-  '💡': '/images/elderly_spirit.jpg',
+  '⚕': '/images/hospital_clinic.jpg',
+  '⚕️': '/images/hospital_clinic.jpg',
 
-  // Family, Citizens & People
+  // Family, Citizens & People (Mapped to realistic person photography)
   '👨‍👩‍👧': '/images/family_school.jpg',
   '🎒': '/images/family_school.jpg',
   '🏫': '/images/family_school.jpg',
   '🤝': '/images/family_school.jpg',
-  '👶': '/images/family_school.jpg',
+  '👶': '/images/person_commuter.jpg',
   '🧑‍🤝‍🧑': '/images/family_school.jpg',
-  '👧': '/images/avatar_citizen.jpg',
+  '👧': '/images/person_commuter.jpg',
   '👨': '/images/avatar_knight.jpg',
-  '👩': '/images/avatar_citizen.jpg',
-  '🧑': '/images/avatar_citizen.jpg',
-  '👤': '/images/avatar_citizen.jpg',
-  '👥': '/images/avatar_citizen.jpg',
-  '🦰': '/images/avatar_citizen.jpg',
+  '👩': '/images/person_commuter.jpg',
+  '🧑': '/images/person_commuter.jpg',
+  '👤': '/images/person_commuter.jpg',
+  '👥': '/images/person_commuter.jpg',
+  '🦰': '/images/person_commuter.jpg',
   '🧔': '/images/avatar_knight.jpg',
   '🤠': '/images/avatar_knight.jpg',
   '👴': '/images/elderly_spirit.jpg',
   '🎓': '/images/family_school.jpg',
   '🥋': '/images/cyber_armor.jpg',
+  '🙋': '/images/person_commuter.jpg',
+  '💁': '/images/person_commuter.jpg',
+  '🧍': '/images/person_commuter.jpg',
+  '🚶': '/images/person_commuter.jpg',
+  '🏃': '/images/person_commuter.jpg',
+  '🧑‍💼': '/images/avatar_partner.jpg',
+  '🧑‍🔧': '/images/avatar_knight.jpg',
+  '🧑‍🍳': '/images/avatar_merchant.jpg',
 
   // Money, Baht, Economy
   '💰': '/images/cyber_coins.jpg',
@@ -264,7 +274,6 @@ export const EMOJI_IMAGE_MAP: Record<string, string> = {
   '🥇': '/images/cyber_armor.jpg',
   '🥈': '/images/cyber_armor.jpg',
   '🥉': '/images/cyber_armor.jpg',
-  '🏃': '/images/cyber_arena.jpg',
 
   // Armor, Weapons, Badges & Protection
   '🛡': '/images/cyber_armor.jpg',
@@ -299,7 +308,7 @@ export const EMOJI_IMAGE_MAP: Record<string, string> = {
   '🧣': '/images/cyber_armor.jpg',
   '🕶': '/images/cyber_armor.jpg',
   '🕶️': '/images/cyber_armor.jpg',
-  '👓': '/images/avatar_citizen.jpg',
+  '👓': '/images/person_commuter.jpg',
   '🧪': '/images/cyber_armor.jpg',
   '🧳': '/images/express_parcel.jpg',
   '🧴': '/images/lifestyle_cafe.jpg',
@@ -351,6 +360,113 @@ export function getCyberImageUrl(emojiOrSrc?: string): string {
 
   return '/images/app_logo.jpg';
 }
+
+/**
+ * Returns matching vehicle image for 3 dream ride categories:
+ * - standard: รถทั่วไป Standard (Wave, PCX, Grand Filano, etc.)
+ * - sport: รถสายสปอร์ต Sport (Ducati Panigale, BMW S1000RR, etc.)
+ * - classic: รถสายคลาสสิค Classic (Harley-Davidson, Fat Boy, etc.)
+ */
+export function getDreamRideImage(categoryOrVehicle?: any): string {
+  if (!categoryOrVehicle) return '/images/cyber_vehicle.jpg';
+  if (typeof categoryOrVehicle === 'object') {
+    if (categoryOrVehicle.imageUrl) return categoryOrVehicle.imageUrl;
+    const cat = categoryOrVehicle.category;
+    if (cat === 'standard') return '/images/ride_standard.jpg';
+    if (cat === 'sport') return '/images/ride_sport.jpg';
+    if (cat === 'classic') return '/images/ride_classic.jpg';
+  } else if (typeof categoryOrVehicle === 'string') {
+    const c = categoryOrVehicle.toLowerCase().trim();
+    if (c === 'standard' || c.includes('standard') || c.includes('ทั่วไป')) return '/images/ride_standard.jpg';
+    if (c === 'sport' || c.includes('sport') || c.includes('สปอร์ต') || c.includes('ซูเปอร์')) return '/images/ride_sport.jpg';
+    if (c === 'classic' || c.includes('classic') || c.includes('คลาสสิค') || c.includes('ครุยเซอร์')) return '/images/ride_classic.jpg';
+    if (c === 'all' || c.includes('all') || c.includes('ทั้งหมด')) return '/images/cyber_vehicle.jpg';
+  }
+  return '/images/ride_standard.jpg';
+}
+
+/**
+ * Dedicated Dream Ride Vehicle Image Component replacing all emojis
+ */
+export const DreamRideVehicleImage: React.FC<{
+  vehicle?: any;
+  category?: string;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | number;
+  className?: string;
+  glowColor?: string;
+  rounded?: string;
+}> = ({
+  vehicle,
+  category,
+  size = 'md',
+  className = '',
+  glowColor,
+  rounded = 'rounded-2xl',
+}) => {
+  const resolvedCategory = category || vehicle?.category || 'standard';
+  const resolvedSrc = vehicle?.imageUrl || getDreamRideImage(vehicle || resolvedCategory);
+  const sizeClass = typeof size === 'string' ? (SIZE_MAP[size] || 'w-12 h-12') : '';
+  const customDim = typeof size === 'number' ? { width: `${size}px`, height: `${size}px` } : {};
+
+  return (
+    <div
+      className={`relative inline-flex items-center justify-center overflow-hidden flex-shrink-0 border border-white/20 shadow-lg bg-black/60 ${sizeClass} ${rounded} ${className}`}
+      style={{
+        ...customDim,
+        boxShadow: glowColor ? `0 0 15px ${glowColor}` : undefined,
+      }}
+    >
+      <img
+        src={resolvedSrc}
+        alt={vehicle?.thaiName || vehicle?.name || 'Dream Ride'}
+        className="w-full h-full object-cover select-none pointer-events-none transition-transform hover:scale-110 duration-300"
+        referrerPolicy="no-referrer"
+        loading="lazy"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).src = '/images/cyber_vehicle.jpg';
+        }}
+      />
+    </div>
+  );
+};
+
+/**
+ * Dedicated Person Image Component replacing all person emojis
+ */
+export const CyberPersonAvatar: React.FC<{
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | number;
+  className?: string;
+  glowColor?: string;
+  rounded?: string;
+  src?: string;
+}> = ({
+  size = 'md',
+  className = '',
+  glowColor = '#00D2FF',
+  rounded = 'rounded-full',
+  src = '/images/person_commuter.jpg',
+}) => {
+  const sizeClass = typeof size === 'string' ? (SIZE_MAP[size] || 'w-10 h-10') : '';
+  const customDim = typeof size === 'number' ? { width: `${size}px`, height: `${size}px` } : {};
+
+  return (
+    <div
+      className={`relative inline-flex items-center justify-center overflow-hidden flex-shrink-0 border-2 border-cyan-400/50 bg-black/60 shadow-md ${sizeClass} ${rounded} ${className}`}
+      style={{
+        ...customDim,
+        boxShadow: `0 0 10px ${glowColor}40`,
+      }}
+    >
+      <img
+        src={src}
+        alt="Person User"
+        className="w-full h-full object-cover select-none pointer-events-none"
+        referrerPolicy="no-referrer"
+        loading="lazy"
+      />
+    </div>
+  );
+};
 
 const SIZE_MAP: Record<string, string> = {
   xs: 'w-4 h-4',

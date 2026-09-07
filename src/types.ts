@@ -327,6 +327,7 @@ export interface EmergencyStation {
   type: EmergencyServiceType;
   typeLabel: string;
   icon: string;
+  imageUrl?: string;
   phone: string;
   hotline?: string;
   address: string;

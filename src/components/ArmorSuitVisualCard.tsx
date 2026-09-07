@@ -78,6 +78,10 @@ export const ArmorSuitVisualCard: React.FC<ArmorSuitVisualCardProps> = ({
     }
 
     // LEVEL 1 - 70 REVEALED SUIT GRAPHICS
+    const displayImageUrl = (suit.subVariantImages && suit.subVariantImages[selectedVariantIndex])
+      ? suit.subVariantImages[selectedVariantIndex]
+      : suit.imageUrl;
+
     return (
       <div 
         className="relative w-full h-72 sm:h-80 rounded-2xl bg-gradient-to-b from-[#091530] via-[#060D1E] to-[#03060E] border border-cyan-500/30 overflow-hidden flex flex-col justify-between p-3"
@@ -108,10 +112,37 @@ export const ArmorSuitVisualCard: React.FC<ArmorSuitVisualCardProps> = ({
           </span>
         </div>
 
-        {/* CENTER SUIT VISUAL CANVAS / GRAPHICAL DIAGRAM */}
-        <div className="relative z-10 flex-1 flex items-center justify-center my-1">
-          {/* LEVEL 1-10: STANDARD BLUE NEON HOODIE */}
-          {suit.id === 'suit-v1' && (
+        {/* CENTER SUIT VISUAL CANVAS / REAL PHOTO & DIAGRAM */}
+        <div className="relative z-10 flex-1 flex items-center justify-center my-1 w-full">
+          {displayImageUrl ? (
+            <div 
+              className="relative w-full max-w-[260px] h-44 sm:h-48 rounded-2xl overflow-hidden border-2 shadow-2xl group transition-all duration-300"
+              style={{ borderColor: suit.accentColor || '#00D2FF', boxShadow: `0 0 20px ${suit.glowColor || 'rgba(0,210,255,0.3)'}` }}
+            >
+              <img
+                src={displayImageUrl}
+                alt={suit.name}
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-all duration-500"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#040814]/90 via-transparent to-black/30 pointer-events-none" />
+              <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-sm border border-cyan-400/40 text-[8px] font-mono text-cyan-300 font-bold">
+                {suit.code}
+              </div>
+              <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-sm border border-amber-400/40 text-[8px] font-mono text-amber-300 font-bold">
+                DEF {suit.stats.defense}%
+              </div>
+              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[9px] font-mono text-white/95 px-1">
+                <span className="font-bold drop-shadow-md truncate max-w-[150px]">{suit.nameEn}</span>
+                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-cyan-300 border border-cyan-500/30">
+                  ARMOR SUIT ✓
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* LEVEL 1-10: STANDARD BLUE NEON HOODIE */}
+              {suit.id === 'suit-v1' && (
             <div className="relative w-48 h-52 flex flex-col items-center justify-center">
               {/* Helmet on Stand */}
               <div className="w-20 h-16 rounded-t-full rounded-b-xl bg-slate-900 border-2 border-cyan-400 relative shadow-[0_0_15px_rgba(0,210,255,0.4)] flex items-center justify-center">
@@ -322,6 +353,8 @@ export const ArmorSuitVisualCard: React.FC<ArmorSuitVisualCardProps> = ({
                 </div>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
 

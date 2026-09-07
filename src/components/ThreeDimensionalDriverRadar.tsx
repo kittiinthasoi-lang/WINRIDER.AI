@@ -34,6 +34,7 @@ import { Vehicle } from '../types';
 import { playTactileBlip, playRadarScan, playEngineRev } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 import { GoogleMapsLiveView } from './GoogleMapsLiveView';
+import { CyberGraphic } from './CyberGraphic';
 
 export type RadarCategory = 'all' | 'customer' | 'shop' | 'partner' | 'driver';
 
@@ -41,6 +42,7 @@ export interface Radar3DPing {
   id: string;
   name: string;
   avatar: string;
+  imageUrl?: string;
   category: 'customer' | 'shop' | 'partner' | 'driver';
   categoryLabel: string;
   service: string;
@@ -74,6 +76,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-CUST-01',
     name: 'คุณณิชา รัตนเวช',
     avatar: '👩‍💼',
+    imageUrl: '/images/person_commuter.jpg',
     category: 'customer',
     categoryLabel: '👤 ลูกค้า',
     service: 'WIN KNIGHT (รับส่งด่วน)',
@@ -94,6 +97,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-CUST-02',
     name: 'คุณลุงฮาซัน & ครอบครัว',
     avatar: '🧓',
+    imageUrl: '/images/elderly_spirit.jpg',
     category: 'customer',
     categoryLabel: '👤 ลูกค้า',
     service: 'WIN Spirit (ศาสนกิจ)',
@@ -114,6 +118,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-CUST-03',
     name: 'คุณแพรวา สายมู',
     avatar: '🧘‍♀️',
+    imageUrl: '/images/mu_buddy.jpg',
     category: 'customer',
     categoryLabel: '👤 ลูกค้า',
     service: 'WIN MU BUDDY',
@@ -134,6 +139,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-CUST-04',
     name: 'คุณหมอทราย & น้องปอม',
     avatar: '🐶',
+    imageUrl: '/images/pet_care.jpg',
     category: 'customer',
     categoryLabel: '👤 ลูกค้า',
     service: 'WIN-Pet Care (สัตว์เลี้ยง)',
@@ -156,6 +162,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-SHOP-01',
     name: 'ร้าน Aura Bake เบเกอรี่',
     avatar: '🧁',
+    imageUrl: '/images/cookie_box.jpg',
     category: 'shop',
     categoryLabel: '🏪 ร้านค้า',
     service: 'WIN Express (พัสดุด่วน)',
@@ -176,6 +183,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-SHOP-02',
     name: 'ครัวเจ๊หงส์ ตามสั่งกระทะร้อน',
     avatar: '🍜',
+    imageUrl: '/images/street_market_food.jpg',
     category: 'shop',
     categoryLabel: '🏪 ร้านค้า',
     service: 'WIN Food Express',
@@ -196,6 +204,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-SHOP-03',
     name: 'Café Amazon สาขาเจริญนคร',
     avatar: '☕',
+    imageUrl: '/images/lifestyle_cafe.jpg',
     category: 'shop',
     categoryLabel: '🏪 ร้านค้า',
     service: 'WIN Beverage Express',
@@ -216,6 +225,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-SHOP-04',
     name: 'Kerry Express Hub สาขาคลองสาน',
     avatar: '📦',
+    imageUrl: '/images/express_parcel.jpg',
     category: 'shop',
     categoryLabel: '🏪 ร้านค้า',
     service: 'WIN Express Hub Drop',
@@ -238,6 +248,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-PART-01',
     name: 'สถานีสลับแบตเตอรี่ WIN EV Swapping Hub #04',
     avatar: '⚡',
+    imageUrl: '/images/cyber_vehicle.jpg',
     category: 'partner',
     categoryLabel: '⚡ พาร์ทเนอร์',
     service: 'WIN EV Battery Swap',
@@ -258,6 +269,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-PART-02',
     name: 'ศูนย์บริการซ่อมบำรุง Win Pro Service & Garage',
     avatar: '🛠️',
+    imageUrl: '/images/armor_circuit.jpg',
     category: 'partner',
     categoryLabel: '⚡ พาร์ทเนอร์',
     service: 'Partner Garage & Tire',
@@ -278,6 +290,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-PART-03',
     name: 'ศูนย์สวัสดิการกองทุน 2 บาท & พักผ่อนอัศวิน',
     avatar: '🏛️',
+    imageUrl: '/images/cyber_arena.jpg',
     category: 'partner',
     categoryLabel: '⚡ พาร์ทเนอร์',
     service: 'Sovereign Knight Lounge',
@@ -298,6 +311,7 @@ export const SAMPLE_3D_PINGS: Radar3DPing[] = [
     id: 'PING-PART-04',
     name: 'ปั๊ม PTT EV Quick Charge Hub',
     avatar: '⛽',
+    imageUrl: '/images/cyber_vehicle.jpg',
     category: 'partner',
     categoryLabel: '⚡ พาร์ทเนอร์',
     service: 'EV Supercharger DC Fast',
@@ -598,8 +612,13 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
 
               {/* Vehicle 3D Card HUD with floating levitate animation */}
               <div className="relative flex flex-col items-center animate-levitate">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00D2FF] via-blue-600 to-emerald-400 text-slate-950 flex items-center justify-center text-2xl font-black shadow-[0_0_30px_#00D2FF] ring-4 ring-cyan-400/60">
-                  {activeVehicle.iconEmoji || '🛵'}
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00D2FF] via-blue-600 to-emerald-400 text-slate-950 flex items-center justify-center shadow-[0_0_30px_#00D2FF] ring-4 ring-cyan-400/60 overflow-hidden">
+                  <img
+                    src={activeVehicle.imageUrl || '/images/ride_sport.jpg'}
+                    alt={activeVehicle.name}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
                 <div className="mt-1 px-2.5 py-0.5 rounded-full bg-black/95 border-2 border-cyan-400 text-[9px] font-black text-cyan-300 shadow-xl whitespace-nowrap flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
@@ -699,8 +718,17 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
                     </div>
 
                     {/* Main Avatar Bubble */}
-                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-base font-bold shadow-2xl transition-all border-2 bg-gradient-to-tr ${categoryBadgeColors[ping.category]}`}>
-                      {ping.avatar || ping.serviceEmoji}
+                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shadow-2xl transition-all border-2 overflow-hidden bg-gradient-to-tr ${categoryBadgeColors[ping.category]}`}>
+                      {ping.imageUrl ? (
+                        <img 
+                          src={ping.imageUrl} 
+                          alt={ping.name} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <CyberGraphic emoji={ping.avatar || ping.serviceEmoji} size={32} />
+                      )}
                     </div>
 
                     {/* Floating Info Tag Badge with Live Distance and Price */}
@@ -915,8 +943,17 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
       {selectedPing && (
         <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0C1E3C] via-[#09172E] to-[#060F20] border-2 border-[#FFD700]/60 shadow-[0_0_25px_rgba(255,215,0,0.25)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in">
           <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#FFD700] via-amber-400 to-yellow-600 text-slate-950 flex items-center justify-center text-2xl font-black shadow-lg flex-shrink-0">
-              {selectedPing.avatar || selectedPing.serviceEmoji}
+            <div className="w-14 h-14 rounded-2xl border-2 border-amber-400 overflow-hidden shadow-lg flex-shrink-0">
+              {selectedPing.imageUrl ? (
+                <img 
+                  src={selectedPing.imageUrl} 
+                  alt={selectedPing.name} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <CyberGraphic emoji={selectedPing.avatar || selectedPing.serviceEmoji} size={56} />
+              )}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-1.5">

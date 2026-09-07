@@ -28,7 +28,7 @@ import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
-import { CyberGraphic } from './CyberGraphic';
+import { CyberGraphic, DreamRideVehicleImage } from './CyberGraphic';
 import confetti from 'canvas-confetti';
 import { 
   Shield, 
@@ -1109,9 +1109,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   className="p-3 rounded-2xl bg-gradient-to-r from-[#0E2044] via-[#091530] to-[#070D1E] border border-[#FFD700]/50 flex items-center justify-between cursor-pointer hover:border-[#FFD700] transition-all shadow-md group"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-black/60 border border-white/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                      {selectedDreamRide.iconEmoji.split(' ')[0]}
-                    </div>
+                    <DreamRideVehicleImage 
+                      vehicle={selectedDreamRide} 
+                      size="lg" 
+                      rounded="rounded-xl" 
+                      className="group-hover:scale-110 transition-transform" 
+                      glowColor="#FFD700" 
+                    />
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#FFD700]/20 text-[#FFD700] font-bold">
@@ -1911,11 +1915,20 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           className="p-3.5 rounded-2xl bg-[#09152C] border border-white/10 hover:border-[#00D2FF]/60 transition-all cursor-pointer space-y-2 flex flex-col justify-between group"
                         >
                           <div>
-                            <div className="flex items-start justify-between">
-                              <div className="w-10 h-10 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                                {item.iconEmoji}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="w-14 h-14 rounded-xl bg-black/60 border border-white/15 overflow-hidden flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                                {item.imageUrl ? (
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <span className="text-2xl">{item.iconEmoji}</span>
+                                )}
                               </div>
-                              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-right">
                                 {item.category}
                               </span>
                             </div>
@@ -2113,7 +2126,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           onClick={() => handleGainCitizenXp(150, "เดินทางด้วย WINRIDER 1 ทริป")}
                           className="p-1.5 rounded-xl bg-black/40 hover:bg-cyan-950/60 border border-white/10 hover:border-cyan-400 text-left transition-all flex items-center justify-between"
                         >
-                          <span>🛵 นั่งวินไปทำงาน</span>
+                          <span className="flex items-center gap-1.5"><Bike className="w-3.5 h-3.5 text-cyan-400" /> นั่งวินไปทำงาน</span>
                           <span className="text-cyan-300 font-bold">+150 XP</span>
                         </button>
                         <button
@@ -2121,7 +2134,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           onClick={() => handleGainCitizenXp(120, "สั่งการด้วยเสียง AI Assistant")}
                           className="p-1.5 rounded-xl bg-black/40 hover:bg-purple-950/60 border border-white/10 hover:border-purple-400 text-left transition-all flex items-center justify-between"
                         >
-                          <span>🎙️ สั่งเสียง AI</span>
+                          <span className="flex items-center gap-1.5"><Mic className="w-3.5 h-3.5 text-purple-400" /> สั่งเสียง AI</span>
                           <span className="text-purple-300 font-bold">+120 XP</span>
                         </button>
                         <button
@@ -2129,7 +2142,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           onClick={() => handleGainCitizenXp(250, "ทริปไหว้พระสายมู WIN MU BUDDY")}
                           className="p-1.5 rounded-xl bg-black/40 hover:bg-amber-950/60 border border-white/10 hover:border-amber-400 text-left transition-all flex items-center justify-between"
                         >
-                          <span>🪷 ไหว้พระสายมู</span>
+                          <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-amber-400" /> ไหว้พระสายมู</span>
                           <span className="text-amber-300 font-bold">+250 XP</span>
                         </button>
                         <button
@@ -2137,7 +2150,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           onClick={() => handleGainCitizenXp(300, "พาญาติผู้ใหญ่ทำศาสนกิจ WIN Spirit")}
                           className="p-1.5 rounded-xl bg-black/40 hover:bg-emerald-950/60 border border-white/10 hover:border-emerald-400 text-left transition-all flex items-center justify-between"
                         >
-                          <span>👵 WIN Spirit</span>
+                          <span className="flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-emerald-400" /> WIN Spirit</span>
                           <span className="text-emerald-300 font-bold">+300 XP</span>
                         </button>
                       </div>
@@ -2145,12 +2158,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   </div>
                 </div>
 
-                {/* 🛍️ วันนี้มีของมาขาย (ใต้โปรไฟล์ลูกค้า C2C Market Action Card) */}
+                {/* วันนี้มีของมาขาย (ใต้โปรไฟล์ลูกค้า C2C Market Action Card) */}
                 <div className="p-4 rounded-3xl bg-gradient-to-br from-[#122442] via-[#0A1A33] to-[#070D1E] border-2 border-[#FFD700]/70 shadow-[0_0_25px_rgba(255,215,0,0.25)] space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(245,158,11,0.5)]">
-                        🛍️
+                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.5)]">
+                        <ShoppingBag className="w-5 h-5 text-slate-950" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -2429,7 +2442,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           <div className="relative w-full max-w-md bg-[#0A1428] rounded-3xl border-2 border-[#00D2FF] p-5 shadow-[0_0_40px_rgba(0,210,255,0.4)] space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🏍️</span>
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center">
+                  <Bike className="w-5 h-5 text-cyan-400" />
+                </div>
                 <div>
                   <h3 className="text-base font-bold text-white">ยืนยันการจองบริการ & รถในฝัน</h3>
                   <span className="text-[10px] text-cyan-300 font-mono">SOVEREIGN DISPATCH PROTOCOL</span>
@@ -2447,8 +2462,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             {currentMatchedDriver && (
               <div className="p-3 rounded-2xl bg-gradient-to-r from-cyan-950/60 to-blue-950/60 border border-cyan-400/40 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-full bg-cyan-400/20 border border-cyan-400 flex items-center justify-center text-xl">
-                    {currentMatchedDriver.avatarEmoji}
+                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-cyan-400 shadow-md flex-shrink-0 bg-black/60">
+                    <img
+                      src={currentMatchedDriver.avatarUrl || '/avatars/knight.jpg'}
+                      alt={currentMatchedDriver.name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
@@ -2457,8 +2477,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                         LV.{currentMatchedDriver.level}
                       </span>
                     </div>
-                    <p className="text-[10px] text-cyan-300 font-mono">
-                      ⭐ {currentMatchedDriver.rating} • ขับ {currentMatchedDriver.vehicleModel}
+                    <p className="text-[10px] text-cyan-300 font-mono flex items-center gap-1">
+                      <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                      <span>{currentMatchedDriver.rating} • ขับ {currentMatchedDriver.vehicleModel}</span>
                     </p>
                   </div>
                 </div>
@@ -2581,8 +2602,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10'
                       }`}
                     >
-                      <div className="text-lg">{ride.iconEmoji.split(' ')[0]}</div>
-                      <div className="font-bold truncate text-[11px] mt-0.5">{ride.thaiName}</div>
+                      <DreamRideVehicleImage vehicle={ride} size="sm" rounded="rounded-lg" />
+                      <div className="font-bold truncate text-[11px] mt-1">{ride.thaiName}</div>
                       <div className="text-[9px] text-[#FFD700] font-mono">
                         {ride.priceAddon === 0 ? 'ฟรี' : `+฿${ride.priceAddon}`}
                       </div>
@@ -2592,9 +2613,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
               ) : (
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-black/60 border border-white/10 flex items-center justify-center text-2xl">
-                      {selectedDreamRide.iconEmoji.split(' ')[0]}
-                    </div>
+                    <DreamRideVehicleImage vehicle={selectedDreamRide} size="md" rounded="rounded-xl" glowColor="#FFD700" />
                     <div>
                       <h4 className="text-xs font-bold text-white leading-tight">{selectedDreamRide.thaiName}</h4>
                       <span className="text-[10px] text-cyan-300 font-mono">
@@ -3160,8 +3179,17 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           <div className="relative w-full max-w-lg bg-[#0A1428] rounded-3xl border-2 border-cyan-500/60 p-6 shadow-[0_0_40px_rgba(0,210,255,0.4)] space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-black/60 border border-white/15 flex items-center justify-center text-2xl">
-                  {selectedShopItem.iconEmoji}
+                <div className="w-12 h-12 rounded-xl bg-black/60 border border-white/15 overflow-hidden flex items-center justify-center flex-shrink-0">
+                  {selectedShopItem.imageUrl ? (
+                    <img
+                      src={selectedShopItem.imageUrl}
+                      alt={selectedShopItem.name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span className="text-2xl">{selectedShopItem.iconEmoji}</span>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white leading-tight">{selectedShopItem.name}</h3>
@@ -3175,6 +3203,22 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 ✕
               </button>
             </div>
+
+            {/* Product Image Spotlight Showcase */}
+            {selectedShopItem.imageUrl && (
+              <div className="w-full h-48 sm:h-56 rounded-2xl overflow-hidden border border-cyan-500/30 relative group shadow-lg">
+                <img
+                  src={selectedShopItem.imageUrl}
+                  alt={selectedShopItem.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0A1428] via-transparent to-black/20 pointer-events-none" />
+                <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-sm border border-cyan-400/40 text-[10px] font-mono text-cyan-300 font-bold">
+                  {selectedShopItem.category}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3 text-xs">
               <p className="text-slate-300 leading-relaxed">{selectedShopItem.description}</p>

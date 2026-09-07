@@ -20,6 +20,7 @@ export interface WinShopItem {
   tacticalAdvantage: string;
   goldAccentDetail: string;
   iconEmoji: string;
+  imageUrl: string;
   glowTheme: string;
   installment: string;
 }
@@ -52,6 +53,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'คุยกับศูนย์และเพื่อนร่วมวินได้ทันทีโดยไม่ต้องละสายตาจากถนน สั่ง AI เปิดเส้นทางลัดด้วยเสียง 100%',
     goldAccentDetail: 'ขอบวงแหวนคอนโทรลเลอร์ชุบทองคำ 3% สลักโลโก้ WINRIDER.AI',
     iconEmoji: '🎧',
+    imageUrl: '/images/shop_comm_intercom.jpg',
     glowTheme: 'from-[#00D2FF]/20 to-transparent',
     installment: 'ผ่อนชำระ 1+1+1+1 (วันละ 25 บาท)'
   },
@@ -82,6 +84,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'จับแฮนด์แน่นกระชับ ไม่ลื่นแม้ฝนตก และรับงานบนสมาร์ทโฟนได้รวดเร็วทันใจ',
     goldAccentDetail: 'เดินด้ายสีทองคำ 3% คู่ขนานตลอดแนวข้อมือเพื่อเสริมสิริมงคลและความเหนียวแน่น',
     iconEmoji: '🧤',
+    imageUrl: '/images/shop_gloves_carbon.jpg',
     glowTheme: 'from-cyan-400/20 to-transparent',
     installment: 'ผ่อนชำระ 4 งวด (งวดละ 322 บาท)'
   },
@@ -112,6 +115,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'ปกป้องหัวเข่าและข้อเท้าจากการเฉี่ยวชนขณะมุดแทรกตามช่องแคบระหว่างรถยนต์',
     goldAccentDetail: 'ลายพิมพ์ยันต์เกราะเพชรดิจิทัลสีทองคำ 3% สลักลงบนแผ่นกลางหัวเข่า',
     iconEmoji: '🛡️',
+    imageUrl: '/images/shop_armor_kneeguards.jpg',
     glowTheme: 'from-emerald-400/20 to-transparent',
     installment: 'ผ่อนชำระ 1+1+1+1 (วันละ 19 บาท)'
   },
@@ -142,6 +146,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'เปิดรับงาน WIN-Pet Care เพิ่มรายได้ต่อทริป 2.5 เท่า สัตว์เลี้ยงไม่อึดอัดและไม่เมารถ',
     goldAccentDetail: 'ขอบวงแหวนยึดโดมชุบทองคำ 3% สไตล์แคปซูลอวกาศหรูหรา',
     iconEmoji: '🐱',
+    imageUrl: '/images/shop_pet_pod.jpg',
     glowTheme: 'from-amber-400/20 to-transparent',
     installment: 'ผ่อนชำระ 6 เดือน (เดือนละ 665 บาท)'
   },
@@ -172,6 +177,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'วิ่งรับงานฝ่าพายุฝนได้ตลอดวันโดยตัวไม่เปียกชื้น ปลอดภัยจากอุบัติเหตุด้วยแถบไฟเด่นชัด',
     goldAccentDetail: 'หัวซิป The Guardian Zipper โลหะสีทอง 3% กันน้ำพร้อมซีลยางแท้',
     iconEmoji: '⚡',
+    imageUrl: '/images/shop_storm_jacket.jpg',
     glowTheme: 'from-cyan-500/20 to-transparent',
     installment: 'ผ่อนชำระ 1+1+1+1 (วันละ 29 บาท)'
   },
@@ -202,6 +208,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'หน้าจอแผนที่ CI Capillary นิ่งสนิท มองง่าย สบายตา และกล้องมือถือไม่พัง',
     goldAccentDetail: 'สลักโลโก้ราชสีห์สีทอง 3% บนแกนหมุนบอลจอยต์ 360 องศา',
     iconEmoji: '📱',
+    imageUrl: '/images/shop_phone_mount.jpg',
     glowTheme: 'from-blue-500/20 to-transparent',
     installment: 'ซื้อสดหรือตัดแต้มอัศวิน 990 แต้ม'
   },
@@ -232,6 +239,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'สร้างความประทับใจระดับ 6 ดาวให้ผู้โดยสาร รับทิปและคะแนน 5 ดาวเต็มทุกเที่ยว',
     goldAccentDetail: 'ปลอกด้ามจับหุ้มทองเหลืองขัดลายชุบทองคำ 3% สลัก WR.AI',
     iconEmoji: '☂️',
+    imageUrl: '/images/shop_cyber_umbrella.jpg',
     glowTheme: 'from-purple-500/20 to-transparent',
     installment: 'ซื้อสดหรือใช้สวัสดิการกองทุน 2 บาท'
   },
@@ -262,6 +270,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'ขับขี่ต่อเนื่อง 8-10 ชั่วโมงโดยไม่ปวดเมื่อยหลัง และรองรับบริการ WIN Spirit อย่างมืออาชีพ',
     goldAccentDetail: 'สลักลายพรหมวิหาร 4 สีทองคำ 3% บริเวณแกนกระดูกสันหลัง',
     iconEmoji: '🦾',
+    imageUrl: '/images/shop_spinal_harness.jpg',
     glowTheme: 'from-rose-500/20 to-transparent',
     installment: 'ผ่อนชำระ 1+1+1+1 (วันละ 26 บาท)'
   },
@@ -292,6 +301,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'รับส่งอาหารระดับภัตตาคาร ยา วัคซีน และเวชภัณฑ์ทางการแพทย์ได้อย่างปลอดภัย 100%',
     goldAccentDetail: 'ตราสัญลักษณ์ราชสีห์สีทองคำ 3% กลางฝากล่องพัสดุ',
     iconEmoji: '📦',
+    imageUrl: '/images/shop_thermal_box.jpg',
     glowTheme: 'from-blue-600/20 to-transparent',
     installment: 'พี่วินเลือกซื้อสดหรือผ่อน +1฿/รอบ | คนทั่วไปเงินสดเท่านั้น'
   },
@@ -322,6 +332,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'ปกป้องข้อศอกขณะเลี้ยวโค้งหรือกรณีเกิดอุบัติเหตุไม่คาดฝัน',
     goldAccentDetail: 'เดินเส้นด้ายสีทองคำ 3% พร้อมปักตรา WINRIDER BIONIC',
     iconEmoji: '🦾',
+    imageUrl: '/images/shop_armor_kneeguards.jpg',
     glowTheme: 'from-emerald-500/20 to-transparent',
     installment: 'พี่วินเลือกซื้อสดหรือผ่อน +1฿/รอบ | คนทั่วไปเงินสดเท่านั้น'
   }

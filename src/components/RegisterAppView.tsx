@@ -38,7 +38,8 @@ import {
   FileText,
   Lock,
   Car,
-  Check
+  Check,
+  Crown
 } from 'lucide-react';
 import { AIFaceBiometricScanner, BiometricScanResult } from './AIFaceBiometricScanner';
 import { CyberGraphic } from './CyberGraphic';
@@ -517,6 +518,66 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
               </div>
             </button>
           </div>
+
+          {/* STEP 1 ACTION CARD: CONFIRM ROLE & PROCEED */}
+          {currentStep === 1 && (
+            <div className="p-5 rounded-3xl bg-gradient-to-r from-[#0C1F45] via-[#091530] to-[#050B18] border-2 border-cyan-400/50 shadow-[0_0_30px_rgba(0,210,255,0.25)] flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in">
+              <div className="flex items-center gap-3.5 w-full md:w-auto">
+                <div className="w-14 h-14 rounded-2xl overflow-hidden bg-black/50 border-2 border-cyan-400/60 flex-shrink-0 shadow-lg">
+                  <img 
+                    src={
+                      selectedRole === 'driver' ? '/avatars/knight.jpg' :
+                      selectedRole === 'merchant' ? '/avatars/merchant.jpg' :
+                      selectedRole === 'partner' ? '/avatars/partner.jpg' :
+                      '/avatars/citizen.jpg'
+                    } 
+                    alt="Selected Role Avatar" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-bold">
+                      บทบาทที่เลือก
+                    </span>
+                    <span className="text-xs text-amber-300 font-mono font-bold">
+                      สิทธิการเป็นเจ้าของยูเซอร์ใหม่ 100%
+                    </span>
+                  </div>
+                  <h4 className="text-base font-black text-white mt-0.5">
+                    {getRoleTitleTh(selectedRole)}
+                  </h4>
+                  <p className="text-xs text-slate-300">
+                    ระบบจะเริ่มนับเลเวล 1 และผูกสิทธิ์อธิปไตยเฉพาะของบทบาทนี้ทันที
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto">
+                <button
+                  type="button"
+                  id="confirm-role-instant-start-btn"
+                  onClick={handleExecuteFullResetAndStart}
+                  disabled={isResetting}
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-black text-xs font-mono shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                >
+                  <Zap className="w-4 h-4 text-slate-950" />
+                  <span>เป็นเจ้าของยูเซอร์ & เข้าใช้งานทันที (Level 1)</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="step1-proceed-to-step2-btn"
+                  onClick={handleProceedToDetails}
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-slate-950 font-black text-xs font-mono shadow-[0_0_20px_rgba(0,210,255,0.4)] flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>กรอกข้อมูลละเอียด (ขั้นตอนที่ 2)</span>
+                  <ChevronRight className="w-4 h-4 text-slate-950" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1298,7 +1359,7 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
             )}
 
             {/* ACTION BUTTONS: STEP 2 */}
-            <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setCurrentStep(1)}
@@ -1308,13 +1369,27 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
                 <span>เปลี่ยนบทบาท</span>
               </button>
 
-              <button
-                type="submit"
-                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-400 via-blue-500 to-[#FFD700] hover:brightness-110 text-slate-950 font-black text-sm shadow-[0_0_25px_rgba(0,210,255,0.4)] flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer"
-              >
-                <span>บันทึกข้อมูล & ไปแสกนหน้ายืนยันตัวตนด้วย AI</span>
-                <Camera className="w-4 h-4" />
-              </button>
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  id="step2-instant-start-btn"
+                  onClick={handleExecuteFullResetAndStart}
+                  disabled={isResetting}
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-black text-xs font-mono shadow-[0_0_15px_rgba(16,185,129,0.35)] flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                >
+                  <Zap className="w-4 h-4 text-slate-950" />
+                  <span>บันทึก & เป็นเจ้าของยูเซอร์ทันที (Level 1)</span>
+                </button>
+
+                <button
+                  type="submit"
+                  id="step2-proceed-to-facescan-btn"
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-400 via-blue-500 to-[#FFD700] hover:brightness-110 text-slate-950 font-black text-xs font-mono shadow-[0_0_20px_rgba(0,210,255,0.4)] flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer"
+                >
+                  <span>ไปแสกนหน้า AI ยืนยันตัวตน (ขั้นตอนที่ 3)</span>
+                  <Camera className="w-4 h-4 text-slate-950" />
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -1336,8 +1411,8 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
           
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-2xl shadow-lg">
-                ✅
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shadow-lg">
+                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -1365,8 +1440,8 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
             {/* Card Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[#FFD700]/20 border border-[#FFD700]/40 flex items-center justify-center text-sm">
-                  👑
+                <div className="w-8 h-8 rounded-xl bg-[#FFD700]/20 border border-[#FFD700]/40 flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-[#FFD700]" />
                 </div>
                 <div>
                   <h4 className="text-xs font-black text-white font-mono">WINRIDER SOVEREIGN CREST</h4>

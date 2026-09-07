@@ -40,6 +40,7 @@ export const SAMPLE_EMERGENCY_STATIONS: EmergencyStation[] = [
     type: 'hospital',
     typeLabel: 'โรงพยาบาล & การแพทย์ฉุกเฉิน',
     icon: '🏥',
+    imageUrl: '/images/hospital_clinic.jpg',
     phone: '02-022-2222',
     address: 'สุขุมวิท 49 เขตวัฒนา กทม.',
     distanceKm: 0.8,
@@ -56,6 +57,7 @@ export const SAMPLE_EMERGENCY_STATIONS: EmergencyStation[] = [
     type: 'fire_station',
     typeLabel: 'สถานีดับเพลิง & บรรเทาสาธารณภัย',
     icon: '🚒',
+    imageUrl: '/images/cyber_vehicle.jpg',
     phone: '199',
     address: 'ถนนพระราม 4 แขวงคลองเตย',
     distanceKm: 1.2,
@@ -72,6 +74,7 @@ export const SAMPLE_EMERGENCY_STATIONS: EmergencyStation[] = [
     type: 'rescue_volunteer',
     typeLabel: 'หน่วยกู้ภัย & อาสาสมัครจิตอาสา',
     icon: '🚑',
+    imageUrl: '/images/ambulance_vehicle.jpg',
     phone: '1418',
     address: 'จุดพักสายตรวจอโศก-ดินแดง',
     distanceKm: 0.6,
@@ -89,17 +92,17 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
   const [selectedStation, setSelectedStation] = useState<EmergencyStation>(SAMPLE_EMERGENCY_STATIONS[0]);
   
   const [activeDispatchList, setActiveDispatchList] = useState([
-    { id: 'DSP-091', target: 'หน่วยกู้ชีพฉุกเฉิน 1 (Golden Hour)', knight: 'อัศวิน-104 (Africa Twin)', status: 'กำลังเดินทาง', eta: '2.5 นาที', icon: '🏥' },
-    { id: 'DSP-092', target: 'จัดส่งถุงเลือดและออกซิเจนด่วน', knight: 'อัศวิน-042 (Wave 110i)', status: 'ส่งมอบสำเร็จ', eta: 'ถึงที่หมายแล้ว', icon: '💉' },
-    { id: 'DSP-093', target: 'หน่วยดับเพลิงซอยแคบ สุขุมวิท 39', knight: 'ทีมอาสาดับเพลิง 08', status: 'ประจำจุดแล้ว', eta: 'ควบคุมสถานการณ์ได้', icon: '🚒' },
-    { id: 'DSP-094', target: 'หน่วยกู้ชีพ CPR ฉุกเฉินแยกอโศก', knight: 'พี่วินอาสากู้ภัย-55', status: 'กำลังปฐมพยาบาล', eta: '1 นาที', icon: '🚑' },
+    { id: 'DSP-091', target: 'หน่วยกู้ชีพฉุกเฉิน 1 (Golden Hour)', knight: 'อัศวิน-104 (Africa Twin)', status: 'กำลังเดินทาง', eta: '2.5 นาที', imageUrl: '/images/hospital_clinic.jpg' },
+    { id: 'DSP-092', target: 'จัดส่งถุงเลือดและออกซิเจนด่วน', knight: 'อัศวิน-042 (Wave 110i)', status: 'ส่งมอบสำเร็จ', eta: 'ถึงที่หมายแล้ว', imageUrl: '/images/hospital_clinic.jpg' },
+    { id: 'DSP-093', target: 'หน่วยดับเพลิงซอยแคบ สุขุมวิท 39', knight: 'ทีมอาสาดับเพลิง 08', status: 'ประจำจุดแล้ว', eta: 'ควบคุมสถานการณ์ได้', imageUrl: '/images/cyber_vehicle.jpg' },
+    { id: 'DSP-094', target: 'หน่วยกู้ชีพ CPR ฉุกเฉินแยกอโศก', knight: 'พี่วินอาสากู้ภัย-55', status: 'กำลังปฐมพยาบาล', eta: '1 นาที', imageUrl: '/images/ambulance_vehicle.jpg' },
   ]);
 
   const securityFeeds = [
-    { id: 1, name: 'ทางเข้าห้องฉุกเฉิน ร.พ. สมิติเวช', status: 'สด (LIVE)', ping: '12ms', icon: '🏥', count: '18 คน', type: 'hospital' },
-    { id: 2, name: 'โรงจอดรถดับเพลิง & มอเตอร์ไซค์สปริงเกลอร์', status: 'สด (LIVE)', ping: '14ms', icon: '🚒', count: '12 นาย', type: 'fire_station' },
-    { id: 3, name: 'จุดรวมพลกู้ภัยอาสาป่อเต็กตึ๊ง-อโศก', status: 'สด (LIVE)', ping: '16ms', icon: '🚑', count: '15 นาย', type: 'rescue_volunteer' },
-    { id: 4, name: 'ศูนย์ส่งต่อเวชภัณฑ์ & ถุงเลือดด่วน', status: 'สด (LIVE)', ping: '18ms', icon: '📦', count: '6 คัน', type: 'hospital' },
+    { id: 1, name: 'ทางเข้าห้องฉุกเฉิน ร.พ. สมิติเวช', status: 'สด (LIVE)', ping: '12ms', imageUrl: '/images/hospital_clinic.jpg', count: '18 คน', type: 'hospital' },
+    { id: 2, name: 'โรงจอดรถดับเพลิง & มอเตอร์ไซค์สปริงเกลอร์', status: 'สด (LIVE)', ping: '14ms', imageUrl: '/images/cyber_vehicle.jpg', count: '12 นาย', type: 'fire_station' },
+    { id: 3, name: 'จุดรวมพลกู้ภัยอาสาป่อเต็กตึ๊ง-อโศก', status: 'สด (LIVE)', ping: '16ms', imageUrl: '/images/ambulance_vehicle.jpg', count: '15 นาย', type: 'rescue_volunteer' },
+    { id: 4, name: 'ศูนย์ส่งต่อเวชภัณฑ์ & ถุงเลือดด่วน', status: 'สด (LIVE)', ping: '18ms', imageUrl: '/images/hospital_clinic.jpg', count: '6 คัน', type: 'hospital' },
   ];
 
   const filteredStations = SAMPLE_EMERGENCY_STATIONS.filter(
@@ -113,13 +116,15 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
     }
     speakThaiText(`สั่งการฉุกเฉิน ${targetType} สั่งการอัศวินและอาสากู้ชีพเข้าพื้นที่ทันที`);
     
+    const isFire = targetType.includes('ดับเพลิง');
+    const isRescue = targetType.includes('กู้ภัย');
     const newDsp = {
       id: `DSP-${Math.floor(Math.random() * 800 + 100)}`,
       target: targetType,
       knight: 'อัศวินกู้ชีพระดับจักรพรรดิ (LV.100)',
       status: 'สั่งการฉุกเฉินด่วนที่สุด',
       eta: '1.5 นาที',
-      icon: targetType.includes('ดับเพลิง') ? '🚒' : targetType.includes('กู้ภัย') ? '🚑' : '🏥'
+      imageUrl: isFire ? '/images/cyber_vehicle.jpg' : isRescue ? '/images/ambulance_vehicle.jpg' : '/images/hospital_clinic.jpg'
     };
     setActiveDispatchList([newDsp, ...activeDispatchList]);
     confetti({ particleCount: 50, spread: 60, colors: ['#EF4444', '#00D2FF', '#FFD700'] });
@@ -134,8 +139,13 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-500 via-amber-500 to-cyan-500 p-0.5 shadow-xl">
-              <div className="w-full h-full bg-[#070D1E] rounded-[14px] flex items-center justify-center text-3xl">
-                🛡️
+              <div className="w-full h-full bg-[#070D1E] rounded-[14px] overflow-hidden flex items-center justify-center">
+                <img 
+                  src="/images/ambulance_vehicle.jpg" 
+                  alt="Ambulance Command" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               </div>
             </div>
             <div>
@@ -155,21 +165,30 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => handleEmergencyDispatch('หน่วยกู้ชีพ ร.พ. & ส่งถุงเลือด')}
-              className="px-3.5 py-2.5 rounded-xl bg-rose-600/90 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg border border-rose-400"
+              className="px-3.5 py-2.5 rounded-xl bg-rose-600/90 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg border border-rose-400"
             >
-              <span>🏥 กู้ชีพ ร.พ.</span>
+              <div className="w-4 h-4 rounded-full overflow-hidden border border-white flex-shrink-0">
+                <img src="/images/hospital_clinic.jpg" alt="Hospital" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+              <span>กู้ชีพ ร.พ. (สมิติเวช)</span>
             </button>
             <button
               onClick={() => handleEmergencyDispatch('หน่วยดับเพลิงซอยแคบ & ตัดถ่าง')}
-              className="px-3.5 py-2.5 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg border border-amber-400"
+              className="px-3.5 py-2.5 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg border border-amber-400"
             >
-              <span>🚒 สั่งการดับเพลิง</span>
+              <div className="w-4 h-4 rounded-full overflow-hidden border border-white flex-shrink-0">
+                <img src="/images/cyber_vehicle.jpg" alt="Fire" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+              <span>สั่งการดับเพลิง BMA</span>
             </button>
             <button
               onClick={() => handleEmergencyDispatch('อาสาสมัครกู้ภัย CPR & AED')}
-              className="px-3.5 py-2.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg border border-emerald-400"
+              className="px-3.5 py-2.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg border border-emerald-400"
             >
-              <span>🚑 เรียกรถกู้ภัย</span>
+              <div className="w-4 h-4 rounded-full overflow-hidden border border-white flex-shrink-0">
+                <img src="/images/ambulance_vehicle.jpg" alt="Ambulance" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+              <span>เรียกรถพยาบาล & กู้ภัย</span>
             </button>
           </div>
         </div>
@@ -178,10 +197,10 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
       {/* Emergency Station Categories Filter */}
       <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-black/40 border border-white/10 overflow-x-auto text-xs">
         {[
-          { id: 'all' as const, label: '🛡️ รวมศูนย์ฉุกเฉินทั้งหมด (3 ศูนย์)', icon: '🛡️' },
-          { id: 'hospital' as const, label: '🏥 โรงพยาบาล & เวชศาสตร์ฉุกเฉิน', icon: '🏥' },
-          { id: 'fire_station' as const, label: '🚒 สถานีดับเพลิง & บรรเทาสาธารณภัย', icon: '🚒' },
-          { id: 'rescue_volunteer' as const, label: '🚑 หน่วยกู้ภัย & อาสาสมัครจิตอาสา', icon: '🚑' },
+          { id: 'all' as const, label: 'รวมศูนย์ฉุกเฉินทั้งหมด (3 ศูนย์)', imgSrc: '/images/hospital_clinic.jpg' },
+          { id: 'hospital' as const, label: 'โรงพยาบาล & เวชศาสตร์ฉุกเฉิน', imgSrc: '/images/hospital_clinic.jpg' },
+          { id: 'fire_station' as const, label: 'สถานีดับเพลิง & บรรเทาสาธารณภัย', imgSrc: '/images/cyber_vehicle.jpg' },
+          { id: 'rescue_volunteer' as const, label: 'หน่วยกู้ภัย & รถพยาบาลจิตอาสา', imgSrc: '/images/ambulance_vehicle.jpg' },
         ].map(cat => (
           <button
             key={cat.id}
@@ -189,12 +208,15 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
               if (audioEnabled) playTactileBlip(750);
               setSelectedStationType(cat.id);
             }}
-            className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
               selectedStationType === cat.id
                 ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(0,210,255,0.4)]'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
+            <div className="w-4 h-4 rounded-full overflow-hidden border border-white/30 flex-shrink-0">
+              <img src={cat.imgSrc} alt={cat.label} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            </div>
             <span>{cat.label}</span>
           </button>
         ))}
@@ -240,20 +262,25 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
                       if (audioEnabled) playTactileBlip(800);
                       setSelectedStation(station);
                     }}
-                    className="absolute cursor-pointer group transition-all duration-300 flex flex-col items-center"
+                    className="absolute cursor-pointer group transition-all duration-300 flex flex-col items-center z-10"
                     style={{ top: pos.top, left: pos.left, transform: 'translate(-50%, -50%)' }}
                   >
                     <div 
-                      className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shadow-lg border-2 transition-transform group-hover:scale-125"
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg border-2 transition-transform group-hover:scale-125 overflow-hidden"
                       style={{ 
                         backgroundColor: station.colorTheme + '33', 
                         borderColor: station.colorTheme,
                         boxShadow: `0 0 20px ${station.colorTheme}`
                       }}
                     >
-                      {station.icon}
+                      <img
+                        src={station.imageUrl || (station.type === 'hospital' ? '/images/hospital_clinic.jpg' : station.type === 'fire_station' ? '/images/cyber_vehicle.jpg' : '/images/ambulance_vehicle.jpg')}
+                        alt={station.name}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
                     </div>
-                    <span className="text-[9px] font-bold text-white bg-black/80 px-2 py-0.5 rounded mt-1 border font-mono whitespace-nowrap" style={{ borderColor: station.colorTheme }}>
+                    <span className="text-[9px] font-bold text-white bg-black/85 px-2 py-0.5 rounded-full mt-1 border font-mono whitespace-nowrap shadow-md" style={{ borderColor: station.colorTheme }}>
                       {station.name.split(' ')[0]}
                     </span>
                   </div>
@@ -261,13 +288,17 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
               })}
 
               {/* Active Knight Dispatch blips */}
-              <div className="absolute top-8 left-10 flex items-center gap-1 bg-black/80 px-2 py-1 rounded-lg border border-cyan-500/30 text-[10px]">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <div className="absolute top-8 left-10 flex items-center gap-1.5 bg-black/80 px-2.5 py-1 rounded-xl border border-cyan-500/30 text-[10px]">
+                <div className="w-3.5 h-3.5 rounded-full overflow-hidden border border-cyan-400 flex-shrink-0">
+                  <img src="/avatars/knight.jpg" alt="Knight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </div>
                 <span className="text-cyan-300 font-mono">อัศวินกู้ชีพ-042 (ห่าง 250 ม.)</span>
               </div>
 
-              <div className="absolute bottom-6 left-12 flex items-center gap-1 bg-black/80 px-2 py-1 rounded-lg border border-amber-500/30 text-[10px]">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <div className="absolute bottom-6 left-12 flex items-center gap-1.5 bg-black/80 px-2.5 py-1 rounded-xl border border-amber-500/30 text-[10px]">
+                <div className="w-3.5 h-3.5 rounded-full overflow-hidden border border-amber-400 flex-shrink-0">
+                  <img src="/images/cyber_vehicle.jpg" alt="Fire Bike" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </div>
                 <span className="text-amber-300 font-mono">มอเตอร์ไซค์ดับเพลิง-08</span>
               </div>
             </div>
@@ -288,7 +319,14 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-2xl">{st.icon}</span>
+                    <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/20 shadow-md">
+                      <img 
+                        src={st.imageUrl || (st.type === 'hospital' ? '/images/hospital_clinic.jpg' : st.type === 'fire_station' ? '/images/cyber_vehicle.jpg' : '/images/ambulance_vehicle.jpg')} 
+                        alt={st.name} 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
                     <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-slate-300">
                       {st.distanceKm} กม.
                     </span>
@@ -314,10 +352,12 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
                 {activeDispatchList.map((dsp) => (
                   <div key={dsp.id} className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <span>{dsp.icon}</span>
+                      <div className="w-6 h-6 rounded-lg overflow-hidden border border-white/20 flex-shrink-0">
+                        <img src={dsp.imageUrl} alt={dsp.target} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
                       <span className="font-mono font-bold text-cyan-300">{dsp.id}</span>
-                      <span className="text-white">{dsp.target}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">({dsp.knight})</span>
+                      <span className="text-white truncate max-w-[200px]">{dsp.target}</span>
+                      <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">({dsp.knight})</span>
                     </div>
                     <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
                       dsp.status.includes('ฉุกเฉิน') || dsp.status.includes('URGENT') ? 'bg-rose-500/20 text-rose-300 border border-rose-500' : 'bg-cyan-500/20 text-cyan-300'
@@ -351,15 +391,22 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
                     </span>
                   </div>
 
-                  <div className="h-28 rounded-xl bg-slate-950 border border-white/5 flex flex-col items-center justify-center relative group">
-                    <div className="text-3xl opacity-80 group-hover:scale-110 transition-transform">
-                      {feed.icon}
+                  <div className="h-28 rounded-xl bg-slate-950 border border-white/10 flex flex-col items-center justify-center relative group overflow-hidden">
+                    <img 
+                      src={feed.imageUrl} 
+                      alt={feed.name} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 filter brightness-90 contrast-110" 
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
+                    <div className="absolute top-2 left-2 text-[8px] font-mono text-emerald-400 bg-black/70 px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1">
+                      <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse" /> REC LIVE
                     </div>
-                    <div className="absolute bottom-2 left-2 text-[9px] font-mono text-cyan-400 bg-black/70 px-1.5 py-0.5 rounded">
+                    <div className="absolute bottom-2 left-2 text-[9px] font-mono text-cyan-300 bg-black/80 px-1.5 py-0.5 rounded">
                       กำลังพลพร้อม: {feed.count}
                     </div>
-                    <div className="absolute top-2 right-2 text-[9px] font-mono text-slate-500">
-                      ความเร็ว: {feed.ping}
+                    <div className="absolute top-2 right-2 text-[9px] font-mono text-slate-300 bg-black/60 px-1 py-0.5 rounded">
+                      {feed.ping}
                     </div>
                   </div>
                 </div>
@@ -381,8 +428,13 @@ export const HospitalCommandCenter: React.FC<HospitalCommandCenterProps> = ({ au
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-black/50 border border-cyan-400 flex items-center justify-center text-2xl">
-                {selectedStation.icon}
+              <div className="w-14 h-14 rounded-2xl bg-black/50 border-2 border-cyan-400 overflow-hidden shadow-lg flex-shrink-0">
+                <img 
+                  src={selectedStation.imageUrl || (selectedStation.type === 'hospital' ? '/images/hospital_clinic.jpg' : selectedStation.type === 'fire_station' ? '/images/cyber_vehicle.jpg' : '/images/ambulance_vehicle.jpg')}
+                  alt={selectedStation.name}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <div>
                 <h4 className="text-sm font-bold text-white">{selectedStation.name}</h4>
