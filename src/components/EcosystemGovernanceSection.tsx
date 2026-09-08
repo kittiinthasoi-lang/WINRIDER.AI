@@ -138,19 +138,24 @@ export const EcosystemGovernanceSection: React.FC<Props> = ({ audioEnabled }) =>
                   setSelectedPillar(pillar);
                   if (audioEnabled) playTactileBlip(700);
                 }}
-                className={`p-4 rounded-xl text-left transition-all border flex flex-col justify-between h-32 ${
+                className={`p-4 rounded-xl text-left transition-all border flex flex-col justify-between h-36 ${
                   isSelected
                     ? 'bg-gradient-to-b from-[#0E2C60] to-[#070D1E] border-[#00D2FF] shadow-[0_0_20px_rgba(0,210,255,0.3)] ring-1 ring-cyan-400'
                     : 'bg-black/30 border-white/10 hover:border-white/20 hover:bg-white/5'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-lg ${isSelected ? 'bg-cyan-500/20 text-cyan-300' : 'bg-white/5 text-slate-400'}`}>
-                    {getPillarIcon(pillar.icon)}
+                  <div className={`w-10 h-10 rounded-xl overflow-hidden border ${isSelected ? 'border-cyan-400 shadow-[0_0_14px_rgba(0,210,255,0.7)]' : 'border-white/15'} bg-black/50 flex-shrink-0`}>
+                    <img
+                      src={pillar.imageUrl || '/images/app_logo.jpg'}
+                      alt={pillar.name}
+                      className="w-full h-full object-cover transition-transform hover:scale-110"
+                      referrerPolicy="no-referrer"
+                    />
                   </div>
-                  <span className="text-[10px] font-mono font-bold text-slate-500">#{pillar.number}</span>
+                  <span className="text-[10px] font-mono font-bold text-slate-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">#{pillar.number}</span>
                 </div>
-                <div>
+                <div className="mt-2">
                   <h4 className="text-sm font-bold text-white truncate">{pillar.name}</h4>
                   <p className="text-[10px] text-slate-400 truncate">{pillar.tagline}</p>
                 </div>
@@ -167,8 +172,20 @@ export const EcosystemGovernanceSection: React.FC<Props> = ({ audioEnabled }) =>
               <span>•</span>
               <span>{selectedPillar.nameEn}</span>
             </div>
-            <h4 className="text-2xl font-black text-white">{selectedPillar.name}</h4>
-            <p className="text-sm text-cyan-200">{selectedPillar.tagline}</p>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-xl overflow-hidden border border-cyan-400 shadow-[0_0_16px_rgba(0,210,255,0.5)] flex-shrink-0 bg-black/60">
+                <img
+                  src={selectedPillar.imageUrl || '/images/app_logo.jpg'}
+                  alt={selectedPillar.name}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div>
+                <h4 className="text-2xl font-black text-white">{selectedPillar.name}</h4>
+                <p className="text-sm text-cyan-200">{selectedPillar.tagline}</p>
+              </div>
+            </div>
             <p className="text-xs text-slate-300 pt-2 leading-relaxed">
               <strong className="text-white">กลุ่มเป้าหมาย:</strong> {selectedPillar.targetAudience}
             </p>

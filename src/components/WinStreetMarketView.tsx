@@ -775,8 +775,8 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
           <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-black/40 border border-white/10 self-stretch sm:self-auto overflow-x-auto">
             {[
               { id: 'all' as const, label: 'ทั้งหมด', icon: '🌐' },
-              { id: 'merchant' as const, label: '🏬 ร้านค้าทางการ', icon: '🏬' },
-              { id: 'citizen' as const, label: '👤 ลูกค้าขายเอง (C2C)', icon: '🤝' },
+              { id: 'merchant' as const, label: 'ร้านค้าทางการ', icon: '🏬' },
+              { id: 'citizen' as const, label: 'ลูกค้าขายเอง (C2C)', icon: '🤝' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -790,7 +790,7 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <span>{tab.icon}</span>
+                <CyberGraphic emoji={tab.icon} size="xs" rounded="rounded-sm" />
                 <span>{tab.label}</span>
               </button>
             ))}
@@ -859,7 +859,11 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
                       ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
                       : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                   }`}>
-                    {item.sellerType === 'merchant' ? '🏬 ร้านค้า' : '👤 ลูกค้าขายเอง'}
+                    {item.sellerType === 'merchant' ? (
+                      <span className="flex items-center gap-1"><Store className="w-3 h-3 text-blue-400" /> ร้านค้า</span>
+                    ) : (
+                      <span className="flex items-center gap-1"><User className="w-3 h-3 text-amber-400" /> ลูกค้าขายเอง</span>
+                    )}
                   </span>
 
                   <span className="text-[10px] font-mono text-cyan-400 flex items-center gap-1">

@@ -22,6 +22,8 @@ import {
   Home
 } from 'lucide-react';
 import { playTactileBlip, speakThaiText } from '../utils/audio';
+import { GoogleMapsLiveView } from './GoogleMapsLiveView';
+import { useRealtimeGps } from './GpsRealTimeTracker';
 
 export interface RadarEntity {
   id: string;
@@ -80,6 +82,8 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
   const [selectedEntity, setSelectedEntity] = useState<RadarEntity | null>(null);
   const [isLiveActive, setIsLiveActive] = useState<boolean>(true);
   const [scanPulse, setScanPulse] = useState<number>(0);
+  const [radarDisplayMode, setRadarDisplayMode] = useState<'3d_radar' | 'google_maps'>('3d_radar');
+  const { gpsState } = useRealtimeGps(true);
 
   // Entities tailored for perspective
   const defaultDriverEntities: RadarEntity[] = [
@@ -208,47 +212,83 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
             </button>
           )}
 
-          <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-white/10 text-[10px] font-mono">
+          {/* PRIMARY SWITCHER: 3D RADAR VS GOOGLE MAPS */}
+          <div className="flex items-center gap-1 bg-black/80 p-1 rounded-xl border border-cyan-400/50 shadow-[0_0_15px_rgba(0,210,255,0.3)] text-[10px] font-mono">
             <button
+              type="button"
               onClick={() => {
-                if (audioEnabled) playTactileBlip(700);
-                setViewMode('3d_isometric');
+                if (audioEnabled) playTactileBlip(800);
+                setRadarDisplayMode('3d_radar');
               }}
-              className={`px-2 py-1 rounded-lg font-bold transition-all ${
-                viewMode === '3d_isometric'
-                  ? 'bg-gradient-to-r from-[#00D2FF] to-blue-500 text-slate-950 shadow-[0_0_10px_#00D2FF]'
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
+                radarDisplayMode === '3d_radar'
+                  ? 'bg-gradient-to-r from-[#00D2FF] to-blue-600 text-slate-950 font-black shadow-[0_0_10px_#00D2FF]'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              3D ไอโซ
+              <Radio className="w-3.5 h-3.5" />
+              <span>เรดาร์ 3D</span>
             </button>
             <button
+              type="button"
               onClick={() => {
-                if (audioEnabled) playTactileBlip(700);
-                setViewMode('top_down');
+                if (audioEnabled) playTactileBlip(800);
+                setRadarDisplayMode('google_maps');
               }}
-              className={`px-2 py-1 rounded-lg font-bold transition-all ${
-                viewMode === 'top_down'
-                  ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-[0_0_10px_#FFD700]'
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
+                radarDisplayMode === 'google_maps'
+                  ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_0_10px_#FFD700]'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              เรดาร์ 2D
-            </button>
-            <button
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(700);
-                setViewMode('hologram_wireframe');
-              }}
-              className={`px-2 py-1 rounded-lg font-bold transition-all ${
-                viewMode === 'hologram_wireframe'
-                  ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 shadow-[0_0_10px_#10B981]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              โฮโลแกรม
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Google Maps</span>
             </button>
           </div>
+
+          {radarDisplayMode === '3d_radar' && (
+            <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-white/10 text-[10px] font-mono">
+              <button
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(700);
+                  setViewMode('3d_isometric');
+                }}
+                className={`px-2 py-1 rounded-lg font-bold transition-all ${
+                  viewMode === '3d_isometric'
+                    ? 'bg-gradient-to-r from-[#00D2FF] to-blue-500 text-slate-950 shadow-[0_0_10px_#00D2FF]'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                3D ไอโซ
+              </button>
+              <button
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(700);
+                  setViewMode('top_down');
+                }}
+                className={`px-2 py-1 rounded-lg font-bold transition-all ${
+                  viewMode === 'top_down'
+                    ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-[0_0_10px_#FFD700]'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                เรดาร์ 2D
+              </button>
+              <button
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(700);
+                  setViewMode('hologram_wireframe');
+                }}
+                className={`px-2 py-1 rounded-lg font-bold transition-all ${
+                  viewMode === 'hologram_wireframe'
+                    ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 shadow-[0_0_10px_#10B981]'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                โฮโลแกรม
+              </button>
+            </div>
+          )}
 
           {/* 3D Elevation / Altitude Control Bar */}
           <div className="flex items-center gap-1.5 bg-black/70 px-2.5 py-1 rounded-xl border border-cyan-500/40 text-[10px] font-mono">
@@ -290,7 +330,18 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
         </div>
       </div>
 
-      {/* FILTER BUTTONS ROW */}
+      {radarDisplayMode === 'google_maps' ? (
+        <div className="w-full space-y-2">
+          <GoogleMapsLiveView
+            gpsLocation={gpsState}
+            height="440px"
+            audioEnabled={audioEnabled}
+            zoom={16}
+          />
+        </div>
+      ) : (
+        <>
+          {/* FILTER BUTTONS ROW */}
       <div className="flex items-center justify-between gap-2 flex-wrap text-xs font-mono">
         <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
           <button
@@ -498,6 +549,8 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
           </p>
         </div>
       </div>
+      </>
+      )}
 
       {/* SELECTED ENTITY DETAIL DRAWER */}
       {selectedEntity && (

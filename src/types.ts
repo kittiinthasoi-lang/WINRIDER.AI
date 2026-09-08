@@ -81,6 +81,7 @@ export interface PillarItem {
   vehicleType: string;
   highlight: string;
   icon: string;
+  imageUrl?: string;
 }
 
 export interface C2CProduct {
@@ -195,6 +196,7 @@ export interface MatchedDriver {
   totalTrips: number;
   phone: string;
   avatarEmoji: string;
+  imageUrl?: string;
   vehicleModel: string;
   plateNumber: string;
   hasDeliveryBox?: boolean;

@@ -25,16 +25,20 @@ import {
   AudioWaveform,
   LogOut,
   Lock,
-  User
+  User,
+  Navigation
 } from 'lucide-react';
 import { UserSession } from '../utils/userSession';
+import { DriverTabType } from './KnightDriverAppView';
 
-export type MainTabType = 'home' | 'dreamRide' | 'ride' | 'shop' | 'modes';
+export type MainTabType = 'home' | 'dreamRide' | 'ride' | 'shop' | 'modes' | 'garage' | 'navigation';
 
 interface MobileBottomNavBarProps {
   activeMode: AppMode;
   activePassengerTab: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile';
   onSelectPassengerTab: (tab: 'home' | 'dreamRide' | 'ride' | 'shop' | 'profile') => void;
+  activeDriverTab?: DriverTabType;
+  onSelectDriverTab?: (tab: DriverTabType) => void;
   onSelectMode: (mode: AppMode) => void;
   audioEnabled: boolean;
   onOpenCustomerVoice?: () => void;
@@ -49,6 +53,8 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   activeMode,
   activePassengerTab,
   onSelectPassengerTab,
+  activeDriverTab,
+  onSelectDriverTab,
   onSelectMode,
   audioEnabled,
   onOpenCustomerVoice,
@@ -65,13 +71,37 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     return null;
   }
 
+  const isDriverRole = currentUserSession?.role === 'driver' || activeMode === 'driver';
+
   // Determine current active tab
   const getIsTabActive = (tabId: string) => {
+    if (isDriverRole) {
+      if (tabId === 'home') {
+        return activeMode === 'driver' && (activeDriverTab === 'jobs' || !activeDriverTab);
+      }
+      if (tabId === 'garage') {
+        return activeMode === 'driver' && activeDriverTab === 'garage';
+      }
+      if (tabId === 'navigation') {
+        return activeMode === 'driver' && activeDriverTab === 'navigation';
+      }
+      if (tabId === 'shop') {
+        return activeMode === 'market';
+      }
+      if (tabId === 'modes') {
+        return isModesDrawerOpen || ['merchant', 'partner', 'hospital', 'register', 'codex'].includes(activeMode);
+      }
+      return false;
+    }
+
+    // Customer, Merchant, Partner roles:
     if (tabId === 'home') {
-      return activeMode === 'passenger' && activePassengerTab === 'home';
+      return (activeMode === 'passenger' && activePassengerTab === 'home') || 
+             (currentUserSession?.role === 'merchant' && activeMode === 'merchant') || 
+             (currentUserSession?.role === 'partner' && activeMode === 'partner');
     }
     if (tabId === 'dreamRide') {
-      return (activeMode === 'passenger' && activePassengerTab === 'dreamRide') || activeMode === 'driver';
+      return activeMode === 'passenger' && activePassengerTab === 'dreamRide';
     }
     if (tabId === 'ride') {
       return activeMode === 'passenger' && activePassengerTab === 'ride';
@@ -85,15 +115,83 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     return false;
   };
 
-  const mainTabs = [
+  // Main Tabs Configuration based on role:
+  // สำหรับบทบาทพี่วิน (Knight Driver):
+  // 1. หน้าหลัก (ไม่เปลี่ยน) -> นำสู่หน้าจอเรดาร์รับงาน/งานสแตนด์บาย (Jobs & Radar)
+  // 2. รถในฝัน -> เปลี่ยนเป็น "อู่รถอัศวิน" (Garage & Fleet)
+  // 3. รอรถ3D -> เปลี่ยนเป็น "แผนที่นำทาง" (GPS Turn-by-Turn / AR / Google Maps)
+  // 4. WIN SHOP -> ไม่เปลี่ยน (เข้าสู่ตลาด WIN SHOP ชุมชน ซื้อ-ขายอะไหล่)
+  // 5. โหมด/หน้าจอ -> ไม่เปลี่ยน
+  // 
+  // สำหรับบทบาทลูกค้า ร้านค้า พาร์ทเนอร์:
+  // สามารถใช้งานได้ทั้งหมดที่ Navbar ด้านล่าง (หน้าหลัก, รถในฝัน, รอรถ3D, WIN SHOP, โหมด/หน้าจอ)
+  const mainTabs = isDriverRole ? [
     { 
       id: 'home', 
       label: 'หน้าหลัก', 
       icon: <Compass className="w-5 h-5" />,
       onClick: () => {
         setIsModesDrawerOpen(false);
-        onSelectMode('passenger');
-        onSelectPassengerTab('home');
+        onSelectMode('driver');
+        onSelectDriverTab?.('jobs');
+      }
+    },
+    { 
+      id: 'garage', 
+      label: 'อู่รถอัศวิน', 
+      icon: <Wrench className="w-5 h-5" />,
+      badge: 'FLEET',
+      onClick: () => {
+        setIsModesDrawerOpen(false);
+        onSelectMode('driver');
+        onSelectDriverTab?.('garage');
+      }
+    },
+    { 
+      id: 'navigation', 
+      label: 'แผนที่นำทาง', 
+      icon: <Navigation className="w-5 h-5" />,
+      badge: 'GPS',
+      onClick: () => {
+        setIsModesDrawerOpen(false);
+        onSelectMode('driver');
+        onSelectDriverTab?.('navigation');
+      }
+    },
+    { 
+      id: 'shop', 
+      label: 'WIN SHOP', 
+      icon: <ShoppingBag className="w-5 h-5" />,
+      badge: 'DEALS',
+      onClick: () => {
+        setIsModesDrawerOpen(false);
+        onSelectMode('market');
+      }
+    },
+    { 
+      id: 'modes', 
+      label: 'โหมด/หน้าจอ', 
+      icon: <Grid className="w-5 h-5" />,
+      badge: isModesDrawerOpen ? undefined : 'เมนู',
+      onClick: () => {
+        setIsModesDrawerOpen(!isModesDrawerOpen);
+      }
+    },
+  ] : [
+    { 
+      id: 'home', 
+      label: 'หน้าหลัก', 
+      icon: <Compass className="w-5 h-5" />,
+      onClick: () => {
+        setIsModesDrawerOpen(false);
+        if (currentUserSession?.role === 'merchant') {
+          onSelectMode('merchant');
+        } else if (currentUserSession?.role === 'partner') {
+          onSelectMode('partner');
+        } else {
+          onSelectMode('passenger');
+          onSelectPassengerTab('home');
+        }
       }
     },
     { 
@@ -109,7 +207,7 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     },
     { 
       id: 'ride', 
-      label: 'รอพี่วิน (3D)', 
+      label: 'รอรถ 3D', 
       icon: <Activity className="w-5 h-5" />,
       onClick: () => {
         setIsModesDrawerOpen(false);
@@ -192,16 +290,15 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   ];
 
   // Role-based allowed modes:
-  // 1. Driver & Customer: CANNOT see each other's profiles/screens.
-  //    CAN access: Merchant, Partner, Hospital, and Market freely.
-  // 2. Merchant & Partner: can ONLY see Merchant, Partner, and Hospital (and Codex).
+  // 1. Driver: Has access to driver cockpit/garage/nav, market (WIN SHOP), merchant, partner, hospital, codex.
+  // 2. Customer, Merchant, and Partner: Can access passenger, market (WIN SHOP), merchant, partner, hospital, codex.
   const allowedModesForRole = currentUserSession?.role === 'customer'
     ? ['passenger', 'market', 'merchant', 'partner', 'hospital', 'codex']
     : currentUserSession?.role === 'driver'
     ? ['driver', 'market', 'merchant', 'partner', 'hospital', 'codex']
     : currentUserSession?.role === 'merchant'
-    ? ['merchant', 'partner', 'hospital', 'codex']
-    : ['partner', 'merchant', 'hospital', 'codex'];
+    ? ['merchant', 'passenger', 'market', 'partner', 'hospital', 'codex']
+    : ['partner', 'passenger', 'market', 'merchant', 'hospital', 'codex'];
 
   const filteredAppModesList = appModesList.filter(mode => allowedModesForRole.includes(mode.id));
 

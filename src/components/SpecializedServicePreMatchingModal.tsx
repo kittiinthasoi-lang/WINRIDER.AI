@@ -332,6 +332,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           sub: 'อัศวินประจำตัวพร้อมพาหนะที่คุณเลือก ทั่วกรุงเทพฯ เริ่มต้น 15฿ ปลอดภัย 100%',
           badge: 'KNIGHT ESCORT PROTOCOL',
           icon: <ShieldCheck className="w-6 h-6 text-[#00D2FF]" />,
+          image: '/images/pillar_knight.jpg',
           borderColor: 'border-[#00D2FF]/70',
           glow: 'shadow-[0_0_35px_rgba(0,210,255,0.4)]',
           badgeBg: 'bg-[#00D2FF]/20 text-[#00D2FF] border-[#00D2FF]/40',
@@ -345,6 +346,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           sub: 'ระบุข้อมูลผู้รับ • ข้อกำหนดบรรจุภัณฑ์โปร่งใส • ตรวจสอบรูปถ่ายปลายทาง',
           badge: 'EXPRESS DISPATCH PROTOCOL',
           icon: <Package className="w-6 h-6 text-[#FF6B00]" />,
+          image: '/images/pillar_express.jpg',
           borderColor: 'border-[#FF6B00]/70',
           glow: 'shadow-[0_0_35px_rgba(255,107,0,0.4)]',
           badgeBg: 'bg-[#FF6B00]/20 text-[#FF6B00] border-[#FF6B00]/40',
@@ -358,6 +360,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           sub: 'ระบุข้อมูลสัตว์เลี้ยง • สายพันธุ์ • คลินิก/รพ.สัตว์ • ถ่ายรูปยืนยันถึงมือหมอ',
           badge: 'PET CARE & VET DISPATCH',
           icon: <Heart className="w-6 h-6 text-[#10B981]" />,
+          image: '/images/pillar_petcare.jpg',
           borderColor: 'border-[#10B981]/70',
           glow: 'shadow-[0_0_35px_rgba(16,185,129,0.4)]',
           badgeBg: 'bg-[#10B981]/20 text-[#10B981] border-[#10B981]/40',
@@ -371,6 +374,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           sub: 'เลือกพี่วินเป็นเพื่อนร่วมทาง • ดูแล 30 นาที (+100฿) • เพิ่มเวลาได้',
           badge: 'SACRED BUDDY ESCORT',
           icon: <Sparkles className="w-6 h-6 text-[#A855F7]" />,
+          image: '/images/pillar_mubuddy.jpg',
           borderColor: 'border-[#A855F7]/70',
           glow: 'shadow-[0_0_35px_rgba(168,85,247,0.4)]',
           badgeBg: 'bg-[#A855F7]/20 text-[#A855F7] border-[#A855F7]/40',
@@ -384,6 +388,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           sub: 'ให้พี่วินถ่ายรูป & ถ่ายคลิป (+20฿ ไม่เกิน 10 นาที) • ระบุธีมภาพถ่าย',
           badge: 'PHOTOGRAPHY ASSIST',
           icon: <Camera className="w-6 h-6 text-[#EC4899]" />,
+          image: '/images/pillar_lifestyle.jpg',
           borderColor: 'border-[#EC4899]/70',
           glow: 'shadow-[0_0_35px_rgba(236,72,153,0.4)]',
           badgeBg: 'bg-[#EC4899]/20 text-[#EC4899] border-[#EC4899]/40',
@@ -397,6 +402,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           sub: 'เลือกรายการของไหว้ & สังฆทาน • พี่วินแวะซื้อก่อนถึงจุดหมาย',
           badge: 'SACRED OFFERINGS & SPIRIT CARE',
           icon: <Flame className="w-6 h-6 text-[#FACC15]" />,
+          image: '/images/pillar_spirit.jpg',
           borderColor: 'border-[#FACC15]/70',
           glow: 'shadow-[0_0_35px_rgba(250,204,21,0.4)]',
           badgeBg: 'bg-[#FACC15]/20 text-[#FACC15] border-[#FACC15]/40',
@@ -410,6 +416,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           sub: 'เลือกประเภทผู้โดยสาร • ระบุจุดรับส่ง • ส่งภาพถ่ายยืนยันถึงที่หมาย',
           badge: 'FAMILY & SPECIAL CARE PROTOCOL',
           icon: <Users className="w-6 h-6 text-[#38BDF8]" />,
+          image: '/images/pillar_family.jpg',
           borderColor: 'border-[#38BDF8]/70',
           glow: 'shadow-[0_0_35px_rgba(56,189,248,0.4)]',
           badgeBg: 'bg-[#38BDF8]/20 text-[#38BDF8] border-[#38BDF8]/40',
@@ -423,6 +430,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           sub: 'ให้พี่วินช่วยจองตั๋ว/กดบัตร/ต่อคิวรับตั๋วตัวจริง/ส่งถึงฮอลล์ & เชื่อมต่อ BTS/MRT',
           badge: 'CONCERT & SPORTS TICKET CONCIERGE',
           icon: <Ticket className="w-6 h-6 text-[#84CC16]" />,
+          image: '/images/pillar_link.jpg',
           borderColor: 'border-[#84CC16]/70',
           glow: 'shadow-[0_0_35px_rgba(132,204,22,0.4)]',
           badgeBg: 'bg-[#84CC16]/20 text-[#84CC16] border-[#84CC16]/40',
@@ -436,6 +444,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           sub: 'กรอกรายละเอียดเพิ่มเติมก่อนเริ่มค้นหาพี่วิน',
           badge: 'PRE-MATCHING SETUP',
           icon: <ShieldCheck className="w-6 h-6 text-[#00D2FF]" />,
+          image: '/images/pillar_knight.jpg',
           borderColor: 'border-[#00D2FF]/70',
           glow: 'shadow-[0_0_35px_rgba(0,210,255,0.4)]',
           badgeBg: 'bg-[#00D2FF]/20 text-[#00D2FF] border-[#00D2FF]/40',
@@ -455,8 +464,13 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
         {/* MODAL HEADER */}
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-black/60 border border-white/15 flex items-center justify-center text-2xl shadow-inner">
-              {header.icon}
+            <div className="w-12 h-12 rounded-2xl bg-black/60 border border-white/20 overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
+              <img
+                src={header.image}
+                alt={header.title}
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">

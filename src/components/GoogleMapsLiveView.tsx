@@ -9,7 +9,9 @@ import {
   ExternalLink,
   Radio,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Video,
+  X
 } from 'lucide-react';
 import { GpsLocationState } from './GpsRealTimeTracker';
 import { playTactileBlip } from '../utils/audio';
@@ -23,6 +25,9 @@ interface GoogleMapsLiveViewProps {
   showControls?: boolean;
   mapType?: 'roadmap' | 'satellite' | 'terrain' | 'hybrid';
   audioEnabled?: boolean;
+  onSwitchToCameraAR?: () => void;
+  onSwitchTo3DMap?: () => void;
+  onClose?: () => void;
 }
 
 export const GoogleMapsLiveView: React.FC<GoogleMapsLiveViewProps> = ({
@@ -33,7 +38,10 @@ export const GoogleMapsLiveView: React.FC<GoogleMapsLiveViewProps> = ({
   height = '420px',
   showControls = true,
   mapType: initialMapType = 'roadmap',
-  audioEnabled = true
+  audioEnabled = true,
+  onSwitchToCameraAR,
+  onSwitchTo3DMap,
+  onClose
 }) => {
   const [currentMapType, setCurrentMapType] = useState<'roadmap' | 'satellite' | 'terrain' | 'hybrid'>(initialMapType);
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
@@ -76,7 +84,54 @@ export const GoogleMapsLiveView: React.FC<GoogleMapsLiveViewProps> = ({
           </div>
         </div>
 
-        {/* Live GPS Coordinates Badge */}
+        {/* Live Navigation View Switcher (Google Maps <-> กล้องสด AR <-> แผนที่ 3D) */}
+        <div className="flex items-center gap-1.5">
+          {onSwitchToCameraAR && (
+            <button
+              type="button"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(900);
+                onSwitchToCameraAR();
+              }}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-[0_0_15px_#00D2FF] flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+              title="สลับเป็นกล้องสดมือถือ AR นำทางแบบเรียลไทม์"
+            >
+              <Video className="w-4 h-4 animate-pulse text-slate-950" />
+              <span>สลับเป็นกล้องสด AR</span>
+            </button>
+          )}
+
+          {onSwitchTo3DMap && (
+            <button
+              type="button"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(800);
+                onSwitchTo3DMap();
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-bold border border-white/10 flex items-center gap-1 cursor-pointer transition-all"
+              title="สลับเป็นแผนที่ 3D CI Capillary"
+            >
+              <Layers className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">แผนที่ 3D</span>
+            </button>
+          )}
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(800);
+                onClose();
+              }}
+              className="p-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 flex items-center justify-center cursor-pointer transition-all"
+              title="ปิดหน้าจอ"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Live GPS Coordinates Badge & Layer controls */}
         <div className="flex items-center gap-2">
           <div className="px-2 py-0.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] flex items-center gap-1">
             <Radio className="w-3 h-3 animate-pulse text-cyan-400" />

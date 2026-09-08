@@ -461,24 +461,34 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
           <div className="flex items-center gap-1.5 bg-black/50 p-1 rounded-xl border border-white/10 w-full sm:w-auto justify-center">
             <button
               onClick={() => handleGenderToggle('female')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-2 transition-all ${
                 currentGender === 'female'
                   ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <span>👩</span>
+              <img
+                src="/images/avatar_passenger_female.jpg"
+                alt="Female"
+                className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm"
+                referrerPolicy="no-referrer"
+              />
               <span>ผู้หญิง (Female)</span>
             </button>
             <button
               onClick={() => handleGenderToggle('male')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-2 transition-all ${
                 currentGender === 'male'
                   ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <span>👨</span>
+              <img
+                src="/images/avatar_passenger_male.jpg"
+                alt="Male"
+                className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm"
+                referrerPolicy="no-referrer"
+              />
               <span>ผู้ชาย (Male)</span>
             </button>
           </div>
@@ -661,9 +671,14 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3">
-                            <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-slate-900 p-0.5 shadow-md flex-shrink-0">
-                              <div className="w-full h-full bg-[#070D1E] rounded-[14px] flex items-center justify-center text-xl">
-                                {driver.avatarEmoji}
+                            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-slate-900 p-0.5 shadow-md flex-shrink-0">
+                              <div className="w-full h-full bg-[#070D1E] rounded-[14px] overflow-hidden flex items-center justify-center">
+                                <img
+                                  src={driver.imageUrl || (driver.gender === 'female' ? '/images/avatar_driver_female.jpg' : '/images/avatar_driver_male.jpg')}
+                                  alt={driver.name}
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
                               </div>
                               <span className="absolute -bottom-1 -right-1 px-1 py-0.2 rounded-full bg-[#FFD700] text-slate-950 font-black text-[8px] font-mono">
                                 LV.{driver.level}
@@ -674,8 +689,16 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <h4 className="text-xs font-bold text-white">{driver.name}</h4>
                                 <span className="text-[10px] font-mono text-cyan-300">({driver.nickname})</span>
-                                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 font-bold">
-                                  {driver.gender === 'female' ? '👩 หญิง' : '👨 ชาย'} • {driver.tierName}
+                                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 font-bold inline-flex items-center gap-1">
+                                  <img
+                                    src={driver.gender === 'female' ? '/images/avatar_driver_female.jpg' : '/images/avatar_driver_male.jpg'}
+                                    alt=""
+                                    className="w-3.5 h-3.5 rounded-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <span>{driver.gender === 'female' ? 'หญิง' : 'ชาย'}</span>
+                                  <span>•</span>
+                                  <span>{driver.tierName}</span>
                                 </span>
                                 {dreamMatch.label && (
                                   <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded flex items-center gap-0.5 ${
@@ -763,14 +786,21 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                       <div
                         key={othDriver.id}
                         onClick={() => handleInitiateConsent(othDriver)}
-                        className="flex-shrink-0 w-44 p-2.5 rounded-xl bg-white/5 border border-white/10 hover:border-amber-400/60 hover:bg-amber-950/20 transition-all cursor-pointer space-y-1"
+                        className="flex-shrink-0 w-48 p-2.5 rounded-xl bg-white/5 border border-white/10 hover:border-amber-400/60 hover:bg-amber-950/20 transition-all cursor-pointer space-y-1"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="text-lg">{othDriver.avatarEmoji}</span>
+                          <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 border border-white/20 bg-black/50">
+                            <img
+                              src={othDriver.imageUrl || (othDriver.gender === 'female' ? '/images/avatar_driver_female.jpg' : '/images/avatar_driver_male.jpg')}
+                              alt={othDriver.name}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
                           <div className="truncate">
                             <h5 className="text-[11px] font-bold text-white truncate">{othDriver.name}</h5>
-                            <span className="text-[9px] text-slate-400 font-mono">
-                              LV.{othDriver.level} • {othDriver.gender === 'female' ? '👩 หญิง' : '👨 ชาย'}
+                            <span className="text-[9px] text-slate-400 font-mono flex items-center gap-1">
+                              LV.{othDriver.level} • {othDriver.gender === 'female' ? 'หญิง' : 'ชาย'}
                             </span>
                           </div>
                         </div>
@@ -1230,8 +1260,8 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
               {/* Consent Header */}
               <div className="flex items-center justify-between pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl font-bold shadow-lg">
-                    🤝
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shadow-lg">
+                    <UserCheck className="w-5 h-5 text-slate-950" />
                   </div>
                   <div>
                     <h3 className="text-sm font-black text-white flex items-center gap-1.5">
@@ -1253,13 +1283,18 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
               {/* Driver Info Card */}
               <div className="p-3 rounded-2xl bg-black/50 border border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-700 flex items-center justify-center text-2xl">
-                    {consentDriver.avatarEmoji}
+                  <div className="w-12 h-12 rounded-2xl overflow-hidden border border-amber-400 flex items-center justify-center flex-shrink-0 shadow-lg">
+                    <img
+                      src={consentDriver.imageUrl || (consentDriver.gender === 'female' ? '/images/avatar_driver_female.jpg' : '/images/avatar_driver_male.jpg')}
+                      alt={consentDriver.name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-white">{consentDriver.name} ({consentDriver.nickname})</h4>
-                    <span className="text-[10px] font-mono text-[#FFD700]">
-                      LV.{consentDriver.level} • {consentDriver.gender === 'female' ? 'สุภาพสตรี 👩' : 'สุภาพบุรุษ 👨'} • {consentDriver.tierName}
+                    <span className="text-[10px] font-mono text-[#FFD700] flex items-center gap-1">
+                      LV.{consentDriver.level} • {consentDriver.gender === 'female' ? 'สุภาพสตรี' : 'สุภาพบุรุษ'} • {consentDriver.tierName}
                     </span>
                     <p className="text-[10px] text-slate-300 mt-0.5">{consentDriver.vehicleModel}</p>
                   </div>

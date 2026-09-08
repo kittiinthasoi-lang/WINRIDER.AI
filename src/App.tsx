@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChapterId, AppMode } from './types';
 import { Navbar } from './components/Navbar';
 import { PassengerAppView } from './components/PassengerAppView';
-import { KnightDriverAppView } from './components/KnightDriverAppView';
+import { KnightDriverAppView, DriverTabType } from './components/KnightDriverAppView';
 import { MerchantCommandCenter } from './components/MerchantCommandCenter';
 import { HospitalCommandCenter } from './components/HospitalCommandCenter';
 import { PartnerProfileView } from './components/PartnerProfileView';
@@ -51,6 +51,7 @@ export default function App() {
     return session ? getDefaultModeForRole(session.role) : 'passenger';
   });
   const [passengerTab, setPassengerTab] = useState<'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile'>('home');
+  const [driverTab, setDriverTab] = useState<DriverTabType>('jobs');
   const [activeChapter, setActiveChapter] = useState<ChapterId>('soul');
   const [audioEnabled, setAudioEnabled] = useState<boolean>(true);
   const [isBuddyModalOpen, setIsBuddyModalOpen] = useState<boolean>(false);
@@ -117,32 +118,25 @@ export default function App() {
     }
 
     // Role-Lock Boundary Enforcement:
-    // 1. Driver & Customer: CANNOT see each other's private profile/screens.
-    //    CAN access: Merchant profile/shop, Partner profile/discounts, and Hospital Command Center freely!
+    // 1. Driver: Accesses driver views (jobs, garage, navigation), WIN SHOP market, merchant, partner, hospital, codex.
     if (currentUserSession.role === 'driver') {
       if (mode === 'passenger') {
-        alert("🔒 ระบบความปลอดภัย Role-Locked: พี่วินไม่สามารถเข้าดูโปรไฟล์หรือหน้าจอส่วนตัวของลูกค้าได้ แต่สามารถเข้าดูโปรไฟล์ร้านค้า พาร์ทเนอร์ และศูนย์กู้ชีพได้อิสระ");
+        alert("🔒 ระบบความปลอดภัย Role-Locked: พี่วินใช้งานหน้าหลักอัศวิน อู่รถ และแผนที่นำทางในโหมดอัศวิน และสามารถเข้าดู WIN SHOP ตลาดชุมชน โปรไฟล์ร้านค้า พาร์ทเนอร์ และศูนย์กู้ชีพได้");
         return;
       }
     }
+    // 2. Customer: Accesses passenger, market, merchant, partner, hospital, codex.
     if (currentUserSession.role === 'customer') {
       if (mode === 'driver') {
-        alert("🔒 ระบบความปลอดภัย Role-Locked: ลูกค้าไม่สามารถเข้าดูโปรไฟล์หรืออู่ของพี่วินได้ แต่สามารถเข้าดูโปรไฟล์ร้านค้า พาร์ทเนอร์ และศูนย์กู้ชีพได้อิสระ");
+        alert("🔒 ระบบความปลอดภัย Role-Locked: ลูกค้าไม่สามารถเข้าดูห้องควบคุมหรืออู่ของพี่วินได้ แต่สามารถใช้งานเมนูผู้โดยสาร รถในฝัน รอรถ3D ตลาด WIN SHOP ร้านค้า พาร์ทเนอร์ และศูนย์กู้ชีพได้อิสระ");
         return;
       }
     }
 
-    // 2. Merchant & Partner: Restricted to only Merchant and Partner profiles and Hospital Command Center.
-    //    CANNOT see driver or customer private profiles/screens.
-    if (currentUserSession.role === 'merchant') {
-      if (mode !== 'merchant' && mode !== 'partner' && mode !== 'hospital' && mode !== 'codex') {
-        alert("🔒 ระบบความปลอดภัย Role-Locked: ร้านค้าสามารถเข้าดูเฉพาะโปรไฟล์ร้านค้า โปรไฟล์พาร์ทเนอร์ และศูนย์โรงพยาบาลกู้ชีพเท่านั้น");
-        return;
-      }
-    }
-    if (currentUserSession.role === 'partner') {
-      if (mode !== 'partner' && mode !== 'merchant' && mode !== 'hospital' && mode !== 'codex') {
-        alert("🔒 ระบบความปลอดภัย Role-Locked: พาร์ทเนอร์สามารถเข้าดูเฉพาะโปรไฟล์ร้านค้า โปรไฟล์พาร์ทเนอร์ และศูนย์โรงพยาบาลกู้ชีพเท่านั้น");
+    // 3. Merchant & Partner: สามารถใช้งานเมนูทั้งหมดที่ Navbar ด้านล่างได้ (passenger, market, merchant, partner, hospital, codex)
+    if (currentUserSession.role === 'merchant' || currentUserSession.role === 'partner') {
+      if (mode === 'driver') {
+        alert("🔒 ระบบความปลอดภัย Role-Locked: เฉพาะพี่วินเท่านั้นที่เข้าห้องควบคุมอัศวินได้ แต่สามารถใช้งานหน้าผู้โดยสาร ตลาด WIN SHOP ร้านค้า พาร์ทเนอร์ และศูนย์กู้ชีพได้อิสระ");
         return;
       }
     }
@@ -259,6 +253,8 @@ export default function App() {
           <KnightDriverAppView 
             audioEnabled={audioEnabled} 
             onOpenWinBuddy={() => setIsBuddyModalOpen(true)} 
+            activeDriverTab={driverTab}
+            onSelectDriverTab={setDriverTab}
           />
         )}
 
@@ -493,6 +489,12 @@ export default function App() {
         onSelectPassengerTab={(tab) => {
           setActiveMode('passenger');
           setPassengerTab(tab);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        activeDriverTab={driverTab}
+        onSelectDriverTab={(tab) => {
+          setActiveMode('driver');
+          setDriverTab(tab);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onSelectMode={handleSelectMode}

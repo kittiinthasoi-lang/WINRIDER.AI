@@ -299,7 +299,8 @@ export const EIGHT_PILLARS: PillarItem[] = [
     targetAudience: 'คนทำงาน, นักเรียน, ผู้เร่งรีบในชั่วโมงเร่งด่วน',
     vehicleType: 'มอเตอร์ไซค์สมรรถนะสูงพร้อมหมวกนิรภัยบลูทูธ',
     highlight: 'รับประกันความเร็วผ่าน CI Map ลัดเลาะซอยแคบ ไม่ติดไฟแดงใหญ่',
-    icon: 'Bike'
+    icon: 'Bike',
+    imageUrl: '/images/pillar_knight.jpg'
   },
   {
     id: 'pet',
@@ -310,7 +311,8 @@ export const EIGHT_PILLARS: PillarItem[] = [
     targetAudience: 'ทาสหมา, ทาสแมว, พาสัตว์เลี้ยงไปหาหมอหรือกรูมมิ่ง',
     vehicleType: 'ติดตั้ง WIN-Pet Pod แคปซูลโดมอวกาศติดแอร์',
     highlight: 'คนขับผ่านการอบรมจิตวิทยาสัตว์เลี้ยงและมีกล้อง Live สดให้เจ้าของดู',
-    icon: 'Cat'
+    icon: 'Cat',
+    imageUrl: '/images/pillar_petcare.jpg'
   },
   {
     id: 'express',
@@ -321,7 +323,8 @@ export const EIGHT_PILLARS: PillarItem[] = [
     targetAudience: 'สำนักงานกฎหมาย, คลินิกความงาม, ขนส่งยาและของสด',
     vehicleType: 'ติดตั้ง WIN-Vault กล่องฉนวนกันความร้อนล็อก NFC',
     highlight: 'รับประกันพัสดุไม่เสียหาย ปลอดภัย 100% พร้อมระบบ Blackbox Log',
-    icon: 'PackageCheck'
+    icon: 'PackageCheck',
+    imageUrl: '/images/pillar_express.jpg'
   },
   {
     id: 'mu_buddy',
@@ -332,7 +335,8 @@ export const EIGHT_PILLARS: PillarItem[] = [
     targetAudience: 'ผู้ศรัทธา, สายมูเตลู, นักท่องเที่ยวไหว้พระแก้ชง',
     vehicleType: 'ตกแต่งด้วยเกราะสีทอง 3% พร้อมเครื่องหอมอโรมาผ่อนคลาย',
     highlight: 'คนขับรอบรู้ประวัติศาสตร์วัดฝั่งธน เคล็ดลับการขอพรให้สัมฤทธิ์ผล',
-    icon: 'Sparkles'
+    icon: 'Sparkles',
+    imageUrl: '/images/pillar_mubuddy.jpg'
   },
   {
     id: 'lifestyle',
@@ -343,7 +347,8 @@ export const EIGHT_PILLARS: PillarItem[] = [
     targetAudience: 'คนเมืองไม่มีเวลา, คอนโดมิเนียม, เจ้าของธุรกิจ',
     vehicleType: 'มอเตอร์ไซค์คล่องตัวพร้อมกระเป๋าจัดระเบียบหลายช่อง',
     highlight: 'สั่งงานผ่าน WIN Buddy AI สรุปรายการซื้อของแม่นยำ 100%',
-    icon: 'ShoppingBag'
+    icon: 'ShoppingBag',
+    imageUrl: '/images/pillar_lifestyle.jpg'
   },
   {
     id: 'spirit',
@@ -354,7 +359,8 @@ export const EIGHT_PILLARS: PillarItem[] = [
     targetAudience: 'ผู้สูงอายุ, ผู้ป่วยพักฟื้น, ญาติที่ติดงานประจำ',
     vehicleType: 'ติดตั้ง Spirit Harness เกราะพยุงหลังลดแรงกระแทก',
     highlight: 'ขับขี่นุ่มนวลเป็นพิเศษ ไม่เร่งเครื่องกระชาก พร้อมดูแลเหมือนคนในครอบครัว',
-    icon: 'HeartPulse'
+    icon: 'HeartPulse',
+    imageUrl: '/images/pillar_spirit.jpg'
   },
   {
     id: 'family',
@@ -365,7 +371,8 @@ export const EIGHT_PILLARS: PillarItem[] = [
     targetAudience: 'คุณพ่อคุณแม่ยุคใหม่, นักเรียนระดับประถม-มัธยม',
     vehicleType: 'ติดตั้งหมวกนิรภัยสำหรับเด็ก และระบบตรวจจับพิกัด Real-time',
     highlight: 'คัดเลือกเฉพาะอัศวิน Lvl 30+ ประวัติดีเด่น ผ่านการตรวจสอบอาชญากรรม',
-    icon: 'Users'
+    icon: 'Users',
+    imageUrl: '/images/pillar_family.jpg'
   },
   {
     id: 'link',
@@ -376,7 +383,8 @@ export const EIGHT_PILLARS: PillarItem[] = [
     targetAudience: 'ผู้โดยสารขนส่งมวลชนรายวัน',
     vehicleType: 'รถจักรยานยนต์ไฟฟ้า EV Zero Emission รักษาสิ่งแวดล้อม',
     highlight: 'ราคาคงที่ Flat Rate เชื่อมต่อตั๋วใบเดียวร่วมกับระบบราง',
-    icon: 'TrainTrack'
+    icon: 'TrainTrack',
+    imageUrl: '/images/pillar_link.jpg'
   }
 ];
 

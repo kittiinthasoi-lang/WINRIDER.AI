@@ -63,13 +63,27 @@ import {
   User
 } from 'lucide-react';
 
+export type DriverTabType = 'profile' | 'garage' | 'cabinet' | 'armor' | 'armorLab' | 'calculator' | 'installment' | 'wallet' | 'jobs' | 'quests' | 'navigation';
+
 interface KnightDriverAppViewProps {
   audioEnabled: boolean;
   onOpenWinBuddy?: () => void;
+  activeDriverTab?: DriverTabType;
+  onSelectDriverTab?: (tab: DriverTabType) => void;
 }
 
-export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ audioEnabled, onOpenWinBuddy }) => {
-  const [activeDriverTab, setActiveDriverTab] = useState<'profile' | 'garage' | 'cabinet' | 'armor' | 'armorLab' | 'calculator' | 'installment' | 'wallet' | 'jobs' | 'quests' | 'navigation'>('jobs');
+export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ 
+  audioEnabled, 
+  onOpenWinBuddy,
+  activeDriverTab: propActiveDriverTab,
+  onSelectDriverTab,
+}) => {
+  const [internalDriverTab, setInternalDriverTab] = useState<DriverTabType>('jobs');
+  const activeDriverTab = propActiveDriverTab !== undefined ? propActiveDriverTab : internalDriverTab;
+  const setActiveDriverTab = (tab: DriverTabType) => {
+    setInternalDriverTab(tab);
+    if (onSelectDriverTab) onSelectDriverTab(tab);
+  };
   const [isOnDuty, setIsOnDuty] = useState<boolean>(true);
   const [deviceFrameMode, setDeviceFrameMode] = useState(true);
   const [balance, setBalance] = useState(125400);
