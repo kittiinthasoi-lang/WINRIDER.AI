@@ -33,7 +33,7 @@ import { playTactileBlip, playLevelUpFanfare, playRadarScan } from '../utils/aud
 import { WinScanAndPayModal } from './WinScanAndPayModal';
 import { CustomerPaymentQrCodeModal } from './CustomerPaymentQrCodeModal';
 import { AIProductPhotoVerifier, AIVerificationResult } from './AIProductPhotoVerifier';
-import { CyberGraphic } from './CyberGraphic';
+import { CyberGraphic, getCyberImageUrl } from './CyberGraphic';
 import confetti from 'canvas-confetti';
 
 interface WinStreetMarketViewProps {
@@ -61,6 +61,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'ปรุงสดใหม่',
     description: 'ผัดกะเพราโบราณแท้ ไม่ใส่ถั่วฝักยาว เนื้อโคขุนบดหยาบ หอมใบกะเพราบ้าน พริกแห้งจินดาแซ่บถึงใจ',
     imageIcon: '🥩',
+    imageUrl: '/images/street_market_food.jpg',
     location: 'สุขุมวิท 39 (พร้อมพงษ์)',
     distanceKm: 0.6,
     stock: 25,
@@ -83,6 +84,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'มือ 2 สภาพนางฟ้า',
     description: 'กล้องฟิล์มส่วนตัว ใช้งานปกติ สปีดชัตเตอร์ตรง ช่องมองใส ไม่มีฝ้า ไม่มีรา แถมเลนส์ 50mm f/1.8 ฟรี',
     imageIcon: '📷',
+    imageUrl: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=600&q=80',
     location: 'ทองหล่อ 13',
     distanceKm: 1.2,
     stock: 1,
@@ -105,6 +107,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'ขนมอบสด',
     description: 'ช็อกโกแลตแท้นำเข้าจากเบลเยียม 70% หวานน้อย เนยสดแท้ 100% อบสดใหม่เช้าวันนี้ พร้อมส่งทันที',
     imageIcon: '🍫',
+    imageUrl: '/images/cookie_box.jpg',
     location: 'เอกมัย ซอย 4',
     distanceKm: 0.9,
     stock: 12,
@@ -127,6 +130,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'ของใหม่มี อย.',
     description: 'เซ็ตยาสามัญดูแลฉุกเฉินเบื้องต้น พร้อมฉลากคำแนะนำการใช้ยาจากเภสัชกร มีใบอนุญาตถูกต้อง',
     imageIcon: '🩺',
+    imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
     location: 'สุขุมวิท 24',
     distanceKm: 0.4,
     stock: 50,
@@ -149,6 +153,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'งานทำมือแฮนด์เมด',
     description: 'ร้อยด้วยเอ็นยืดคุณภาพสูง หินแท้ขนาด 8 มม. เสริมพลังการเงิน ความมั่งคั่ง และการเจรจาค้าขาย',
     imageIcon: '📿',
+    imageUrl: 'https://images.unsplash.com/photo-1611591475152-477d5c3f9942?auto=format&fit=crop&w=600&q=80',
     location: 'อโศกมนตรี',
     distanceKm: 1.5,
     stock: 4,
@@ -171,6 +176,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'สดจากสวน',
     description: 'หวานฉ่ำ ไร้เสี้ยน เก็บสดเช้าตรู่จากสวนปลอดสารพิษ วิตามินซีสูง คัดพิเศษทุกลูก',
     imageIcon: '🥭',
+    imageUrl: 'https://images.unsplash.com/photo-1588165171080-c89acfa5a259?auto=format&fit=crop&w=600&q=80',
     location: 'ตลาดคลองเตย',
     distanceKm: 2.1,
     stock: 30,
@@ -193,6 +199,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'ของใหม่ 100%',
     description: 'สูตรบำรุงขนสวย ลดขนร่วง ปราศจากข้าวโพด ข้าวสาลี และสารเคมีสังเคราะห์ เหมาะกับน้องแมวทุกวัย',
     imageIcon: '🐱',
+    imageUrl: '/images/pet_care.jpg',
     location: 'พระราม 4',
     distanceKm: 1.8,
     stock: 18,
@@ -215,6 +222,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'ผลงานต้นฉบับ Original',
     description: 'วาดด้วยสีน้ำเกรดศิลปิน Arches 300g ลายพู่กันประณีต ถ่ายทอดวิถีชีวิตริมน้ำฝั่งธนบุรี',
     imageIcon: '🖼️',
+    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=600&q=80',
     location: 'ฝั่งธนบุรี เจริญนคร',
     distanceKm: 3.2,
     stock: 1,
@@ -237,6 +245,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'มือ 2 วินเทจแท้',
     description: 'ไซส์ L อก 42 ยาว 29 สภาพเฟดสวย ตะเข็บเดี่ยวทั้งตัว ผ้าบางนุ่ม ไม่มีตำหนิขาดรู',
     imageIcon: '🦅',
+    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80',
     location: 'พระโขนง',
     distanceKm: 2.8,
     stock: 1,
@@ -259,6 +268,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'งานทำมือแฮนด์เมด',
     description: 'กระดาษถนอมสายตานำเข้า 120 แกรม เข้าเล่มมือด้วยเชือกเทียนอย่างแน่นหนา',
     imageIcon: '📚',
+    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=600&q=80',
     location: 'สยามสแควร์',
     distanceKm: 3.5,
     stock: 14,
@@ -281,6 +291,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'งานแฮนด์เมดแท้',
     description: 'เงินแท้ 925 ปลอดสารนิกเกิล ไม่แพ้ ไม่คัน ไข่มุกน้ำจืดคัดทรงกลมเงางาม เคลือบทองคำขาวกันหมอง',
     imageIcon: '✨',
+    imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=600&q=80',
     location: 'ทองหล่อ 8',
     distanceKm: 1.1,
     stock: 6,
@@ -303,6 +314,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'ยาแผนปัจจุบันมี อย.',
     description: 'ชุดดูแลสุขภาพฉุกเฉิน ยาพาราเซตามอล 500mg, ยาแก้แพ้ลดน้ำมูก, ยาอมแก้เจ็บคอ, สเปรย์พ่นคอโพรโพลิส และยาดมสมุนไพรกฤษณา',
     imageIcon: '🌿',
+    imageUrl: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?auto=format&fit=crop&w=600&q=80',
     location: 'อโศกมนตรี',
     distanceKm: 0.8,
     stock: 45,
@@ -325,6 +337,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'เพ้นท์มือชิ้นเดียวในโลก',
     description: 'ผ้าแคนวาสหนา 14 ออนซ์ ทนทาน ซักได้ สีอะคริลิกเกรดพรีเมียมไม่ลอกหลุด ใส่ iPad และหนังสือได้สบาย',
     imageIcon: '👜',
+    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=600&q=80',
     location: 'เจริญกรุง 43',
     distanceKm: 2.3,
     stock: 3,
@@ -347,6 +360,7 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'เก็บสดเช้านี้',
     description: 'ปลูกด้วยระบบน้ำวนปิด ไร้สารเคมีและยาฆ่าแมลง 100% กรอบหวาน ไม่ขม สะอาดพร้อมทานทันที',
     imageIcon: '🥗',
+    imageUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80',
     location: 'สุขุมวิท 71 (ปรีดีฯ)',
     distanceKm: 1.9,
     stock: 40,
@@ -369,11 +383,104 @@ export const SAMPLE_MARKET_ITEMS: MarketItem[] = [
     conditionLabel: 'มือสอง สภาพ 99%',
     description: 'เครื่องแท้ศูนย์ไทย ไม่เคยตกหล่น ไร้รอยขีดข่วน ติดฟิล์มกระจก Paperlike เรียบร้อย พร้อมกล่องและหัวชาร์จแท้ครบ',
     imageIcon: '💻',
+    imageUrl: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=600&q=80',
     location: 'สาทรเหนือ',
     distanceKm: 2.7,
     stock: 1,
     salesCount: 1,
     tags: ['มือสองสภาพนางฟ้า', 'ประกันศูนย์', 'ของแท้ 100%']
+  },
+  {
+    id: 'm-016',
+    title: 'หมวกกันน็อกเต็มใบ Knight Shield สเปก มอก./ECE มีแว่นกันแดด 2 ชั้น (ของแท้)',
+    price: 1290,
+    originalPrice: 1850,
+    sellerType: 'merchant',
+    sellerName: 'ร้าน WIN Rider Pro Garage & Gear สุขุมวิท',
+    sellerAvatar: '🪖',
+    sellerLevel: 75,
+    sellerRating: 4.98,
+    category: 'rider_gear',
+    categoryLabel: 'อุปกรณ์ขับขี่ & อะไหล่วิน',
+    condition: 'new',
+    conditionLabel: 'ของใหม่แกะกล่อง มี มอก.',
+    description: 'หมวกกันน็อกเต็มใบน้ำหนักเบา ระบายอากาศดี มีแว่นกันแดดด้านในสไลด์เปิด-ปิดได้ สายรัดคางแบบ Micro Lock ปลอดภัยมาตรฐานสากล',
+    imageIcon: '🪖',
+    imageUrl: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=600&q=80',
+    location: 'ซุ้มช่างทองหล่อ-พร้อมพงษ์',
+    distanceKm: 0.5,
+    stock: 15,
+    salesCount: 184,
+    tags: ['สำหรับพี่วิน', 'มอก.แท้', 'ส่งด่วน 15 นาที']
+  },
+  {
+    id: 'm-017',
+    title: 'น้ำมันเครื่องสังเคราะห์แท้ 100% Motul 7100 4T 10W-40 (1 ลิตร) + กรองน้ำมันแท้',
+    price: 390,
+    originalPrice: 520,
+    sellerType: 'merchant',
+    sellerName: 'ศูนย์เซอร์วิสอู่อัศวินฝั่งธนบุรี',
+    sellerAvatar: '🔧',
+    sellerLevel: 82,
+    sellerRating: 5.0,
+    category: 'rider_gear',
+    categoryLabel: 'อุปกรณ์ขับขี่ & อะไหล่วิน',
+    condition: 'new',
+    conditionLabel: 'ของแท้ 100% นำเข้าจากฝรั่งเศส',
+    description: 'น้ำมันเครื่อง Ester Technology ปกป้องเครื่องยนต์รอบจัด ลดความร้อน ประหยัดน้ำมัน วิ่งลื่นนุ่มนวล เข้าเกียร์ง่าย',
+    imageIcon: '🛢️',
+    imageUrl: 'https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=600&q=80',
+    location: 'จรัญสนิทวงศ์ 13',
+    distanceKm: 1.8,
+    stock: 40,
+    salesCount: 320,
+    tags: ['น้ำมันเครื่องแท้', 'สำหรับพี่วิน', 'บำรุงรักษารถ']
+  },
+  {
+    id: 'm-018',
+    title: 'ที่จับโทรศัพท์มือถือมอเตอร์ไซค์อลูมิเนียม CNC พร้อมระบบกันสะเทือนกล้อง OIS',
+    price: 450,
+    originalPrice: 690,
+    sellerType: 'merchant',
+    sellerName: 'WIN Gadget & Tech Station',
+    sellerAvatar: '📱',
+    sellerLevel: 68,
+    sellerRating: 4.95,
+    category: 'rider_gear',
+    categoryLabel: 'อุปกรณ์ขับขี่ & อะไหล่วิน',
+    condition: 'new',
+    conditionLabel: 'ของใหม่ ประกัน 6 เดือน',
+    description: 'ที่จับมือถือเกรดพรีเมียม ล็อก 8 ทิศทาง หมุนได้ 360 องศา มีลูกยางดูดซับแรงสั่นสะเทือน ป้องกันกล้องมือถือพัง',
+    imageIcon: '📲',
+    imageUrl: '/images/shop_phone_mount.jpg',
+    location: 'BTS อโศก',
+    distanceKm: 0.9,
+    stock: 28,
+    salesCount: 260,
+    tags: ['กันสั่นกล้อง', 'อลูมิเนียม CNC', 'ทนแดดทนฝน']
+  },
+  {
+    id: 'm-019',
+    title: 'เสื้อกั๊กสะท้อนแสง WINRIDER Pro Armor ป้องกันความร้อน & ระบายเหงื่อ',
+    price: 320,
+    originalPrice: 450,
+    sellerType: 'merchant',
+    sellerName: 'สหกรณ์เครื่องแบบวินสยามพิทักษ์',
+    sellerAvatar: '🦺',
+    sellerLevel: 90,
+    sellerRating: 4.99,
+    category: 'rider_gear',
+    categoryLabel: 'อุปกรณ์ขับขี่ & อะไหล่วิน',
+    condition: 'new',
+    conditionLabel: 'ผ้าตาข่ายพิเศษ ระบายลม',
+    description: 'เสื้อกั๊กสะท้อนแสง 3M คมชัดระยะ 300 เมตร ซิป YKK แข็งแรง พร้อมกระเป๋าใส่เงินทอน บัตร และปากกาครบเซ็ต',
+    imageIcon: '🦺',
+    imageUrl: '/images/armor_standard.jpg',
+    location: 'เอกมัย ซอย 1',
+    distanceKm: 1.1,
+    stock: 50,
+    salesCount: 450,
+    tags: ['เสื้อกั๊กวิน', 'สะท้อนแสง 3M', 'ระบายเหงื่อ']
   }
 ];
 
@@ -499,6 +606,7 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
 
   const categories: { id: string; label: string; icon: string }[] = [
     { id: 'all', label: 'ทั้งหมด', icon: '🌟' },
+    { id: 'rider_gear', label: 'อุปกรณ์ขับขี่ & อะไหล่วิน', icon: '🏍️' },
     { id: 'food_snack', label: 'อาหาร & ขนม', icon: '🍜' },
     { id: 'second_hand', label: 'มือหนึ่ง/มือสอง', icon: '📦' },
     { id: 'fashion_accessories', label: 'เสื้อผ้า/เครื่องประดับ', icon: '💎' },
@@ -873,14 +981,16 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
 
                 {/* Main Product Display */}
                 <div className="space-y-2.5">
-                  <div className="relative w-full h-36 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/40 border border-white/5 flex items-center justify-center overflow-hidden">
-                    <CyberGraphic 
-                      src={item.imageUrl} 
-                      emoji={item.imageIcon} 
+                  <div className="relative w-full h-44 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/40 border border-white/10 flex items-center justify-center overflow-hidden">
+                    <img 
+                      src={item.imageUrl || (item.imageIcon ? getCyberImageUrl(item.imageIcon) : '/images/street_market_food.jpg')} 
                       alt={item.title}
-                      size="2xl"
-                      rounded="rounded-none"
-                      className="w-full h-full"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = '/images/street_market_food.jpg';
+                      }}
                     />
 
                     {/* AI Verified Badge Overlay */}
@@ -1178,21 +1288,26 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-slate-300 font-semibold mb-1 block">อิโมจิสินค้า:</label>
-                  <div className="flex gap-1.5">
-                    {['📦', '🍪', '📷', '👗', '🎨', '📿', '📚', '🪴'].map(em => (
-                      <button
-                        type="button"
-                        key={em}
-                        onClick={() => setNewEmoji(em)}
-                        className={`p-1.5 rounded-lg border text-sm ${
-                          newEmoji === em ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-black/40'
-                        }`}
-                      >
-                        {em}
-                      </button>
-                    ))}
-                  </div>
+                  <label className="text-slate-300 font-semibold mb-1 block">รูปภาพสินค้า (AI Verified Photo):</label>
+                  {customerAiVerified?.imageUrl ? (
+                    <div className="flex items-center gap-2 p-1.5 rounded-xl bg-cyan-950/60 border border-cyan-400/40">
+                      <img 
+                        src={customerAiVerified.imageUrl} 
+                        alt="Verified Product" 
+                        className="w-10 h-10 rounded-lg object-cover border border-cyan-400"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="text-[10px] text-cyan-300 font-mono">
+                        <span className="text-emerald-400 font-bold block">✓ ตรวจสอบภาพถ่ายสำเร็จ</span>
+                        <span>{customerAiVerified.certificateId}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 p-2 rounded-xl">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                      <span>กรุณาถ่ายรูปหรือเลือกรูปด้านบน</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1347,14 +1462,15 @@ export const WinStreetMarketView: React.FC<WinStreetMarketViewProps> = ({
               </button>
             </div>
 
-            <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-cyan-500/30 bg-black/60 flex items-center justify-center">
-              <CyberGraphic 
-                src={inspectingCertItem.imageUrl} 
-                emoji={inspectingCertItem.imageIcon} 
+            <div className="relative w-full h-48 rounded-2xl overflow-hidden border border-cyan-500/30 bg-black/60 flex items-center justify-center">
+              <img 
+                src={inspectingCertItem.imageUrl || (inspectingCertItem.imageIcon ? getCyberImageUrl(inspectingCertItem.imageIcon) : '/images/street_market_food.jpg')} 
                 alt={inspectingCertItem.title} 
-                size="2xl" 
-                className="w-full h-full" 
-                rounded="rounded-none" 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/images/street_market_food.jpg';
+                }}
               />
               <div className="absolute top-2 right-2 px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-400 text-emerald-300 text-[10px] font-mono font-bold flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-400" />

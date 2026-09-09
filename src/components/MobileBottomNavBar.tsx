@@ -77,16 +77,19 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   const getIsTabActive = (tabId: string) => {
     if (isDriverRole) {
       if (tabId === 'home') {
-        return activeMode === 'driver' && (activeDriverTab === 'jobs' || !activeDriverTab);
+        return activeMode === 'passenger' && activePassengerTab === 'home';
       }
-      if (tabId === 'garage') {
-        return activeMode === 'driver' && activeDriverTab === 'garage';
+      if (tabId === 'driverJobs' || tabId === 'jobs') {
+        return activeMode === 'driver' && (activeDriverTab === 'jobs' || !activeDriverTab);
       }
       if (tabId === 'navigation') {
         return activeMode === 'driver' && activeDriverTab === 'navigation';
       }
       if (tabId === 'shop') {
-        return activeMode === 'market';
+        return activeMode === 'market' || (activeMode === 'passenger' && activePassengerTab === 'shop');
+      }
+      if (tabId === 'garage') {
+        return activeMode === 'driver' && activeDriverTab === 'garage';
       }
       if (tabId === 'modes') {
         return isModesDrawerOpen || ['merchant', 'partner', 'hospital', 'register', 'codex'].includes(activeMode);
@@ -117,11 +120,11 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
 
   // Main Tabs Configuration based on role:
   // สำหรับบทบาทพี่วิน (Knight Driver):
-  // 1. หน้าหลัก (ไม่เปลี่ยน) -> นำสู่หน้าจอเรดาร์รับงาน/งานสแตนด์บาย (Jobs & Radar)
-  // 2. รถในฝัน -> เปลี่ยนเป็น "อู่รถอัศวิน" (Garage & Fleet)
-  // 3. รอรถ3D -> เปลี่ยนเป็น "แผนที่นำทาง" (GPS Turn-by-Turn / AR / Google Maps)
-  // 4. WIN SHOP -> ไม่เปลี่ยน (เข้าสู่ตลาด WIN SHOP ชุมชน ซื้อ-ขายอะไหล่)
-  // 5. โหมด/หน้าจอ -> ไม่เปลี่ยน
+  // 1. หน้าหลัก -> นำสู่หน้าหลักของแอปเพื่อเข้าถึงบริการ 8 เสาหลัก (WINRIDER Core Services)
+  // 2. ห้องรับงาน -> นำสู่หน้าจอเรดาร์รับงาน/งานสแตนด์บาย (Jobs & Radar)
+  // 3. แผนที่นำทาง -> GPS Turn-by-Turn / กล้องสด AR / Google Maps
+  // 4. WIN SHOP -> สินค้าและอุปกรณ์ทางการที่แอปขายเอง (WIN Official Shop) แบบเดียวกับ Navbar ของลูกค้า
+  // 5. โหมด/หน้าจอ -> รวมทุกโหมดและบริการ
   // 
   // สำหรับบทบาทลูกค้า ร้านค้า พาร์ทเนอร์:
   // สามารถใช้งานได้ทั้งหมดที่ Navbar ด้านล่าง (หน้าหลัก, รถในฝัน, รอรถ3D, WIN SHOP, โหมด/หน้าจอ)
@@ -130,6 +133,18 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
       id: 'home', 
       label: 'หน้าหลัก', 
       icon: <Compass className="w-5 h-5" />,
+      badge: '8 เสาหลัก',
+      onClick: () => {
+        setIsModesDrawerOpen(false);
+        onSelectMode('passenger');
+        onSelectPassengerTab('home');
+      }
+    },
+    { 
+      id: 'driverJobs', 
+      label: 'ห้องรับงาน', 
+      icon: <Bike className="w-5 h-5" />,
+      badge: activeMode === 'driver' ? 'ONLINE' : undefined,
       onClick: () => {
         setIsModesDrawerOpen(false);
         onSelectMode('driver');
@@ -137,21 +152,10 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
       }
     },
     { 
-      id: 'garage', 
-      label: 'อู่รถอัศวิน', 
-      icon: <Wrench className="w-5 h-5" />,
-      badge: 'FLEET',
-      onClick: () => {
-        setIsModesDrawerOpen(false);
-        onSelectMode('driver');
-        onSelectDriverTab?.('garage');
-      }
-    },
-    { 
       id: 'navigation', 
       label: 'แผนที่นำทาง', 
       icon: <Navigation className="w-5 h-5" />,
-      badge: 'GPS',
+      badge: 'AR GPS',
       onClick: () => {
         setIsModesDrawerOpen(false);
         onSelectMode('driver');
@@ -165,7 +169,8 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
       badge: 'DEALS',
       onClick: () => {
         setIsModesDrawerOpen(false);
-        onSelectMode('market');
+        onSelectMode('passenger');
+        onSelectPassengerTab('shop');
       }
     },
     { 
@@ -239,18 +244,25 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
 
   const appModesList: { id: AppMode; label: string; desc: string; icon: React.ReactNode; color: string }[] = [
     { 
-      id: 'register', 
-      label: 'ลงทะเบียน 4 บทบาท', 
-      desc: 'อัศวิน วินมอเตอร์ไซค์, ผู้โดยสาร, ร้านค้า, พาร์ทเนอร์', 
-      icon: <UserPlus className="w-5 h-5" />,
-      color: 'from-amber-500/20 to-orange-500/10 border-amber-500/40 text-amber-300'
+      id: 'passenger', 
+      label: 'หน้าหลักแอป & 8 เสาหลัก', 
+      desc: 'เข้าถึง 8 เสาหลัก WINRIDER (วิน, ส่งของ, อาหาร, สายมู, ดูแลผู้สูงวัย, เชื่อมต่อรถไฟฟ้า ฯลฯ)', 
+      icon: <Compass className="w-5 h-5" />,
+      color: 'from-cyan-500/20 to-blue-500/10 border-cyan-500/40 text-cyan-300'
     },
     { 
       id: 'driver', 
       label: 'อู่อัศวิน (คนขับ)', 
       desc: 'ระบบสตรีมงาน, มิเตอร์อัจฉริยะ, แท่นแท็กซี่, แผนที่ลาดตระเวน', 
       icon: <Bike className="w-5 h-5" />,
-      color: 'from-cyan-500/20 to-blue-500/10 border-cyan-500/40 text-cyan-300'
+      color: 'from-amber-500/20 to-orange-500/10 border-amber-500/40 text-amber-300'
+    },
+    { 
+      id: 'register', 
+      label: 'ลงทะเบียน 4 บทบาท', 
+      desc: 'อัศวิน วินมอเตอร์ไซค์, ผู้โดยสาร, ร้านค้า, พาร์ทเนอร์', 
+      icon: <UserPlus className="w-5 h-5" />,
+      color: 'from-purple-500/20 to-pink-500/10 border-purple-500/40 text-purple-300'
     },
     { 
       id: 'merchant', 
@@ -290,12 +302,12 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   ];
 
   // Role-based allowed modes:
-  // 1. Driver: Has access to driver cockpit/garage/nav, market (WIN SHOP), merchant, partner, hospital, codex.
+  // 1. Driver: Has access to passenger (8 pillars), driver cockpit/garage/nav, market (WIN SHOP), merchant, partner, hospital, codex.
   // 2. Customer, Merchant, and Partner: Can access passenger, market (WIN SHOP), merchant, partner, hospital, codex.
   const allowedModesForRole = currentUserSession?.role === 'customer'
     ? ['passenger', 'market', 'merchant', 'partner', 'hospital', 'codex']
     : currentUserSession?.role === 'driver'
-    ? ['driver', 'market', 'merchant', 'partner', 'hospital', 'codex']
+    ? ['passenger', 'driver', 'market', 'merchant', 'partner', 'hospital', 'codex']
     : currentUserSession?.role === 'merchant'
     ? ['merchant', 'passenger', 'market', 'partner', 'hospital', 'codex']
     : ['partner', 'passenger', 'market', 'merchant', 'hospital', 'codex'];

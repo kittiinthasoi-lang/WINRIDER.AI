@@ -13,16 +13,16 @@ export interface CyberGraphicProps {
 
 export const EMOJI_IMAGE_MAP: Record<string, string> = {
   // Vehicles & Rides (Mapped to generated high-res realistic vehicles)
-  '🏍': '/images/ride_sport.jpg',
-  '🏍️': '/images/ride_sport.jpg',
-  '🛵': '/images/ride_standard.jpg',
-  '🚲': '/images/ride_standard.jpg',
+  '🏍': '/images/garage_adventure.jpg',
+  '🏍️': '/images/garage_adventure.jpg',
+  '🛵': '/images/garage_wave.jpg',
+  '🚲': '/images/garage_ev.jpg',
   '🚗': '/images/ride_classic.jpg',
   '🏎': '/images/ride_sport.jpg',
   '🏎️': '/images/ride_sport.jpg',
   '🚘': '/images/ride_classic.jpg',
-  '🚙': '/images/ride_classic.jpg',
-  '🛺': '/images/ride_standard.jpg',
+  '🚙': '/images/garage_adventure.jpg',
+  '🛺': '/images/garage_pcx.jpg',
   '🚌': '/images/transit_train.jpg',
   '🚝': '/images/transit_train.jpg',
   '🚆': '/images/transit_train.jpg',
@@ -581,6 +581,9 @@ export const CyberGraphic: React.FC<CyberGraphicProps> = ({
         className="w-full h-full object-cover select-none pointer-events-none"
         referrerPolicy="no-referrer"
         loading="lazy"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).src = '/images/app_logo.jpg';
+        }}
       />
     </span>
   );

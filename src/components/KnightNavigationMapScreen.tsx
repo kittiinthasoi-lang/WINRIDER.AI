@@ -96,7 +96,8 @@ import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { DriverPaymentQrCodeModal } from './DriverPaymentQrCodeModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
-import { ARLiveCameraNavigation } from './ARLiveCameraNavigation';
+import { ARLiveCameraNavigation, ARManeuverType } from './ARLiveCameraNavigation';
+import { VirtualArOverlay } from './VirtualArOverlay';
 import { GoogleMapsLiveView } from './GoogleMapsLiveView';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 import confetti from 'canvas-confetti';
@@ -264,6 +265,53 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   // 3-Way Navigation View Mode: '3d_map' | 'google_maps' | 'live_camera_ar'
   const [navDisplayMode, setNavDisplayMode] = useState<'3d_map' | 'google_maps' | 'live_camera_ar'>('3d_map');
   const { gpsState } = useRealtimeGps(true);
+
+  // Real-time mobile camera backdrop behind 3D map
+  const [cameraBackdropActive, setCameraBackdropActive] = useState<boolean>(false);
+  const [backdropCameraFacing, setBackdropCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [backdropCameraLive, setBackdropCameraLive] = useState<boolean>(false);
+  const [backdropManeuver, setBackdropManeuver] = useState<ARManeuverType>('turn_left');
+  const [backdropManeuverDist, setBackdropManeuverDist] = useState<number>(45);
+  const [backdropManeuverStreet, setBackdropManeuverStreet] = useState<string>('ซอยสุขุมวิท 39 (พร้อมพงษ์)');
+  const backdropVideoRef = useRef<HTMLVideoElement | null>(null);
+  const backdropStreamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (cameraBackdropActive && navDisplayMode === '3d_map') {
+      if (navigator?.mediaDevices?.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: backdropCameraFacing } },
+          audio: false
+        }).then(stream => {
+          backdropStreamRef.current = stream;
+          setBackdropCameraLive(true);
+          if (backdropVideoRef.current) {
+            backdropVideoRef.current.srcObject = stream;
+            backdropVideoRef.current.play().catch(() => {});
+          }
+        }).catch(err => {
+          console.warn('Camera backdrop access:', err);
+          setBackdropCameraLive(false);
+        });
+      }
+    } else {
+      if (backdropStreamRef.current) {
+        backdropStreamRef.current.getTracks().forEach(t => t.stop());
+        backdropStreamRef.current = null;
+      }
+      if (backdropVideoRef.current) {
+        backdropVideoRef.current.srcObject = null;
+      }
+      setBackdropCameraLive(false);
+    }
+
+    return () => {
+      if (backdropStreamRef.current) {
+        backdropStreamRef.current.getTracks().forEach(t => t.stop());
+        backdropStreamRef.current = null;
+      }
+    };
+  }, [cameraBackdropActive, navDisplayMode, backdropCameraFacing]);
 
   // Holo Overlay & Weather
   const [showRoutesOverlay, setShowRoutesOverlay] = useState<boolean>(false);
@@ -830,9 +878,48 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
         </div>
       ) : (
         <>
-          <div className={`relative w-full rounded-3xl overflow-hidden bg-gradient-to-b ${weatherGradients[weatherCondition]} border-2 border-[#00D2FF]/60 shadow-[0_0_40px_rgba(0,210,255,0.25)] select-none ${
+          <div className={`relative w-full rounded-3xl overflow-hidden ${
+            cameraBackdropActive ? 'bg-black/30' : `bg-gradient-to-b ${weatherGradients[weatherCondition]}`
+          } border-2 border-[#00D2FF]/60 shadow-[0_0_40px_rgba(0,210,255,0.25)] select-none ${
             isFullscreen ? 'h-[640px]' : 'h-[460px] sm:h-[520px]'
           }`}>
+        {/* Real-time mobile camera stream overlaid as live backdrop behind 3D map */}
+        {cameraBackdropActive && (
+          <>
+            <video
+              ref={backdropVideoRef}
+              playsInline
+              autoPlay
+              muted
+              className="absolute inset-0 w-full h-full object-cover z-0 opacity-80 pointer-events-none"
+            />
+            {/* Realistic street POV background if camera is not granted */}
+            {!backdropCameraLive && (
+              <div className="absolute inset-0 bg-gradient-to-b from-[#06142E]/70 via-[#0B254E]/60 to-[#040A18]/80 pointer-events-none z-0" />
+            )}
+            
+            {/* VIRTUAL AR 3D ARROW OVERLAY OVER LIVE CAMERA FEED */}
+            <VirtualArOverlay
+              currentManeuver={backdropManeuver}
+              distanceM={backdropManeuverDist}
+              streetName={backdropManeuverStreet}
+              landmarkNotice="จุดสังเกต: ปากซอยมีร้าน 7-Eleven และวินมอเตอร์ไซค์"
+              speedKmH={currentSpeed}
+              cameraActive={backdropCameraLive}
+              cameraFacing={backdropCameraFacing}
+              onToggleCameraFacing={() => {
+                if (audioEnabled) playTactileBlip(800);
+                setBackdropCameraFacing(prev => prev === 'environment' ? 'user' : 'environment');
+              }}
+              onSelectManeuver={(m, dist, street) => {
+                if (audioEnabled) playTactileBlip(850);
+                setBackdropManeuver(m);
+                setBackdropManeuverDist(dist);
+                setBackdropManeuverStreet(street);
+              }}
+            />
+          </>
+        )}
         {/* 3D MAP CANVAS CONTAINER (PERSPECTIVE 3D RENDER ENGINE) */}
         <div 
           className="relative w-full h-full overflow-hidden"
@@ -1373,6 +1460,48 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             <Compass className="w-3.5 h-3.5 text-emerald-400" />
             <span>GPS จริง</span>
           </button>
+
+          <button
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(850);
+              setNavDisplayMode('live_camera_ar');
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-[0_0_12px_#00D2FF] flex items-center gap-1 animate-pulse"
+            title="สลับเข้าโหมดกล้องสด AR ซ้อนลูกศร 3D แบบเต็มจอ"
+          >
+            <Video className="w-3.5 h-3.5 text-slate-950" />
+            <span>กล้องสด AR เต็มจอ</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(800);
+              setCameraBackdropActive(!cameraBackdropActive);
+            }}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1 border transition-all ${
+              cameraBackdropActive
+                ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                : 'bg-black/60 text-slate-300 border-white/10 hover:text-white'
+            }`}
+            title="เปิด/ปิดการดึงภาพกล้องสดมือถือมาซ้อนกับลูกศรเสมือน AR บนแผนที่ 3D"
+          >
+            <Camera className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span>{cameraBackdropActive ? 'ซ้อนกล้องสด AR: เปิดอยู่' : '📹 ซ้อนกล้องสด AR บนแผนที่'}</span>
+          </button>
+
+          {cameraBackdropActive && (
+            <button
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(750);
+                setBackdropCameraFacing(prev => prev === 'environment' ? 'user' : 'environment');
+              }}
+              className="px-2 py-1.5 rounded-xl bg-black/60 text-cyan-300 border border-cyan-400/40 text-xs font-mono font-bold flex items-center gap-1 hover:bg-slate-800"
+              title="สลับกล้องหน้า/กล้องหลัง"
+            >
+              <RotateCw className="w-3.5 h-3.5 text-cyan-400" />
+              <span>สลับกล้อง</span>
+            </button>
+          )}
 
           <button
             onClick={() => setShowQrPayModal(true)}

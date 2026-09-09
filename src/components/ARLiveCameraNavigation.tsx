@@ -102,6 +102,14 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
     };
   }, [cameraFacing]);
 
+  // Keep video element attached to stream whenever camera becomes active or element mounts
+  useEffect(() => {
+    if (videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [cameraActive, cameraFacing]);
+
   const startLiveCamera = async () => {
     try {
       setCameraError(null);
@@ -119,13 +127,17 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         streamRef.current = stream;
+        setCameraActive(true);
+        setUseSimulationFeed(false);
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
+          try {
+            await videoRef.current.play();
+          } catch (e) {
+            console.log('Video play caught:', e);
+          }
         }
-        setCameraActive(true);
-        setUseSimulationFeed(false);
       } else {
         throw new Error('เบราว์เซอร์ไม่รองรับการเข้าถึงกล้อง');
       }
@@ -141,6 +153,9 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     setCameraActive(false);
   };
@@ -322,18 +337,36 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
       {/* ========================================================================= */}
       <div className="relative w-full h-[460px] sm:h-[520px] overflow-hidden bg-black flex items-center justify-center">
         
-        {/* 1. REAL LIVE CAMERA VIDEO FEED */}
-        {cameraActive && (
-          <video
-            ref={videoRef}
-            playsInline
-            autoPlay
-            muted
-            className={`absolute inset-0 w-full h-full object-cover z-0 transition-all ${getFilterStyle()}`}
-          />
-        )}
+        {/* 1. REAL LIVE CAMERA VIDEO FEED (Always mounted in DOM so stream connects instantly) */}
+        <video
+          ref={videoRef}
+          playsInline
+          autoPlay
+          muted
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            cameraActive ? 'z-0 opacity-100' : 'z-[-1] opacity-0 pointer-events-none'
+          } ${getFilterStyle()}`}
+        />
 
-        {/* 2. REALISTIC FALLBACK POV VIDEO / SIMULATION STREET FEED */}
+        {/* Real-time Camera status pill / retry button */}
+        <div className="absolute top-3 left-3 z-30 flex items-center gap-2 pointer-events-auto">
+          {cameraActive ? (
+            <div className="px-3 py-1.5 rounded-xl bg-black/80 backdrop-blur-md border border-emerald-400/60 shadow-[0_0_15px_rgba(52,211,153,0.4)] flex items-center gap-2 text-[11px] font-mono font-bold text-emerald-300">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <span>📷 กล้องสดมือถือเรียลไทม์ (Live Mobile AR)</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => startLiveCamera()}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-slate-950 font-black text-xs shadow-[0_0_15px_rgba(245,158,11,0.5)] flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <Camera className="w-3.5 h-3.5 text-slate-950 animate-pulse" />
+              <span>กดเปิดกล้องสดมือถือ (Live Camera)</span>
+            </button>
+          )}
+        </div>
+
+        {/* 2. REALISTIC FALLBACK POV VIDEO / SIMULATION STREET FEED (shown if camera is off or denied) */}
         {(!cameraActive || useSimulationFeed) && (
           <div className={`absolute inset-0 w-full h-full z-0 overflow-hidden ${getFilterStyle()}`}>
             {/* Animated Bangkok Street Background (Perspective Road & Cityscape) */}
@@ -611,20 +644,50 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
           </div>
         )}
 
-        {/* Bottom Right: Real-time AI Voice Guidance Controller Banner */}
-        <div className="absolute bottom-16 right-3 z-25 p-2.5 rounded-2xl bg-gradient-to-r from-purple-950/90 via-[#07132B]/90 to-black/90 border border-purple-400/60 shadow-xl backdrop-blur-md flex items-center gap-2.5 font-mono">
-          <button
-            type="button"
-            onClick={() => handleSpeakInstruction()}
-            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-[0_0_12px_#A855F7] flex items-center gap-1.5 active:scale-95 transition-all"
-            title="กดเพื่อให้ AI พูดนำทางทันที"
-          >
-            <Volume2 className={`w-4 h-4 text-purple-200 ${speechWaveActive ? 'animate-bounce' : ''}`} />
-            <span>ฟังเสียง AI นำทาง</span>
-          </button>
-          
-          <div className="hidden sm:block text-[10px] text-purple-200">
-            <span>เสียง: <strong>{AI_VOICE_PERSONAS.find(p => p.id === selectedPersona)?.name.split(' ')[0] || 'ฟ้าใส'}</strong></span>
+        {/* Bottom Right: Mini Map PIP & Real-time AI Voice Guidance Controller */}
+        <div className="absolute bottom-16 right-3 z-25 flex flex-col items-end gap-2 font-mono">
+          {/* Mini 3D Map PIP Radar (แสดงแผนที่ซ้อนคู่กับกล้องสด) */}
+          {onSwitchToMap && (
+            <div 
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(800);
+                onSwitchToMap();
+              }}
+              className="group cursor-pointer w-28 h-24 sm:w-32 sm:h-28 rounded-2xl overflow-hidden bg-black/85 border-2 border-cyan-400/80 shadow-[0_0_20px_rgba(0,210,255,0.5)] relative transition-all hover:scale-105 active:scale-95"
+              title="แตะเพื่อสลับกลับหน้าจอแผนที่ 3D หลัก"
+            >
+              {/* Mini Map Graphic Simulation */}
+              <div className="absolute inset-0 bg-[#07132B]">
+                <svg className="w-full h-full opacity-60" viewBox="0 0 100 100">
+                  <path d="M 10 50 L 90 50" stroke="#00D2FF" strokeWidth="4" />
+                  <path d="M 50 10 L 50 90" stroke="#00D2FF" strokeWidth="4" />
+                  <path d="M 25 30 L 75 70" stroke="#FFD700" strokeWidth="3" strokeDasharray="4 2" />
+                  <circle cx="50" cy="50" r="6" fill="#10B981" />
+                </svg>
+                {/* Ping blip */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
+              </div>
+              <div className="absolute bottom-1 inset-x-1 px-1.5 py-0.5 rounded-lg bg-black/80 text-[8px] font-bold text-cyan-300 text-center flex items-center justify-center gap-1">
+                <Layers className="w-2.5 h-2.5 text-[#00D2FF]" />
+                <span>แผนที่ 3D (แตะขยาย)</span>
+              </div>
+            </div>
+          )}
+
+          <div className="p-2 sm:p-2.5 rounded-2xl bg-gradient-to-r from-purple-950/90 via-[#07132B]/90 to-black/90 border border-purple-400/60 shadow-xl backdrop-blur-md flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSpeakInstruction()}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[10px] sm:text-xs font-bold shadow-[0_0_12px_#A855F7] flex items-center gap-1.5 active:scale-95 transition-all"
+              title="กดเพื่อให้ AI พูดนำทางทันที"
+            >
+              <Volume2 className={`w-3.5 h-3.5 text-purple-200 ${speechWaveActive ? 'animate-bounce' : ''}`} />
+              <span>ฟังเสียง AI</span>
+            </button>
+            
+            <div className="hidden sm:block text-[10px] text-purple-200">
+              <span>เสียง: <strong>{AI_VOICE_PERSONAS.find(p => p.id === selectedPersona)?.name.split(' ')[0] || 'ฟ้าใส'}</strong></span>
+            </div>
           </div>
         </div>
 

@@ -280,7 +280,7 @@ export default function App() {
             onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
             customerListedItems={customerListedItems}
             onAddNewCustomerItem={handleAddCustomerItem}
-            onBackToMain={() => handleSelectMode('passenger')}
+            onBackToMain={() => handleSelectMode(currentUserSession.role === 'driver' ? 'driver' : 'passenger')}
           />
         )}
 

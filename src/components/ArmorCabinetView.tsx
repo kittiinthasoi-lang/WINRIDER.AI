@@ -104,7 +104,7 @@ export const ArmorCabinetView: React.FC<ArmorCabinetViewProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-slate-300 mt-0.5">
-              รวมตู้จัดแสดง (Chamber Pod), นิทรรศการตัวอย่างเกราะเลเวล 1-70 (เกราะ 71-100 ยังไม่เปิดเผย) และศูนย์ทดสอบ
+              รวมตู้จัดแสดง (Chamber Pod), นิทรรศการชุดเกราะอัศวิน และศูนย์ทดสอบสมรรถนะครบวงจร
             </p>
           </div>
         </div>
@@ -119,7 +119,7 @@ export const ArmorCabinetView: React.FC<ArmorCabinetViewProps> = ({
             className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 text-slate-950 font-black text-xs shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:brightness-110 flex items-center gap-1.5 transition-all border border-amber-300"
           >
             <Eye className="w-3.5 h-3.5" />
-            <span>ตัวอย่างเกราะ Lv.1-70 (71-100 ลับ 🔒)</span>
+            <span>ตัวอย่างเกราะอัศวิน</span>
           </button>
 
           <div className="flex items-center gap-1.5 p-1 bg-black/60 rounded-2xl border border-white/10 w-full md:w-auto">

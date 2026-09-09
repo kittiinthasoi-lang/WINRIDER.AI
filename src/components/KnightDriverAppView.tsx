@@ -63,6 +63,11 @@ import {
   User
 } from 'lucide-react';
 
+import waveBikeImg from '../assets/images/garage_wave_commuter_1788938989771.jpg';
+import pcxBikeImg from '../assets/images/garage_pcx_scooter_1788939007353.jpg';
+import adventureBikeImg from '../assets/images/garage_adventure_bike_1788939029183.jpg';
+import evBikeImg from '../assets/images/garage_clean_ev_1788939045009.jpg';
+
 export type DriverTabType = 'profile' | 'garage' | 'cabinet' | 'armor' | 'armorLab' | 'calculator' | 'installment' | 'wallet' | 'jobs' | 'quests' | 'navigation';
 
 interface KnightDriverAppViewProps {
@@ -207,6 +212,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
       oil: 92,
       batteryHealth: 96,
       fuelEconomy: '60.0 กม./ลิตร',
+      image: waveBikeImg,
       iconEmoji: '🛵',
       dailyRidesDone: 14,
       accent: 'border-cyan-500/40 bg-cyan-950/20',
@@ -230,6 +236,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
       oil: 94,
       batteryHealth: 98,
       fuelEconomy: '45.0 กม./ลิตร',
+      image: pcxBikeImg,
       iconEmoji: '✨',
       dailyRidesDone: 7,
       accent: 'border-blue-500/40 bg-blue-950/20',
@@ -253,6 +260,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
       oil: 85,
       batteryHealth: 100,
       fuelEconomy: '20.5 กม./ลิตร',
+      image: adventureBikeImg,
       iconEmoji: '🏜️',
       dailyRidesDone: 2,
       accent: 'border-[#FFD700]/50 bg-amber-950/20',
@@ -276,6 +284,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
       oil: 100,
       batteryHealth: 99,
       fuelEconomy: '0.12 บาท/กม. (สลับแบตที่ Win Hub ฟรี)',
+      image: evBikeImg,
       iconEmoji: '⚡',
       dailyRidesDone: 8,
       accent: 'border-emerald-500/40 bg-emerald-950/20',
@@ -355,6 +364,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
       oil: 100,
       batteryHealth: 100,
       fuelEconomy: '50.0 กม./ลิตร',
+      image: newRideCategory === 'ev' ? evBikeImg : newRideCategory === 'touring' ? adventureBikeImg : newRideCategory === 'scooter' ? pcxBikeImg : waveBikeImg,
       iconEmoji: newRideCategory === 'ev' ? '⚡' : newRideCategory === 'touring' ? '🏜️' : '🛵',
       accent: newRideCategory === 'ev' ? 'border-emerald-400/40 bg-emerald-950/20' : 'border-cyan-400/40 bg-cyan-900/20',
       description: 'ยานรบคันใหม่ บันทึกในสมุดทะเบียนอัศวินจักรวรรดิ WINRIDER พร้อมออกรับงานทันที',
@@ -576,8 +586,14 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               {/* ACTIVE DISPATCH BIKE BANNER (ALLOWS SWITCHING ANYTIME) */}
               <div className="p-2.5 rounded-2xl bg-gradient-to-r from-[#081830] to-[#0D2447] border border-[#00D2FF]/60 flex items-center justify-between gap-2 shadow-md">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#00D2FF] to-blue-600 flex items-center justify-center text-slate-950 font-black text-base shadow-[0_0_12px_rgba(0,210,255,0.4)]">
-                    {activeVehicle.iconEmoji || '🛵'}
+                  <div className="w-11 h-11 rounded-xl overflow-hidden border border-cyan-400/80 bg-black/60 flex items-center justify-center flex-shrink-0 shadow-[0_0_12px_rgba(0,210,255,0.4)]">
+                    <img 
+                      src={activeVehicle.image || '/images/garage_wave.jpg'} 
+                      alt={activeVehicle.name} 
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                    />
                   </div>
                   <div>
                     <div className="text-[9px] font-mono text-cyan-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
@@ -639,10 +655,10 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                       setShowArmorShowcaseModal(true);
                     }}
                     className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 text-[10px] font-bold border border-amber-500/40 transition-all flex items-center gap-1"
-                    title="ดูตัวอย่างชุดเกราะเลเวล 1-70 (71-100 ยังไม่เปิดเผย)"
+                    title="ดูชุดเกราะอัศวิน"
                   >
                     <Eye className="w-3 h-3" />
-                    <span>ตัวอย่างเกราะ 1-70 (71-100 ลับ 🔒)</span>
+                    <span>ชุดเกราะอัศวิน</span>
                   </button>
 
                   <button
@@ -997,8 +1013,14 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                   
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00D2FF] to-blue-600 flex items-center justify-center text-slate-950 font-black text-2xl shadow-lg">
-                        {activeVehicle.iconEmoji || '🛵'}
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-cyan-400 bg-black/60 shadow-[0_0_20px_rgba(0,210,255,0.4)] flex-shrink-0">
+                        <img 
+                          src={activeVehicle.image || '/images/garage_wave.jpg'} 
+                          alt={activeVehicle.name} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                        />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -1070,7 +1092,15 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-3">
-                            <span className="text-2xl sm:text-3xl">{v.iconEmoji || '🏍️'}</span>
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-cyan-500/50 bg-black/60 flex-shrink-0 shadow-md">
+                              <img 
+                                src={v.image || '/images/garage_wave.jpg'} 
+                                alt={v.name} 
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                              />
+                            </div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-black font-mono px-2 py-0.5 rounded bg-cyan-400/20 text-cyan-300 border border-cyan-400/40">
@@ -1853,8 +1883,14 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
           <div className="relative w-full max-w-lg bg-[#0A152E] rounded-3xl border-2 border-[#00D2FF] p-6 shadow-[0_0_50px_rgba(0,210,255,0.4)] space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00D2FF] to-blue-600 flex items-center justify-center text-2xl shadow-lg">
-                  {selectedInspectVehicle.iconEmoji || '🏍️'}
+                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-cyan-400 bg-black/60 shadow-lg flex-shrink-0">
+                  <img 
+                    src={selectedInspectVehicle.image || '/images/garage_wave.jpg'} 
+                    alt={selectedInspectVehicle.name} 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                  />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -1876,6 +1912,26 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               >
                 ✕
               </button>
+            </div>
+
+            {/* Real Vehicle Showcase Hero Photo */}
+            <div className="w-full h-44 sm:h-52 rounded-2xl overflow-hidden border border-cyan-500/40 relative shadow-inner bg-black/60">
+              <img
+                src={selectedInspectVehicle.image || '/images/garage_wave.jpg'}
+                alt={selectedInspectVehicle.name}
+                className="w-full h-full object-cover select-none pointer-events-none transition-transform duration-500 hover:scale-105"
+                referrerPolicy="no-referrer"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0A152E] via-transparent to-transparent pointer-events-none" />
+              <div className="absolute bottom-2.5 left-3.5 flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500 text-slate-950 text-[10px] font-black font-mono shadow-md">
+                  {selectedInspectVehicle.brand || 'HONDA'}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-black/80 backdrop-blur-sm text-amber-300 border border-amber-400/40 text-[10px] font-mono">
+                  ทะเบียน {selectedInspectVehicle.plateNumber}
+                </span>
+              </div>
             </div>
 
             {/* Vehicle Description */}
@@ -2009,10 +2065,16 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${
-                          isActive ? 'bg-[#00D2FF] text-slate-950 font-black' : 'bg-white/10 text-white'
+                        <div className={`w-12 h-12 rounded-xl overflow-hidden border flex-shrink-0 flex items-center justify-center ${
+                          isActive ? 'border-[#00D2FF] ring-2 ring-cyan-400/50 shadow-md' : 'border-white/10 bg-black/40'
                         }`}>
-                          {v.iconEmoji || '🏍️'}
+                          <img
+                            src={v.image || '/images/garage_wave.jpg'}
+                            alt={v.name}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                          />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">

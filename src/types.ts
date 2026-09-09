@@ -223,6 +223,7 @@ export interface LifestylePlace {
 }
 
 export type MarketItemCategory = 
+  | 'rider_gear'
   | 'food_snack' 
   | 'produce_fruit' 
   | 'second_hand' 
