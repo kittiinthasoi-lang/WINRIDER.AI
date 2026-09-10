@@ -1743,6 +1743,18 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
             </div>
             )}
 
+            {/* NAVIGATION TAB: 3D MAP, GOOGLE MAPS & LIVE CAMERA AR */}
+            {activeDriverTab === 'navigation' && (
+              <div className="space-y-4">
+                <KnightNavigationMapScreen
+                  activeVehicle={activeVehicle}
+                  driverLevel={driverLevel}
+                  audioEnabled={audioEnabled}
+                  isEmbedded={true}
+                />
+              </div>
+            )}
+
             {/* 5. SOVEREIGN XP QUEST CENTER TAB (ภารกิจเก็บ XP พี่วิน & เครือข่าย) */}
             {activeDriverTab === 'quests' && (
               <SovereignQuestCenter

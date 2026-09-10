@@ -28,7 +28,8 @@ import {
   Sliders,
   Filter,
   Sun,
-  SunMedium
+  SunMedium,
+  Video
 } from 'lucide-react';
 import { Vehicle } from '../types';
 import { ThreeDimensionalDriverRadar, Radar3DPing } from './ThreeDimensionalDriverRadar';
@@ -241,6 +242,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   const [autoSimulateToggle, setAutoSimulateToggle] = useState<boolean>(true);
   const [showDispatchRulesModal, setShowDispatchRulesModal] = useState<boolean>(false);
   const [showNavigationMapModal, setShowNavigationMapModal] = useState<boolean>(false);
+  const [navModalInitialMode, setNavModalInitialMode] = useState<'3d_map' | 'google_maps' | 'live_camera_ar'>('3d_map');
   const [lastDeclinedJobId, setLastDeclinedJobId] = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState<string>('all');
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string>('all');
@@ -560,12 +562,26 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
               type="button"
               onClick={() => {
                 if (audioEnabled) playTactileBlip(900);
+                setNavModalInitialMode('3d_map');
                 setShowNavigationMapModal(true);
               }}
               className="px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:brightness-110 text-white font-bold text-xs font-mono shadow-[0_0_15px_rgba(0,210,255,0.4)] flex items-center gap-1.5 transition-all"
             >
               <Navigation className="w-4 h-4 text-white" />
-              <span>🗺️ แผนที่นำทาง GPS (ROUTE HUD)</span>
+              <span>🗺️ แผนที่ 3D (ROUTE HUD)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(950);
+                setNavModalInitialMode('live_camera_ar');
+                setShowNavigationMapModal(true);
+              }}
+              className="px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-400 via-blue-600 to-indigo-600 hover:brightness-110 text-slate-950 font-black text-xs font-mono shadow-[0_0_20px_#00D2FF] flex items-center gap-1.5 transition-all border border-cyan-300 active:scale-95 animate-pulse"
+            >
+              <Video className="w-4 h-4 text-slate-950" />
+              <span>📹 กล้องสด AR (ซ้อนลูกศร 3D)</span>
             </button>
 
             <button
@@ -805,6 +821,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
               activeVehicle={activeVehicle}
               driverLevel={driverLevel}
               audioEnabled={audioEnabled}
+              initialNavMode={navModalInitialMode}
               onClose={() => setShowNavigationMapModal(false)}
               onAdvanceTripStep={() => {
                 if (currentActiveTrip) handleAdvanceTripStep();

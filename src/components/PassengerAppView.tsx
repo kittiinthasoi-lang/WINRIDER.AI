@@ -491,10 +491,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
   // C2C Marketplace state
   const [c2cItems, setC2cItems] = useState([
-    { id: '1', name: 'น้ำพริกกรอบสูตรเด็ดคุณแม่ (Crispy Chili Snack)', price: 150, rating: 4.9, sales: 84, tag: 'Homemade Food', icon: '🌶️' },
-    { id: '2', name: 'Sony WH-1000XM5 Wireless Headphones (สภาพ 99%)', price: 8500, rating: 5.0, sales: 1, tag: 'Electronics', icon: '🎧' },
-    { id: '3', name: 'ผ้าไหมมัดหมี่สุรินทร์แท้ ทอมือ (Royal Silk Scarf)', price: 500, rating: 4.8, sales: 12, tag: 'Handcraft', icon: '🧣' },
-    { id: '4', name: 'คุกกี้เนยสดดาร์กช็อกโกแลตโฮมเมด', price: 85, rating: 5.0, sales: 42, tag: 'Bakery', icon: '🍪' },
+    { id: '1', name: 'น้ำพริกกรอบสูตรเด็ดคุณแม่ (Crispy Chili Snack)', price: 150, rating: 4.9, sales: 84, tag: 'Homemade Food', icon: '🌶️', imageUrl: '/images/street_market_food.jpg' },
+    { id: '2', name: 'Sony WH-1000XM5 Wireless Headphones (สภาพ 99%)', price: 8500, rating: 5.0, sales: 1, tag: 'Electronics', icon: '🎧', imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80' },
+    { id: '3', name: 'ผ้าไหมมัดหมี่สุรินทร์แท้ ทอมือ (Royal Silk Scarf)', price: 500, rating: 4.8, sales: 12, tag: 'Handcraft', icon: '🧣', imageUrl: 'https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?auto=format&fit=crop&w=600&q=80' },
+    { id: '4', name: 'คุกกี้เนยสดดาร์กช็อกโกแลตโฮมเมด', price: 85, rating: 5.0, sales: 42, tag: 'Bakery', icon: '🍪', imageUrl: '/images/cookie_box.jpg' },
   ]);
   const [showAddC2cModal, setShowAddC2cModal] = useState(false);
   const [newItemName, setNewItemName] = useState('');
@@ -1100,40 +1100,43 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   </button>
                 </div>
 
-                {/* Selected Dream Ride Banner (Quick Showcase) */}
+                {/* Selected Dream Ride Banner (Quick Showcase) with Cyberpunk 3D Holographic Display */}
                 <div 
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
                     setActiveTab('dreamRide');
                   }}
-                  className="p-3 rounded-2xl bg-gradient-to-r from-[#0E2044] via-[#091530] to-[#070D1E] border border-[#FFD700]/50 flex items-center justify-between cursor-pointer hover:border-[#FFD700] transition-all shadow-md group"
+                  className="holo-card-3d holo-corner-hud p-3.5 rounded-2xl flex items-center justify-between cursor-pointer transition-all group"
+                  style={{
+                    boxShadow: '-3px -3px 20px rgba(0, 240, 255, 0.25), 3px 3px 20px rgba(255, 0, 127, 0.2), inset 0 0 15px rgba(0, 240, 255, 0.08)'
+                  }}
                 >
                   <div className="flex items-center gap-3">
                     <DreamRideVehicleImage 
                       vehicle={selectedDreamRide} 
                       size="lg" 
                       rounded="rounded-xl" 
-                      className="group-hover:scale-110 transition-transform" 
-                      glowColor="#FFD700" 
+                      className="group-hover:scale-110 transition-transform drop-shadow-[0_0_12px_rgba(0,240,255,0.6)]" 
+                      glowColor="#00F0FF" 
                     />
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#FFD700]/20 text-[#FFD700] font-bold">
-                          รถในฝันที่คุณเลือก
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-pink-500/20 text-[#00F0FF] border border-[#00F0FF]/50 font-black shadow-[0_0_8px_rgba(0,240,255,0.4)]">
+                          3D HOLO VEHICLE
                         </span>
-                        <span className="text-[9px] text-cyan-300 font-mono">
+                        <span className="text-[9px] text-pink-300 font-mono font-bold">
                           {selectedDreamRide.category === 'standard' ? 'รถทั่วไป' : selectedDreamRide.category === 'sport' ? 'บิ๊กไบค์สปอร์ต' : 'คลาสสิค'}
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-white leading-tight mt-0.5">{selectedDreamRide.thaiName}</h4>
-                      <p className="text-[10px] text-slate-400 font-mono">
+                      <h4 className="text-xs font-black text-white leading-tight mt-0.5 holo-text-3d">{selectedDreamRide.thaiName}</h4>
+                      <p className="text-[10px] text-slate-300 font-mono">
                         ความนุ่มสบาย {selectedDreamRide.specs.comfortScore}% • {selectedDreamRide.priceAddon === 0 ? 'ฟรีไม่บวกเพิ่ม' : `+฿${selectedDreamRide.priceAddon}`}
                       </p>
                     </div>
                   </div>
 
-                  <span className="text-[10px] font-bold text-[#FFD700] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                    <span>เลือกรถอื่น</span>
+                  <span className="text-[10px] font-mono font-bold text-[#00F0FF] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform bg-cyan-500/10 px-2 py-1 rounded-lg border border-cyan-400/30">
+                    <span>สลับรถ</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -1144,53 +1147,40 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     if (audioEnabled) playTactileBlip(950);
                     setShowCustomerRadarModal(true);
                   }}
+                  className="holo-card-3d holo-corner-hud p-3.5 rounded-2xl flex items-center justify-between cursor-pointer hover:brightness-110 transition-all group active:scale-98"
                   style={{ 
-                    borderColor: currentTheme.hex,
-                    boxShadow: `0 0 24px ${currentTheme.glowRgba}`
+                    border: '1.5px solid rgba(0, 240, 255, 0.6)',
+                    boxShadow: '0 0 30px rgba(0, 240, 255, 0.4), 0 0 20px rgba(255, 0, 127, 0.3), inset 0 0 20px rgba(0, 240, 255, 0.15)'
                   }}
-                  className="p-3.5 rounded-2xl bg-gradient-to-r from-[#061429] via-[#081C38] to-[#040E1E] border-2 flex items-center justify-between cursor-pointer hover:brightness-110 transition-all group active:scale-98"
                 >
                   <div className="flex items-center gap-3">
                     <div 
-                      className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-950 font-black text-xl transition-transform group-hover:scale-110"
-                      style={{ 
-                        backgroundColor: currentTheme.hex,
-                        boxShadow: `0 0 16px ${currentTheme.glowRgba}`
-                      }}
+                      className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-950 font-black text-xl transition-transform group-hover:scale-110 bg-gradient-to-br from-[#00F0FF] via-cyan-400 to-[#FF007F] shadow-[0_0_20px_rgba(0,240,255,0.8)]"
                     >
-                      <Radio className="w-6 h-6 animate-pulse" />
+                      <Radio className="w-6 h-6 animate-pulse text-slate-950" />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span 
-                          className="text-[9px] font-mono px-2 py-0.5 rounded-full font-bold border"
-                          style={{ 
-                            backgroundColor: currentTheme.darkRgba, 
-                            borderColor: currentTheme.hex, 
-                            color: currentTheme.hex 
-                          }}
+                          className="text-[9px] font-mono px-2 py-0.5 rounded-full font-black border bg-cyan-950/80 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.5)]"
                         >
-                          HOLOGRAPHIC RADAR (2.5 KM)
+                          3D VOLUMETRIC RADAR (2.5 KM)
                         </span>
-                        <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: currentTheme.hex }} />
+                        <span className="w-2 h-2 rounded-full animate-ping bg-[#FF007F] shadow-[0_0_8px_#FF007F]" />
                       </div>
-                      <h4 className="text-xs font-black text-white leading-tight mt-1">
-                        เรดาร์ 3D สแกนพี่วิน, ร้านค้า & พาร์ทเนอร์รอบตัว
+                      <h4 className="text-xs font-black text-white leading-tight mt-1 holo-text-3d">
+                        เรดาร์ 3D โฮโลแกรม สแกนพี่วิน, ร้านค้า & พาร์ทเนอร์
                       </h4>
-                      <p className="text-[10px] text-slate-300 font-mono">
-                        ตรวจจับแบบเรียลไทม์ 360° รัศมี 2.5 กม. ในพิกัดของคุณ
+                      <p className="text-[10px] text-cyan-200/90 font-mono">
+                        ตรวจจับแบบเรียลไทม์ 360° รอบทิศทาง รัศมี 2.5 กม.
                       </p>
                     </div>
                   </div>
 
                   <span 
-                    className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs font-mono shadow-md group-hover:scale-105 transition-transform flex items-center gap-1 flex-shrink-0"
-                    style={{ 
-                      backgroundColor: currentTheme.hex,
-                      boxShadow: `0 0 12px ${currentTheme.glowRgba}`
-                    }}
+                    className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs font-mono shadow-[0_0_16px_rgba(0,240,255,0.7)] group-hover:scale-105 transition-transform flex items-center gap-1 flex-shrink-0 bg-gradient-to-r from-[#00F0FF] to-cyan-300"
                   >
-                    <span>เปิดเรดาร์</span>
+                    <span>เปิดเรดาร์ 3D</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -1974,8 +1964,19 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       {c2cItems.map((item) => (
                         <div key={item.id} className="p-3.5 rounded-2xl bg-[#09152C] border border-white/10 space-y-2 flex flex-col justify-between">
                           <div>
-                            <div className="flex items-start justify-between">
-                              <span className="text-2xl">{item.icon}</span>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="w-12 h-12 rounded-xl bg-black/60 border border-white/15 overflow-hidden flex items-center justify-center flex-shrink-0">
+                                {item.imageUrl ? (
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <CyberGraphic emoji={item.icon} size="md" />
+                                )}
+                              </div>
                               <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-amber-300">
                                 {item.tag}
                               </span>
@@ -2229,7 +2230,38 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   </div>
                 </div>
 
-                {/* 🛵 ACTIVE RIDE SPOTLIGHT & AI VOICE NAVIGATOR BANNER (สถานะทริป & เสียง AI นำทาง วางต่อจาก วันนี้มีของมาขาย) */}
+                {/* Citizen Credit Score Card (คะแนนเครดิตการเงินพลเมือง วางต่อจาก วันนี้มีของมาขาย) */}
+                <div className="p-4 rounded-3xl bg-gradient-to-br from-[#0D2447] to-[#070E22] border-2 border-emerald-500/50 space-y-3 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-bold text-white">คะแนนเครดิตการเงินพลเมือง</span>
+                    </div>
+                    <span className="text-sm font-black text-emerald-400 font-mono">
+                      {citizenCreditScore}/850 (AAA)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/10">
+                      <span className="text-[10px] text-slate-400 block">วงเงินเดินทางก่อนจ่ายทีหลัง:</span>
+                      <span className="text-xs font-bold text-amber-400">฿{citizenRideLaterCredit.toLocaleString()}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/10">
+                      <span className="text-[10px] text-slate-400 block">วงเงินผ่อนของ WIN Shop:</span>
+                      <span className="text-xs font-bold text-cyan-300">฿{citizenShopCredit.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleExpandRideCredit}
+                    className="w-full py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 font-bold text-xs font-mono transition-all hover:brightness-110 active:scale-98"
+                  >
+                    + ขอเพิ่มวงเงินเครดิตความน่าเชื่อถือ
+                  </button>
+                </div>
+
+                {/* 🛵 ACTIVE RIDE SPOTLIGHT & AI VOICE NAVIGATOR BANNER (สถานะทริป & เสียง AI นำทาง) */}
                 <div className="p-4 rounded-3xl bg-gradient-to-r from-[#0C2B54] via-[#091C3D] to-[#08152B] border-2 border-cyan-400/80 shadow-[0_0_25px_rgba(0,210,255,0.3)] space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -2313,37 +2345,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   audioEnabled={audioEnabled}
                   onGainCitizenXp={(amount, reason) => handleGainCitizenXp(amount, reason)}
                 />
-
-                {/* Citizen Credit Score Card */}
-                <div className="p-4 rounded-3xl bg-gradient-to-br from-[#0D2447] to-[#070E22] border-2 border-emerald-500/50 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-emerald-400" />
-                      <span className="text-xs font-bold text-white">คะแนนเครดิตการเงินพลเมือง</span>
-                    </div>
-                    <span className="text-sm font-black text-emerald-400 font-mono">
-                      {citizenCreditScore}/850 (AAA)
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/10">
-                      <span className="text-[10px] text-slate-400 block">วงเงินเดินทางก่อนจ่ายทีหลัง:</span>
-                      <span className="text-xs font-bold text-amber-400">฿{citizenRideLaterCredit.toLocaleString()}</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/10">
-                      <span className="text-[10px] text-slate-400 block">วงเงินผ่อนของ WIN Shop:</span>
-                      <span className="text-xs font-bold text-cyan-300">฿{citizenShopCredit.toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                    <button
-                    onClick={handleExpandRideCredit}
-                    className="w-full py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 font-bold text-xs font-mono transition-all"
-                  >
-                    + ขอเพิ่มวงเงินเครดิตความน่าเชื่อถือ
-                  </button>
-                </div>
               </div>
             )}
           </div>

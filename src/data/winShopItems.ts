@@ -1,3 +1,7 @@
+import stormShieldJacketImg from '../assets/images/shop_storm_shield_1789027143467.jpg';
+import spinalExoskeletonImg from '../assets/images/shop_spinal_exoskeleton_1789027167596.jpg';
+import temperatureTopBoxImg from '../assets/images/shop_temperature_box_1789027187702.jpg';
+
 export interface WinShopItem {
   id: string;
   code: string;
@@ -177,7 +181,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'วิ่งรับงานฝ่าพายุฝนได้ตลอดวันโดยตัวไม่เปียกชื้น ปลอดภัยจากอุบัติเหตุด้วยแถบไฟเด่นชัด',
     goldAccentDetail: 'หัวซิป The Guardian Zipper โลหะสีทอง 3% กันน้ำพร้อมซีลยางแท้',
     iconEmoji: '⚡',
-    imageUrl: '/images/shop_storm_jacket.jpg',
+    imageUrl: stormShieldJacketImg,
     glowTheme: 'from-cyan-500/20 to-transparent',
     installment: 'ผ่อนชำระ 1+1+1+1 (วันละ 29 บาท)'
   },
@@ -270,7 +274,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'ขับขี่ต่อเนื่อง 8-10 ชั่วโมงโดยไม่ปวดเมื่อยหลัง และรองรับบริการ WIN Spirit อย่างมืออาชีพ',
     goldAccentDetail: 'สลักลายพรหมวิหาร 4 สีทองคำ 3% บริเวณแกนกระดูกสันหลัง',
     iconEmoji: '🦾',
-    imageUrl: '/images/shop_spinal_harness.jpg',
+    imageUrl: spinalExoskeletonImg,
     glowTheme: 'from-rose-500/20 to-transparent',
     installment: 'ผ่อนชำระ 1+1+1+1 (วันละ 26 บาท)'
   },
@@ -301,7 +305,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     tacticalAdvantage: 'รับส่งอาหารระดับภัตตาคาร ยา วัคซีน และเวชภัณฑ์ทางการแพทย์ได้อย่างปลอดภัย 100%',
     goldAccentDetail: 'ตราสัญลักษณ์ราชสีห์สีทองคำ 3% กลางฝากล่องพัสดุ',
     iconEmoji: '📦',
-    imageUrl: '/images/shop_thermal_box.jpg',
+    imageUrl: temperatureTopBoxImg,
     glowTheme: 'from-blue-600/20 to-transparent',
     installment: 'พี่วินเลือกซื้อสดหรือผ่อน +1฿/รอบ | คนทั่วไปเงินสดเท่านั้น'
   },

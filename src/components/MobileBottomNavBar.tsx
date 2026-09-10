@@ -547,8 +547,11 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
       {/* Main Bottom Navigation Bar */}
       <nav 
         id="mobile-native-tabbar"
-        className="fixed bottom-0 left-0 right-0 z-40 bg-[#070D1E]/95 backdrop-blur-xl border-t border-[#00D2FF]/25 shadow-[0_-8px_30px_rgba(0,0,0,0.8)] px-2 pt-1 pb-safe"
+        className="fixed bottom-0 left-0 right-0 z-40 bg-[#070D1E]/95 backdrop-blur-2xl border-t border-[#00D2FF]/30 shadow-[0_-10px_35px_rgba(0,0,0,0.85)] px-3 pt-1.5 pb-safe"
       >
+        {/* Subtle Ambient Top Border Light */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-[1px] bg-gradient-to-r from-transparent via-[#00D2FF] to-transparent shadow-[0_0_8px_#00D2FF]" />
+
         <div className="max-w-md mx-auto flex items-center justify-around">
           {mainTabs.map((tab) => {
             const isActive = getIsTabActive(tab.id);
@@ -560,30 +563,30 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
                   if (audioEnabled) playTactileBlip(isActive ? 600 : 900);
                   tab.onClick();
                 }}
-                className={`relative flex-1 py-2 px-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer select-none active:scale-90 ${
+                className={`relative flex-1 py-1.5 px-1 flex flex-col items-center justify-center gap-0.5 rounded-2xl transition-all duration-200 cursor-pointer select-none active:scale-90 ${
                   isActive 
-                    ? 'text-[#00D2FF]' 
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'text-[#00D2FF] bg-gradient-to-b from-[#00D2FF]/10 to-transparent' 
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 }`}
               >
-                {/* Active Neon Aura Bar */}
+                {/* Active Top Glowing Capsule */}
                 {isActive && (
-                  <span className="absolute -top-1 w-10 h-1 rounded-full bg-[#00D2FF] shadow-[0_0_10px_#00D2FF]" />
+                  <span className="absolute -top-1.5 w-8 h-1 rounded-full bg-gradient-to-r from-cyan-400 via-sky-300 to-[#00D2FF] shadow-[0_0_12px_#00D2FF]" />
                 )}
 
                 <div className="relative">
-                  <div className={`transition-transform duration-200 ${isActive ? 'scale-115 drop-shadow-[0_0_10px_rgba(0,210,255,0.8)]' : ''}`}>
+                  <div className={`transition-transform duration-200 ${isActive ? 'scale-110 drop-shadow-[0_0_12px_rgba(0,210,255,0.9)]' : ''}`}>
                     {tab.icon}
                   </div>
                   {tab.badge && (
-                    <span className="absolute -top-1 -right-3.5 px-1 py-0.2 bg-[#FF6B00] text-[8px] font-black text-white rounded-full border border-black animate-pulse">
+                    <span className="absolute -top-1 -right-3.5 px-1.5 py-0.2 bg-gradient-to-r from-[#FF6B00] to-amber-500 text-[8px] font-black text-white rounded-full border border-black shadow-[0_0_8px_rgba(255,107,0,0.6)] animate-pulse">
                       {tab.badge}
                     </span>
                   )}
                 </div>
 
-                <span className={`text-[10px] tracking-tight truncate max-w-[85px] ${
-                  isActive ? 'font-black text-white drop-shadow-[0_0_6px_rgba(0,210,255,0.6)]' : 'font-medium'
+                <span className={`text-[10px] tracking-tight truncate max-w-[85px] transition-colors ${
+                  isActive ? 'font-black text-white drop-shadow-[0_0_8px_rgba(0,210,255,0.7)]' : 'font-medium text-slate-400'
                 }`}>
                   {tab.label}
                 </span>

@@ -58,6 +58,7 @@ export default function App() {
   const [isCustomerVoiceOpen, setIsCustomerVoiceOpen] = useState<boolean>(false);
   const [isWebhookModalOpen, setIsWebhookModalOpen] = useState<boolean>(false);
   const [customerListedItems, setCustomerListedItems] = useState<MarketItem[]>([]);
+  const [is3DHoloMode, setIs3DHoloMode] = useState<boolean>(true);
 
   // Listen to external session changes (e.g. from modals or storage events)
   useEffect(() => {
@@ -190,7 +191,46 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans selection:bg-[#00D2FF] selection:text-slate-950">
+    <div className="min-h-screen bg-[#070D1E] bg-cyber-grid text-slate-100 font-sans selection:bg-[#00D2FF] selection:text-slate-950 relative overflow-x-hidden">
+      {/* Futuristic Ambient Glow Orbs */}
+      <div className="fixed top-0 left-1/4 w-96 h-96 bg-[#00F0FF]/15 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="fixed top-1/3 right-5 w-96 h-96 bg-[#FF007F]/12 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="fixed bottom-1/4 left-10 w-80 h-80 bg-[#FFD700]/10 rounded-full blur-[120px] pointer-events-none -z-10" />
+      <div className="fixed bottom-10 right-1/4 w-96 h-96 bg-[#8B5CF6]/12 rounded-full blur-[130px] pointer-events-none -z-10" />
+
+      {/* 3D Cyberpunk Holographic HUD Volumetric Layers */}
+      {is3DHoloMode && (
+        <>
+          {/* Holographic Scanlines */}
+          <div className="fixed inset-0 holo-scanlines z-30 pointer-events-none opacity-40" />
+
+          {/* Sweeping Laser Beam */}
+          <div className="fixed inset-0 z-30 pointer-events-none overflow-hidden">
+            <div className="holo-beam-line" />
+          </div>
+
+          {/* Cyberpunk 3D Holographic Spatial Floor Grid (Perspective depth) */}
+          <div className="fixed bottom-0 left-0 right-0 h-52 holo-grid-floor pointer-events-none -z-10 opacity-70" />
+
+          {/* Hologram Floating Corner HUD Telemetry */}
+          <div className="fixed top-20 left-4 z-20 pointer-events-none hidden lg:flex flex-col gap-1 font-mono text-[9px] select-none">
+            <div className="flex items-center gap-1.5 border-l-2 border-[#00F0FF] pl-2 text-[#00F0FF] bg-[#070D1E]/70 backdrop-blur-sm py-1 pr-2 rounded-r">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF] animate-ping" />
+              <span>3D HOLO HUD • BANGKOK CAPILLARY</span>
+            </div>
+            <span className="text-[#FF007F]/80 pl-2">VOLUMETRIC PROJECTION: 120 FPS // LAT 13.7563°</span>
+          </div>
+
+          <div className="fixed top-20 right-4 z-20 pointer-events-none hidden lg:flex flex-col items-end gap-1 font-mono text-[9px] select-none">
+            <div className="flex items-center gap-1.5 border-r-2 border-[#FF007F] pr-2 text-[#FF007F] bg-[#070D1E]/70 backdrop-blur-sm py-1 pl-2 rounded-l">
+              <span>CYBERPUNK NEON MATRIX</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF007F] animate-pulse" />
+            </div>
+            <span className="text-[#00F0FF]/80 pr-2">SPATIAL LINK: 100% LOCK // 5.8 GHz</span>
+          </div>
+        </>
+      )}
+
       {/* Sovereign Navbar */}
       <Navbar 
         activeMode={activeMode}
@@ -204,6 +244,8 @@ export default function App() {
         onOpenWebhookModal={() => setIsWebhookModalOpen(true)}
         currentUserSession={currentUserSession}
         onSignOut={handleSignOut}
+        is3DHoloMode={is3DHoloMode}
+        onToggle3DHoloMode={() => setIs3DHoloMode(prev => !prev)}
         onOpenProfile={() => {
           if (currentUserSession.role === 'customer') {
             setActiveMode('passenger');

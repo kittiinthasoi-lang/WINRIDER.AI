@@ -100,6 +100,13 @@ import { ARLiveCameraNavigation, ARManeuverType } from './ARLiveCameraNavigation
 import { VirtualArOverlay } from './VirtualArOverlay';
 import { GoogleMapsLiveView } from './GoogleMapsLiveView';
 import { useRealtimeGps } from './GpsRealTimeTracker';
+import {
+  computeLiveRoute,
+  POPULAR_BANGKOK_DESTINATIONS,
+  ComputedLiveRoute,
+  LiveRouteStep,
+  RouteDestination
+} from '../services/googleRoutesService';
 import confetti from 'canvas-confetti';
 import {
   BANGKOK_COMPLEX_ROUTES,
@@ -120,6 +127,7 @@ export interface KnightNavigationMapScreenProps {
   onCompleteTrip?: (job: IncomingJobData) => void;
   onClose?: () => void;
   isEmbedded?: boolean;
+  initialNavMode?: '3d_map' | 'google_maps' | 'live_camera_ar';
 }
 
 // Bangkok Real Locations Pool for Realistic Random Simulation
@@ -158,7 +166,8 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   onAdvanceTripStep,
   onCompleteTrip,
   onClose,
-  isEmbedded = false
+  isEmbedded = false,
+  initialNavMode
 }) => {
   // Active Selected Job
   const [selectedJob, setSelectedJob] = useState<IncomingJobData>(() => activeJob || SAMPLE_INCOMING_JOBS[0]);
@@ -263,8 +272,17 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   const [googleMapsLiveActive, setGoogleMapsLiveActive] = useState<boolean>(true);
   
   // 3-Way Navigation View Mode: '3d_map' | 'google_maps' | 'live_camera_ar'
-  const [navDisplayMode, setNavDisplayMode] = useState<'3d_map' | 'google_maps' | 'live_camera_ar'>('3d_map');
+  const [navDisplayMode, setNavDisplayMode] = useState<'3d_map' | 'google_maps' | 'live_camera_ar'>(initialNavMode || '3d_map');
   const { gpsState } = useRealtimeGps(true);
+
+  // Google Maps Routes API (New) Live Integration State
+  const [selectedDestination, setSelectedDestination] = useState<RouteDestination>(POPULAR_BANGKOK_DESTINATIONS[0]);
+  const [liveRoute, setLiveRoute] = useState<ComputedLiveRoute | null>(null);
+  const [isComputingRoute, setIsComputingRoute] = useState<boolean>(false);
+  const [currentRouteStepIndex, setCurrentRouteStepIndex] = useState<number>(0);
+  const [routeTravelMode, setRouteTravelMode] = useState<'TWO_WHEELER' | 'DRIVE' | 'BICYCLE'>('TWO_WHEELER');
+  const [showDestinationPicker, setShowDestinationPicker] = useState<boolean>(false);
+  const [customDestInput, setCustomDestInput] = useState<string>('');
 
   // Real-time mobile camera backdrop behind 3D map
   const [cameraBackdropActive, setCameraBackdropActive] = useState<boolean>(false);
@@ -312,6 +330,60 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
       }
     };
   }, [cameraBackdropActive, navDisplayMode, backdropCameraFacing]);
+
+  // Handle Google Maps Routes API Calculation
+  const handleCalculateRoute = async (targetDest?: RouteDestination) => {
+    const dest = targetDest || selectedDestination;
+    setIsComputingRoute(true);
+    try {
+      const origLat = gpsState.latitude || 13.7563;
+      const origLng = gpsState.longitude || 100.5018;
+      const res = await computeLiveRoute({
+        origin: { latitude: origLat, longitude: origLng },
+        destination: { latitude: dest.lat, longitude: dest.lng, name: dest.name, address: dest.address },
+        travelMode: routeTravelMode,
+        routingPreference: 'TRAFFIC_AWARE'
+      });
+      setLiveRoute(res);
+      setCurrentRouteStepIndex(0);
+
+      // Sync first step with AR overlay and voice
+      if (res.steps && res.steps.length > 0) {
+        const step0 = res.steps[0];
+        setBackdropManeuver(step0.maneuver);
+        setBackdropManeuverDist(step0.distanceMeters);
+        setBackdropManeuverStreet(step0.instructions);
+        setVoiceInstruction(step0.instructions);
+        if (voiceGuidanceEnabled && audioEnabled) {
+          speakThaiText(step0.instructions, voicePersona);
+        }
+      }
+    } catch (e) {
+      console.warn('Google Routes API compute error:', e);
+    } finally {
+      setIsComputingRoute(false);
+    }
+  };
+
+  // Step selector
+  const handleSelectRouteStep = (stepIdx: number) => {
+    if (!liveRoute || stepIdx < 0 || stepIdx >= liveRoute.steps.length) return;
+    setCurrentRouteStepIndex(stepIdx);
+    const step = liveRoute.steps[stepIdx];
+    setBackdropManeuver(step.maneuver);
+    setBackdropManeuverDist(step.distanceMeters);
+    setBackdropManeuverStreet(step.instructions);
+    setVoiceInstruction(step.instructions);
+    if (audioEnabled) playTactileBlip(880);
+    if (voiceGuidanceEnabled && audioEnabled) {
+      speakThaiText(step.instructions, voicePersona);
+    }
+  };
+
+  // Calculate route on initial mount
+  useEffect(() => {
+    handleCalculateRoute(selectedDestination);
+  }, []);
 
   // Holo Overlay & Weather
   const [showRoutesOverlay, setShowRoutesOverlay] = useState<boolean>(false);
@@ -838,15 +910,181 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
       </div>
 
       {/* ========================================================================= */}
+      {/* 1.5 GOOGLE MAPS ROUTES API (NEW) - LIVE NAVIGATION COMMAND DECK */}
+      {/* Source: Google Maps Platform Code Assist (gmp_mcp_codeassist_v1_aistudio) */}
+      {/* ========================================================================= */}
+      <div className="w-full bg-[#0A1633]/95 border border-cyan-500/40 rounded-2xl p-3 shadow-[0_0_25px_rgba(0,210,255,0.15)] backdrop-blur-md font-mono">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+          {/* Left: Provider branding & status badge */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-white p-1 flex items-center justify-center shadow-lg border border-cyan-400/40">
+              <img 
+                src="https://www.gstatic.com/images/branding/product/1x/maps_512dp.png" 
+                alt="Google Maps" 
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-white font-black text-xs sm:text-sm tracking-wide">
+                  Google Maps Routes API (Live)
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-400/40 text-[9px] font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>{liveRoute?.source === 'google_routes_api_live' ? 'สด 100%' : 'เชื่อมต่อพร้อมทำงาน'}</span>
+                </span>
+              </div>
+              <div className="text-[10px] text-cyan-300 flex items-center gap-1.5 mt-0.5">
+                <span>📍 ต้นทาง: {gpsState.addressLabel || 'จุดปัจจุบัน (BTS พร้อมพงษ์)'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Center/Right: Destination Selector & Compute Button */}
+          <div className="flex items-center flex-wrap gap-2 w-full lg:w-auto">
+            {/* Travel Mode Pills */}
+            <div className="flex items-center bg-black/60 p-0.5 rounded-xl border border-white/10 text-[10px]">
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setRouteTravelMode('TWO_WHEELER');
+                }}
+                className={`px-2 py-1 rounded-lg font-bold transition-all ${
+                  routeTravelMode === 'TWO_WHEELER'
+                    ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-[0_0_8px_#FFD700]'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="โหมดมอเตอร์ไซค์รับจ้าง TWO_WHEELER (ซอกแซกซอย & เลี่ยงรถติด)"
+              >
+                🛵 มอเตอร์ไซค์
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setRouteTravelMode('DRIVE');
+                }}
+                className={`px-2 py-1 rounded-lg font-bold transition-all ${
+                  routeTravelMode === 'DRIVE'
+                    ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-[0_0_8px_#00D2FF]'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="โหมดรถยนต์ DRIVE"
+              >
+                🚗 รถยนต์
+              </button>
+            </div>
+
+            {/* Quick Destination Select Dropdown */}
+            <select
+              value={selectedDestination.id}
+              onChange={(e) => {
+                const found = POPULAR_BANGKOK_DESTINATIONS.find(d => d.id === e.target.value);
+                if (found) {
+                  if (audioEnabled) playTactileBlip(850);
+                  setSelectedDestination(found);
+                  handleCalculateRoute(found);
+                }
+              }}
+              className="bg-black/80 text-white text-xs border border-cyan-400/50 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-cyan-300 max-w-[220px]"
+            >
+              {POPULAR_BANGKOK_DESTINATIONS.map(d => (
+                <option key={d.id} value={d.id} className="bg-slate-900 text-white">
+                  🏁 {d.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Calculate Button */}
+            <button
+              type="button"
+              disabled={isComputingRoute}
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(950);
+                handleCalculateRoute(selectedDestination);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00D2FF] via-cyan-500 to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-[0_0_15px_#00D2FF] flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${isComputingRoute ? 'animate-spin' : ''}`} />
+              <span>{isComputingRoute ? 'กำลังคำนวณ...' : 'คำนวณเส้นทางสด'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Live Route Stats & Turn-by-Turn Maneuver Tracker */}
+        {liveRoute && (
+          <div className="mt-2.5 pt-2.5 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+            {/* Route Stats */}
+            <div className="flex items-center gap-3 text-xs flex-wrap">
+              <span className="px-2 py-0.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-bold">
+                📏 ระยะทาง: <strong className="text-white font-black">{liveRoute.totalDistanceKm}</strong>
+              </span>
+              <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 font-bold">
+                ⏱️ เวลา: <strong className="text-white font-black">{liveRoute.formattedEta}</strong>
+              </span>
+              <span className="text-[11px] text-slate-300 hidden md:inline">
+                {liveRoute.routeDescription}
+              </span>
+            </div>
+
+            {/* Step Controller */}
+            {liveRoute.steps && liveRoute.steps.length > 0 && (
+              <div className="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-end">
+                <span className="text-[10px] text-amber-300 font-bold">
+                  คำแนะนำที่ {currentRouteStepIndex + 1}/{liveRoute.steps.length}
+                </span>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={currentRouteStepIndex <= 0}
+                    onClick={() => handleSelectRouteStep(currentRouteStepIndex - 1)}
+                    className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-[10px] font-bold disabled:opacity-30 cursor-pointer"
+                  >
+                    ◀ ก่อนหน้า
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={currentRouteStepIndex >= liveRoute.steps.length - 1}
+                    onClick={() => handleSelectRouteStep(currentRouteStepIndex + 1)}
+                    className="px-2 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-[10px] font-bold disabled:opacity-30 cursor-pointer"
+                  >
+                    ถัดไป ▶
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(800);
+                      const currentStep = liveRoute.steps[currentRouteStepIndex];
+                      if (currentStep) {
+                        speakThaiText(currentStep.instructions, voicePersona);
+                      }
+                    }}
+                    className="p-1 rounded-lg bg-amber-400/20 text-amber-300 hover:bg-amber-400/30 border border-amber-400/40 cursor-pointer"
+                    title="ฟังเสียงนำทางสำหรับขั้นตอนนี้"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
       {/* 2. NAVIGATION VIEWPORT: CAMERA AR / GOOGLE MAPS / PURE 3D MAP */}
       {/* ========================================================================= */}
       {navDisplayMode === 'live_camera_ar' ? (
         <div className="w-full">
           <ARLiveCameraNavigation
             activeJob={selectedJob}
-            voiceInstruction={voiceInstruction}
-            remainingDistM={remainingDistM}
-            remainingMinutes={parseFloat(remainingMinutes) || 4}
+            voiceInstruction={liveRoute?.steps[currentRouteStepIndex]?.instructions || voiceInstruction}
+            remainingDistM={liveRoute?.steps[currentRouteStepIndex]?.distanceMeters || remainingDistM}
+            remainingMinutes={liveRoute?.totalDurationMinutes || parseFloat(remainingMinutes) || 4}
             currentSpeed={currentSpeed}
             liveHeading={liveHeading}
             audioEnabled={audioEnabled}
@@ -855,13 +1093,20 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             onClose={onClose}
             onSwitchToMap={() => setNavDisplayMode('3d_map')}
             onSwitchToGoogleMaps={() => setNavDisplayMode('google_maps')}
-            onAdvanceTripStep={handleAdvancePhase}
+            onAdvanceTripStep={() => {
+              if (liveRoute && currentRouteStepIndex < liveRoute.steps.length - 1) {
+                handleSelectRouteStep(currentRouteStepIndex + 1);
+              } else {
+                handleAdvancePhase();
+              }
+            }}
           />
         </div>
       ) : navDisplayMode === 'google_maps' ? (
         <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">
           <GoogleMapsLiveView
             gpsLocation={gpsState}
+            targetDestination={selectedDestination.name}
             height={isFullscreen ? '640px' : '520px'}
             audioEnabled={audioEnabled}
             zoom={16}

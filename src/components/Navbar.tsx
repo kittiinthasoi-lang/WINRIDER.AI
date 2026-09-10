@@ -28,7 +28,8 @@ import {
   Compass,
   LogOut,
   Lock,
-  CheckCircle2
+  CheckCircle2,
+  Box
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { UserSession } from '../utils/userSession';
@@ -48,6 +49,8 @@ interface NavbarProps {
   onOpenGpsModal?: () => void;
   currentUserSession?: UserSession | null;
   onSignOut?: () => void;
+  is3DHoloMode?: boolean;
+  onToggle3DHoloMode?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -65,6 +68,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGpsModal,
   currentUserSession,
   onSignOut,
+  is3DHoloMode = true,
+  onToggle3DHoloMode,
 }) => {
   const [nfcSynced, setNfcSynced] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -115,27 +120,30 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-[#070D1E]/95 backdrop-blur-md border-b border-[#00D2FF]/20 shadow-2xl">
-      {/* Top micro banner (desktop/tablet only) */}
-      <div className="hidden sm:block bg-gradient-to-r from-[#070D1E] via-[#0A1838] to-[#070D1E] border-b border-white/5 py-1 px-4 text-xs">
+    <header className="sticky top-0 z-50 bg-[#070D1E]/95 backdrop-blur-xl border-b border-[#00D2FF]/25 shadow-[0_10px_30px_rgba(0,0,0,0.8)]">
+      {/* Top micro telemetry banner */}
+      <div className="bg-gradient-to-r from-[#070D1E] via-[#0A1B40] to-[#070D1E] border-b border-cyan-500/20 py-1 px-3 sm:px-4 text-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between text-slate-300">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-[#FFD700]/10 text-[#FFD700] border border-[#FFD700]/30">
-              <Sparkles className="w-3 h-3" /> คัมภีร์ยุทธศาสตร์ฉบับสมบูรณ์ & ชุดแอปพลิเคชัน
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/40 shadow-[0_0_10px_rgba(255,215,0,0.2)]">
+              <Sparkles className="w-2.5 h-2.5 animate-spin" style={{ animationDuration: '6s' }} /> SOVEREIGN OS v4.5
             </span>
-            <span className="hidden md:inline text-slate-400">
-              มหายุทธศาสตร์อาณาจักร WINRIDER.AI | ผู้นำ: <strong className="text-cyan-300">CEO Cosmo-Ko</strong> (🦁) & ที่ปรึกษา: <strong className="text-amber-300">จิตใจ</strong> (🦥)
+            <span className="hidden md:inline text-slate-300 text-[11px]">
+              จักรวรรดิ <strong className="text-cyan-300 font-mono">WINRIDER.AI</strong> | ซีอีโอ: <strong className="text-cyan-200">Cosmo-Ko</strong> (🦁) & ที่ปรึกษา: <strong className="text-amber-200">จิตใจ</strong> (🦥)
             </span>
           </div>
-          <div className="flex items-center gap-4 text-[11px] font-mono">
-            <span className="hidden sm:inline text-cyan-400/80">ระบบอธิปไตยเปิดทำงาน</span>
-            <span className="text-slate-400">เวลา กทม.: <strong className="text-white">{currentTime}</strong></span>
+          <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] font-mono">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#10B981]" />
+              <span className="hidden sm:inline">QUANTUM GPS:</span> 100% LOCK (14ms)
+            </div>
+            <span className="text-slate-400">เวลา กทม.: <strong className="text-cyan-200 font-mono">{currentTime}</strong></span>
           </div>
         </div>
       </div>
 
       {/* Main Navbar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Brand Logo */}
           <div 
@@ -144,9 +152,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               if (audioEnabled) playTactileBlip(600);
               onSelectMode('passenger');
             }}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-3 cursor-pointer group select-none"
           >
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-cyan-400 to-[#070D1E] p-[1.5px] shadow-[0_0_18px_rgba(0,210,255,0.5)] group-hover:shadow-[0_0_28px_rgba(0,210,255,0.8)] transition-all overflow-hidden flex-shrink-0">
+            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#FFD700] via-[#00D2FF] to-[#0A1B40] p-[1.5px] shadow-[0_0_20px_rgba(0,210,255,0.6)] group-hover:shadow-[0_0_30px_rgba(0,210,255,0.9)] transition-all overflow-hidden flex-shrink-0">
               <img 
                 src="/app-logo.png" 
                 alt="WINRIDER.AI Official Logo" 
@@ -156,9 +164,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-lg font-black tracking-wider text-white">WINRIDER<span className="text-[#00D2FF]">.AI</span></span>
+                <span className="text-lg sm:text-xl font-black tracking-wider text-white font-sans">
+                  WINRIDER<span className="text-[#00D2FF] drop-shadow-[0_0_10px_rgba(0,210,255,0.8)]">.AI</span>
+                </span>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 hidden sm:inline">
+                  PRO
+                </span>
               </div>
-              <p className="text-[10px] text-slate-400 -mt-0.5 tracking-tight">คัมภีร์มหาอาณาจักรและแอปพลิเคชันมือถือ</p>
+              <p className="text-[10px] text-slate-300 -mt-0.5 tracking-tight font-medium">Next-Gen Sovereign Mobility & City AI OS</p>
             </div>
           </div>
 
@@ -301,6 +314,28 @@ export const Navbar: React.FC<NavbarProps> = ({
               <AudioWaveform className="w-4 h-4 animate-pulse text-[#00D2FF] group-hover:scale-110 transition-transform" />
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00D2FF]" />
             </button>
+
+            {/* 3D Holographic Display Toggle Button */}
+            {onToggle3DHoloMode && (
+              <button
+                type="button"
+                id="navbar-holo-toggle-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(1100);
+                  onToggle3DHoloMode();
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 border ${
+                  is3DHoloMode
+                    ? 'bg-gradient-to-r from-cyan-500/25 via-pink-500/25 to-purple-600/25 text-cyan-300 border-cyan-400/60 shadow-[0_0_15px_rgba(0,240,255,0.4),0_0_20px_rgba(255,0,128,0.25)] ring-1 ring-cyan-400/50'
+                    : 'bg-white/5 hover:bg-white/10 text-slate-400 border-white/10'
+                }`}
+                title="สลับโหมดหน้าจอแสดงผลสามมิติ Cyberpunk (3D Holographic HUD Display)"
+              >
+                <Box className={`w-3.5 h-3.5 ${is3DHoloMode ? 'text-[#00F0FF] animate-spin' : 'text-slate-400'}`} style={{ animationDuration: '8s' }} />
+                <span className="hidden sm:inline">3D โฮโลแกรม</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${is3DHoloMode ? 'bg-[#FF007F] shadow-[0_0_8px_#FF007F] animate-pulse' : 'bg-slate-500'}`} />
+              </button>
+            )}
 
             {/* 2. ไอคอนแจ้งเตือน (Notifications) */}
             <button
