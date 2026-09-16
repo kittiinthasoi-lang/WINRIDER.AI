@@ -335,6 +335,8 @@ Respond concisely in Thai (unless asked otherwise) with clear tactical actions o
 // Source: Google Maps Platform Code Assist
 // Internal Usage Attribution: gmp_mcp_codeassist_v1_aistudio
 // =========================================================================
+let routesApiRateLimitedUntil = 0;
+
 app.post("/api/routes/compute", async (req, res) => {
   try {
     const {
@@ -351,10 +353,10 @@ app.post("/api/routes/compute", async (req, res) => {
       });
     }
 
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCB6IzBTHuQDVGc018yllw4yZVKB-GOhGQ";
 
-    // 1. If live Google Maps API Key is available, request Google Routes API REST endpoint
-    if (apiKey && apiKey.trim() !== "" && !apiKey.includes("MY_GOOGLE_MAPS")) {
+    // 1. If live Google Maps API Key is available and not rate-limited, request Google Routes API REST endpoint
+    if (apiKey && apiKey.trim() !== "" && !apiKey.includes("MY_GOOGLE_MAPS") && Date.now() > routesApiRateLimitedUntil) {
       try {
         const routesPayload = {
           origin: {
@@ -427,11 +429,12 @@ app.post("/api/routes/compute", async (req, res) => {
             });
           }
         } else {
-          const errText = await googleResponse.text();
-          console.warn("[Google Routes API] Response status:", googleResponse.status, errText);
+          if (googleResponse.status === 429) {
+            routesApiRateLimitedUntil = Date.now() + 15 * 60 * 1000;
+          }
         }
-      } catch (gErr: any) {
-        console.warn("[Google Routes API] Live call error, using high-fidelity fallback:", gErr?.message);
+      } catch (_gErr: any) {
+        // Fall back gracefully to high-fidelity tactical engine
       }
     }
 

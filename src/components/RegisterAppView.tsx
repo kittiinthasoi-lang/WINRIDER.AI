@@ -84,6 +84,7 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
     phone: '089-123-4567',
     emergencyContact: 'สมศรี รักเกียรติ (ภรรยา)',
     emergencyPhone: '081-998-8776',
+    email: 'somchai.knight@winrider.ai',
     winStation: 'วินทองหล่อ ซอย 10 (สุขุมวิท 55)',
     vestNumber: '28',
     district: 'วัฒนา, กรุงเทพมหานคร',
@@ -211,12 +212,14 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
     const activeId = issuedCitizenId || `WIN-${selectedRole === 'driver' ? 'KGT' : selectedRole === 'customer' ? 'CTZ' : selectedRole === 'merchant' ? 'MCH' : 'PTN'}-${Math.floor(100000 + Math.random() * 900000)}`;
     const roleName = selectedRole === 'driver' ? driverForm.fullName : selectedRole === 'customer' ? customerForm.fullName : selectedRole === 'merchant' ? merchantForm.shopName : partnerForm.companyName;
     const phone = selectedRole === 'driver' ? driverForm.phone : selectedRole === 'customer' ? customerForm.phone : selectedRole === 'merchant' ? merchantForm.phone : partnerForm.phone;
+    const userEmail = selectedRole === 'driver' ? driverForm.email : selectedRole === 'customer' ? customerForm.email : selectedRole === 'merchant' ? merchantForm.email : partnerForm.email;
 
     const freshSession: UserSession = {
       id: activeId,
       role: selectedRole,
       name: roleName,
       phone: phone,
+      email: userEmail,
       roleTitleTh: getRoleTitleTh(selectedRole),
       level: 1,
       xp: 100,

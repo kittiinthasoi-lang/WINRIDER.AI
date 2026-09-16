@@ -22,7 +22,7 @@ import { AIProductPhotoVerifier, AIVerificationResult } from './AIProductPhotoVe
 import { SpecializedServicePreMatchingModal, SpecializedPreMatchingData } from './SpecializedServicePreMatchingModal';
 import { ServicePhotoVerificationModal } from './ServicePhotoVerificationModal';
 import { CustomerPaymentQrCodeModal } from './CustomerPaymentQrCodeModal';
-import { createLiveOrder, subscribeToLiveOrders, LiveRideOrder } from '../utils/dispatchSync';
+import { createLiveOrder, subscribeToLiveOrders, getOrdersForPassenger, fetchFirestoreOrdersForUser, LiveRideOrder } from '../utils/dispatchSync';
 import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
@@ -275,6 +275,46 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [isAiSpeaking, setIsAiSpeaking] = useState<boolean>(false);
   const [isAutoVoiceAnnounce, setIsAutoVoiceAnnounce] = useState<boolean>(true);
   const [aiSpeechText, setAiSpeechText] = useState<string>('พี่วินกิตติ (LV.100) กำลังเดินทางมารับคุณที่คอนโดสุขุมวิท 39 อีกประมาณ 2.2 นาทีถึงค่ะ');
+
+  const [userRideHistory, setUserRideHistory] = useState<LiveRideOrder[]>([]);
+
+  // Sync profile data with authenticated user session
+  React.useEffect(() => {
+    if (currentUserSession) {
+      setPassengerProfileData(prev => ({
+        ...prev,
+        displayName: currentUserSession.name || prev.displayName,
+        avatarEmoji: currentUserSession.avatarEmoji || prev.avatarEmoji,
+        bioStatus: currentUserSession.bio || prev.bioStatus,
+      }));
+    }
+  }, [currentUserSession]);
+
+  // Load and subscribe to passenger's isolated personal order history
+  React.useEffect(() => {
+    if (!currentUserSession?.id) return;
+    
+    // 1. Initial cached history
+    const cached = getOrdersForPassenger(currentUserSession.id);
+    setUserRideHistory(cached);
+
+    // 2. Fetch from Firestore for cloud persistence
+    fetchFirestoreOrdersForUser(currentUserSession.id, 'customer')
+      .then((orders) => {
+        if (orders && orders.length > 0) {
+          setUserRideHistory(orders);
+        }
+      })
+      .catch((err) => console.warn('Firestore orders fetch error:', err));
+
+    // 3. Live subscriptions
+    const unsub = subscribeToLiveOrders(() => {
+      const updated = getOrdersForPassenger(currentUserSession.id);
+      setUserRideHistory(updated);
+    });
+
+    return () => unsub();
+  }, [currentUserSession?.id]);
 
   // Cross-tab Live Dispatch Listener: updates passenger UI when Knight accepts or advances trip
   React.useEffect(() => {
@@ -832,12 +872,15 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
     // Create live order for cross-tab sync and No-Code webhook dispatch
     try {
+      const pName = currentUserSession?.name || passengerProfileData.displayName || 'คุณผู้โดยสาร';
+      const pPhone = currentUserSession?.phone || '089-445-1234';
       const liveOrder = await createLiveOrder({
         serviceId: activeServiceId || 'knight',
         serviceTitle: selectedService ? `WIN ${selectedService.toUpperCase()}` : 'WIN KNIGHT',
         serviceIconEmoji: selectedDreamRide?.icon || '🛵',
-        passengerName: 'คุณอารียา สุขสวัสดิ์ (Citizen LV.91)',
-        passengerPhone: '089-445-1234',
+        passengerUserId: currentUserSession?.id || 'ANON',
+        passengerName: `${pName} (${currentUserSession?.level ? `LV.${currentUserSession.level}` : 'Citizen'})`,
+        passengerPhone: pPhone,
         pickupLocation: 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)',
         dropoffLocation: selectedDestination || 'อาคาร Exchange Tower อโศก',
         distanceKm: tripDistanceKm,
@@ -2424,6 +2467,78 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Personal Ride & Delivery History Card (Data Isolation) */}
+                <div className="p-4 rounded-3xl bg-gradient-to-br from-[#0B1A38] to-[#060D1E] border-2 border-cyan-500/40 space-y-3 shadow-lg">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-300">
+                        <Package className="w-4 h-4 text-cyan-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span>ประวัติการเดินทางและการจัดส่งส่วนบุคคล</span>
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                            ISOLATED DATA
+                          </span>
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          ผูกกับบัญชี: <strong className="text-cyan-300">{currentUserSession?.id || 'CTZ-ANON'}</strong>
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono text-cyan-300 bg-black/40 px-2 py-1 rounded-lg border border-white/10">
+                      รวม {userRideHistory.length} รายการ
+                    </span>
+                  </div>
+
+                  {userRideHistory.length === 0 ? (
+                    <div className="p-4 rounded-2xl bg-black/40 border border-white/10 text-center space-y-1.5">
+                      <p className="text-xs text-slate-300">ยังไม่มีประวัติการเดินทางในบัญชีส่วนบุคคลนี้</p>
+                      <p className="text-[10px] text-slate-500 font-mono">
+                        เมื่อคุณกดเรียกรถหรือส่งพัสดุ ทริปทั้งหมดจะถูกบันทึกแยกอิสระใน Cloud Firestore สำหรับบัญชีของคุณเท่านั้น
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1 font-mono text-xs">
+                      {userRideHistory.map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-3 rounded-2xl bg-black/40 border border-white/10 hover:border-cyan-400/40 transition-all space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{item.serviceIconEmoji || '🛵'}</span>
+                              <span className="font-bold text-white text-xs">{item.serviceTitle}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-amber-400 font-bold">฿{item.fare}</span>
+                              <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                                item.status === 'completed'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : item.status === 'in_transit' || item.status === 'picked_up'
+                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse'
+                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              }`}>
+                                {item.status === 'completed' ? 'สำเร็จ' : item.status === 'in_transit' ? 'กำลังเดินทาง' : item.status === 'picked_up' ? 'รับผู้โดยสารแล้ว' : 'รอพี่วิน'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-[10px] text-slate-400 space-y-0.5 pl-6 border-l-2 border-cyan-500/30">
+                            <div><span className="text-slate-500">ต้นทาง:</span> {item.pickupLocation}</div>
+                            <div><span className="text-slate-500">ปลายทาง:</span> {item.dropoffLocation}</div>
+                            {item.driverName && (
+                              <div className="text-emerald-300">
+                                พี่วินผู้ดูแล: {item.driverName} ({item.driverPlate || '1กข 7789 กทม.'})
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Sovereign Quest Center for Citizen */}

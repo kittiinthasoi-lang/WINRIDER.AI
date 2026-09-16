@@ -3,6 +3,7 @@ export interface WebhookDispatchEvent {
   event: 'order_created' | 'order_accepted' | 'order_status_updated' | 'order_completed' | 'test_ping';
   timestamp: string;
   orderId: string;
+  passengerUserId?: string;
   passengerName: string;
   passengerPhone: string;
   serviceTitle: string;
@@ -14,6 +15,7 @@ export interface WebhookDispatchEvent {
   driverPayout: number; // Fare - 2.00
   tipAmount?: number;
   status: 'pending' | 'accepted' | 'heading_pickup' | 'in_transit' | 'completed' | 'cancelled';
+  driverUserId?: string;
   driverName?: string;
   driverLevel?: number;
   driverPlate?: string;
@@ -95,6 +97,7 @@ export function clearDispatchLogs(): void {
 export function buildWebhookPayload(params: {
   event: WebhookDispatchEvent['event'];
   orderId: string;
+  passengerUserId?: string;
   passengerName: string;
   passengerPhone?: string;
   serviceTitle: string;
@@ -104,6 +107,7 @@ export function buildWebhookPayload(params: {
   fare: number;
   tipAmount?: number;
   status: WebhookDispatchEvent['status'];
+  driverUserId?: string;
   driverName?: string;
   driverLevel?: number;
   driverPlate?: string;
@@ -241,6 +245,7 @@ export function buildWebhookPayload(params: {
     event: params.event,
     timestamp,
     orderId: params.orderId,
+    passengerUserId: params.passengerUserId,
     passengerName: params.passengerName,
     passengerPhone: params.passengerPhone || '089-123-4567',
     serviceTitle: params.serviceTitle,
@@ -252,6 +257,7 @@ export function buildWebhookPayload(params: {
     driverPayout,
     tipAmount: params.tipAmount || 0,
     status: params.status,
+    driverUserId: params.driverUserId,
     driverName: params.driverName,
     driverLevel: params.driverLevel,
     driverPlate: params.driverPlate,

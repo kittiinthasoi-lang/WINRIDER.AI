@@ -1,12 +1,13 @@
 import { buildWebhookPayload, dispatchToWebhook, isAutoDispatchEnabled } from './webhookDispatcher';
 import { db } from '../lib/firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
 export interface LiveRideOrder {
   id: string;
   serviceId: string;
   serviceTitle: string;
   serviceIconEmoji: string;
+  passengerUserId?: string;
   passengerName: string;
   passengerPhone: string;
   passengerAvatarEmoji?: string;
@@ -21,6 +22,7 @@ export interface LiveRideOrder {
   createdAt: string;
   updatedAt: string;
   // Driver Info (once accepted)
+  driverUserId?: string;
   driverName?: string;
   driverLevel?: number;
   driverPhone?: string;
@@ -132,6 +134,7 @@ export async function createLiveOrder(orderInput: {
   serviceId: string;
   serviceTitle: string;
   serviceIconEmoji: string;
+  passengerUserId?: string;
   passengerName: string;
   passengerPhone: string;
   pickupLocation: string;
@@ -151,6 +154,7 @@ export async function createLiveOrder(orderInput: {
     serviceId: orderInput.serviceId,
     serviceTitle: orderInput.serviceTitle,
     serviceIconEmoji: orderInput.serviceIconEmoji || '🛵',
+    passengerUserId: orderInput.passengerUserId || 'ANON',
     passengerName: orderInput.passengerName || 'คุณผู้โดยสาร',
     passengerPhone: orderInput.passengerPhone || '089-123-4567',
     pickupLocation: orderInput.pickupLocation,
@@ -194,6 +198,7 @@ export async function createLiveOrder(orderInput: {
     const payload = buildWebhookPayload({
       event: 'order_created',
       orderId: newOrder.id,
+      passengerUserId: newOrder.passengerUserId,
       passengerName: newOrder.passengerName,
       passengerPhone: newOrder.passengerPhone,
       serviceTitle: newOrder.serviceTitle,
@@ -215,6 +220,7 @@ export async function createLiveOrder(orderInput: {
 export async function acceptLiveOrder(
   orderId: string,
   driverInfo: {
+    driverUserId?: string;
     driverName: string;
     driverLevel: number;
     driverPhone?: string;
@@ -232,6 +238,7 @@ export async function acceptLiveOrder(
       ...orders[orderIndex],
       status: 'accepted',
       updatedAt: new Date().toISOString(),
+      driverUserId: driverInfo.driverUserId,
       driverName: driverInfo.driverName,
       driverLevel: driverInfo.driverLevel,
       driverPhone: driverInfo.driverPhone || '081-998-3344',
@@ -277,6 +284,7 @@ export async function acceptLiveOrder(
     updateDoc(doc(db, 'rides', targetOrder.id), {
       status: 'accepted',
       updatedAt: new Date().toISOString(),
+      driverUserId: driverInfo.driverUserId || '',
       driverName: driverInfo.driverName,
       driverLevel: driverInfo.driverLevel,
       driverPhone: driverInfo.driverPhone || '081-998-3344',
@@ -308,6 +316,44 @@ export async function acceptLiveOrder(
   }
 
   return targetOrder;
+}
+
+/**
+ * Filter orders strictly by passengerUserId for individual user privacy
+ */
+export function getOrdersForPassenger(userId: string): LiveRideOrder[] {
+  if (!userId) return [];
+  const all = getLocalLiveOrders();
+  return all.filter((o) => o.passengerUserId === userId);
+}
+
+/**
+ * Filter orders strictly by driverUserId
+ */
+export function getOrdersForDriver(driverUserId: string): LiveRideOrder[] {
+  if (!driverUserId) return [];
+  const all = getLocalLiveOrders();
+  return all.filter((o) => o.driverUserId === driverUserId);
+}
+
+/**
+ * Fetch orders from Firestore for specific user
+ */
+export async function fetchFirestoreOrdersForUser(userId: string, role: 'customer' | 'driver' = 'customer'): Promise<LiveRideOrder[]> {
+  if (!userId) return [];
+  try {
+    const fieldName = role === 'driver' ? 'driverUserId' : 'passengerUserId';
+    const q = query(collection(db, 'rides'), where(fieldName, '==', userId));
+    const snap = await getDocs(q);
+    const results: LiveRideOrder[] = [];
+    snap.forEach((doc) => {
+      results.push(doc.data() as LiveRideOrder);
+    });
+    return results;
+  } catch (e) {
+    console.warn('Firestore fetch user orders error:', e);
+    return role === 'driver' ? getOrdersForDriver(userId) : getOrdersForPassenger(userId);
+  }
 }
 
 /**

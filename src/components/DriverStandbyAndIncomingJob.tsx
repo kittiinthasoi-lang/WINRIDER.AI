@@ -44,6 +44,7 @@ import {
 } from '../data/realBangkokLocations';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { subscribeToLiveOrders, acceptLiveOrder, advanceLiveOrderStep, LiveRideOrder } from '../utils/dispatchSync';
+import { getCurrentUserSession } from '../utils/userSession';
 import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { sendJobToLine, chatWithPassengerOnLine } from '../utils/lineIntegration';
 
@@ -412,11 +413,13 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
     onAcceptJob(job);
 
     // Sync accept order to passenger and webhook
+    const userSession = getCurrentUserSession();
     acceptLiveOrder(job.id, {
-      driverName: 'พี่สมศักดิ์ ไนท์สายฟ้า',
-      driverLevel: driverLevel || 100,
-      driverPlate: '1กข 7789 กทม.',
-      driverAvatarEmoji: '🦁',
+      driverUserId: userSession?.id,
+      driverName: userSession?.name || 'พี่สมศักดิ์ ไนท์สายฟ้า',
+      driverLevel: userSession?.level || driverLevel || 1,
+      driverPlate: userSession?.plateNumber || '1กข 7789 กทม.',
+      driverAvatarEmoji: userSession?.avatarEmoji || '🦁',
       driverVehicle: activeVehicle?.name || 'Honda Wave 125i'
     });
   };

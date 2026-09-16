@@ -100,6 +100,7 @@ import { RealGpsMapModal } from './RealGpsMapModal';
 import { ARLiveCameraNavigation, ARManeuverType } from './ARLiveCameraNavigation';
 import { VirtualArOverlay } from './VirtualArOverlay';
 import { GoogleMapsLiveView } from './GoogleMapsLiveView';
+import { GoogleMapsNavigationScreen } from './GoogleMapsNavigationScreen';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 import { chatWithPassengerOnLine } from '../utils/lineIntegration';
 import {
@@ -273,8 +274,9 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   // Google Maps Real-time Traffic Layer Status
   const [googleMapsLiveActive, setGoogleMapsLiveActive] = useState<boolean>(true);
   
-  // 4-Way Navigation View Mode: '3d_map' | 'google_maps' | 'mapbox' | 'live_camera_ar'
-  const [navDisplayMode, setNavDisplayMode] = useState<'3d_map' | 'google_maps' | 'mapbox' | 'live_camera_ar'>(initialNavMode || '3d_map');
+  // Google Maps Navigation View Mode: default to google_maps (3D map disabled)
+  const [navDisplayMode, setNavDisplayMode] = useState<'google_maps' | 'live_camera_ar'>('google_maps');
+  const [driverLegPhase, setDriverLegPhase] = useState<'to_pickup' | 'to_destination'>('to_pickup');
   const { gpsState } = useRealtimeGps(true);
 
   // Google Maps Routes API (New) Live Integration State
@@ -412,13 +414,9 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
     { time: '4m', battery: 91.9, earningsPerKm: 55, speed: 42 },
   ]);
 
-  // Voice announcement trigger helper
-  const triggerVoiceGuidance = (text: string) => {
-    if (!voiceGuidanceEnabled || !audioEnabled) return;
-    if (lastSpokenRef.current !== text) {
-      lastSpokenRef.current = text;
-      speakThaiText(text, voicePersona, voiceSpeedRate);
-    }
+  // Voice announcement trigger helper (simulated voice removed per user instruction)
+  const triggerVoiceGuidance = (_text: string) => {
+    // Disabled simulated voice chatter - keep only real navigation
   };
 
   // Random realistic Bangkok job generator
@@ -775,86 +773,13 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
 
         {/* Action Buttons Toolbar */}
         <div className="flex items-center justify-between sm:justify-end gap-1.5 font-mono flex-shrink-0 border-t sm:border-t-0 pt-1.5 sm:pt-0 border-white/10 flex-wrap">
-          {/* 3-WAY VIEW MODE SWITCHER: 3D MAP / GOOGLE MAPS / LIVE CAMERA AR */}
-          <div className="flex items-center bg-black/80 p-0.5 rounded-xl border border-cyan-400/50 shadow-[0_0_15px_rgba(0,210,255,0.3)]">
-            <button
-              type="button"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(800);
-                setNavDisplayMode('3d_map');
-              }}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
-                navDisplayMode === '3d_map'
-                  ? 'bg-gradient-to-r from-[#00D2FF] to-blue-600 text-slate-950 font-black shadow-[0_0_10px_#00D2FF]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Layers className="w-3 h-3" />
-              <span>🗺️ แผนที่ 3D</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(800);
-                setNavDisplayMode('google_maps');
-              }}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
-                navDisplayMode === 'google_maps'
-                  ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_0_10px_#FFD700]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <MapPin className="w-3 h-3" />
-              <span>🌍 Google Maps</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(800);
-                setNavDisplayMode('mapbox');
-              }}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
-                navDisplayMode === 'mapbox'
-                  ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black shadow-[0_0_10px_#00D2FF]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Globe className="w-3 h-3" />
-              <span>🗺️ Mapbox 3D</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(850);
-                setNavDisplayMode('live_camera_ar');
-              }}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
-                navDisplayMode === 'live_camera_ar'
-                  ? 'bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 font-black shadow-[0_0_12px_#00D2FF]'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Video className="w-3 h-3 animate-pulse text-cyan-300" />
-              <span>📹 กล้องสด AR</span>
-            </button>
+          {/* NAVIGATION VIEW INDICATOR: GOOGLE MAPS */}
+          <div className="flex items-center bg-black/80 p-1 rounded-xl border border-amber-400/50 shadow-[0_0_15px_rgba(255,215,0,0.25)]">
+            <div className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_0_10px_#FFD700] flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>🌍 Google Maps Navigation</span>
+            </div>
           </div>
-
-          {/* AI Voice Persona Controller button */}
-          <button
-            type="button"
-            onClick={() => {
-              if (audioEnabled) playTactileBlip(850);
-              setShowVoiceSettingsModal(true);
-            }}
-            className="px-2 py-1 rounded-xl bg-gradient-to-r from-purple-600/30 to-indigo-600/30 hover:from-purple-600/50 hover:to-indigo-600/50 text-purple-200 border border-purple-400/50 text-[10px] font-bold flex items-center gap-1 shadow-md transition-all"
-            title="ปรับแต่งเสียง AI นำทางและความเร็วพูด"
-          >
-            <Volume2 className="w-3.5 h-3.5 text-purple-300 animate-pulse" />
-            <span>🎙️ เสียง AI ({AI_VOICE_PERSONAS.find(p => p.id === voicePersona)?.name.split(' ')[0] || 'ฟ้าใส'})</span>
-          </button>
 
           {/* Speed Multiplier Quick Toggle */}
           <button
@@ -1120,12 +1045,48 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             }}
           />
         </div>
-      ) : navDisplayMode === 'google_maps' || navDisplayMode === 'mapbox' ? (
+      ) : navDisplayMode === 'google_maps' ? (
+        <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">
+          <GoogleMapsNavigationScreen
+            role="driver"
+            initialPhase={driverLegPhase === 'to_pickup' ? 'approaching' : 'in_transit'}
+            driverName={activeVehicle?.name || 'พี่วินอัศวิน'}
+            driverAvatar={activeVehicle?.imageEmoji || '🛵'}
+            driverPlate="1กข 7789 กทม."
+            driverVehicle={activeVehicle?.model || 'Honda Forza 350'}
+            passengerName={selectedJob?.customerName || 'คุณผู้โดยสาร'}
+            pickupAddress={activeJob?.pickupLocation || 'สุขุมวิท 39 หน้า BTS พร้อมพงษ์'}
+            pickupCoords={{
+              lat: (activeJob as any)?.pickupCoords?.lat || gpsState.latitude || 13.7314,
+              lng: (activeJob as any)?.pickupCoords?.lng || gpsState.longitude || 100.5700
+            }}
+            dropoffAddress={selectedDestination.name || activeJob?.dropoffLocation || 'สยามพารากอน - สยามสแควร์วัน'}
+            dropoffCoords={{
+              lat: selectedDestination.lat || 13.7462,
+              lng: selectedDestination.lng || 100.5348
+            }}
+            fareBaht={activeJob?.fare || 65}
+            audioEnabled={audioEnabled}
+            onArrivedAtPickup={() => {
+              if (audioEnabled) playTactileBlip(950);
+              setDriverLegPhase('to_destination');
+              triggerVoiceGuidance('ถึงจุดรับผู้โดยสารเรียบร้อย เริ่มการเดินทางไปสู่ปลายทาง');
+            }}
+            onArrivedAtDropoff={() => {
+              if (audioEnabled) playTactileBlip(950);
+              setShowDeliveryProofModal(true);
+              triggerVoiceGuidance('ถึงปลายทางส่งผู้โดยสารเรียบร้อย กรุณาตรวจสอบความปลอดภัยและยืนยันการรับชำระเงิน');
+            }}
+            onClose={onClose}
+            onOpenChat={() => setShowDirectChatModal(true)}
+          />
+        </div>
+      ) : navDisplayMode === 'mapbox' ? (
         <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">
           <GoogleMapsLiveView
             gpsLocation={gpsState}
             targetDestination={selectedDestination.name}
-            initialProvider={navDisplayMode === 'mapbox' ? 'mapbox' : 'google_maps'}
+            initialProvider="mapbox"
             height={isFullscreen ? '640px' : '520px'}
             audioEnabled={audioEnabled}
             zoom={16}
