@@ -7,7 +7,16 @@ import { GoogleGenAI } from "@google/genai";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+
+// Port Configuration:
+// 1. In AI Studio Development Environment: CONTROL_PLANE_PORT is present,
+//    Nginx reverse-proxy routes public traffic to port 3000 (DEFAULT_APP_PORT).
+// 2. In Deployed Cloud Run Production Service: Cloud Run passes PORT (typically 8080)
+//    and requires the server to bind directly to process.env.PORT.
+const isDevContainer = Boolean(process.env.CONTROL_PLANE_PORT);
+const PORT = isDevContainer
+  ? (Number(process.env.DEFAULT_APP_PORT) || 3000)
+  : (Number(process.env.PORT) || 3000);
 
 app.use(express.json());
 
@@ -30,8 +39,8 @@ function getAiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// Health check endpoint
-app.get("/api/health", (_req, res) => {
+// Health check endpoints (Cloud Run, Kubernetes, AI Studio probes)
+app.get(["/api/health", "/healthz", "/health"], (_req, res) => {
   res.json({ status: "ok", empire: "WINRIDER.AI", timestamp: new Date().toISOString() });
 });
 
@@ -523,16 +532,42 @@ process.on("unhandledRejection", (reason) => {
   console.error("[WINRIDER.AI] Process unhandledRejection caught:", reason);
 });
 
+// Helper to discover the dist directory containing compiled static artifacts
+function getDistPath(): string {
+  const possiblePaths = [
+    path.resolve(process.cwd(), "dist"),
+    typeof __dirname !== "undefined" ? path.resolve(__dirname, "dist") : "",
+    typeof __dirname !== "undefined" ? __dirname : "",
+    typeof __dirname !== "undefined" ? path.resolve(__dirname, "..", "dist") : "",
+    path.resolve("/app/applet/dist"),
+    path.resolve("/app/dist"),
+    path.resolve("/workspace/dist"),
+    process.cwd(),
+  ].filter(Boolean);
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(path.join(p, "index.html"))) {
+      return p;
+    }
+  }
+  return path.resolve(process.cwd(), "dist");
+}
+
 // Vite / Static Middleware Integration
 async function startServer() {
+  const distPath = getDistPath();
+  const hasDist = fs.existsSync(path.join(distPath, "index.html"));
+
   // Robust production detection:
   // 1. Explicit NODE_ENV === "production"
-  // 2. Or executed as compiled CommonJS bundle (.cjs)
-  // 3. Or dist/index.html already exists and not explicitly in development
-  const isBundled = typeof __filename !== "undefined" && __filename.endsWith(".cjs");
-  const hasDist = (typeof __dirname !== "undefined" && fs.existsSync(path.resolve(__dirname, "index.html"))) ||
-                  fs.existsSync(path.resolve(process.cwd(), "dist", "index.html"));
-  const isProduction = process.env.NODE_ENV === "production" || isBundled || (hasDist && process.env.NODE_ENV !== "development");
+  // 2. Google Cloud Run standalone indicators (when not inside AI Studio dev container)
+  // 3. Compiled bundle execution (.cjs)
+  // 4. Or static artifacts exist and not in explicit development mode
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    (!isDevContainer && (Boolean(process.env.K_SERVICE) || Boolean(process.env.K_REVISION))) ||
+    (typeof __filename !== "undefined" && __filename.endsWith(".cjs")) ||
+    (hasDist && process.env.NODE_ENV !== "development");
 
   if (!isProduction) {
     try {
@@ -545,44 +580,71 @@ async function startServer() {
       console.log("[WINRIDER.AI] Development mode: Vite middleware mounted");
     } catch (viteErr) {
       console.warn("[WINRIDER.AI] Vite dev middleware unavailable, serving static dist:", viteErr);
-      serveStaticFiles();
+      serveStaticFiles(distPath);
     }
   } else {
     console.log("[WINRIDER.AI] Production mode active: serving static artifacts");
-    serveStaticFiles();
+    serveStaticFiles(distPath);
   }
 
   // Global Express error handler to prevent container crashes
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error("[WINRIDER.AI] Express Route Error:", err);
-    res.status(500).json({ error: "Internal Server Error", message: err?.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal Server Error", message: err?.message });
+    }
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`[WINRIDER.AI] Sovereign Server running on http://0.0.0.0:${PORT} [mode: ${isProduction ? "production" : "development"}]`);
+  });
+
+  server.on("error", (err: any) => {
+    console.error("[WINRIDER.AI] Server listen error:", err);
+    if (!isDevContainer) {
+      process.exit(1);
+    }
+  });
+
+  // Cloud Run lifecycle shutdown signals
+  process.on("SIGTERM", () => {
+    console.log("[WINRIDER.AI] SIGTERM received. Closing HTTP server...");
+    server.close(() => {
+      console.log("[WINRIDER.AI] Server terminated gracefully.");
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 4000);
+  });
+
+  process.on("SIGINT", () => {
+    console.log("[WINRIDER.AI] SIGINT received. Shutting down...");
+    server.close(() => process.exit(0));
   });
 }
 
-function serveStaticFiles() {
-  // Resolve correct directory containing index.html and assets:
-  // When running from dist/server.cjs -> __dirname is the dist directory
-  // When running from project root -> process.cwd()/dist is the dist directory
-  let distPath = path.resolve(process.cwd(), "dist");
-  if (typeof __dirname !== "undefined" && fs.existsSync(path.resolve(__dirname, "index.html"))) {
-    distPath = __dirname;
-  } else if (!fs.existsSync(path.join(distPath, "index.html")) && fs.existsSync(path.resolve(process.cwd(), "index.html"))) {
-    distPath = process.cwd();
-  }
-
+function serveStaticFiles(distPath: string) {
   console.log(`[WINRIDER.AI] Static distribution directory: ${distPath}`);
   app.use(express.static(distPath));
 
-  app.get("*", (_req, res) => {
+  app.get("*", (_req, res, next) => {
     const indexPath = path.join(distPath, "index.html");
     if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
+      res.sendFile(indexPath, (err) => {
+        if (err && !res.headersSent) {
+          next(err);
+        }
+      });
     } else {
-      res.sendFile(path.resolve(process.cwd(), "index.html"));
+      const fallbackPath = path.resolve(process.cwd(), "index.html");
+      if (fs.existsSync(fallbackPath)) {
+        res.sendFile(fallbackPath, (err) => {
+          if (err && !res.headersSent) {
+            next(err);
+          }
+        });
+      } else {
+        res.status(200).send("<!doctype html><html><head><title>WINRIDER.AI</title></head><body><h1>WINRIDER.AI</h1></body></html>");
+      }
     }
   });
 }

@@ -15,6 +15,7 @@ import {
   LocateFixed,
   Flame,
   Volume2,
+  VolumeX,
   Box,
   Layers3,
   Shield,
@@ -28,13 +29,32 @@ import {
   Package,
   HeartHandshake,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  CornerUpLeft,
+  CornerUpRight,
+  ArrowUp,
+  Route,
+  Camera,
+  X,
+  Crosshair,
+  Clock,
+  Leaf,
+  Globe
 } from 'lucide-react';
 import { Vehicle } from '../types';
-import { playTactileBlip, playRadarScan, playEngineRev } from '../utils/audio';
+import { playTactileBlip, playRadarScan, playEngineRev, speakThaiText } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 import { GoogleMapsLiveView } from './GoogleMapsLiveView';
 import { CyberGraphic } from './CyberGraphic';
+import { ARLiveCameraNavigation, ARManeuverType } from './ARLiveCameraNavigation';
+import { 
+  RadarNavRoute, 
+  RadarNavStep, 
+  calculateHaversineMeters, 
+  CAPILLARY_PRESET_ROUTES, 
+  generateRouteToPing 
+} from '../data/radarNavigationData';
+import { RadarRoutePlannerModal } from './RadarRoutePlannerModal';
 
 export type RadarCategory = 'all' | 'customer' | 'shop' | 'partner' | 'driver';
 
@@ -355,9 +375,113 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
 
   // Realtime Live GPS Hook
-  const { gpsState } = useRealtimeGps(true);
-  // Toggle between 3D Radar and Google Maps
-  const [radarDisplayMode, setRadarDisplayMode] = useState<'3d_radar' | 'google_maps'>('3d_radar');
+  const { gpsState, acquireCurrentGps } = useRealtimeGps(true);
+  const [gpsToast, setGpsToast] = useState<string | null>(null);
+
+  // Real-time Turn-by-Turn Navigation & AR Camera State
+  const [isRoutePlannerOpen, setIsRoutePlannerOpen] = useState<boolean>(false);
+  const [isNavigating, setIsNavigating] = useState<boolean>(false);
+  const [isArCameraOpen, setIsArCameraOpen] = useState<boolean>(false);
+  const [activeNavRoute, setActiveNavRoute] = useState<RadarNavRoute | null>(null);
+  const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
+  const [currentStepRemainingDist, setCurrentStepRemainingDist] = useState<number>(0);
+
+  // Real-time Step Detection via Haversine Distance Calculation
+  useEffect(() => {
+    if (!isNavigating || !activeNavRoute) return;
+    const currentStep = activeNavRoute.steps[activeStepIndex];
+    if (!currentStep) return;
+
+    const dist = calculateHaversineMeters(
+      gpsState.latitude,
+      gpsState.longitude,
+      currentStep.targetCoord.lat,
+      currentStep.targetCoord.lng
+    );
+
+    // Update remaining distance
+    setCurrentStepRemainingDist(dist > 0 ? dist : currentStep.distanceMeters);
+
+    // Auto-advance if within 20 meters of waypoint
+    if (dist < 20 && activeStepIndex < activeNavRoute.steps.length - 1) {
+      const nextIdx = activeStepIndex + 1;
+      setActiveStepIndex(nextIdx);
+      if (audioEnabled) playTactileBlip(950);
+      const nextStep = activeNavRoute.steps[nextIdx];
+      speakThaiText(nextStep.instruction, 'fah_sai');
+    }
+  }, [gpsState.latitude, gpsState.longitude, isNavigating, activeNavRoute, activeStepIndex, audioEnabled]);
+
+  const handleLocateMe = () => {
+    if (audioEnabled) playTactileBlip(900);
+    acquireCurrentGps();
+    setGpsToast(`🛰️ ล็อคพิกัดดาวเทียมสำเร็จ (${gpsState.latitude.toFixed(4)}, ${gpsState.longitude.toFixed(4)})`);
+    speakThaiText('เชื่อมต่อพิกัดดาวเทียมเรียบร้อยแล้วค่ะ', 'fah_sai');
+    setTimeout(() => setGpsToast(null), 4000);
+  };
+
+  const handleStartNavigation = (route: RadarNavRoute) => {
+    setActiveNavRoute(route);
+    setActiveStepIndex(0);
+    setIsNavigating(true);
+    setCurrentStepRemainingDist(route.steps[0].distanceMeters);
+    if (audioEnabled) playEngineRev();
+    speakThaiText(`เริ่มการนำทางเรียลไทม์สู่ ${route.destinationName} ค่ะ ${route.steps[0].instruction}`, 'fah_sai');
+  };
+
+  const handleStartArCameraNav = (route: RadarNavRoute) => {
+    handleStartNavigation(route);
+    setIsArCameraOpen(true);
+  };
+
+  const advanceToNextStep = () => {
+    if (!activeNavRoute) return;
+    if (activeStepIndex < activeNavRoute.steps.length - 1) {
+      const nextIdx = activeStepIndex + 1;
+      setActiveStepIndex(nextIdx);
+      if (audioEnabled) playTactileBlip(920);
+      const nextStep = activeNavRoute.steps[nextIdx];
+      speakThaiText(nextStep.instruction, 'fah_sai');
+    } else {
+      if (audioEnabled) playTactileBlip(1200);
+      speakThaiText(`คุณได้เดินทางถึงจุดหมาย ${activeNavRoute.destinationName} เรียบร้อยแล้วค่ะ`, 'fah_sai');
+    }
+  };
+
+  const handleEndNavigation = () => {
+    setIsNavigating(false);
+    setActiveNavRoute(null);
+    setActiveStepIndex(0);
+    if (audioEnabled) playTactileBlip(600);
+    speakThaiText('สิ้นสุดการนำทางเรียบร้อยแล้วค่ะ ขอให้เดินทางปลอดภัยนะคะ', 'fah_sai');
+  };
+
+  const calculateSvgPathD = (points: { x: number; y: number }[]): string => {
+    if (!points || points.length === 0) return '';
+    return points.reduce((acc, pt, idx) => {
+      return idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
+    }, '');
+  };
+
+  const getManeuverIcon = (maneuver: string, className = 'w-5 h-5') => {
+    switch (maneuver) {
+      case 'turn_left':
+      case 'slight_left':
+      case 'sharp_left':
+        return <CornerUpLeft className={className} />;
+      case 'turn_right':
+      case 'slight_right':
+      case 'sharp_right':
+        return <CornerUpRight className={className} />;
+      case 'arrived':
+        return <CheckCircle2 className={className} />;
+      default:
+        return <ArrowUp className={className} />;
+    }
+  };
+
+  // Toggle between 3D Radar, Google Maps, and Mapbox
+  const [radarDisplayMode, setRadarDisplayMode] = useState<'3d_radar' | 'google_maps' | 'mapbox'>('3d_radar');
 
   // Radar continuous sweep rotation
   useEffect(() => {
@@ -414,9 +538,9 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
 
   return (
     <div className="space-y-3 font-mono">
-      {/* TOP VIEW SWITCHER: 3D RADAR VS GOOGLE MAPS */}
-      <div className="flex items-center justify-between bg-black/80 p-1.5 rounded-2xl border border-cyan-400/40 shadow-[0_0_15px_rgba(0,210,255,0.2)]">
-        <div className="flex items-center gap-1.5">
+      {/* TOP VIEW SWITCHER & NAVIGATION CONTROLS */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-black/85 p-2 rounded-2xl border border-cyan-400/40 shadow-[0_0_20px_rgba(0,210,255,0.2)]">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             type="button"
             onClick={() => {
@@ -447,17 +571,178 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
             <MapPin className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
             <span>Google Maps GPS สด</span>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(850);
+              setRadarDisplayMode('mapbox');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              radarDisplayMode === 'mapbox'
+                ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-md font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-slate-950" />
+            <span>Mapbox 3D</span>
+          </button>
+
+          {/* GPS จริง / พิกัดฉัน (Locate Me) */}
+          <button
+            type="button"
+            onClick={handleLocateMe}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition-all active:scale-95 shadow-sm"
+            title="อัปเดตและล็อคพิกัดดาวเทียม GPS สดทันที"
+          >
+            <LocateFixed className="w-3.5 h-3.5 text-emerald-400" />
+            <span>GPS จริง (Locate Me)</span>
+          </button>
+
+          {/* 🗺️ วางแผนเส้นทาง (Route Planner) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(800);
+              setIsRoutePlannerOpen(true);
+            }}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition-all active:scale-95 shadow-sm"
+            title="วางแผนเส้นทางซอยลัดจักรยานสีขาว"
+          >
+            <Route className="w-3.5 h-3.5 text-cyan-400" />
+            <span>🗺️ วางแผนเส้นทาง</span>
+          </button>
+
+          {/* 📹 กล้องสด AR (Mobile Camera HUD) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(800);
+              setIsArCameraOpen(true);
+            }}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 transition-all active:scale-95 shadow-sm"
+            title="นำทางผ่านกล้องสดภาพสดจากมือถือพร้อมลูกศร AR และเสียง AI"
+          >
+            <Camera className="w-3.5 h-3.5 text-purple-400" />
+            <span>📹 กล้องสด AR</span>
+          </button>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 pr-2 text-[10px] text-cyan-300">
+        <div className="hidden lg:flex items-center gap-2 pr-2 text-[10px] text-cyan-300">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          <span>GPS สด: {gpsState.latitude.toFixed(4)}, {gpsState.longitude.toFixed(4)}</span>
+          <span>GPS สด: {gpsState.latitude.toFixed(4)}, {gpsState.longitude.toFixed(4)} (±{gpsState.accuracy}ม.)</span>
         </div>
       </div>
 
-      {radarDisplayMode === 'google_maps' ? (
+      {/* GPS Confirmation Toast */}
+      {gpsToast && (
+        <div className="bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 text-xs px-3 py-2 rounded-xl flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{gpsToast}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setGpsToast(null)}
+            className="text-emerald-400 hover:text-white p-0.5"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* ACTIVE TURN-BY-TURN NAVIGATION BANNER */}
+      {isNavigating && activeNavRoute && (
+        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-2 border-emerald-500/70 rounded-2xl p-3.5 shadow-[0_0_25px_rgba(16,185,129,0.35)] space-y-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-emerald-400 shadow-inner shrink-0">
+                {getManeuverIcon(activeNavRoute.steps[activeStepIndex]?.maneuver || 'straight', 'w-6 h-6')}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black text-emerald-400 uppercase tracking-wide">
+                    {activeNavRoute.steps[activeStepIndex]?.maneuver === 'arrived' 
+                      ? 'ถึงจุดหมายปลายทาง' 
+                      : `อีก ${currentStepRemainingDist} ม.`}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
+                    ก้าว {activeStepIndex + 1}/{activeNavRoute.steps.length}
+                  </span>
+                  <span className="text-[10px] text-amber-300 font-bold">
+                    🏁 {activeNavRoute.destinationName}
+                  </span>
+                </div>
+                <div className="text-sm sm:text-base font-black text-white tracking-tight mt-0.5">
+                  {activeNavRoute.steps[activeStepIndex]?.instruction}
+                </div>
+                {activeNavRoute.steps[activeStepIndex + 1] && (
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                    <span>ถัดไป:</span>
+                    <span className="text-slate-300">{activeNavRoute.steps[activeStepIndex + 1].instruction}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Navigation Action Buttons */}
+            <div className="flex items-center gap-1.5 self-end sm:self-center">
+              {/* Voice Guidance Repeat */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeNavRoute.steps[activeStepIndex]) {
+                    speakThaiText(activeNavRoute.steps[activeStepIndex].instruction, 'fah_sai');
+                  }
+                  if (audioEnabled) playTactileBlip(880);
+                }}
+                className="p-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40"
+                title="ฟังเสียง AI ไกด์นำทางภาษาไทยอีกครั้ง"
+              >
+                <Volume2 className="w-4 h-4" />
+              </button>
+
+              {/* Manual Advance / Next Step Button */}
+              {activeStepIndex < activeNavRoute.steps.length - 1 && (
+                <button
+                  type="button"
+                  onClick={advanceToNextStep}
+                  className="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1"
+                  title="จำลองเข้าใกล้จุดเลี้ยว (< 20 ม.) และเปลี่ยนก้าวถัดไป"
+                >
+                  <span>ก้าวถัดไป</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Live Camera AR Switcher Button */}
+              <button
+                type="button"
+                onClick={() => setIsArCameraOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-md hover:brightness-110"
+                title="เปิดกล้องสดภาพสดจากมือถือพร้อมลูกศร AR นำทาง"
+              >
+                <Camera className="w-3.5 h-3.5 text-slate-950" />
+                <span>กล้องสด AR</span>
+              </button>
+
+              {/* End Navigation Button */}
+              <button
+                type="button"
+                onClick={handleEndNavigation}
+                className="p-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40"
+                title="สิ้นสุดการนำทาง"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {radarDisplayMode === 'google_maps' || radarDisplayMode === 'mapbox' ? (
         <GoogleMapsLiveView
           gpsLocation={gpsState}
+          initialProvider={radarDisplayMode === 'mapbox' ? 'mapbox' : 'google_maps'}
           height="430px"
           audioEnabled={audioEnabled}
         />
@@ -522,7 +807,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
 
             {/* 5. 3D Wireframe Capillary Alleys (ซอยลัดฝั่งธนบุรี โซน 4) */}
             {showCapillaryPaths && (
-              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-60 overflow-visible">
+              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-80 overflow-visible" viewBox="0 0 360 360">
                 {/* Main Arterial Road (ถ.เจริญนคร - กรุงธนบุรี) */}
                 <path d="M 40 190 Q 180 180 340 170" fill="none" stroke="#00D2FF" strokeWidth="2.5" strokeDasharray="6,4" />
                 {/* Alley 1 (ซอยเจริญนคร 14 -> สาทร) */}
@@ -533,7 +818,66 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
                 <path d="M 180 180 Q 240 250 280 300" fill="none" stroke="#8B5CF6" strokeWidth="1.5" />
                 {/* Alley 4 (ซอยกรุงธนบุรี 4 -> BTS) */}
                 <path d="M 180 180 Q 100 240 60 290" fill="none" stroke="#EC4899" strokeWidth="1.5" />
+
+                {/* 5.1 Real-Time Dynamic Active Navigation Green Polyline */}
+                {isNavigating && activeNavRoute && (
+                  <g className="filter drop-shadow-[0_0_12px_#10B981]">
+                    {/* Glowing neon green base path */}
+                    <path
+                      d={calculateSvgPathD(activeNavRoute.radarPolyline)}
+                      fill="none"
+                      stroke="#10B981"
+                      strokeWidth="5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="opacity-80 animate-pulse"
+                    />
+                    {/* Bright pulsating dashline */}
+                    <path
+                      d={calculateSvgPathD(activeNavRoute.radarPolyline)}
+                      fill="none"
+                      stroke="#00FF9D"
+                      strokeWidth="2.5"
+                      strokeDasharray="8,6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {/* Waypoint nodes */}
+                    {activeNavRoute.radarPolyline.map((pt, idx) => (
+                      <circle
+                        key={idx}
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={idx === activeNavRoute.radarPolyline.length - 1 ? 6 : 3.5}
+                        fill={idx === activeNavRoute.radarPolyline.length - 1 ? '#FFD700' : '#10B981'}
+                        stroke="#ffffff"
+                        strokeWidth="1.5"
+                      />
+                    ))}
+                  </g>
+                )}
               </svg>
+            )}
+
+            {/* 5.2 Real-Time Destination Target 3D Beacon */}
+            {isNavigating && activeNavRoute && (
+              <div
+                className="absolute pointer-events-none z-30"
+                style={{
+                  left: `${50 + (activeNavRoute.targetCoord.radarX / 2)}%`,
+                  top: `${50 + (activeNavRoute.targetCoord.radarY / 2)}%`,
+                  transform: 'translate(-50%, -100%) translateZ(35px)',
+                  transformStyle: 'preserve-3d'
+                }}
+              >
+                <div className="flex flex-col items-center animate-bounce">
+                  <div className="bg-emerald-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full border border-white shadow-[0_0_15px_#10B981] whitespace-nowrap">
+                    🏁 {activeNavRoute.destinationName}
+                  </div>
+                  <div className="w-1.5 h-6 bg-gradient-to-t from-emerald-400 to-transparent" />
+                  <div className="w-4 h-4 rounded-full bg-emerald-400/40 border border-emerald-300 animate-ping -mt-2" />
+                </div>
+              </div>
             )}
 
             {/* 6. 3D Isometric Buildings along the alleys */}
@@ -1007,6 +1351,20 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
               </div>
             )}
 
+            {/* Quick Navigate to Ping Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const route = generateRouteToPing(selectedPing, gpsState.latitude, gpsState.longitude);
+                handleStartNavigation(route);
+              }}
+              className="px-3.5 py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold text-xs font-mono flex items-center gap-1.5 transition-all active:scale-95"
+              title="เริ่มนำทางเรียลไทม์ไปยังเป้าหมายนี้"
+            >
+              <Navigation className="w-3.5 h-3.5 text-cyan-400" />
+              <span>เริ่มนำทาง</span>
+            </button>
+
             {onTriggerJob && (
               <button
                 type="button"
@@ -1027,6 +1385,47 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Route Planner Modal */}
+      <RadarRoutePlannerModal
+        isOpen={isRoutePlannerOpen}
+        onClose={() => setIsRoutePlannerOpen(false)}
+        gpsState={gpsState}
+        onLocateMe={handleLocateMe}
+        onStartNavigation={handleStartNavigation}
+        onStartArCameraNav={handleStartArCameraNav}
+        availablePings={SAMPLE_3D_PINGS}
+        selectedPing={selectedPing}
+      />
+
+      {/* Fullscreen Mobile Live Camera AR Navigation */}
+      {isArCameraOpen && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <ARLiveCameraNavigation
+            voiceInstruction={
+              activeNavRoute 
+                ? activeNavRoute.steps[activeStepIndex]?.instruction 
+                : 'อีก 80 เมตร เลี้ยวซ้ายเข้าตรอกวานิช 2'
+            }
+            remainingDistM={currentStepRemainingDist || 250}
+            remainingMinutes={activeNavRoute?.totalDurationMinutes || 4}
+            currentSpeed={gpsState.speed || 32}
+            liveHeading={gpsState.heading || 45}
+            audioEnabled={audioEnabled}
+            voiceGuidanceEnabled={true}
+            onClose={() => setIsArCameraOpen(false)}
+            onSwitchToMap={() => {
+              setIsArCameraOpen(false);
+              setRadarDisplayMode('3d_radar');
+            }}
+            onSwitchToGoogleMaps={() => {
+              setIsArCameraOpen(false);
+              setRadarDisplayMode('google_maps');
+            }}
+            onAdvanceTripStep={advanceToNextStep}
+          />
         </div>
       )}
     </div>

@@ -10,7 +10,8 @@ import {
   Satellite, 
   Layers, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Globe
 } from 'lucide-react';
 import { useRealGeolocation, calculateHaversineDistanceKm, DEFAULT_BANGKOK_COORDS } from '../hooks/useRealGeolocation';
 import { playTactileBlip } from '../utils/audio';
@@ -31,6 +32,7 @@ export const RealGpsMapModal: React.FC<RealGpsMapModalProps> = ({
   audioEnabled = true,
 }) => {
   const geo = useRealGeolocation(true);
+  const [provider, setProvider] = useState<'google_maps' | 'mapbox'>('google_maps');
   const [mapStyle, setMapStyle] = useState<'standard' | 'dark' | 'satellite'>('dark');
 
   if (!isOpen) return null;
@@ -46,7 +48,9 @@ export const RealGpsMapModal: React.FC<RealGpsMapModalProps> = ({
 
   const googleMapsNavUrl = `https://www.google.com/maps/dir/?api=1&origin=${currentLat},${currentLon}&destination=${destinationCoords.latitude},${destinationCoords.longitude}&travelmode=two_wheeler`;
 
-  // OpenStreetMap embed coordinates bounding box
+  const googleEmbedUrl = `https://maps.google.com/maps?q=${currentLat},${currentLon}&hl=th&z=16&output=embed`;
+
+  // Mapbox Vector / OpenStreetMap embed coordinates bounding box
   const delta = 0.008;
   const osmUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${currentLon - delta}%2C${currentLat - delta}%2C${currentLon + delta}%2C${currentLat + delta}&layer=mapnik&marker=${currentLat}%2C${currentLon}`;
 
@@ -83,6 +87,39 @@ export const RealGpsMapModal: React.FC<RealGpsMapModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Map Provider Switcher */}
+            <div className="flex items-center bg-black/60 p-0.5 rounded-xl border border-white/10 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setProvider('google_maps');
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
+                  provider === 'google_maps'
+                    ? 'bg-amber-400 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>Google Maps</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setProvider('mapbox');
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
+                  provider === 'mapbox'
+                    ? 'bg-cyan-400 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Globe className="w-3 h-3" />
+                <span>Mapbox</span>
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => {
@@ -129,17 +166,25 @@ export const RealGpsMapModal: React.FC<RealGpsMapModalProps> = ({
 
         {/* Live Map Frame Container */}
         <div className="relative flex-1 bg-slate-900 overflow-hidden">
-          <iframe
-            title="Real Time GPS Map"
-            src={osmUrl}
-            className="w-full h-full border-none filter invert-90 contrast-125 hue-rotate-180 brightness-95"
-          />
+          {provider === 'google_maps' ? (
+            <iframe
+              title="Google Maps Live View"
+              src={googleEmbedUrl}
+              className="w-full h-full border-none"
+            />
+          ) : (
+            <iframe
+              title="Mapbox Vector Map"
+              src={osmUrl}
+              className="w-full h-full border-none filter invert-90 contrast-125 hue-rotate-180 brightness-95"
+            />
+          )}
 
           {/* Overlay Coordinates Marker Pin HUD */}
           <div className="absolute top-4 left-4 p-3 rounded-2xl bg-black/85 backdrop-blur-md border border-cyan-400/40 shadow-xl max-w-[280px]">
             <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300 mb-1">
               <MapPin className="w-4 h-4 text-cyan-400 animate-bounce" />
-              <span>ตำแหน่งปัจจุบันของคุณ</span>
+              <span>{provider === 'google_maps' ? 'ตำแหน่งดาวเทียม Google Maps' : 'ตำแหน่งดาวเทียม Mapbox'}</span>
             </div>
             <div className="text-[11px] text-slate-300">
               {geo.isRealGps ? 'สัญญาณดาวเทียมตรวจพบตำแหน่งจริง' : 'ซอยสุขุมวิท 39 / พร้อมพงษ์'}
@@ -150,7 +195,7 @@ export const RealGpsMapModal: React.FC<RealGpsMapModalProps> = ({
           </div>
 
           {/* Quick External Navigation Floating Action Button */}
-          <div className="absolute bottom-4 right-4">
+          <div className="absolute bottom-4 right-4 flex items-center gap-2">
             <a
               href={googleMapsNavUrl}
               target="_blank"
@@ -161,7 +206,7 @@ export const RealGpsMapModal: React.FC<RealGpsMapModalProps> = ({
               className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs shadow-[0_0_25px_rgba(16,185,129,0.4)] flex items-center gap-2 transition-all active:scale-95"
             >
               <Navigation className="w-4 h-4" />
-              <span>เปิด Google Maps สองล้อ นำทางทันที</span>
+              <span>นำทางจริง (มอเตอร์ไซค์)</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>

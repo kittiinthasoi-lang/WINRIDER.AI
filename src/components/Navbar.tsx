@@ -14,6 +14,9 @@ import {
   VolumeX, 
   AudioWaveform,
   User,
+  UserCheck,
+  ChevronDown,
+  RefreshCw,
   Sparkles,
   Smartphone,
   Bike,
@@ -32,7 +35,7 @@ import {
   Box
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
-import { UserSession } from '../utils/userSession';
+import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 
 interface NavbarProps {
   activeMode: AppMode;
@@ -49,8 +52,7 @@ interface NavbarProps {
   onOpenGpsModal?: () => void;
   currentUserSession?: UserSession | null;
   onSignOut?: () => void;
-  is3DHoloMode?: boolean;
-  onToggle3DHoloMode?: () => void;
+  onToggleDriverPersona?: (target: 'driver' | 'customer') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -68,11 +70,86 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGpsModal,
   currentUserSession,
   onSignOut,
-  is3DHoloMode = true,
-  onToggle3DHoloMode,
+  onToggleDriverPersona,
 }) => {
   const [nfcSynced, setNfcSynced] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [showRoleInfoModal, setShowRoleInfoModal] = useState(false);
+
+  const isDriver = isDriverAccount(currentUserSession || null);
+  const isDriverCitizen = isDriverInCitizenMode(currentUserSession || null);
+  const isPureCustomer = currentUserSession?.role === 'customer' && !isDriver;
+  const isMerchant = currentUserSession?.role === 'merchant';
+  const isPartner = currentUserSession?.role === 'partner';
+
+  // Role details for profile avatar, icon, and label
+  const profileInfo = (() => {
+    if (!currentUserSession) {
+      return {
+        name: 'พลเมือง',
+        title: 'โปรไฟล์พลเมือง',
+        roleLabel: 'พลเมือง',
+        avatar: '/avatars/citizen.jpg',
+        badgeBorder: 'border-amber-400/50 shadow-[0_0_10px_rgba(255,215,0,0.2)]',
+        buttonClass: 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-400/40 shadow-[0_0_12px_rgba(255,215,0,0.2)]',
+        icon: <User className="w-3.5 h-3.5 text-amber-300" />
+      };
+    }
+    if (isDriverCitizen) {
+      return {
+        name: currentUserSession.name,
+        title: `โปรไฟล์พลเมือง (พี่วินพักงาน/Off-Duty) - เลเวล ${currentUserSession.level} คงเดิม`,
+        roleLabel: `พลเมือง (พี่วิน) Lv.${currentUserSession.level}`,
+        avatar: '/avatars/citizen.jpg',
+        badgeBorder: 'border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.4)]',
+        buttonClass: 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-400/60 shadow-[0_0_14px_rgba(16,185,129,0.35)]',
+        icon: <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+      };
+    }
+    if (currentUserSession.role === 'driver') {
+      return {
+        name: currentUserSession.name,
+        title: `โปรไฟล์พี่วินอัศวิน: ${currentUserSession.name} (Lv.${currentUserSession.level})`,
+        roleLabel: `พี่วิน Lv.${currentUserSession.level}`,
+        avatar: '/avatars/knight.jpg',
+        badgeBorder: 'border-cyan-400 shadow-[0_0_10px_rgba(0,210,255,0.5)]',
+        buttonClass: 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border-cyan-400/60 shadow-[0_0_14px_rgba(0,210,255,0.35)]',
+        icon: <Bike className="w-3.5 h-3.5 text-cyan-300" />
+      };
+    }
+    if (isMerchant) {
+      return {
+        name: currentUserSession.name,
+        title: `โปรไฟล์ร้านค้าพันธมิตร: ${currentUserSession.name} (Lv.${currentUserSession.level})`,
+        roleLabel: `ร้านค้า Lv.${currentUserSession.level}`,
+        avatar: '/avatars/merchant.jpg',
+        badgeBorder: 'border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]',
+        buttonClass: 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.3)]',
+        icon: <Store className="w-3.5 h-3.5 text-amber-400" />
+      };
+    }
+    if (isPartner) {
+      return {
+        name: currentUserSession.name,
+        title: `โปรไฟล์พาร์ทเนอร์องค์กร & โรงพยาบาล: ${currentUserSession.name} (Lv.${currentUserSession.level})`,
+        roleLabel: `พาร์ทเนอร์ Lv.${currentUserSession.level}`,
+        avatar: '/avatars/partner.jpg',
+        badgeBorder: 'border-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.4)]',
+        buttonClass: 'bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border-pink-500/60 shadow-[0_0_12px_rgba(236,72,153,0.3)]',
+        icon: <Building2 className="w-3.5 h-3.5 text-pink-400" />
+      };
+    }
+    // Citizen Passenger
+    return {
+      name: currentUserSession.name,
+      title: `โปรไฟล์พลเมืองผู้โดยสาร: ${currentUserSession.name} (Lv.${currentUserSession.level})`,
+      roleLabel: `พลเมือง Lv.${currentUserSession.level}`,
+      avatar: '/avatars/citizen.jpg',
+      badgeBorder: 'border-amber-400/60 shadow-[0_0_10px_rgba(255,215,0,0.25)]',
+      buttonClass: 'bg-amber-500/15 hover:bg-amber-500/25 text-[#FFD700] border-[#FFD700]/40 shadow-[0_0_12px_rgba(255,215,0,0.2)]',
+      icon: <User className="w-3.5 h-3.5 text-[#FFD700]" />
+    };
+  })();
 
   useEffect(() => {
     const updateClock = () => {
@@ -179,19 +256,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           {currentUserSession ? (
             <div className="hidden lg:flex items-center gap-3">
               {/* Role Badge and Identification */}
-              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-[#0B1736] border border-cyan-500/40 shadow-[0_0_18px_rgba(0,210,255,0.15)] font-mono">
-                <div className="w-8 h-8 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
+              <div 
+                onClick={() => setShowRoleInfoModal(true)}
+                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-[#0B1736] border ${profileInfo.badgeBorder} font-mono cursor-pointer hover:brightness-110 transition-all`}
+                title="คลิกเพื่อดูรายละเอียดบทบาทหรือสลับบทบาท"
+              >
+                <div className="relative w-8 h-8 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
                   <img 
-                    src={
-                      currentUserSession.role === 'driver' ? '/avatars/knight.jpg' :
-                      currentUserSession.role === 'merchant' ? '/avatars/merchant.jpg' :
-                      currentUserSession.role === 'partner' ? '/avatars/partner.jpg' :
-                      '/avatars/citizen.jpg'
-                    }
+                    src={profileInfo.avatar}
                     alt={currentUserSession.name}
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
+                  {isDriver && (
+                    <div className="absolute -bottom-0.5 -right-0.5 px-1 py-0.2 bg-black/80 rounded text-[9px]">
+                      {isDriverCitizen ? '🦥' : '🛵'}
+                    </div>
+                  )}
                 </div>
                 <div className="text-left">
                   <div className="flex items-center gap-2">
@@ -211,8 +292,43 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               </div>
 
+              {/* Dual-Role Switcher for Drivers (Prominently next to user card) */}
+              {isDriver && (
+                <div className="flex items-center gap-1.5">
+                  {isDriverCitizen ? (
+                    <button
+                      type="button"
+                      id="navbar-switch-to-driver-btn"
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(800);
+                        onToggleDriverPersona?.('driver');
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/25 to-blue-600/25 hover:from-cyan-500/35 hover:to-blue-600/35 text-cyan-300 border border-cyan-400/60 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,210,255,0.3)] active:scale-95 transition-all cursor-pointer animate-pulse"
+                      title="สลับกลับเป็นพี่วิน พร้อมรับงานและเปิดระบบเรดาร์"
+                    >
+                      <Bike className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>สลับกลับเป็นพี่วิน 🛵</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      id="navbar-switch-to-citizen-btn"
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(800);
+                        onToggleDriverPersona?.('customer');
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 border border-emerald-400/50 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.2)] active:scale-95 transition-all cursor-pointer"
+                      title="วันไหนไม่อยากวิ่งงาน พี่วินสามารถเลือกเป็นบทบาทพลเมืองได้ โดยเลเวลและข้อมูลเท่ากัน"
+                    >
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>🦥 วันนี้พักงาน: สลับเป็นพลเมือง</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Role-allowed Navigation links */}
-              {currentUserSession.role === 'customer' && (
+              {(currentUserSession.role === 'customer' || isDriverCitizen) && (
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -247,7 +363,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
-              {currentUserSession.role === 'driver' && (
+              {currentUserSession.role === 'driver' && !isDriverCitizen && (
                 <div className="flex items-center gap-1">
                   <div className="px-3 py-1.5 rounded-xl text-xs font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-400/40 flex items-center gap-1.5">
                     <Bike className="w-3.5 h-3.5" />
@@ -315,28 +431,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00D2FF]" />
             </button>
 
-            {/* 3D Holographic Display Toggle Button */}
-            {onToggle3DHoloMode && (
-              <button
-                type="button"
-                id="navbar-holo-toggle-btn"
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(1100);
-                  onToggle3DHoloMode();
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer active:scale-95 border ${
-                  is3DHoloMode
-                    ? 'bg-gradient-to-r from-cyan-500/25 via-pink-500/25 to-purple-600/25 text-cyan-300 border-cyan-400/60 shadow-[0_0_15px_rgba(0,240,255,0.4),0_0_20px_rgba(255,0,128,0.25)] ring-1 ring-cyan-400/50'
-                    : 'bg-white/5 hover:bg-white/10 text-slate-400 border-white/10'
-                }`}
-                title="สลับโหมดหน้าจอแสดงผลสามมิติ Cyberpunk (3D Holographic HUD Display)"
-              >
-                <Box className={`w-3.5 h-3.5 ${is3DHoloMode ? 'text-[#00F0FF] animate-spin' : 'text-slate-400'}`} style={{ animationDuration: '8s' }} />
-                <span className="hidden sm:inline">3D โฮโลแกรม</span>
-                <span className={`w-1.5 h-1.5 rounded-full ${is3DHoloMode ? 'bg-[#FF007F] shadow-[0_0_8px_#FF007F] animate-pulse' : 'bg-slate-500'}`} />
-              </button>
-            )}
-
             {/* 2. ไอคอนแจ้งเตือน (Notifications) */}
             <button
               id="navbar-notification-btn"
@@ -353,7 +447,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </button>
 
-            {/* 3. ไอคอนโปรไฟล์ (Citizen Profile) */}
+            {/* 3. ไอคอนโปรไฟล์ตามแต่ละบทบาทที่เลือก (Profile icon matches active role/persona) */}
             <button
               id="navbar-profile-btn"
               onClick={() => {
@@ -361,26 +455,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                 if (onOpenProfile) {
                   onOpenProfile();
                 } else {
-                  onSelectMode('passenger');
+                  onSelectMode(isDriverCitizen || currentUserSession?.role === 'customer' ? 'passenger' : 'driver');
                 }
               }}
-              className="relative p-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-[#FFD700] border border-[#FFD700]/40 transition-all cursor-pointer shadow-[0_0_12px_rgba(255,215,0,0.2)] flex items-center gap-1 active:scale-95"
-              title={currentUserSession ? `โปรไฟล์: ${currentUserSession.name} (${currentUserSession.roleTitleTh})` : "โปรไฟล์พลเมือง"}
+              className={`relative p-1.5 sm:px-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${profileInfo.buttonClass}`}
+              title={profileInfo.title}
             >
-              <div className="w-5 h-5 rounded-full overflow-hidden border border-cyan-400/50 shadow-[0_0_6px_#00D2FF] flex-shrink-0">
+              <div className={`w-5 h-5 rounded-full overflow-hidden border ${profileInfo.badgeBorder} flex-shrink-0`}>
                 <img 
-                  src={
-                    currentUserSession?.role === 'driver' ? '/avatars/knight.jpg' :
-                    currentUserSession?.role === 'merchant' ? '/avatars/merchant.jpg' :
-                    currentUserSession?.role === 'partner' ? '/avatars/partner.jpg' :
-                    '/avatars/citizen.jpg'
-                  }
-                  alt="Profile"
+                  src={profileInfo.avatar}
+                  alt={profileInfo.name}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <User className="w-3.5 h-3.5 text-[#FFD700]" />
+              {profileInfo.icon}
+              <span className="hidden xl:inline text-[11px] font-mono font-bold whitespace-nowrap">
+                {profileInfo.roleLabel}
+              </span>
             </button>
 
             {/* Mobile Sign Out Button */}
@@ -496,6 +588,182 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>{ch.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Dual-Role Status Sub-bar for Drivers (Works seamlessly on Mobile & Desktop) */}
+      {currentUserSession && isDriver && (
+        <div className="bg-gradient-to-r from-[#061224] via-[#091D3E] to-[#061224] border-t border-cyan-500/25 px-3 sm:px-6 py-1.5 text-xs font-mono">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              {isDriverCitizen ? (
+                <span className="flex items-center gap-1.5 text-emerald-300 font-bold">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>โหมดพลเมือง (พี่วินพักงาน) • เลเวล {currentUserSession.level} คงเดิม</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-cyan-300 font-bold">
+                  <Bike className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>โหมดพี่วินอัศวิน (พร้อมรับงาน) • เลเวล {currentUserSession.level}</span>
+                </span>
+              )}
+              <span className="hidden sm:inline text-slate-500">•</span>
+              <span className="hidden sm:inline text-slate-400 text-[11px]">
+                {isDriverCitizen ? 'วันไหนไม่อยากวิ่งงาน พี่วินสามารถเลือกเป็นบทบาทพลเมืองได้' : 'เปิดระบบรับงาน เรดาร์ และนำทาง'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(800);
+                onToggleDriverPersona?.(isDriverCitizen ? 'driver' : 'customer');
+              }}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 ${
+                isDriverCitizen
+                  ? 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/60 shadow-[0_0_12px_rgba(0,210,255,0.25)]'
+                  : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/60 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+              }`}
+            >
+              {isDriverCitizen ? (
+                <>
+                  <Bike className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>สลับกลับเป็นพี่วิน 🛵</span>
+                </>
+              ) : (
+                <>
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>🦥 วันนี้พักงาน: สลับเป็นพลเมือง</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Role Info & Dual-Role Switcher Modal */}
+      {showRoleInfoModal && currentUserSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-[#0A1633] border border-cyan-500/40 rounded-3xl p-6 shadow-[0_0_40px_rgba(0,210,255,0.3)] relative overflow-hidden text-left">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-14 h-14 rounded-2xl overflow-hidden border-2 ${profileInfo.badgeBorder} shadow-lg relative flex-shrink-0`}>
+                  <img 
+                    src={profileInfo.avatar}
+                    alt={currentUserSession.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {isDriver && (
+                    <div className="absolute bottom-0 right-0 px-1.5 py-0.5 bg-black/90 rounded-tl text-[10px]">
+                      {isDriverCitizen ? '🦥' : '🛵'}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">{currentUserSession.name}</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-400/30">
+                      LV.{currentUserSession.level} (XP เท่ากันทุกบทบาท)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-mono mt-1">
+                    ID: {currentUserSession.id} • {currentUserSession.phone}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowRoleInfoModal(false)}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-400">บทบาทปัจจุบัน:</span>
+                  <span className="font-bold text-cyan-300 flex items-center gap-1">
+                    {profileInfo.icon}
+                    <span>{currentUserSession.roleTitleTh}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Driver Dual-Role Section */}
+              {isDriver ? (
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0D2447] to-[#08152B] border border-cyan-400/40 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                    <Crown className="w-4 h-4 text-amber-400" />
+                    <span>ระบบสองบทบาท (Dual-Persona for Driver)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    วันไหนพี่วินไม่อยากวิ่งงาน สามารถเลือกเป็นบทบาทพลเมืองได้ โดยที่เลเวลและข้อมูลทั้งหมดจะเท่ากันทั้งสองบทบาท
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(800);
+                        onToggleDriverPersona?.('driver');
+                        setShowRoleInfoModal(false);
+                      }}
+                      className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                        !isDriverCitizen
+                          ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_15px_rgba(0,210,255,0.3)]'
+                          : 'bg-black/30 border-white/10 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Bike className="w-4 h-4" />
+                      <span>โหมดพี่วิน (รับงาน)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(800);
+                        onToggleDriverPersona?.('customer');
+                        setShowRoleInfoModal(false);
+                      }}
+                      className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                        isDriverCitizen
+                          ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                          : 'bg-black/30 border-white/10 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      <span>โหมดพลเมือง (พักงาน)</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-400/30 text-xs text-amber-200/90 leading-relaxed font-mono">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-300 mb-1">
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>ระบบรักษาความปลอดภัยบทบาท (Role Lock)</span>
+                  </div>
+                  พลเมืองไม่สามารถเปลี่ยนบทบาทเป็นพี่วินได้โดยตรง เนื่องจากต้องผ่านการตรวจสอบประวัติและมีใบอนุญาตขับขี่สาธารณะ
+                </div>
+              )}
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRoleInfoModal(false);
+                    onOpenProfile?.();
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-all shadow-[0_0_15px_rgba(0,210,255,0.4)] cursor-pointer"
+                >
+                  ดูโปรไฟล์และค่าสถานะเต็ม
+                </button>
+              </div>
             </div>
           </div>
         </div>

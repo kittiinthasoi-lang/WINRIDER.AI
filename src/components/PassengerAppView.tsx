@@ -29,6 +29,7 @@ import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { CyberGraphic, DreamRideVehicleImage } from './CyberGraphic';
+import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import confetti from 'canvas-confetti';
 import { 
   Shield, 
@@ -204,6 +205,8 @@ interface PassengerAppViewProps {
   onAddNewCustomerItem?: (item: any) => void;
   activeTab?: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile';
   onTabChange?: (tab: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile') => void;
+  currentUserSession?: UserSession | null;
+  onToggleDriverPersona?: (targetPersona: 'driver' | 'customer') => void;
 }
 
 export const PassengerAppView: React.FC<PassengerAppViewProps> = ({ 
@@ -213,7 +216,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   onNavigateToMarket,
   onAddNewCustomerItem,
   activeTab: propActiveTab,
-  onTabChange
+  onTabChange,
+  currentUserSession,
+  onToggleDriverPersona,
 }) => {
   const [internalActiveTab, setInternalActiveTab] = useState<'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile'>('home');
   const activeTab = propActiveTab !== undefined ? propActiveTab : internalActiveTab;
@@ -412,6 +417,27 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [showCustomerQrModal, setShowCustomerQrModal] = useState<boolean>(false);
   const [customerQrAmount, setCustomerQrAmount] = useState<number>(150);
   const [customerQrTitle, setCustomerQrTitle] = useState<string>('สินค้าจาก วันนี้มีของมาขาย');
+
+  const isDriver = isDriverAccount(currentUserSession);
+  const isDriverCitizen = isDriverInCitizenMode(currentUserSession);
+
+  // Sync citizen profile with currentUserSession (Equal levels & persistent persona)
+  React.useEffect(() => {
+    if (currentUserSession) {
+      setCitizenLevel(currentUserSession.level);
+      setCitizenNextXp(calculateLevelMaxXp(currentUserSession.level, 'citizen'));
+      setCitizenXp(Math.round(calculateLevelMaxXp(currentUserSession.level, 'citizen') * 0.42));
+
+      setPassengerProfileData(prev => ({
+        ...prev,
+        displayName: currentUserSession.name || prev.displayName,
+        bioStatus: isDriverCitizen 
+          ? 'พลเมือง (พี่วินพักงาน 1 วัน) • เลเวลและสถิติเชื่อมโยงกันสมบูรณ์ 🦥🛵'
+          : (currentUserSession.bio || prev.bioStatus),
+        avatarUrl: '/avatars/citizen.jpg'
+      }));
+    }
+  }, [currentUserSession, isDriverCitizen]);
 
   const currentCitizenTier = useMemo(() => getCitizenTier(citizenLevel), [citizenLevel]);
   const citizenDifficultyMetrics = useMemo(() => getLevelDifficultyMetrics(citizenLevel), [citizenLevel]);
@@ -1100,43 +1126,40 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   </button>
                 </div>
 
-                {/* Selected Dream Ride Banner (Quick Showcase) with Cyberpunk 3D Holographic Display */}
+                {/* Selected Dream Ride Banner (Quick Showcase) */}
                 <div 
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
                     setActiveTab('dreamRide');
                   }}
-                  className="holo-card-3d holo-corner-hud p-3.5 rounded-2xl flex items-center justify-between cursor-pointer transition-all group"
-                  style={{
-                    boxShadow: '-3px -3px 20px rgba(0, 240, 255, 0.25), 3px 3px 20px rgba(255, 0, 127, 0.2), inset 0 0 15px rgba(0, 240, 255, 0.08)'
-                  }}
+                  className="p-3 rounded-2xl bg-gradient-to-r from-[#0E2044] via-[#091530] to-[#070D1E] border border-[#FFD700]/50 flex items-center justify-between cursor-pointer hover:border-[#FFD700] transition-all shadow-md group"
                 >
                   <div className="flex items-center gap-3">
                     <DreamRideVehicleImage 
                       vehicle={selectedDreamRide} 
                       size="lg" 
                       rounded="rounded-xl" 
-                      className="group-hover:scale-110 transition-transform drop-shadow-[0_0_12px_rgba(0,240,255,0.6)]" 
-                      glowColor="#00F0FF" 
+                      className="group-hover:scale-110 transition-transform" 
+                      glowColor="#FFD700" 
                     />
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-pink-500/20 text-[#00F0FF] border border-[#00F0FF]/50 font-black shadow-[0_0_8px_rgba(0,240,255,0.4)]">
-                          3D HOLO VEHICLE
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#FFD700]/20 text-[#FFD700] font-bold">
+                          รถในฝันที่คุณเลือก
                         </span>
-                        <span className="text-[9px] text-pink-300 font-mono font-bold">
+                        <span className="text-[9px] text-cyan-300 font-mono">
                           {selectedDreamRide.category === 'standard' ? 'รถทั่วไป' : selectedDreamRide.category === 'sport' ? 'บิ๊กไบค์สปอร์ต' : 'คลาสสิค'}
                         </span>
                       </div>
-                      <h4 className="text-xs font-black text-white leading-tight mt-0.5 holo-text-3d">{selectedDreamRide.thaiName}</h4>
-                      <p className="text-[10px] text-slate-300 font-mono">
+                      <h4 className="text-xs font-bold text-white leading-tight mt-0.5">{selectedDreamRide.thaiName}</h4>
+                      <p className="text-[10px] text-slate-400 font-mono">
                         ความนุ่มสบาย {selectedDreamRide.specs.comfortScore}% • {selectedDreamRide.priceAddon === 0 ? 'ฟรีไม่บวกเพิ่ม' : `+฿${selectedDreamRide.priceAddon}`}
                       </p>
                     </div>
                   </div>
 
-                  <span className="text-[10px] font-mono font-bold text-[#00F0FF] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform bg-cyan-500/10 px-2 py-1 rounded-lg border border-cyan-400/30">
-                    <span>สลับรถ</span>
+                  <span className="text-[10px] font-bold text-[#FFD700] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                    <span>เลือกรถอื่น</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -1147,40 +1170,53 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     if (audioEnabled) playTactileBlip(950);
                     setShowCustomerRadarModal(true);
                   }}
-                  className="holo-card-3d holo-corner-hud p-3.5 rounded-2xl flex items-center justify-between cursor-pointer hover:brightness-110 transition-all group active:scale-98"
                   style={{ 
-                    border: '1.5px solid rgba(0, 240, 255, 0.6)',
-                    boxShadow: '0 0 30px rgba(0, 240, 255, 0.4), 0 0 20px rgba(255, 0, 127, 0.3), inset 0 0 20px rgba(0, 240, 255, 0.15)'
+                    borderColor: currentTheme.hex,
+                    boxShadow: `0 0 24px ${currentTheme.glowRgba}`
                   }}
+                  className="p-3.5 rounded-2xl bg-gradient-to-r from-[#061429] via-[#081C38] to-[#040E1E] border-2 flex items-center justify-between cursor-pointer hover:brightness-110 transition-all group active:scale-98"
                 >
                   <div className="flex items-center gap-3">
                     <div 
-                      className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-950 font-black text-xl transition-transform group-hover:scale-110 bg-gradient-to-br from-[#00F0FF] via-cyan-400 to-[#FF007F] shadow-[0_0_20px_rgba(0,240,255,0.8)]"
+                      className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-950 font-black text-xl transition-transform group-hover:scale-110"
+                      style={{ 
+                        backgroundColor: currentTheme.hex,
+                        boxShadow: `0 0 16px ${currentTheme.glowRgba}`
+                      }}
                     >
-                      <Radio className="w-6 h-6 animate-pulse text-slate-950" />
+                      <Radio className="w-6 h-6 animate-pulse" />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span 
-                          className="text-[9px] font-mono px-2 py-0.5 rounded-full font-black border bg-cyan-950/80 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.5)]"
+                          className="text-[9px] font-mono px-2 py-0.5 rounded-full font-bold border"
+                          style={{ 
+                            backgroundColor: currentTheme.darkRgba, 
+                            borderColor: currentTheme.hex, 
+                            color: currentTheme.hex 
+                          }}
                         >
-                          3D VOLUMETRIC RADAR (2.5 KM)
+                          HOLOGRAPHIC RADAR (2.5 KM)
                         </span>
-                        <span className="w-2 h-2 rounded-full animate-ping bg-[#FF007F] shadow-[0_0_8px_#FF007F]" />
+                        <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: currentTheme.hex }} />
                       </div>
-                      <h4 className="text-xs font-black text-white leading-tight mt-1 holo-text-3d">
-                        เรดาร์ 3D โฮโลแกรม สแกนพี่วิน, ร้านค้า & พาร์ทเนอร์
+                      <h4 className="text-xs font-black text-white leading-tight mt-1">
+                        เรดาร์ 3D สแกนพี่วิน, ร้านค้า & พาร์ทเนอร์รอบตัว
                       </h4>
-                      <p className="text-[10px] text-cyan-200/90 font-mono">
-                        ตรวจจับแบบเรียลไทม์ 360° รอบทิศทาง รัศมี 2.5 กม.
+                      <p className="text-[10px] text-slate-300 font-mono">
+                        ตรวจจับแบบเรียลไทม์ 360° รัศมี 2.5 กม. ในพิกัดของคุณ
                       </p>
                     </div>
                   </div>
 
                   <span 
-                    className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs font-mono shadow-[0_0_16px_rgba(0,240,255,0.7)] group-hover:scale-105 transition-transform flex items-center gap-1 flex-shrink-0 bg-gradient-to-r from-[#00F0FF] to-cyan-300"
+                    className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs font-mono shadow-md group-hover:scale-105 transition-transform flex items-center gap-1 flex-shrink-0"
+                    style={{ 
+                      backgroundColor: currentTheme.hex,
+                      boxShadow: `0 0 12px ${currentTheme.glowRgba}`
+                    }}
                   >
-                    <span>เปิดเรดาร์ 3D</span>
+                    <span>เปิดเรดาร์</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -1913,6 +1949,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                                     alt={item.name}
                                     className="w-full h-full object-cover"
                                     referrerPolicy="no-referrer"
+                                    onError={(e) => {
+                                      e.currentTarget.onerror = null;
+                                      e.currentTarget.src = '/images/shop_comm_intercom.jpg';
+                                    }}
                                   />
                                 ) : (
                                   <span className="text-2xl">{item.iconEmoji}</span>
@@ -1972,6 +2012,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                                     alt={item.name}
                                     className="w-full h-full object-cover"
                                     referrerPolicy="no-referrer"
+                                    onError={(e) => {
+                                      e.currentTarget.onerror = null;
+                                      e.currentTarget.src = '/images/cyber_coins.jpg';
+                                    }}
                                   />
                                 ) : (
                                   <CyberGraphic emoji={item.icon} size="md" />
@@ -2060,7 +2104,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           {passengerProfileData.bioStatus}
                         </p>
                         <p className="text-[10px] text-slate-300 font-mono mt-0.5">
-                          ID: <strong className="text-cyan-300">CTZ-SLOTH-999</strong> • เขตคลองสาน-เจริญนคร
+                          ID: <strong className="text-cyan-300">{currentUserSession?.id || 'CTZ-SLOTH-999'}</strong> • เขตคลองสาน-เจริญนคร
                         </p>
                       </div>
                     </div>
@@ -2090,6 +2134,50 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       </button>
                     </div>
                   </div>
+
+                  {/* Dual-Role Status Banner for Driver acting as Citizen */}
+                  {isDriver && (
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/50 via-cyan-950/40 to-black/60 border border-emerald-400/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-base">🛵 ↔️ 🦥</span>
+                          <span className="text-xs font-bold text-emerald-300">
+                            {isDriverCitizen ? 'คุณกำลังอยู่ในบทบาท: พลเมือง (พักงาน 1 วัน)' : 'บทบาทอัศวินพี่วิน'}
+                          </span>
+                          <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-400/40">
+                            LV.{currentUserSession?.level ?? citizenLevel} เท่ากันทั้ง 2 บทบาท
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-300">
+                          {isDriverCitizen
+                            ? 'วันไหนพี่วินไม่อยากวิ่งงาน สามารถใช้ชีวิตเป็นพลเมือง ซื้อของ และเรียกรถได้ตามปกติ เมื่อต้องการรับงานกดสลับกลับได้ทันที'
+                            : 'คุณสามารถสลับไปรับบทเป็นพลเมืองได้เมื่อต้องการพักงาน'}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(800);
+                          onToggleDriverPersona?.(isDriverCitizen ? 'driver' : 'customer');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,210,255,0.4)] active:scale-95 transition-all cursor-pointer flex-shrink-0"
+                      >
+                        <Bike className="w-4 h-4 text-slate-950" />
+                        <span>{isDriverCitizen ? 'สลับกลับเป็นโหมดพี่วิน 🛵' : '🦥 พักงาน: สลับเป็นพลเมือง'}</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {!isDriver && (
+                    <div className="p-2.5 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                      <span className="flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>บทบาทพลเมือง (Citizen) • สงวนสิทธิ์ไม่สามารถเปลี่ยนเป็นพี่วินได้</span>
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-bold">✓ สิทธิพลเมืองสมบูรณ์</span>
+                    </div>
+                  )}
 
                   {/* Level Progress Bar */}
                   <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1.5 font-mono">
@@ -3187,6 +3275,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       alt={selectedShopItem.name}
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = '/images/shop_comm_intercom.jpg';
+                      }}
                     />
                   ) : (
                     <span className="text-2xl">{selectedShopItem.iconEmoji}</span>
@@ -3213,6 +3305,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   alt={selectedShopItem.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = '/images/shop_comm_intercom.jpg';
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0A1428] via-transparent to-black/20 pointer-events-none" />
                 <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-sm border border-cyan-400/40 text-[10px] font-mono text-cyan-300 font-bold">

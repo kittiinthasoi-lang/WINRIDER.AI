@@ -23,8 +23,10 @@ import {
   QrCode,
   Fingerprint,
   UserPlus,
-  ChevronRight
+  ChevronRight,
+  MessageCircle
 } from 'lucide-react';
+import { LineAuthModal } from './LineAuthModal';
 
 interface SovereignAuthGatewayProps {
   onLoginSuccess?: (session: UserSession) => void;
@@ -45,6 +47,7 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
   const [phoneOrIdInput, setPhoneOrIdInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLineModalOpen, setIsLineModalOpen] = useState(false);
 
   const handleSuccess = (session: UserSession) => {
     if (typeof onLoginSuccess === 'function') {
@@ -215,6 +218,45 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
           >
             <UserPlus className="w-4 h-4 text-slate-950" />
             <span>ลงทะเบียนผู้ใช้งานใหม่ทันที</span>
+            <ChevronRight className="w-4 h-4 text-slate-950" />
+          </button>
+        </div>
+
+        {/* PROMINENT LINE INSTANT LOGIN & BINDING HERO CARD */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#06C755]/25 via-emerald-900/30 to-[#06C755]/15 border-2 border-[#06C755] shadow-[0_0_30px_rgba(6,199,85,0.3)] relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5 text-left w-full sm:w-auto">
+            <div className="w-12 h-12 rounded-2xl bg-[#06C755] flex items-center justify-center text-white flex-shrink-0 shadow-[0_0_20px_rgba(6,199,85,0.6)]">
+              <MessageCircle className="w-7 h-7 fill-white text-[#06C755]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#06C755] text-slate-950 font-black">
+                  LINE CONNECT & LOGIN
+                </span>
+                <span className="text-xs text-emerald-300 font-mono font-bold">
+                  เร็วที่สุด • ไม่ต้องจำรหัสผ่าน
+                </span>
+              </div>
+              <h3 className="text-sm sm:text-base font-black text-white mt-0.5">
+                ลงทะเบียน / เข้าสู่ระบบผูกกับ LINE เริ่มใช้งานทันที
+              </h3>
+              <p className="text-[11px] text-slate-300 font-mono">
+                รับงานและส่งข้อความแจ้งเตือนผ่าน LINE • แชทติดต่อผู้โดยสารและพี่วินได้แบบเรียลไทม์
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            id="gateway-line-login-hero-btn"
+            onClick={() => {
+              if (audioEnabled) playNfcSyncSound();
+              setIsLineModalOpen(true);
+            }}
+            className="w-full sm:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-[#06C755] to-emerald-400 hover:brightness-110 text-slate-950 font-black text-xs font-mono shadow-[0_0_25px_rgba(6,199,85,0.6)] flex items-center justify-center gap-2 transition-all transform active:scale-95 whitespace-nowrap cursor-pointer animate-pulse"
+          >
+            <MessageCircle className="w-4 h-4 fill-slate-950 text-[#06C755]" />
+            <span>เข้าสู่ระบบด้วย LINE ทันที</span>
             <ChevronRight className="w-4 h-4 text-slate-950" />
           </button>
         </div>
@@ -393,6 +435,17 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
           </button>
         </div>
       </div>
+
+      {/* LINE AUTH MODAL */}
+      <LineAuthModal
+        isOpen={isLineModalOpen}
+        onClose={() => setIsLineModalOpen(false)}
+        audioEnabled={audioEnabled}
+        onLoginSuccess={(session) => {
+          setIsLineModalOpen(false);
+          handleSuccess(session);
+        }}
+      />
     </div>
   );
 };

@@ -9,6 +9,8 @@ export interface UserSession {
   name: string;
   phone: string;
   role: UserRole;
+  primaryRole?: UserRole; // Original registered role (e.g. 'driver')
+  activePersona?: 'driver' | 'customer'; // For drivers who switch to citizen role
   roleTitleTh: string;
   plateNumber?: string;
   shopName?: string;
@@ -21,6 +23,12 @@ export interface UserSession {
   faceImageUrl?: string;
   faceHash?: string;
   biometricVerified?: boolean;
+  lineConnected?: boolean;
+  lineUserId?: string;
+  lineDisplayName?: string;
+  linePictureUrl?: string;
+  lineStatusMessage?: string;
+  lineNotificationEnabled?: boolean;
 }
 
 const STORAGE_KEY = 'WINRIDER_ACTIVE_USER_SESSION';
@@ -31,6 +39,8 @@ export const PRESET_ACCOUNTS: UserSession[] = [
     name: 'พี่กิตติ อินทะสร้อย',
     phone: '089-445-1234',
     role: 'driver',
+    primaryRole: 'driver',
+    activePersona: 'driver',
     roleTitleTh: 'อัศวินวินมอเตอร์ไซค์ (Knight Driver)',
     plateNumber: '1กข 7789 กทม.',
     level: 100,
@@ -44,6 +54,7 @@ export const PRESET_ACCOUNTS: UserSession[] = [
     name: 'คุณ จิตใจ สล็อต',
     phone: '081-992-5678',
     role: 'customer',
+    primaryRole: 'customer',
     roleTitleTh: 'พลเมืองผู้โดยสาร (Citizen Passenger)',
     level: 12,
     xp: 2450,
@@ -238,6 +249,53 @@ export function getDefaultModeForRole(role: UserRole): AppMode {
     default:
       return 'passenger';
   }
+}
+
+// Check if the account has driver credentials (original role is driver)
+export function isDriverAccount(session: UserSession | null): boolean {
+  if (!session) return false;
+  return (
+    session.primaryRole === 'driver' ||
+    session.role === 'driver' ||
+    Boolean(session.plateNumber) ||
+    session.id.startsWith('WIN-KGT')
+  );
+}
+
+// Check if a driver is currently acting as a citizen/passenger
+export function isDriverInCitizenMode(session: UserSession | null): boolean {
+  if (!session) return false;
+  const isDriver = isDriverAccount(session);
+  return isDriver && (session.activePersona === 'customer' || session.role === 'customer');
+}
+
+// Check if a user is permitted to switch to driver mode (citizens are locked out)
+export function canUserSwitchToDriver(session: UserSession | null): boolean {
+  if (!session) return false;
+  return isDriverAccount(session);
+}
+
+// Switch driver persona between driver (ready to drive) and customer (off-duty citizen)
+// Preserves Level, XP, Rating, Points, ID and all credentials equally across both roles!
+export async function switchDriverPersona(
+  session: UserSession,
+  targetPersona: 'driver' | 'customer'
+): Promise<UserSession> {
+  const updated: UserSession = {
+    ...session,
+    primaryRole: 'driver', // Ensure primary role is marked as driver
+    activePersona: targetPersona,
+    role: targetPersona,
+    roleTitleTh:
+      targetPersona === 'driver'
+        ? 'อัศวินวินมอเตอร์ไซค์ (Knight Driver)'
+        : 'พลเมือง (พี่วินพักงาน/Off-Duty)',
+    avatarEmoji: targetPersona === 'driver' ? '🛵' : '🦥',
+    // Note: level, xp, rating, id, name, phone, plateNumber remain 100% untouched and equal!
+  };
+
+  await saveUserSession(updated);
+  return updated;
 }
 
 // Full application state reset: clears old orders, dispatch queues, chats, and initializes fresh session

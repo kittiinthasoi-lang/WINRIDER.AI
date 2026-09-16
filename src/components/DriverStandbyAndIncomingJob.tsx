@@ -29,7 +29,9 @@ import {
   Filter,
   Sun,
   SunMedium,
-  Video
+  Video,
+  MessageCircle,
+  Share2
 } from 'lucide-react';
 import { Vehicle } from '../types';
 import { ThreeDimensionalDriverRadar, Radar3DPing } from './ThreeDimensionalDriverRadar';
@@ -43,6 +45,7 @@ import {
 import { useWakeLock } from '../hooks/useWakeLock';
 import { subscribeToLiveOrders, acceptLiveOrder, advanceLiveOrderStep, LiveRideOrder } from '../utils/dispatchSync';
 import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
+import { sendJobToLine, chatWithPassengerOnLine } from '../utils/lineIntegration';
 
 export interface IncomingJobData {
   id: string;
@@ -509,7 +512,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
               {isOnDuty ? '📡' : '💤'}
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase flex items-center gap-1.5 ${
                   isOnDuty
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
@@ -518,6 +521,12 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
                   <span className={`w-2 h-2 rounded-full ${isOnDuty ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
                   {isOnDuty ? 'พร้อมรับงาน (ON DUTY - RADAR ACTIVE)' : 'พักชั่วคราว (OFF DUTY)'}
                 </span>
+
+                <span className="px-2.5 py-0.5 rounded-full bg-[#06C755]/20 text-emerald-300 border border-[#06C755]/40 text-[10px] font-mono flex items-center gap-1">
+                  <MessageCircle className="w-3 h-3 text-[#06C755]" />
+                  <span>LINE แจ้งเตือน: เชื่อมต่อแล้ว</span>
+                </span>
+
                 <button
                   type="button"
                   onClick={() => setShowDispatchRulesModal(true)}
@@ -994,26 +1003,68 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
                 </div>
               </div>
 
-              {/* Google Maps Real Route Link */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-blue-950/40 border border-blue-500/30 text-[11px]">
-                <div className="flex items-center gap-1.5 text-blue-300">
-                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>รองรับพิกัด Google Maps จริง</span>
-                  {activeIncomingJob.zoneTitle && (
-                    <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-200 text-[10px]">
-                      {activeIncomingJob.zoneTitle}
-                    </span>
-                  )}
+              {/* Google Maps Real Route Link & LINE Actions */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 rounded-xl bg-blue-950/40 border border-blue-500/30 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-blue-300">
+                    <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>รองรับพิกัด Google Maps จริง</span>
+                    {activeIncomingJob.zoneTitle && (
+                      <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-200 text-[10px]">
+                        {activeIncomingJob.zoneTitle}
+                      </span>
+                    )}
+                  </div>
+                  <a
+                    href={activeIncomingJob.googleMapsUrl || getGoogleMapsNavigationUrl(activeIncomingJob.pickupLocation, activeIncomingJob.dropoffLocation, activeIncomingJob.dropoffCoord)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-lg bg-cyan-400/20 hover:bg-cyan-400 hover:text-slate-950 text-cyan-300 text-[10px] font-bold border border-cyan-400/40 flex items-center gap-1 transition-all"
+                  >
+                    <span>เปิด Google Maps</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
-                <a
-                  href={activeIncomingJob.googleMapsUrl || getGoogleMapsNavigationUrl(activeIncomingJob.pickupLocation, activeIncomingJob.dropoffLocation, activeIncomingJob.dropoffCoord)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2.5 py-1 rounded-lg bg-cyan-400/20 hover:bg-cyan-400 hover:text-slate-950 text-cyan-300 text-[10px] font-bold border border-cyan-400/40 flex items-center gap-1 transition-all"
-                >
-                  <span>เปิด Google Maps</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+
+                {/* LINE DIRECT ACTION BUTTONS FOR JOB */}
+                <div className="grid grid-cols-2 gap-2 p-2 rounded-xl bg-[#06C755]/10 border border-[#06C755]/40 text-xs font-mono">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(850);
+                      sendJobToLine({
+                        id: activeIncomingJob.id,
+                        serviceTitle: activeIncomingJob.serviceTitle,
+                        pickupLocation: activeIncomingJob.pickupLocation,
+                        dropoffLocation: activeIncomingJob.dropoffLocation,
+                        fare: activeIncomingJob.netFare,
+                        passengerName: activeIncomingJob.customerName,
+                        passengerPhone: activeIncomingJob.customerPhone,
+                        distanceKm: activeIncomingJob.distanceKm,
+                        estMinutes: activeIncomingJob.estMinutes,
+                        googleMapsUrl: activeIncomingJob.googleMapsUrl || getGoogleMapsNavigationUrl(activeIncomingJob.pickupLocation, activeIncomingJob.dropoffLocation, activeIncomingJob.dropoffCoord)
+                      });
+                    }}
+                    className="p-2 rounded-lg bg-[#06C755] hover:brightness-110 text-slate-950 font-black text-[11px] flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
+                    title="ส่งรายละเอียดงานนี้เข้าแชทหรือกลุ่ม LINE ของคุณ"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 fill-slate-950" />
+                    <span>แชร์งานเข้า LINE</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(850);
+                      chatWithPassengerOnLine(activeIncomingJob.customerName);
+                    }}
+                    className="p-2 rounded-lg bg-black/60 hover:bg-[#06C755]/20 text-[#06C755] border border-[#06C755]/50 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                    title="เปิด LINE เพื่อทักคุยกับผู้โดยสารโดยตรง"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-[#06C755]" />
+                    <span>ติดต่อผ่าน LINE</span>
+                  </button>
+                </div>
               </div>
             </div>
 

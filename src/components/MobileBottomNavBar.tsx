@@ -26,9 +26,10 @@ import {
   LogOut,
   Lock,
   User,
-  Navigation
+  Navigation,
+  UserCheck
 } from 'lucide-react';
-import { UserSession } from '../utils/userSession';
+import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import { DriverTabType } from './KnightDriverAppView';
 
 export type MainTabType = 'home' | 'dreamRide' | 'ride' | 'shop' | 'modes' | 'garage' | 'navigation';
@@ -47,6 +48,7 @@ interface MobileBottomNavBarProps {
   onSelectChapter: (id: ChapterId) => void;
   currentUserSession?: UserSession | null;
   onSignOut?: () => void;
+  onToggleDriverPersona?: (targetPersona: 'driver' | 'customer') => void;
 }
 
 export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
@@ -63,6 +65,7 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   onSelectChapter,
   currentUserSession,
   onSignOut,
+  onToggleDriverPersona,
 }) => {
   const [isModesDrawerOpen, setIsModesDrawerOpen] = useState(false);
 
@@ -71,7 +74,9 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     return null;
   }
 
-  const isDriverRole = currentUserSession?.role === 'driver' || activeMode === 'driver';
+  const isDriver = isDriverAccount(currentUserSession);
+  const isDriverCitizen = isDriverInCitizenMode(currentUserSession);
+  const isDriverRole = (currentUserSession?.role === 'driver' && !isDriverCitizen) || (activeMode === 'driver');
 
   // Determine current active tab
   const getIsTabActive = (tabId: string) => {
@@ -361,47 +366,98 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
             </div>
 
             {/* Quick Profile Feature Item */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#FFD700]/15 via-amber-500/10 to-transparent border border-[#FFD700]/40 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-cyan-400 shadow-[0_0_10px_#00D2FF] flex-shrink-0">
-                  <img 
-                    src={
-                      currentUserSession.role === 'driver' ? '/avatars/knight.jpg' :
-                      currentUserSession.role === 'merchant' ? '/avatars/merchant.jpg' :
-                      currentUserSession.role === 'partner' ? '/avatars/partner.jpg' :
-                      '/avatars/citizen.jpg'
-                    }
-                    alt={currentUserSession.name}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-black text-white text-sm">{currentUserSession.name}</span>
-                    <span className="px-1.5 py-0.2 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 text-[9px] font-bold font-mono">
-                      LV.{currentUserSession.level}
-                    </span>
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#FFD700]/15 via-amber-500/10 to-transparent border border-[#FFD700]/40 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-full overflow-hidden border-2 ${
+                    isDriverCitizen ? 'border-emerald-400 shadow-[0_0_10px_#10B981]' :
+                    currentUserSession.role === 'driver' ? 'border-cyan-400 shadow-[0_0_10px_#00D2FF]' :
+                    currentUserSession.role === 'merchant' ? 'border-amber-500 shadow-[0_0_10px_#F59E0B]' :
+                    currentUserSession.role === 'partner' ? 'border-pink-500 shadow-[0_0_10px_#EC4899]' :
+                    'border-amber-400 shadow-[0_0_10px_#FFD700]'
+                  } flex-shrink-0 relative`}>
+                    <img 
+                      src={
+                        isDriverCitizen ? '/avatars/citizen.jpg' :
+                        currentUserSession.role === 'driver' ? '/avatars/knight.jpg' :
+                        currentUserSession.role === 'merchant' ? '/avatars/merchant.jpg' :
+                        currentUserSession.role === 'partner' ? '/avatars/partner.jpg' :
+                        '/avatars/citizen.jpg'
+                      }
+                      alt={currentUserSession.name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    {isDriver && (
+                      <div className="absolute bottom-0 right-0 px-1 py-0.2 bg-black/80 rounded-tl text-[8px]">
+                        {isDriverCitizen ? '🦥' : '🛵'}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-cyan-300">
-                    🔒 {currentUserSession.roleTitleTh} • {currentUserSession.id}
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-black text-white text-sm">{currentUserSession.name}</span>
+                      <span className="px-1.5 py-0.2 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 text-[9px] font-bold font-mono">
+                        LV.{currentUserSession.level}
+                      </span>
+                    </div>
+                    <p className="text-xs text-cyan-300 flex items-center gap-1 mt-0.5">
+                      <Lock className="w-3 h-3 text-cyan-400" />
+                      <span>{currentUserSession.roleTitleTh}</span>
+                      <span className="text-slate-500">•</span>
+                      <span className="font-mono text-[10px] text-slate-400">{currentUserSession.id}</span>
+                    </p>
+                  </div>
                 </div>
+                {onSignOut && (
+                  <button
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(800);
+                      setIsModesDrawerOpen(false);
+                      if (window.confirm(`ต้องการออกจากระบบบัญชี "${currentUserSession.name}" ใช่หรือไม่?`)) {
+                        onSignOut();
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/50 text-rose-300 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>ออก</span>
+                  </button>
+                )}
               </div>
-              {onSignOut && (
-                <button
-                  onClick={() => {
-                    if (audioEnabled) playTactileBlip(800);
-                    setIsModesDrawerOpen(false);
-                    if (window.confirm(`ต้องการออกจากระบบบัญชี "${currentUserSession.name}" ใช่หรือไม่?`)) {
-                      onSignOut();
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/50 text-rose-300 font-bold text-xs flex items-center gap-1 cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>ออก</span>
-                </button>
+
+              {/* Driver Dual-Role Switcher on Mobile Drawer */}
+              {isDriver && (
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                  <div className="text-[11px] text-slate-300 font-mono">
+                    {isDriverCitizen ? 'โหมดพลเมือง (พักวิ่งงาน)' : 'โหมดพี่วิน (รับงาน)'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(800);
+                      setIsModesDrawerOpen(false);
+                      onToggleDriverPersona?.(isDriverCitizen ? 'driver' : 'customer');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                      isDriverCitizen
+                        ? 'bg-cyan-500/25 hover:bg-cyan-500/35 text-cyan-300 border border-cyan-400/60 shadow-[0_0_12px_rgba(0,210,255,0.3)]'
+                        : 'bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 border border-emerald-400/60 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                    }`}
+                  >
+                    {isDriverCitizen ? (
+                      <>
+                        <Bike className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>สลับกลับเป็นพี่วิน 🛵</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>🦥 พักงาน: สลับเป็นพลเมือง</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
 

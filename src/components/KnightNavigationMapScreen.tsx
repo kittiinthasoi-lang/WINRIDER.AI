@@ -67,6 +67,7 @@ import {
   UserCheck,
   SlidersHorizontal,
   Volume1,
+  MessageCircle,
   X
 } from 'lucide-react';
 import {
@@ -100,6 +101,7 @@ import { ARLiveCameraNavigation, ARManeuverType } from './ARLiveCameraNavigation
 import { VirtualArOverlay } from './VirtualArOverlay';
 import { GoogleMapsLiveView } from './GoogleMapsLiveView';
 import { useRealtimeGps } from './GpsRealTimeTracker';
+import { chatWithPassengerOnLine } from '../utils/lineIntegration';
 import {
   computeLiveRoute,
   POPULAR_BANGKOK_DESTINATIONS,
@@ -271,8 +273,8 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   // Google Maps Real-time Traffic Layer Status
   const [googleMapsLiveActive, setGoogleMapsLiveActive] = useState<boolean>(true);
   
-  // 3-Way Navigation View Mode: '3d_map' | 'google_maps' | 'live_camera_ar'
-  const [navDisplayMode, setNavDisplayMode] = useState<'3d_map' | 'google_maps' | 'live_camera_ar'>(initialNavMode || '3d_map');
+  // 4-Way Navigation View Mode: '3d_map' | 'google_maps' | 'mapbox' | 'live_camera_ar'
+  const [navDisplayMode, setNavDisplayMode] = useState<'3d_map' | 'google_maps' | 'mapbox' | 'live_camera_ar'>(initialNavMode || '3d_map');
   const { gpsState } = useRealtimeGps(true);
 
   // Google Maps Routes API (New) Live Integration State
@@ -810,6 +812,22 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             <button
               type="button"
               onClick={() => {
+                if (audioEnabled) playTactileBlip(800);
+                setNavDisplayMode('mapbox');
+              }}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
+                navDisplayMode === 'mapbox'
+                  ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black shadow-[0_0_10px_#00D2FF]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Globe className="w-3 h-3" />
+              <span>🗺️ Mapbox 3D</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
                 if (audioEnabled) playTactileBlip(850);
                 setNavDisplayMode('live_camera_ar');
               }}
@@ -1102,11 +1120,12 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             }}
           />
         </div>
-      ) : navDisplayMode === 'google_maps' ? (
+      ) : navDisplayMode === 'google_maps' || navDisplayMode === 'mapbox' ? (
         <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">
           <GoogleMapsLiveView
             gpsLocation={gpsState}
             targetDestination={selectedDestination.name}
+            initialProvider={navDisplayMode === 'mapbox' ? 'mapbox' : 'google_maps'}
             height={isFullscreen ? '640px' : '520px'}
             audioEnabled={audioEnabled}
             zoom={16}
@@ -1692,6 +1711,24 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
           >
             <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
             <span>แชทลูกค้า</span>
+          </button>
+
+          {/* Contact Customer via LINE */}
+          <button
+            type="button"
+            onClick={() => {
+              if (audioEnabled) playTactileBlip(880);
+              const customerName = selectedJob?.customerName || 'ผู้โดยสาร';
+              const rideDetails = selectedJob 
+                ? `งานรับส่ง: ${selectedJob.pickupLocation} -> ${selectedJob.dropoffLocation} (ค่าโดยสาร ${selectedJob.fareThb} บาท)`
+                : `งานนำทางไปยัง: ${selectedDestination.name}`;
+              chatWithPassengerOnLine(customerName, rideDetails);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-[#06C755]/20 hover:bg-[#06C755]/30 text-[#06C755] border border-[#06C755]/50 text-xs font-mono font-bold flex items-center gap-1 shadow-[0_0_10px_rgba(6,199,85,0.25)] transition-all active:scale-95"
+            title="ติดต่อหรือแชทกับลูกค้าผ่าน LINE ทันที"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-[#06C755]" />
+            <span>ทัก LINE ลูกค้า</span>
           </button>
 
           <button

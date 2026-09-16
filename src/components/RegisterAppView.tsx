@@ -43,6 +43,8 @@ import {
 } from 'lucide-react';
 import { AIFaceBiometricScanner, BiometricScanResult } from './AIFaceBiometricScanner';
 import { CyberGraphic } from './CyberGraphic';
+import { MessageCircle } from 'lucide-react';
+import { LineAuthModal } from './LineAuthModal';
 
 interface RegisterAppViewProps {
   audioEnabled: boolean;
@@ -67,6 +69,7 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
   const [issuedCitizenId, setIssuedCitizenId] = useState<string>('');
   const [isResetting, setIsResetting] = useState<boolean>(false);
   const [resetCompleted, setResetCompleted] = useState<boolean>(false);
+  const [isLineModalOpen, setIsLineModalOpen] = useState<boolean>(false);
 
   // AI Biometric Scan state
   const [biometricResult, setBiometricResult] = useState<BiometricScanResult | null>(null);
@@ -395,6 +398,45 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
       {/* STEP 1: ROLE SELECTOR TABS */}
       {currentStep <= 2 && (
         <div className="space-y-4">
+          {/* FAST LINE REGISTRATION BANNER */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#06C755]/25 via-emerald-950/40 to-[#06C755]/15 border-2 border-[#06C755] shadow-[0_0_30px_rgba(6,199,85,0.35)] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 text-left w-full sm:w-auto">
+              <div className="w-12 h-12 rounded-2xl bg-[#06C755] flex items-center justify-center text-white flex-shrink-0 shadow-[0_0_20px_rgba(6,199,85,0.6)] animate-pulse">
+                <MessageCircle className="w-7 h-7 fill-white text-[#06C755]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#06C755] text-slate-950 font-black">
+                    LINE FAST REGISTRATION
+                  </span>
+                  <span className="text-xs text-emerald-300 font-mono font-bold">
+                    ผูกบัญชี & เริ่มต้นใหม่ทันที
+                  </span>
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-white mt-0.5">
+                  ลงทะเบียนด่วนผูกกับ LINE (1-Click Start)
+                </h3>
+                <p className="text-[11px] text-slate-300 font-mono">
+                  ไม่ต้องกรอกแบบฟอร์มยาว เชื่อมต่อ LINE ID เพื่อรับส่งงานและติดต่อกันได้ทันที
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              id="register-line-instant-btn"
+              onClick={() => {
+                if (audioEnabled) playNfcSyncSound();
+                setIsLineModalOpen(true);
+              }}
+              className="w-full sm:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-[#06C755] to-emerald-400 hover:brightness-110 text-slate-950 font-black text-xs font-mono shadow-[0_0_20px_rgba(6,199,85,0.6)] flex items-center justify-center gap-2 transition-all transform active:scale-95 whitespace-nowrap cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4 fill-slate-950 text-[#06C755]" />
+              <span>ลงทะเบียนผูกกับ LINE ทันที</span>
+              <ChevronRight className="w-4 h-4 text-slate-950" />
+            </button>
+          </div>
+
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
               <Layers className="w-4 h-4 text-cyan-400" />
@@ -1633,6 +1675,18 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
         </div>
       </div>
 
+      {/* LINE AUTH & REGISTRATION MODAL */}
+      <LineAuthModal
+        isOpen={isLineModalOpen}
+        onClose={() => setIsLineModalOpen(false)}
+        audioEnabled={audioEnabled}
+        onLoginSuccess={(session) => {
+          setIsLineModalOpen(false);
+          if (onRegisteredUserSession) {
+            onRegisteredUserSession(session);
+          }
+        }}
+      />
     </div>
   );
 };

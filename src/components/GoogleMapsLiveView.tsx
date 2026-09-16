@@ -11,10 +11,13 @@ import {
   CheckCircle2,
   AlertCircle,
   Video,
-  X
+  X,
+  Globe
 } from 'lucide-react';
 import { GpsLocationState } from './GpsRealTimeTracker';
 import { playTactileBlip } from '../utils/audio';
+
+export type MapProvider = 'google_maps' | 'mapbox';
 
 interface GoogleMapsLiveViewProps {
   gpsLocation: GpsLocationState;
@@ -24,6 +27,7 @@ interface GoogleMapsLiveViewProps {
   height?: string;
   showControls?: boolean;
   mapType?: 'roadmap' | 'satellite' | 'terrain' | 'hybrid';
+  initialProvider?: MapProvider;
   audioEnabled?: boolean;
   onSwitchToCameraAR?: () => void;
   onSwitchTo3DMap?: () => void;
@@ -38,44 +42,90 @@ export const GoogleMapsLiveView: React.FC<GoogleMapsLiveViewProps> = ({
   height = '420px',
   showControls = true,
   mapType: initialMapType = 'roadmap',
+  initialProvider = 'google_maps',
   audioEnabled = true,
   onSwitchToCameraAR,
   onSwitchTo3DMap,
   onClose
 }) => {
+  const [provider, setProvider] = useState<MapProvider>(initialProvider);
   const [currentMapType, setCurrentMapType] = useState<'roadmap' | 'satellite' | 'terrain' | 'hybrid'>(initialMapType);
+  const [mapboxStyle, setMapboxStyle] = useState<'dark_navigation' | 'streets' | 'satellite'>('dark_navigation');
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
-  const [isTrafficActive, setIsTrafficActive] = useState<boolean>(true);
 
-  // Derive Google Maps Embed URL with actual coordinates or search queries
+  // Derive Google Maps and Mapbox Embed URL with actual coordinates
   const lat = gpsLocation.latitude || 13.7563;
   const lng = gpsLocation.longitude || 100.5018;
 
   // Google Maps embed URL with live coords
   const mapTypeParam = currentMapType === 'satellite' ? '&t=k' : currentMapType === 'terrain' ? '&t=p' : currentMapType === 'hybrid' ? '&t=h' : '';
-  const embedUrl = `https://maps.google.com/maps?q=${lat},${lng}&hl=th&z=${currentZoom}&output=embed${mapTypeParam}`;
+  const googleEmbedUrl = `https://maps.google.com/maps?q=${lat},${lng}&hl=th&z=${currentZoom}&output=embed${mapTypeParam}`;
+
+  // Mapbox dark navigation / OSM interactive embed
+  const bboxDelta = 0.008 * (17 / currentZoom);
+  const mapboxEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lng - bboxDelta}%2C${lat - bboxDelta * 0.7}%2C${lng + bboxDelta}%2C${lat + bboxDelta * 0.7}&layer=mapnik&marker=${lat}%2C${lng}`;
 
   const openGoogleMapsExternal = () => {
     if (audioEnabled) playTactileBlip(900);
+    const destParam = targetDestination ? `&destination=${encodeURIComponent(targetDestination)}` : `&destination=${lat},${lng}`;
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}${destParam}&travelmode=two_wheeler`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const openMapboxExternal = () => {
+    if (audioEnabled) playTactileBlip(900);
+    // Mapbox Navigation / directions URL
     const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
     <div className="relative w-full rounded-3xl overflow-hidden border border-cyan-500/40 bg-[#070D1E] shadow-2xl flex flex-col">
-      {/* Top Google Maps Bar */}
+      {/* Top Map Engine Bar (Google Maps vs Mapbox Switcher) */}
       <div className="px-4 py-2.5 bg-[#0A1633]/90 backdrop-blur-md border-b border-white/10 flex items-center justify-between flex-wrap gap-2 text-xs font-mono">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-white p-1 flex items-center justify-center shadow-md">
-            <img 
-              src="https://www.gstatic.com/images/branding/product/1x/maps_512dp.png" 
-              alt="Google Maps" 
-              className="w-full h-full object-contain"
-            />
+        <div className="flex items-center gap-3">
+          {/* Provider Switcher Tabs */}
+          <div className="flex items-center bg-black/70 p-1 rounded-xl border border-white/15">
+            <button
+              type="button"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(850);
+                setProvider('google_maps');
+              }}
+              className={`px-3 py-1 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all ${
+                provider === 'google_maps'
+                  ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <img 
+                src="https://www.gstatic.com/images/branding/product/1x/maps_512dp.png" 
+                alt="Google Maps" 
+                className="w-3.5 h-3.5 object-contain"
+              />
+              <span>Google Maps</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (audioEnabled) playTactileBlip(850);
+                setProvider('mapbox');
+              }}
+              className={`px-3 py-1 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all ${
+                provider === 'mapbox'
+                  ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 text-slate-950" />
+              <span>Mapbox 3D</span>
+            </button>
           </div>
+
           <div>
             <div className="flex items-center gap-1.5 font-bold text-white text-xs">
-              <span>Google Maps Live GPS</span>
+              <span>{provider === 'google_maps' ? 'Google Maps Live GPS' : 'Mapbox Vector Dark Navigation'}</span>
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             </div>
             <div className="text-[10px] text-cyan-300 flex items-center gap-1">
@@ -84,7 +134,7 @@ export const GoogleMapsLiveView: React.FC<GoogleMapsLiveViewProps> = ({
           </div>
         </div>
 
-        {/* Live Navigation View Switcher (Google Maps <-> กล้องสด AR <-> แผนที่ 3D) */}
+        {/* Live Navigation View Switcher (Google Maps / Mapbox <-> กล้องสด AR <-> แผนที่ 3D) */}
         <div className="flex items-center gap-1.5">
           {onSwitchToCameraAR && (
             <button
@@ -139,85 +189,147 @@ export const GoogleMapsLiveView: React.FC<GoogleMapsLiveViewProps> = ({
           </div>
 
           {/* Map Type Switcher */}
-          <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-white/10 text-[10px]">
-            <button
-              type="button"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(800);
-                setCurrentMapType('roadmap');
-              }}
-              className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
-                currentMapType === 'roadmap' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              แผนที่ถนน
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(800);
-                setCurrentMapType('satellite');
-              }}
-              className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
-                currentMapType === 'satellite' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              ดาวเทียม
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(800);
-                setCurrentMapType('terrain');
-              }}
-              className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
-                currentMapType === 'terrain' ? 'bg-emerald-400 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              ภูมิประเทศ
-            </button>
-          </div>
+          {provider === 'google_maps' ? (
+            <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-white/10 text-[10px]">
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setCurrentMapType('roadmap');
+                }}
+                className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                  currentMapType === 'roadmap' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                แผนที่ถนน
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setCurrentMapType('satellite');
+                }}
+                className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                  currentMapType === 'satellite' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                ดาวเทียม
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setCurrentMapType('terrain');
+                }}
+                className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                  currentMapType === 'terrain' ? 'bg-emerald-400 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                ภูมิประเทศ
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-white/10 text-[10px]">
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setMapboxStyle('dark_navigation');
+                }}
+                className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                  mapboxStyle === 'dark_navigation' ? 'bg-cyan-400 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Night HUD
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  setMapboxStyle('streets');
+                }}
+                className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                  mapboxStyle === 'streets' ? 'bg-blue-400 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Streets
+              </button>
+            </div>
+          )}
 
-          {/* External Google Maps Button */}
+          {/* External Navigation Launch Button */}
           <button
             type="button"
-            onClick={openGoogleMapsExternal}
-            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all flex items-center gap-1 text-[10px]"
-            title="เปิดใน Google Maps แอปพลิเคชัน"
+            onClick={provider === 'google_maps' ? openGoogleMapsExternal : openMapboxExternal}
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-500 hover:brightness-110 text-slate-950 font-black transition-all flex items-center gap-1 text-[10px] shadow-md"
+            title="เปิดระบบนำทางเลี้ยวต่อเลี้ยว (Turn-by-Turn Motorcycle Mode)"
           >
-            <ExternalLink className="w-3.5 h-3.5" />
+            <Navigation className="w-3 h-3 fill-slate-950" />
+            <span>นำทาง GPS</span>
+            <ExternalLink className="w-3 h-3" />
           </button>
         </div>
       </div>
 
-      {/* Embedded Google Maps Viewport */}
-      <div className="relative w-full overflow-hidden bg-slate-900" style={{ height }}>
-        <iframe
-          title="Google Maps Realtime View"
-          src={embedUrl}
-          width="100%"
-          height="100%"
-          style={{ border: 0, filter: currentMapType === 'roadmap' ? 'contrast(1.05) saturate(1.1)' : 'none' }}
-          allowFullScreen={false}
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          className="w-full h-full"
-        />
+      {/* Embedded Maps Viewport */}
+      <div className="relative w-full overflow-hidden bg-slate-950" style={{ height }}>
+        {provider === 'google_maps' ? (
+          <iframe
+            title="Google Maps Realtime View"
+            src={googleEmbedUrl}
+            width="100%"
+            height="100%"
+            style={{ border: 0, filter: currentMapType === 'roadmap' ? 'contrast(1.05) saturate(1.1)' : 'none' }}
+            allowFullScreen={false}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            className="w-full h-full"
+          />
+        ) : (
+          <div className="relative w-full h-full">
+            <iframe
+              title="Mapbox Navigation View"
+              src={mapboxEmbedUrl}
+              width="100%"
+              height="100%"
+              style={{ 
+                border: 0, 
+                filter: mapboxStyle === 'dark_navigation' 
+                  ? 'invert(90%) hue-rotate(180deg) brightness(95%) contrast(120%)' 
+                  : 'contrast(1.1)' 
+              }}
+              allowFullScreen={false}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="w-full h-full"
+            />
+            {/* Mapbox Vector Style Brand Overlay */}
+            <div className="absolute top-3 right-3 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-xl border border-cyan-400/40 text-[10px] text-cyan-300 font-mono font-bold flex items-center gap-1.5 pointer-events-none shadow-lg">
+              <Globe className="w-3.5 h-3.5 text-cyan-400 animate-spin" style={{ animationDuration: '8s' }} />
+              <span>Mapbox High-Speed Vector Engine</span>
+            </div>
+          </div>
+        )}
 
         {/* Floating Live GPS & Target Overlay */}
         <div className="absolute top-3 left-3 z-10 p-3 rounded-2xl bg-[#091530]/90 backdrop-blur-md border border-cyan-500/40 shadow-xl max-w-xs space-y-1.5 font-mono text-[11px] pointer-events-auto">
           <div className="flex items-center justify-between">
             <span className="text-cyan-300 font-bold flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>ตำแหน่งพิกัดดาวเทียมสด</span>
+              <span>{provider === 'google_maps' ? 'พิกัดดาวเทียม Google Maps' : 'พิกัดดาวเทียม Mapbox'}</span>
             </span>
             <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              {gpsLocation.status === 'locked' ? 'GPS LOCKED 🛰️' : 'SIMULATED GPS 📍'}
+              {gpsLocation.status === 'locked' ? 'GPS LOCKED 🛰️' : 'REAL GPS 📍'}
             </span>
           </div>
           <p className="text-slate-200 text-xs font-bold leading-tight">
             {gpsLocation.addressLabel}
           </p>
+          {targetDestination && (
+            <div className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
+              <span>🎯 ปลายทาง: {targetDestination}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-white/10">
             <span>ความแม่นยำ: ±{gpsLocation.accuracy}m</span>
             <span>ความเร็ว: {gpsLocation.speed || 0} km/h</span>
@@ -232,7 +344,7 @@ export const GoogleMapsLiveView: React.FC<GoogleMapsLiveViewProps> = ({
               if (audioEnabled) playTactileBlip(800);
               setCurrentZoom(prev => Math.min(19, prev + 1));
             }}
-            className="w-9 h-9 rounded-xl bg-black/80 hover:bg-black text-white border border-white/20 flex items-center justify-center font-bold text-base shadow-lg transition-all active:scale-95"
+            className="w-9 h-9 rounded-xl bg-black/80 hover:bg-black text-white border border-white/20 flex items-center justify-center font-bold text-base shadow-lg transition-all active:scale-95 cursor-pointer"
             title="ซูมเข้า"
           >
             +
@@ -243,7 +355,7 @@ export const GoogleMapsLiveView: React.FC<GoogleMapsLiveViewProps> = ({
               if (audioEnabled) playTactileBlip(800);
               setCurrentZoom(prev => Math.max(12, prev - 1));
             }}
-            className="w-9 h-9 rounded-xl bg-black/80 hover:bg-black text-white border border-white/20 flex items-center justify-center font-bold text-base shadow-lg transition-all active:scale-95"
+            className="w-9 h-9 rounded-xl bg-black/80 hover:bg-black text-white border border-white/20 flex items-center justify-center font-bold text-base shadow-lg transition-all active:scale-95 cursor-pointer"
             title="ซูมออก"
           >
             -

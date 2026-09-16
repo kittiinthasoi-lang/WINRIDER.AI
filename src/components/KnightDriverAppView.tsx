@@ -17,6 +17,7 @@ import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { DriverPaymentQrCodeModal } from './DriverPaymentQrCodeModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { calculateLevelMaxXp, getLevelDifficultyMetrics } from '../data/tierHierarchyData';
+import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import { 
   Shield, 
   Wrench, 
@@ -63,10 +64,10 @@ import {
   User
 } from 'lucide-react';
 
-import waveBikeImg from '../assets/images/garage_wave_commuter_1788938989771.jpg';
-import pcxBikeImg from '../assets/images/garage_pcx_scooter_1788939007353.jpg';
-import adventureBikeImg from '../assets/images/garage_adventure_bike_1788939029183.jpg';
-import evBikeImg from '../assets/images/garage_clean_ev_1788939045009.jpg';
+const waveBikeImg = '/images/garage_wave.jpg';
+const pcxBikeImg = '/images/garage_pcx.jpg';
+const adventureBikeImg = '/images/garage_adventure.jpg';
+const evBikeImg = '/images/garage_ev.jpg';
 
 export type DriverTabType = 'profile' | 'garage' | 'cabinet' | 'armor' | 'armorLab' | 'calculator' | 'installment' | 'wallet' | 'jobs' | 'quests' | 'navigation';
 
@@ -75,6 +76,8 @@ interface KnightDriverAppViewProps {
   onOpenWinBuddy?: () => void;
   activeDriverTab?: DriverTabType;
   onSelectDriverTab?: (tab: DriverTabType) => void;
+  currentUserSession?: UserSession | null;
+  onToggleDriverPersona?: (targetPersona: 'driver' | 'customer') => void;
 }
 
 export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({ 
@@ -82,6 +85,8 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   onOpenWinBuddy,
   activeDriverTab: propActiveDriverTab,
   onSelectDriverTab,
+  currentUserSession,
+  onToggleDriverPersona,
 }) => {
   const [internalDriverTab, setInternalDriverTab] = useState<DriverTabType>('jobs');
   const activeDriverTab = propActiveDriverTab !== undefined ? propActiveDriverTab : internalDriverTab;
@@ -579,6 +584,33 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                 </div>
                 <span className="text-[8px] font-mono text-[#FFD700] block">วงเงินฉุกเฉิน ฿{emergencyCreditAvailable.toLocaleString()}</span>
               </div>
+            </div>
+
+            {/* Dual-Role Switcher for Driver: Switch to Citizen on rest days */}
+            <div className="mt-3 p-3 rounded-2xl bg-gradient-to-r from-cyan-950/60 via-[#0A1A3A] to-slate-900/80 border border-cyan-400/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-lg">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm">🛵 ↔️ 🦥</span>
+                  <span className="text-xs font-bold text-cyan-300">ระบบ 2 บทบาท (Dual-Persona Role): วันนี้ไม่อยากวิ่งงาน?</span>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-bold border border-cyan-400/30">
+                    LV.{driverLevel} เท่ากันทั้ง 2 บทบาท
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-300">
+                  พี่วินสามารถสลับไปใช้ชีวิตเป็น 'พลเมือง' ได้ทันที เพื่อซื้อของ สั่งอาหาร หรือเรียกรถ โดยเลเวล ยศ และเครดิตจะคงเดิม
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(850);
+                  onToggleDriverPersona?.('customer');
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.35)] active:scale-95 transition-all cursor-pointer flex-shrink-0"
+              >
+                <span>🦥 พักงาน: สลับเป็นพลเมือง</span>
+              </button>
             </div>
 
             {/* TWO CRITICAL BANNERS: 1) ACTIVE DISPATCH VEHICLE & 2) EQUIPPED ARMOR SUIT */}
