@@ -22,63 +22,44 @@ import {
 import { UserDoc } from '../types/auth';
 
 /**
- * ดึง Custom Claims ของผู้ดูแลระบบ
- * รองรับทั้ง Firebase ID Token Claims จริง และโหมดพัฒนา
+ * getAdminClaims() — ฉบับแก้ไขความปลอดภัย
+ * -----------------------------------------------------------------
+ * แทนที่ฟังก์ชัน getAdminClaims() เดิมทั้งหมดใน services/adminService.ts
+ * ด้วยเวอร์ชันนี้
+ *
+ * เหตุผลที่แก้:
+ * 1. ลบการเช็ค localStorage ('WINRIDER_ADMIN_OVERRIDE_LEVEL',
+ *    'WINRIDER_ACTIVE_DEV_ACCOUNT') ออกทั้งหมด — เพราะเป็นค่าที่ผู้ใช้
+ *    แก้ไขเองได้จาก browser console โดยตรง ทำให้ใครก็ได้สิทธิ์แอดมิน
+ *    โดยไม่ต้องผ่านการยืนยันตัวตนจริงเลย
+ *
+ * 2. ลบการ fallback ไปเช็ค field "isAdmin" / "role" / "adminLevel"
+ *    ใน Firestore doc users/{uid} ออก — เพราะ field พวกนี้อยู่ใน
+ *    เอกสารที่ "เจ้าของ" แก้ไขได้เอง (ตาม firestore.rules เดิม)
+ *    ผู้ใช้ทั่วไปจึงตั้งค่าตัวเองเป็นแอดมินได้ตรงๆ
+ *
+ * แหล่งความจริงเดียวที่เหลือ = Firebase ID Token Custom Claims เท่านั้น
+ * (ตั้งค่าได้ผ่าน Admin SDK บน server/Cloud Function เท่านั้น
+ * ผู้ใช้ทั่วไปไม่มีทางแก้ไขเองได้)
+ * -----------------------------------------------------------------
  */
 export async function getAdminClaims(): Promise<AdminClaims | null> {
   const currentUser = auth.currentUser;
-  
-  // 1. ตรวจสอบจาก Dev Session หรือ LocalStorage
-  const devAccountRaw = localStorage.getItem('WINRIDER_ACTIVE_DEV_ACCOUNT');
-  const devAdminLevel = localStorage.getItem('WINRIDER_ADMIN_OVERRIDE_LEVEL') as AdminLevel | null;
+  if (!currentUser) return null;
 
-  if (devAdminLevel) {
-    return {
-      admin: true,
-      adminLevel: devAdminLevel
-    };
-  }
+  try {
+    // force refresh (true) เพื่อให้แน่ใจว่าได้ claims ล่าสุดเสมอ
+    // สำคัญมาก: ถ้าเพิ่งถูกถอดสิทธิ์แอดมิน จะได้ผลทันที ไม่ต้องรอ token หมดอายุ
+    const tokenResult = await currentUser.getIdTokenResult(true);
 
-  if (devAccountRaw) {
-    try {
-      const devAcc = JSON.parse(devAccountRaw);
-      // หากเป็นแอดมินหรือ developer testing account
-      if (devAcc.role === 'partner' || devAcc.id?.includes('SOVEREIGN') || devAcc.name?.includes('กิตติ')) {
-        return {
-          admin: true,
-          adminLevel: 'super'
-        };
-      }
-    } catch {
-      // ignore
+    if (tokenResult.claims.admin === true) {
+      return {
+        admin: true,
+        adminLevel: (tokenResult.claims.adminLevel as AdminLevel) || 'support'
+      };
     }
-  }
-
-  // 2. ตรวจสอบจาก Firebase Auth Token Custom Claims
-  if (currentUser) {
-    try {
-      const tokenResult = await currentUser.getIdTokenResult(false);
-      if (tokenResult.claims.admin === true) {
-        return {
-          admin: true,
-          adminLevel: (tokenResult.claims.adminLevel as AdminLevel) || 'support'
-        };
-      }
-      
-      // เช็ค Firestore doc users/{uid} สำหรับ fallback role
-      const uSnap = await getDoc(doc(db, 'users', currentUser.uid));
-      if (uSnap.exists()) {
-        const uData = uSnap.data();
-        if (uData.isAdmin === true || uData.role === 'admin' || uData.adminLevel) {
-          return {
-            admin: true,
-            adminLevel: (uData.adminLevel as AdminLevel) || 'super'
-          };
-        }
-      }
-    } catch (err) {
-      console.warn('Error fetching admin token claims:', err);
-    }
+  } catch (err) {
+    console.warn('Error fetching admin token claims:', err);
   }
 
   return null;
