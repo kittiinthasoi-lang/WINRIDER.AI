@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ChapterId, AppMode } from './types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ChapterId, AppMode, MarketItem } from './types';
 import { Navbar } from './components/Navbar';
 import { PassengerAppView } from './components/PassengerAppView';
 import { KnightDriverAppView, DriverTabType } from './components/KnightDriverAppView';
@@ -7,18 +7,12 @@ import { MerchantCommandCenter } from './components/MerchantCommandCenter';
 import { HospitalCommandCenter } from './components/HospitalCommandCenter';
 import { PartnerProfileView } from './components/PartnerProfileView';
 import { WinStreetMarketView } from './components/WinStreetMarketView';
-import { RegisterAppView } from './components/RegisterAppView';
-import { SovereignAuthGateway } from './components/SovereignAuthGateway';
 import { 
   UserSession, 
-  getCurrentUserSession, 
-  clearUserSession, 
-  getDefaultModeForRole,
   isDriverAccount,
   isDriverInCitizenMode,
   switchDriverPersona
 } from './utils/userSession';
-import { MarketItem } from './types';
 import { SovereignSoulSection } from './components/SovereignSoulSection';
 import { FinancialEngineSection } from './components/FinancialEngineSection';
 import { IntelligenceStealthSection } from './components/IntelligenceStealthSection';
@@ -29,8 +23,14 @@ import { WinHubGalacticSection } from './components/WinHubGalacticSection';
 import { WinBuddyModal } from './components/WinBuddyModal';
 import { CustomerVoiceCommandModal } from './components/CustomerVoiceCommandModal';
 import { NoCodeWebhookBridgeModal } from './components/NoCodeWebhookBridgeModal';
+import { PushNotificationManagerModal } from './components/PushNotificationManagerModal';
 import { MobileBottomNavBar } from './components/MobileBottomNavBar';
 import { playTactileBlip } from './utils/audio';
+import { useAuth } from './context/AuthContext';
+import { AuthModalOrView } from './components/auth/AuthModalOrView';
+import { RoleSelectionAndRegistration } from './components/auth/RoleSelectionAndRegistration';
+import { PendingReviewView } from './components/auth/PendingReviewView';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { 
   Crown, 
   Coins, 
@@ -39,25 +39,26 @@ import {
   Wrench, 
   Globe2, 
   Rocket, 
-  Sparkles, 
-  Bot,
   ChevronRight,
-  Smartphone,
-  Bike,
-  Store,
-  Building2,
   BookOpen,
-  Lock,
-  LogOut
+  Loader2
 } from 'lucide-react';
 
+const CHAPTERS: { id: ChapterId; label: string; icon: React.ReactNode; num: string }[] = [
+  { id: 'soul', label: 'จิตวิญญาณแห่งอธิปไตย', icon: <Crown className="w-4 h-4" />, num: '01' },
+  { id: 'finance', label: 'เครื่องยนต์การเงิน 2 บาท', icon: <Coins className="w-4 h-4" />, num: '02' },
+  { id: 'intelligence', label: 'ข่าวกรอง & แผนที่ CI', icon: <Radio className="w-4 h-4" />, num: '03' },
+  { id: 'armor', label: 'เทคโนโลยีชุดเกราะ 70 ระดับ', icon: <Shield className="w-4 h-4" />, num: '04' },
+  { id: 'weapons', label: '10 อาวุธยุทธวิธี', icon: <Wrench className="w-4 h-4" />, num: '05' },
+  { id: 'ecosystem', label: 'ระบบนิเวศ & 8 เสาหลัก', icon: <Globe2 className="w-4 h-4" />, num: '06' },
+  { id: 'hub_galactic', label: 'WinHub & แผนจักรวาล', icon: <Rocket className="w-4 h-4" />, num: '07' },
+];
+
 export default function App() {
-  const [currentUserSession, setCurrentUserSession] = useState<UserSession | null>(() => getCurrentUserSession());
-  const [showRegistrationFlow, setShowRegistrationFlow] = useState<boolean>(false);
-  const [activeMode, setActiveMode] = useState<AppMode>(() => {
-    const session = getCurrentUserSession();
-    return session ? getDefaultModeForRole(session.role) : 'passenger';
-  });
+  const { firebaseUser, userData, loading: authLoading, signOut, signInWithDevAccount } = useAuth();
+
+  // Mode & Tabs
+  const [activeMode, setActiveMode] = useState<AppMode>('passenger');
   const [passengerTab, setPassengerTab] = useState<'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile'>('home');
   const [driverTab, setDriverTab] = useState<DriverTabType>('jobs');
   const [activeChapter, setActiveChapter] = useState<ChapterId>('soul');
@@ -65,37 +66,55 @@ export default function App() {
   const [isBuddyModalOpen, setIsBuddyModalOpen] = useState<boolean>(false);
   const [isCustomerVoiceOpen, setIsCustomerVoiceOpen] = useState<boolean>(false);
   const [isWebhookModalOpen, setIsWebhookModalOpen] = useState<boolean>(false);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState<boolean>(false);
   const [customerListedItems, setCustomerListedItems] = useState<MarketItem[]>([]);
+  const [driverCitizenPersona, setDriverCitizenPersona] = useState<'driver' | 'customer'>('driver');
 
-  // Listen to external session changes (e.g. from modals or storage events)
+  // Convert real Firebase or Dev userData to live UserSession
+  const currentUserSession: UserSession | null = useMemo(() => {
+    if (!userData || !userData.role) return null;
+
+    const mappedRole = userData.role === 'knight' ? 'driver' 
+      : userData.role === 'citizen' ? 'customer'
+      : userData.role === 'merchant' ? 'merchant' 
+      : 'partner';
+
+    const roleTitle = userData.role === 'knight' ? 'อัศวินไรเดอร์'
+      : userData.role === 'citizen' ? 'พลเมืองอัศวิน'
+      : userData.role === 'merchant' ? 'ร้านค้าพันธมิตร'
+      : 'องค์กรพาร์ทเนอร์';
+
+    const avatar = userData.role === 'knight' ? '🏍️'
+      : userData.role === 'citizen' ? '🛡️'
+      : userData.role === 'merchant' ? '🏪'
+      : '🏢';
+
+    return {
+      id: userData.uid,
+      email: userData.email,
+      name: userData.displayName || 'อัศวินผู้กล้า',
+      phone: userData.phone || '',
+      role: mappedRole,
+      primaryRole: mappedRole,
+      activePersona: mappedRole === 'driver' ? driverCitizenPersona : 'customer',
+      roleTitleTh: roleTitle,
+      level: userData.level !== undefined ? userData.level : 1,
+      xp: userData.xp !== undefined ? userData.xp : 0,
+      rating: userData.rating !== undefined ? userData.rating : 5.0,
+      avatarEmoji: userData.avatarUrl || avatar,
+      registeredAt: userData.createdAt || new Date().toISOString(),
+    };
+  }, [userData, driverCitizenPersona]);
+
+  // Set default active mode according to registered role
   useEffect(() => {
-    const handleSessionChanged = () => {
-      const current = getCurrentUserSession();
-      setCurrentUserSession(current);
-      if (current) {
-        setActiveMode(getDefaultModeForRole(current.role));
-      }
-    };
-
-    const handleFullReset = (e: any) => {
-      const newSession = e.detail || getCurrentUserSession();
-      setCurrentUserSession(newSession);
-      setShowRegistrationFlow(false);
-      setCustomerListedItems([]);
-      setPassengerTab('home');
-      if (newSession) {
-        setActiveMode(getDefaultModeForRole(newSession.role));
-      }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    window.addEventListener('winrider:session_changed', handleSessionChanged);
-    window.addEventListener('winrider:full_reset', handleFullReset);
-    return () => {
-      window.removeEventListener('winrider:session_changed', handleSessionChanged);
-      window.removeEventListener('winrider:full_reset', handleFullReset);
-    };
-  }, []);
+    if (userData?.role) {
+      if (userData.role === 'knight') setActiveMode('driver');
+      else if (userData.role === 'citizen') setActiveMode('passenger');
+      else if (userData.role === 'merchant') setActiveMode('merchant');
+      else if (userData.role === 'partner') setActiveMode('partner');
+    }
+  }, [userData?.role, userData?.uid]);
 
   const handleAddCustomerItem = (item: MarketItem) => {
     setCustomerListedItems(prev => [item, ...prev]);
@@ -119,17 +138,15 @@ export default function App() {
   };
 
   const handleToggleDriverPersona = (targetPersona?: 'driver' | 'customer') => {
-    if (!currentUserSession) return;
-    const updated = switchDriverPersona(currentUserSession, targetPersona);
-    if (updated) {
-      setCurrentUserSession(updated);
-      if (updated.activePersona === 'customer') {
-        setActiveMode('passenger');
-      } else {
-        setActiveMode('driver');
-      }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!currentUserSession || userData?.role !== 'knight') return;
+    const newPersona = targetPersona || (driverCitizenPersona === 'driver' ? 'customer' : 'driver');
+    setDriverCitizenPersona(newPersona);
+    if (newPersona === 'customer') {
+      setActiveMode('passenger');
+    } else {
+      setActiveMode('driver');
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSelectMode = (mode: AppMode) => {
@@ -139,377 +156,347 @@ export default function App() {
       return;
     }
 
-    const isDriver = isDriverAccount(currentUserSession);
-    const isDriverCitizen = isDriverInCitizenMode(currentUserSession);
+    const isDriver = userData?.role === 'knight';
 
-    // 1. Driver Dual-Role Support:
-    // "ในกรณีเลือกบทบาทพี่วิน วันไหนพี่วินไม่อยากวิ่งงานพี่วินสามารถเลือกเป็นบทบาทพลเมืองได้
-    // โดยที่เลเวลและอื่นๆจะเหมือนเท่ากันทั้งสองบทบาท ฉะนั้นถ้าเลือกพี่วินแล้วโปรไฟล์ในหน้าหลักจะเปลี่ยนเป็นจากพี่วินเป็นพลเมืองได้ทันที"
     if (isDriver) {
       if (mode === 'passenger') {
-        if (!isDriverCitizen) {
-          const updated = switchDriverPersona(currentUserSession, 'customer');
-          if (updated) setCurrentUserSession(updated);
-        }
+        setDriverCitizenPersona('customer');
         setActiveMode('passenger');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
-
       if (mode === 'driver') {
-        if (isDriverCitizen) {
-          const updated = switchDriverPersona(currentUserSession, 'driver');
-          if (updated) setCurrentUserSession(updated);
-        }
+        setDriverCitizenPersona('driver');
         setActiveMode('driver');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
     }
 
-    // 2. Pure Customer:
-    // "แต่พลเมืองไม่สามารถเปลี่ยนบทบาทเป็นพี่วินได้"
-    if (!isDriver && currentUserSession.role === 'customer') {
-      if (mode === 'driver') {
-        alert("🔒 ระบบความปลอดภัย Role-Locked: พลเมืองไม่สามารถเปลี่ยนบทบาทเป็นพี่วินได้ (สงวนสิทธิ์เฉพาะพี่วินที่ผ่านการตรวจสอบประวัติและมีใบอนุญาตขับขี่สาธารณะ)");
-        return;
-      }
-    }
-
-    // 3. Merchant & Partner:
-    if (!isDriver && (currentUserSession.role === 'merchant' || currentUserSession.role === 'partner')) {
-      if (mode === 'driver') {
-        alert("🔒 ระบบความปลอดภัย Role-Locked: เฉพาะพี่วินเท่านั้นที่เข้าห้องควบคุมอัศวินได้ แต่สามารถใช้งานหน้าผู้โดยสาร ตลาด WIN SHOP ร้านค้า พาร์ทเนอร์ และศูนย์กู้ชีพได้อิสระ");
-        return;
-      }
+    if (!isDriver && mode === 'driver') {
+      alert("🔒 ระบบความปลอดภัย Role-Locked: พลเมืองไม่สามารถเปลี่ยนบทบาทเป็นพี่วินได้ (สงวนสิทธิ์เฉพาะพี่วินที่ผ่านการตรวจสอบประวัติและมีใบอนุญาตขับขี่สาธารณะ)");
+      return;
     }
 
     setActiveMode(mode);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSignOut = () => {
-    clearUserSession();
-    setCurrentUserSession(null);
-    setShowRegistrationFlow(false);
-    setActiveMode('passenger');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleSignOut = async () => {
+    playTactileBlip(700);
+    await signOut();
   };
 
-  // If user is not logged in: display the Role-Locked Gateway or Registration flow
-  if (!currentUserSession) {
-    if (showRegistrationFlow) {
-      return (
-        <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans selection:bg-[#00D2FF] selection:text-slate-950 p-2 sm:p-6">
-          <RegisterAppView 
-            audioEnabled={audioEnabled} 
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
-            onCancel={() => setShowRegistrationFlow(false)}
-            onRegisteredUserSession={(session) => {
-              setCurrentUserSession(session);
-              setShowRegistrationFlow(false);
-              setActiveMode(getDefaultModeForRole(session.role));
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
-        </div>
-      );
-    }
-
+  // 1. Loading state
+  if (authLoading) {
     return (
-      <SovereignAuthGateway
-        audioEnabled={audioEnabled}
-        onAuthenticated={(session) => {
-          setCurrentUserSession(session);
-          setActiveMode(getDefaultModeForRole(session.role));
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onStartRegistration={() => {
-          setShowRegistrationFlow(true);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-      />
+      <div className="min-h-screen bg-[#070D1E] flex flex-col items-center justify-center gap-4 text-slate-100 font-sans">
+        <div className="p-4 rounded-2xl bg-[#00D4FF]/10 border border-[#00D4FF]/30 text-[#00D4FF] shadow-[0_0_25px_rgba(0,212,255,0.3)] animate-pulse">
+          <Loader2 className="w-10 h-10 animate-spin" />
+        </div>
+        <div className="text-sm font-bold tracking-wider text-slate-200">
+          WINRIDER.AI กำลังเชื่อมต่อระบบความปลอดภัยอธิปไตย...
+        </div>
+      </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#070D1E] bg-cyber-grid text-slate-100 font-sans selection:bg-[#00D2FF] selection:text-slate-950 relative overflow-x-hidden">
-      {/* Futuristic Ambient Glow Orbs */}
-      <div className="fixed top-0 left-1/4 w-96 h-96 bg-[#00F0FF]/15 rounded-full blur-[140px] pointer-events-none -z-10" />
-      <div className="fixed top-1/3 right-5 w-96 h-96 bg-[#FF007F]/12 rounded-full blur-[140px] pointer-events-none -z-10" />
-      <div className="fixed bottom-1/4 left-10 w-80 h-80 bg-[#FFD700]/10 rounded-full blur-[120px] pointer-events-none -z-10" />
-      <div className="fixed bottom-10 right-1/4 w-96 h-96 bg-[#8B5CF6]/12 rounded-full blur-[130px] pointer-events-none -z-10" />
+  // 2. Not logged in to Firebase -> Show Google & Email login
+  if (!firebaseUser) {
+    return (
+      <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans flex flex-col">
+        <Navbar
+          activeMode="passenger"
+          onSelectMode={() => {}}
+          activeChapter={activeChapter}
+          onSelectChapter={handleSelectChapter}
+          audioEnabled={audioEnabled}
+          onToggleAudio={() => setAudioEnabled(prev => !prev)}
+          onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
+          onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+          onOpenWebhookModal={() => setIsWebhookModalOpen(true)}
+          currentUserSession={null}
+          onSignOut={() => {}}
+          onToggleDriverPersona={() => {}}
+          onSelectDevAccount={signInWithDevAccount}
+        />
+        <main className="flex-1 flex items-center justify-center p-4">
+          <AuthModalOrView />
+        </main>
+      </div>
+    );
+  }
 
-      {/* Sovereign Navbar */}
-      <Navbar 
+  // 3. Logged in, but hasn't selected role yet -> Show 4-card role selection & registration
+  if (!userData || !userData.role) {
+    return (
+      <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans flex flex-col">
+        <Navbar
+          activeMode="passenger"
+          onSelectMode={() => {}}
+          activeChapter={activeChapter}
+          onSelectChapter={handleSelectChapter}
+          audioEnabled={audioEnabled}
+          onToggleAudio={() => setAudioEnabled(prev => !prev)}
+          onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
+          onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+          onOpenWebhookModal={() => setIsWebhookModalOpen(true)}
+          currentUserSession={currentUserSession}
+          onSignOut={handleSignOut}
+          onToggleDriverPersona={() => {}}
+          onSelectDevAccount={signInWithDevAccount}
+        />
+        <main className="flex-1">
+          <RoleSelectionAndRegistration />
+        </main>
+      </div>
+    );
+  }
+
+  // 4. Pending review state (for knight, merchant, partner)
+  if (userData.status === 'pending_review' && userData.role !== 'citizen') {
+    return (
+      <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans flex flex-col">
+        <Navbar
+          activeMode="passenger"
+          onSelectMode={() => {}}
+          activeChapter={activeChapter}
+          onSelectChapter={handleSelectChapter}
+          audioEnabled={audioEnabled}
+          onToggleAudio={() => setAudioEnabled(prev => !prev)}
+          onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
+          onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+          onOpenWebhookModal={() => setIsWebhookModalOpen(true)}
+          currentUserSession={currentUserSession}
+          onSignOut={handleSignOut}
+          onToggleDriverPersona={handleToggleDriverPersona}
+          onSelectDevAccount={signInWithDevAccount}
+        />
+        <main className="flex-1">
+          <PendingReviewView />
+        </main>
+      </div>
+    );
+  }
+
+  // 5. Active User Dashboard
+  return (
+    <div className="min-h-screen bg-[#070D1E] text-slate-100 flex flex-col font-sans pb-24 md:pb-0">
+      {/* Sovereign Navigation Bar */}
+      <Navbar
         activeMode={activeMode}
         onSelectMode={handleSelectMode}
         activeChapter={activeChapter}
         onSelectChapter={handleSelectChapter}
         audioEnabled={audioEnabled}
-        onToggleAudio={() => setAudioEnabled(!audioEnabled)}
+        onToggleAudio={() => setAudioEnabled(prev => !prev)}
         onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
         onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
         onOpenWebhookModal={() => setIsWebhookModalOpen(true)}
+        onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
         currentUserSession={currentUserSession}
         onSignOut={handleSignOut}
         onToggleDriverPersona={handleToggleDriverPersona}
-        onOpenProfile={() => {
-          const isDriver = isDriverAccount(currentUserSession);
-          const isDriverCitizen = isDriverInCitizenMode(currentUserSession);
-          if (isDriverCitizen || currentUserSession.role === 'customer') {
-            setActiveMode('passenger');
-            setPassengerTab('profile');
-          } else if (currentUserSession.role === 'driver') {
-            setActiveMode('driver');
-          } else if (currentUserSession.role === 'merchant') {
-            setActiveMode('merchant');
-          } else {
-            setActiveMode('partner');
-          }
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
+        onSelectDevAccount={signInWithDevAccount}
       />
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-2.5 sm:px-6 py-4 sm:py-10 space-y-6 sm:space-y-10 pb-24 sm:pb-12">
-        
-        {/* Dynamic Mode Screen Render */}
-        {activeMode === 'register' && (
-          <RegisterAppView 
-            audioEnabled={audioEnabled} 
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
-            onNavigateToMode={handleSelectMode}
-            onRegisteredUserSession={(session) => {
-              setCurrentUserSession(session);
-              setCustomerListedItems([]);
-              setActiveMode(getDefaultModeForRole(session.role));
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
-        )}
-
+      {/* Main Viewport Content with ProtectedRoute */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-6 py-4">
         {activeMode === 'passenger' && (
-          <PassengerAppView 
-            audioEnabled={audioEnabled} 
-            onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
-            onNavigateToMarket={() => handleSelectMode('market')}
-            onAddNewCustomerItem={handleAddCustomerItem}
-            activeTab={passengerTab}
-            onTabChange={(tab) => setPassengerTab(tab)}
-            currentUserSession={currentUserSession}
-            onToggleDriverPersona={handleToggleDriverPersona}
-          />
+          <ProtectedRoute 
+            allowedRoles={['citizen', 'knight']}
+            onRedirectToMyDashboard={(r) => {
+              if (r === 'knight') setActiveMode('driver');
+              else if (r === 'merchant') setActiveMode('merchant');
+              else if (r === 'partner') setActiveMode('partner');
+            }}
+          >
+            <PassengerAppView
+              audioEnabled={audioEnabled}
+              onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
+              onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+              onNavigateToMarket={() => setActiveMode('market')}
+              onAddNewCustomerItem={handleAddCustomerItem}
+              activeTab={passengerTab}
+              onTabChange={setPassengerTab}
+              currentUserSession={currentUserSession}
+              onToggleDriverPersona={handleToggleDriverPersona}
+            />
+          </ProtectedRoute>
         )}
 
         {activeMode === 'driver' && (
-          <KnightDriverAppView 
-            audioEnabled={audioEnabled} 
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)} 
-            activeDriverTab={driverTab}
-            onSelectDriverTab={setDriverTab}
-            currentUserSession={currentUserSession}
-            onToggleDriverPersona={handleToggleDriverPersona}
-          />
+          <ProtectedRoute 
+            allowedRoles={['knight']}
+            onRedirectToMyDashboard={(r) => {
+              if (r === 'citizen') setActiveMode('passenger');
+              else if (r === 'merchant') setActiveMode('merchant');
+              else if (r === 'partner') setActiveMode('partner');
+            }}
+          >
+            <KnightDriverAppView
+              audioEnabled={audioEnabled}
+              onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+              activeDriverTab={driverTab}
+              onSelectDriverTab={setDriverTab}
+              currentUserSession={currentUserSession}
+              onToggleDriverPersona={handleToggleDriverPersona}
+            />
+          </ProtectedRoute>
         )}
 
         {activeMode === 'merchant' && (
-          <MerchantCommandCenter 
-            audioEnabled={audioEnabled} 
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
-            onRideToStore={(name, addr, dist) => handleRideToDestination(name, addr, dist)}
-          />
+          <ProtectedRoute 
+            allowedRoles={['merchant']}
+            onRedirectToMyDashboard={(r) => {
+              if (r === 'knight') setActiveMode('driver');
+              else if (r === 'citizen') setActiveMode('passenger');
+              else if (r === 'partner') setActiveMode('partner');
+            }}
+          >
+            <MerchantCommandCenter
+              audioEnabled={audioEnabled}
+              onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+              onRideToStore={handleRideToDestination}
+            />
+          </ProtectedRoute>
         )}
 
         {activeMode === 'partner' && (
-          <PartnerProfileView 
-            audioEnabled={audioEnabled} 
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
-            onRideToPartner={(name, addr, dist) => handleRideToDestination(name, addr, dist)}
-          />
-        )}
-
-        {activeMode === 'market' && (
-          <WinStreetMarketView 
-            audioEnabled={audioEnabled} 
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
-            customerListedItems={customerListedItems}
-            onAddNewCustomerItem={handleAddCustomerItem}
-            onBackToMain={() => handleSelectMode(currentUserSession.role === 'driver' ? 'driver' : 'passenger')}
-          />
+          <ProtectedRoute 
+            allowedRoles={['partner']}
+            onRedirectToMyDashboard={(r) => {
+              if (r === 'knight') setActiveMode('driver');
+              else if (r === 'citizen') setActiveMode('passenger');
+              else if (r === 'merchant') setActiveMode('merchant');
+            }}
+          >
+            <PartnerProfileView
+              audioEnabled={audioEnabled}
+              onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+              onRideToPartner={handleRideToDestination}
+            />
+          </ProtectedRoute>
         )}
 
         {activeMode === 'hospital' && (
-          <HospitalCommandCenter 
-            audioEnabled={audioEnabled} 
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)} 
+          <ProtectedRoute 
+            allowedRoles={['partner']}
+            onRedirectToMyDashboard={() => setActiveMode('partner')}
+          >
+            <HospitalCommandCenter
+              audioEnabled={audioEnabled}
+              onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+            />
+          </ProtectedRoute>
+        )}
+
+        {activeMode === 'market' && (
+          <WinStreetMarketView
+            audioEnabled={audioEnabled}
+            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+            customerListedItems={customerListedItems}
+            onAddNewCustomerItem={handleAddCustomerItem}
+            onBackToMain={() => setActiveMode('passenger')}
           />
         )}
 
-        {/* 7 Sacred Chapters Render in Codex Mode */}
         {activeMode === 'codex' && (
-          <div className="space-y-10">
-            {activeChapter === 'soul' && (
-              <SovereignSoulSection 
-                audioEnabled={audioEnabled} 
-                onNavigateToChapter={handleSelectChapter} 
-              />
-            )}
-
-            {activeChapter === 'finance' && (
-              <FinancialEngineSection 
-                audioEnabled={audioEnabled} 
-                onNavigateToChapter={handleSelectChapter} 
-              />
-            )}
-
-            {activeChapter === 'intelligence' && (
-              <IntelligenceStealthSection 
-                audioEnabled={audioEnabled} 
-              />
-            )}
-
-            {activeChapter === 'armor' && (
-              <ArmorTechSection 
-                audioEnabled={audioEnabled} 
-              />
-            )}
-
-            {activeChapter === 'weapons' && (
-              <HardwareWeaponsSection 
-                audioEnabled={audioEnabled} 
-              />
-            )}
-
-            {activeChapter === 'ecosystem' && (
-              <EcosystemGovernanceSection 
-                audioEnabled={audioEnabled} 
-              />
-            )}
-
-            {activeChapter === 'hub_galactic' && (
-              <WinHubGalacticSection 
-                audioEnabled={audioEnabled} 
-              />
-            )}
-
-            {/* Quick Chapter Navigation Bar */}
-            <section className="p-6 rounded-3xl bg-black/40 border border-white/10 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-cyan-400 font-bold uppercase">
-                  THE 7 SACRED CHAPTERS DIRECTORY
-                </span>
-                <span className="text-xs text-slate-400">WINRIDER.AI Master Strategy Index</span>
+          <div className="space-y-6">
+            {/* Codex Chapter Switcher Bar */}
+            <div className="bg-[#0A1633]/90 backdrop-blur-md p-2 rounded-2xl border border-[#00D2FF]/20 flex items-center gap-1.5 overflow-x-auto scrollbar-none shadow-lg">
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-[#00D2FF] whitespace-nowrap">
+                <BookOpen className="w-4 h-4" />
+                <span>EMPIRE CODEX</span>
               </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                {[
-                  { id: 'soul' as const, label: '1. จิตวิญญาณ', icon: <Crown className="w-3.5 h-3.5" /> },
-                  { id: 'finance' as const, label: '2. การเงิน $10B', icon: <Coins className="w-3.5 h-3.5" /> },
-                  { id: 'intelligence' as const, label: '3. สมองกล CI Map', icon: <Radio className="w-3.5 h-3.5" /> },
-                  { id: 'armor' as const, label: '4. คัมภีร์ชุดเกราะ', icon: <Shield className="w-3.5 h-3.5" /> },
-                  { id: 'weapons' as const, label: '5. 10 ศาสตราวุธ', icon: <Wrench className="w-3.5 h-3.5" /> },
-                  { id: 'ecosystem' as const, label: '6. ระบบนิเวศ 8 เสา', icon: <Globe2 className="w-3.5 h-3.5" /> },
-                  { id: 'hub_galactic' as const, label: '7. วินฮับ & อวกาศ', icon: <Rocket className="w-3.5 h-3.5" /> },
-                ].map((item) => (
+              {CHAPTERS.map((chap) => {
+                const isActive = activeChapter === chap.id;
+                return (
                   <button
-                    key={item.id}
+                    key={chap.id}
                     onClick={() => {
                       if (audioEnabled) playTactileBlip(800);
-                      handleSelectChapter(item.id);
+                      setActiveChapter(chap.id);
                     }}
-                    className={`p-2.5 rounded-xl text-left text-xs transition-all border flex items-center justify-between ${
-                      activeChapter === item.id
-                        ? 'bg-cyan-500 text-slate-950 font-bold border-cyan-400 shadow-[0_0_12px_rgba(0,210,255,0.4)]'
-                        : 'bg-[#070D1E] text-slate-300 border-white/10 hover:border-white/30 hover:bg-white/5'
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                      isActive
+                        ? 'bg-[#00D2FF] text-slate-950 shadow-[0_0_15px_rgba(0,210,255,0.4)]'
+                        : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                     }`}
                   >
-                    <span className="flex items-center gap-1.5 truncate">
-                      {item.icon}
-                      {item.label}
-                    </span>
-                    <ChevronRight className="w-3 h-3 opacity-60 flex-shrink-0" />
+                    {chap.icon}
+                    <span>{chap.num}. {chap.label}</span>
+                    {isActive && <ChevronRight className="w-3.5 h-3.5" />}
                   </button>
-                ))}
-              </div>
-            </section>
+                );
+              })}
+            </div>
+
+            {/* Chapter Section View */}
+            <div className="transition-all duration-300">
+              {activeChapter === 'soul' && (
+                <SovereignSoulSection 
+                  audioEnabled={audioEnabled} 
+                  onNavigateToChapter={handleSelectChapter} 
+                />
+              )}
+              {activeChapter === 'finance' && (
+                <FinancialEngineSection 
+                  audioEnabled={audioEnabled} 
+                  onNavigateToChapter={handleSelectChapter} 
+                />
+              )}
+              {activeChapter === 'intelligence' && (
+                <IntelligenceStealthSection audioEnabled={audioEnabled} />
+              )}
+              {activeChapter === 'armor' && (
+                <ArmorTechSection audioEnabled={audioEnabled} />
+              )}
+              {activeChapter === 'weapons' && (
+                <HardwareWeaponsSection audioEnabled={audioEnabled} />
+              )}
+              {activeChapter === 'ecosystem' && (
+                <EcosystemGovernanceSection audioEnabled={audioEnabled} />
+              )}
+              {activeChapter === 'hub_galactic' && (
+                <WinHubGalacticSection audioEnabled={audioEnabled} />
+              )}
+            </div>
           </div>
         )}
       </main>
 
-      {/* Floating Robot AI Pop-up Trigger (สำหรับพี่วินโดยเฉพาะ) */}
-      <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40">
-        <button
-          id="floating-buddy-robot-btn"
-          onClick={() => {
-            if (audioEnabled) playTactileBlip(1200);
-            setIsBuddyModalOpen(true);
-          }}
-          className={`relative group p-3.5 sm:p-4 rounded-2xl font-black transition-all flex items-center gap-2 border cursor-pointer shadow-2xl hover:scale-105 active:scale-95 bg-gradient-to-br from-[#FFD700] via-amber-500 to-[#070D1E] text-slate-950 ${
-            isBuddyModalOpen
-              ? 'border-amber-300 ring-2 ring-amber-300/80 ring-offset-2 ring-offset-[#070D1E] shadow-[0_0_35px_rgba(255,215,0,0.85)]'
-              : 'border-amber-400/40 shadow-[0_0_25px_rgba(255,215,0,0.5)] hover:shadow-[0_0_35px_rgba(255,215,0,0.8)]'
-          }`}
-          title="สั่งการด้วยเสียงของพี่วิน (หุ่นยนต์ WIN Buddy AI)"
-        >
-          {/* Subtle Audio/Voice Wave Ripples radiating from button when listening */}
-          {isBuddyModalOpen && (
-            <div className="absolute inset-0 rounded-2xl pointer-events-none overflow-visible">
-              <span className="absolute -inset-1 rounded-2xl border-2 border-amber-300/60 animate-voice-ripple-1 pointer-events-none" />
-              <span className="absolute -inset-2 rounded-2xl border border-amber-400/40 animate-voice-ripple-2 pointer-events-none" />
-              <span className="absolute -inset-3 rounded-2xl border border-amber-400/20 animate-voice-ripple-3 pointer-events-none" />
-            </div>
-          )}
+      {/* Sovereign Mobile Bottom Navigation Bar */}
+      <MobileBottomNavBar
+        activeMode={activeMode}
+        activePassengerTab={passengerTab}
+        onSelectPassengerTab={(tab) => {
+          setPassengerTab(tab);
+          if (activeMode !== 'passenger') setActiveMode('passenger');
+        }}
+        activeDriverTab={driverTab}
+        onSelectDriverTab={(tab) => {
+          setDriverTab(tab);
+          if (activeMode !== 'driver') setActiveMode('driver');
+        }}
+        onSelectMode={handleSelectMode}
+        audioEnabled={audioEnabled}
+        onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
+        onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+        activeChapter={activeChapter}
+        onSelectChapter={handleSelectChapter}
+        currentUserSession={currentUserSession}
+        onSignOut={handleSignOut}
+        onToggleDriverPersona={handleToggleDriverPersona}
+      />
 
-          <div className="relative flex items-center justify-center">
-            {/* Concentric voice wave ripples around the robot icon */}
-            {isBuddyModalOpen && (
-              <>
-                <span className="absolute -inset-2 rounded-full border border-amber-950/40 animate-voice-ripple-1 pointer-events-none" />
-                <span className="absolute -inset-3.5 rounded-full border border-amber-950/20 animate-voice-ripple-2 pointer-events-none" />
-              </>
-            )}
+      {/* Global Modals */}
+      <WinBuddyModal
+        isOpen={isBuddyModalOpen}
+        onClose={() => setIsBuddyModalOpen(false)}
+        audioEnabled={audioEnabled}
+      />
 
-            {/* Robot Icon: subtle speaking animation when WinBuddy modal is open */}
-            <Bot
-              className={`w-6 h-6 text-slate-950 transition-all ${
-                isBuddyModalOpen
-                  ? 'animate-speaking-robot drop-shadow-[0_0_6px_rgba(0,0,0,0.35)]'
-                  : 'animate-bounce'
-              }`}
-            />
-
-            {/* Voice Feedback: Animated Speech Waves / Equalizer under the robot when listening */}
-            {isBuddyModalOpen ? (
-              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 flex items-center justify-center gap-0.5 bg-slate-950/90 px-1 py-0.5 rounded-full border border-amber-300/60 shadow-sm pointer-events-none">
-                <span className="w-0.5 h-2 bg-amber-400 rounded-full animate-[pulse_0.6s_ease-in-out_infinite]" />
-                <span className="w-0.5 h-3 bg-amber-300 rounded-full animate-[pulse_0.4s_ease-in-out_infinite_0.15s]" />
-                <span className="w-0.5 h-3.5 bg-white rounded-full animate-[pulse_0.5s_ease-in-out_infinite_0.3s]" />
-                <span className="w-0.5 h-2 bg-amber-400 rounded-full animate-[pulse_0.45s_ease-in-out_infinite_0.1s]" />
-              </div>
-            ) : (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#070D1E] animate-ping" />
-            )}
-          </div>
-
-          <div className="hidden sm:flex flex-col text-left">
-            <span className="text-xs text-slate-950 font-black tracking-wider leading-none flex items-center gap-1">
-              หุ่นยนต์พี่วิน AI
-              {isBuddyModalOpen && (
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-700 animate-ping" />
-              )}
-            </span>
-            {isBuddyModalOpen && (
-              <span className="text-[9px] text-slate-950 font-bold tracking-tight mt-0.5">
-                กำลังฟัง/โต้ตอบ...
-              </span>
-            )}
-          </div>
-        </button>
-      </div>
-
-      {/* 1. สั่งการด้วยเสียงของลูกค้าเพื่อใช้งานแอป (เปิดจากไอคอนด้านบน) */}
       <CustomerVoiceCommandModal
         isOpen={isCustomerVoiceOpen}
         onClose={() => setIsCustomerVoiceOpen(false)}
@@ -517,51 +504,19 @@ export default function App() {
         onNavigateTab={(tab) => {
           setActiveMode('passenger');
           setPassengerTab(tab);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        onNavigateMode={(mode) => {
-          handleSelectMode(mode);
-        }}
+        onNavigateMode={(mode) => setActiveMode(mode)}
       />
 
-      {/* 2. สั่งการด้วยเสียงของพี่วิน (เปิดจาก Pop up หุ่นยนต์ที่เด้งบนหน้าจอ) */}
-      <WinBuddyModal 
-        isOpen={isBuddyModalOpen} 
-        onClose={() => setIsBuddyModalOpen(false)} 
-        audioEnabled={audioEnabled}
-      />
-
-      {/* 3. No-Code Webhook Bridge Modal (Google Sheets / Make.com / Zapier / LINE OA) */}
       <NoCodeWebhookBridgeModal
         isOpen={isWebhookModalOpen}
         onClose={() => setIsWebhookModalOpen(false)}
         audioEnabled={audioEnabled}
       />
 
-      {/* Native Mobile App Bottom Navigation Bar */}
-      <MobileBottomNavBar 
-        activeMode={activeMode}
-        activePassengerTab={passengerTab}
-        onSelectPassengerTab={(tab) => {
-          setActiveMode('passenger');
-          setPassengerTab(tab);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        activeDriverTab={driverTab}
-        onSelectDriverTab={(tab) => {
-          setActiveMode('driver');
-          setDriverTab(tab);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onSelectMode={handleSelectMode}
-        audioEnabled={audioEnabled}
-        onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
-        onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
-        activeChapter={activeChapter}
-        onSelectChapter={handleSelectChapter}
-        currentUserSession={currentUserSession}
-        onSignOut={handleSignOut}
-        onToggleDriverPersona={handleToggleDriverPersona}
+      <PushNotificationManagerModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
       />
     </div>
   );

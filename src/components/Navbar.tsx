@@ -12,7 +12,7 @@ import {
   Rocket, 
   Volume2, 
   VolumeX, 
-  AudioWaveform,
+  Bot,
   User,
   UserCheck,
   ChevronDown,
@@ -26,7 +26,6 @@ import {
   UserPlus,
   ShoppingBag,
   Flame,
-  Bell,
   Zap,
   Compass,
   LogOut,
@@ -35,7 +34,7 @@ import {
   Box
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
-import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
+import { UserSession, PRESET_ACCOUNTS, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 
 interface NavbarProps {
   activeMode: AppMode;
@@ -53,6 +52,7 @@ interface NavbarProps {
   currentUserSession?: UserSession | null;
   onSignOut?: () => void;
   onToggleDriverPersona?: (target: 'driver' | 'customer') => void;
+  onSelectDevAccount?: (acc: UserSession) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -71,10 +71,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUserSession,
   onSignOut,
   onToggleDriverPersona,
+  onSelectDevAccount,
 }) => {
   const [nfcSynced, setNfcSynced] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [showRoleInfoModal, setShowRoleInfoModal] = useState(false);
+  const [showDevModal, setShowDevModal] = useState(false);
 
   const isDriver = isDriverAccount(currentUserSession || null);
   const isDriverCitizen = isDriverInCitizenMode(currentUserSession || null);
@@ -415,9 +417,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           )}
 
-          {/* Action Buttons: Voice Command, Notification, Profile (Side-by-side) */}
+          {/* Action Buttons: Voice Command (Robot AI), Profile (Side-by-side) */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* 1. ไอคอนสั่งการด้วยเสียงของลูกค้าเพื่อใช้งานแอป (Customer Voice Command) */}
+            {/* 1. ไอคอนสั่งการด้วยเสียงของลูกค้าเพื่อใช้งานแอป (Customer Voice Robot AI) */}
             <button
               id="navbar-voice-command-btn"
               onClick={() => {
@@ -427,27 +429,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="relative p-2 rounded-xl bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-[#00D2FF] border border-[#00D2FF]/40 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,210,255,0.3)] active:scale-95 flex items-center justify-center group"
               title="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป (Customer Voice AI)"
             >
-              <AudioWaveform className="w-4 h-4 animate-pulse text-[#00D2FF] group-hover:scale-110 transition-transform" />
+              <Bot className="w-4 h-4 animate-pulse text-[#00D2FF] group-hover:scale-110 transition-transform" />
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00D2FF]" />
             </button>
 
-            {/* 2. ไอคอนแจ้งเตือน (Notifications) */}
-            <button
-              id="navbar-notification-btn"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(1000);
-                alert("🔔 การแจ้งเตือน: อัศวิน กิตติ อินทะสร้อย (Level 100 Sovereign) ประจำสถานีใกล้คุณ, มีโปรโมชั่นคอนเสิร์ตลด 20%");
-              }}
-              className="relative p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors cursor-pointer active:scale-95"
-              title="การแจ้งเตือน"
-            >
-              <Bell className="w-4 h-4 text-[#00D2FF]" />
-              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 text-[9px] text-white font-bold flex items-center justify-center">
-                3
-              </span>
-            </button>
-
-            {/* 3. ไอคอนโปรไฟล์ตามแต่ละบทบาทที่เลือก (Profile icon matches active role/persona) */}
+            {/* 2. ไอคอนโปรไฟล์ตามแต่ละบทบาทที่เลือก (Profile icon matches active role/persona) */}
             <button
               id="navbar-profile-btn"
               onClick={() => {
@@ -492,6 +478,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
+            {/* Quick Developer Account Switcher Button */}
+            {onSelectDevAccount && (
+              <button
+                type="button"
+                id="navbar-dev-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(850);
+                  setShowDevModal(true);
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-400/40 text-xs font-mono font-bold transition-all shadow-[0_0_12px_rgba(255,201,60,0.2)] active:scale-95 cursor-pointer"
+                title="สลับบัญชีตัวอย่างสำหรับผู้พัฒนา (4 บทบาทหลัก)"
+              >
+                <Wrench className="w-3.5 h-3.5 text-[#FFC93C]" />
+                <span className="hidden md:inline">บัญชีตัวอย่าง</span>
+              </button>
+            )}
+
             {/* No-Code Webhook Bridge Button */}
             {onOpenWebhookModal && (
               <button
@@ -525,22 +528,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Web Push & LINE Notify Launcher */}
-            {onOpenNotificationModal && (
-              <button
-                type="button"
-                id="push-notif-btn"
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(900);
-                  onOpenNotificationModal();
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-400/30 text-xs font-mono font-semibold transition-all active:scale-95"
-                title="ตั้งค่าการแจ้งเตือน Web Push & LINE Notify"
-              >
-                <Bell className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">แจ้งเตือน</span>
-              </button>
-            )}
+
 
             {/* PWA Install Button */}
             <div className="hidden sm:block">
@@ -752,6 +740,52 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
+              {/* Dev Accounts Switcher in Profile Modal */}
+              {onSelectDevAccount && (
+                <div className="pt-3 border-t border-white/10 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-mono text-amber-400">
+                    <span className="flex items-center gap-1.5 font-bold">
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>สลับไปยังบัญชีตัวอย่าง (Dev Accounts):</span>
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PRESET_ACCOUNTS.map((acc) => {
+                      const isCurrent = currentUserSession?.id === acc.id;
+                      return (
+                        <button
+                          key={acc.id}
+                          type="button"
+                          onClick={() => {
+                            if (audioEnabled) playTactileBlip(800);
+                            onSelectDevAccount(acc);
+                            setShowRoleInfoModal(false);
+                          }}
+                          className={`p-2 rounded-xl text-left transition-all border text-xs cursor-pointer ${
+                            isCurrent
+                              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-sm'
+                              : 'bg-white/5 border-white/10 hover:border-cyan-400/50 hover:bg-white/10 text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{acc.avatarEmoji}</span>
+                            <span className="text-[9px] font-mono px-1 rounded bg-black/40 text-cyan-300">
+                              Lv.{acc.level}
+                            </span>
+                          </div>
+                          <div className="font-bold text-white truncate text-[11px] mt-0.5">
+                            {acc.name}
+                          </div>
+                          <div className="text-[9px] text-slate-400 truncate font-mono">
+                            {acc.roleTitleTh.split(' ')[0]}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
@@ -764,6 +798,81 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ดูโปรไฟล์และค่าสถานะเต็ม
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Standalone Developer Accounts Switcher Modal */}
+      {showDevModal && onSelectDevAccount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg bg-[#0A1633] border border-amber-400/40 rounded-3xl p-6 shadow-[0_0_40px_rgba(255,201,60,0.25)] text-slate-100">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/30">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white font-thai">บัญชีตัวอย่างสำหรับผู้พัฒนา</h3>
+                  <p className="text-xs text-slate-400">เลือกสลับบัญชีเพื่อทดสอบบทบาทและสิทธิ์ของแต่ละระบบทันที</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDevModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+              {PRESET_ACCOUNTS.map((acc) => {
+                const isCurrent = currentUserSession?.id === acc.id;
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(800);
+                      onSelectDevAccount(acc);
+                      setShowDevModal(false);
+                    }}
+                    className={`p-3.5 rounded-2xl text-left transition-all border group cursor-pointer ${
+                      isCurrent
+                        ? 'bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border-cyan-400 text-white shadow-[0_0_15px_rgba(0,212,255,0.25)]'
+                        : 'bg-white/5 border-white/10 hover:border-amber-400/60 hover:bg-amber-500/10 text-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl group-hover:scale-110 transition-transform">{acc.avatarEmoji}</span>
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/40 text-amber-300 border border-amber-400/30">
+                        Lv.{acc.level}
+                      </span>
+                    </div>
+                    <div className="font-bold text-sm text-white mt-2 group-hover:text-amber-300 transition-colors">
+                      {acc.name}
+                    </div>
+                    <div className="text-xs text-cyan-300 mt-0.5">
+                      {acc.roleTitleTh}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-1">
+                      ID: {acc.id}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+              <span>* สลับบัญชีโดยตรง ไม่จำเป็นต้องกรอกรหัสผ่าน</span>
+              <button
+                type="button"
+                onClick={() => setShowDevModal(false)}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium cursor-pointer"
+              >
+                ปิดหน้าต่าง
+              </button>
             </div>
           </div>
         </div>

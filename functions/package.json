@@ -1,0 +1,21 @@
+{
+  "name": "winrider-ai-functions",
+  "version": "1.0.0",
+  "description": "WINRIDER.AI Cloud Functions Double-Entry Financial Engine",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.4.0",
+    "firebase-functions": "^7.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "private": true
+}

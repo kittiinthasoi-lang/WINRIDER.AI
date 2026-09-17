@@ -1,7 +1,104 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
+
+    // 1. Transparent fee rules: anyone can read, authenticated can seed/update
+    match /fee_rules/{ruleId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // 2. Atomic system counters (e.g. foundingKnights)
+    match /counters/{counterId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // 3. User profiles
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null;
+    }
+
+    // 4. Role Collections
+    match /knights/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null;
+    }
+
+    match /citizens/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null;
+    }
+
+    match /merchants/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null;
+    }
+
+    match /partners/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null;
+    }
+
+    // 5. WALLETS (Sovereign Wallets) - STRICTLY ADMIN SDK ONLY FOR WRITES
+    // Client can only read their own wallet balance; direct client writes are forbidden
+    match /wallets/{walletId} {
+      allow read: if request.auth != null && (request.auth.uid == walletId || walletId == 'SYSTEM_POOLS');
+      allow write: if false; // DIRECT CLIENT WRITING FORBIDDEN! Admin SDK & Cloud Functions only
+    }
+
+    // 6. LEDGER (Double-Entry Bookkeeping Journal) - STRICTLY ADMIN SDK ONLY FOR WRITES
+    // Client can audit their own transactions; direct client writes are forbidden
+    match /ledger/{entryId} {
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.citizenId == request.auth.uid ||
+        resource.data.knightId == request.auth.uid
+      );
+      allow write: if false; // DIRECT CLIENT WRITING FORBIDDEN! Admin SDK & Cloud Functions only
+    }
+
+    match /ledger_entries/{entryId} {
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.citizenId == request.auth.uid ||
+        resource.data.knightId == request.auth.uid
+      );
+      allow write: if false; // DIRECT CLIENT WRITING FORBIDDEN! Admin SDK & Cloud Functions only
+    }
+
+    // 7. IDEMPOTENCY KEYS - STRICTLY ADMIN SDK ONLY
+    match /idempotency_keys/{key} {
+      allow read, write: if false; // Internal Admin SDK & Cloud Functions only
+    }
+
+    // 8. PAYOUT REQUESTS - Callable Cloud Function only for writes
+    match /payout_requests/{requestId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if false; // Must use requestPayout callable Cloud Function
+    }
+
+    // 9. Dispatch Rides & Trips
+    match /rides/{rideId} {
+      allow read, write: if request.auth != null;
+    }
+    match /trips/{tripId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // 10. LINE Bindings & Notifications
+    match /line_bindings/{bindingId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // 11. Connection testing
+    match /_connection_test/{docId} {
       allow read, write: if true;
     }
   }

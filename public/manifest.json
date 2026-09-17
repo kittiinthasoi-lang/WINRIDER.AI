@@ -1,0 +1,32 @@
+{
+  "id": "/",
+  "name": "WINRIDER.AI",
+  "short_name": "WINRIDER",
+  "description": "WINRIDER.AI — เข้าถึงทุกเส้นเลือดฝอย แพลตฟอร์มอัศวินมอเตอร์ไซค์รับจ้างและบริการครบวงจร",
+  "theme_color": "#0A1633",
+  "background_color": "#0A1633",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

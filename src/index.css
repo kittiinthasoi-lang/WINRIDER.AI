@@ -339,3 +339,61 @@ html, body {
   animation: voice-wave-ripple 1.8s cubic-bezier(0, 0.2, 0.8, 1) 1.2s infinite;
 }
 
+/* ====================================================
+   WINRIDER.AI STRICT VISUAL DNA (70:27:3 RULE)
+   - Navy #0A1633 = 70%
+   - Neon Blue #00D4FF = 27%
+   - Gold #FFC93C = 3% (Honor, Level Badge, Wallet Totals, 6-Stars)
+   ==================================================== */
+
+:root {
+  --dna-navy: #0A1633;
+  --dna-neon: #00D4FF;
+  --dna-gold: #FFC93C;
+}
+
+body {
+  background-color: #0A1633;
+  color: #F0F6FC;
+  font-family: 'Noto Sans Thai', 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-thai {
+  font-family: 'Noto Sans Thai', 'IBM Plex Sans Thai', sans-serif;
+}
+
+.bg-navy-main {
+  background-color: #0A1633;
+}
+
+.glass-navy-card {
+  background: rgba(10, 22, 51, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 212, 255, 0.22);
+  border-radius: 16px;
+}
+
+.glass-navy-modal {
+  background: rgba(10, 22, 51, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 212, 255, 0.2);
+}
+
+.glow-neon-sm {
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.35);
+}
+
+.glow-neon-lg {
+  box-shadow: 0 0 25px rgba(0, 212, 255, 0.5), inset 0 0 10px rgba(0, 212, 255, 0.2);
+}
+
+.glow-gold-badge {
+  box-shadow: 0 0 15px rgba(255, 201, 60, 0.45);
+  border: 1px solid #FFC93C;
+}
+
+

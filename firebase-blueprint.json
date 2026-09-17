@@ -1,51 +1,193 @@
 {
   "$schema": "https://json.schemastore.org/firebase-blueprint.json",
   "entities": {
-    "UserProfile": {
-      "title": "UserProfile",
-      "description": "User profile for riders and passengers",
+    "User": {
+      "title": "User",
+      "description": "Core authenticated user document",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "role": { "type": "string", "enum": ["passenger", "driver", "merchant", "hospital"] },
-        "name": { "type": "string" },
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["knight", "citizen", "merchant", "partner"] },
+        "displayName": { "type": "string" },
         "phone": { "type": "string" },
-        "level": { "type": "number" },
-        "xp": { "type": "number" },
-        "rating": { "type": "number" },
-        "armorTier": { "type": "number" },
-        "promptPayId": { "type": "string" },
+        "province": { "type": "string" },
+        "district": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending_review", "active", "suspended"] },
+        "pdpaConsent": {
+          "type": "object",
+          "properties": {
+            "version": { "type": "string" },
+            "acceptedAt": { "type": "string" }
+          }
+        },
+        "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["id", "role", "name"]
+      "required": ["uid", "role", "displayName", "phone", "status"]
     },
-    "RideOrder": {
-      "title": "RideOrder",
-      "description": "Persistent ride orders and sovereign fund allocations",
+    "Knight": {
+      "title": "Knight",
+      "description": "Knight rider specific profile and equipment tracking",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "customerName": { "type": "string" },
-        "pickupLocation": { "type": "string" },
-        "dropoffLocation": { "type": "string" },
-        "fare": { "type": "number" },
-        "sovereignFundCut": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "accepted", "arrived_pickup", "in_transit", "completed", "cancelled"] },
-        "serviceType": { "type": "string" },
-        "driverName": { "type": "string" },
-        "createdAt": { "type": "string" }
+        "level": { "type": "number" },
+        "xp": { "type": "number" },
+        "isOnline": { "type": "boolean" },
+        "vehicleType": { "type": "string", "enum": ["motorcycle", "car"] },
+        "plateNumber": { "type": "string" },
+        "licenseNumber": { "type": "string" },
+        "kycStatus": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "isFoundingKnight": { "type": "boolean" },
+        "equipmentPaidSatang": { "type": "number" },
+        "dailyEquipmentCount": { "type": "number" },
+        "certifications": { "type": "array" },
+        "documents": { "type": "object" }
       },
-      "required": ["id", "customerName", "pickupLocation", "fare", "status"]
+      "required": ["level", "xp", "vehicleType", "plateNumber", "licenseNumber"]
+    },
+    "Citizen": {
+      "title": "Citizen",
+      "description": "Citizen passenger profile",
+      "type": "object",
+      "properties": {
+        "savedAddresses": { "type": "array" },
+        "emergencyContact": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "phone": { "type": "string" }
+          }
+        }
+      }
+    },
+    "Merchant": {
+      "title": "Merchant",
+      "description": "Merchant partner profile",
+      "type": "object",
+      "properties": {
+        "shopName": { "type": "string" },
+        "shopType": { "type": "string" },
+        "address": { "type": "string" },
+        "gpRate": { "type": "number" },
+        "taxId": { "type": "string" }
+      },
+      "required": ["shopName", "shopType", "address", "gpRate"]
+    },
+    "Partner": {
+      "title": "Partner",
+      "description": "Institutional partner organization profile",
+      "type": "object",
+      "properties": {
+        "orgName": { "type": "string" },
+        "orgType": { "type": "string" },
+        "contactPerson": { "type": "string" },
+        "estimatedUsers": { "type": "number" },
+        "gpRate": { "type": "number" }
+      },
+      "required": ["orgName", "orgType", "contactPerson", "gpRate"]
+    },
+    "Wallet": {
+      "title": "Wallet",
+      "description": "Sovereign wallet holding integer Satang amounts",
+      "type": "object",
+      "properties": {
+        "balanceSatang": { "type": "number" },
+        "pendingSatang": { "type": "number" },
+        "lockedSatang": { "type": "number" },
+        "buckets": {
+          "type": "object",
+          "properties": {
+            "system": { "type": "number" },
+            "insurance": { "type": "number" },
+            "pension": { "type": "number" },
+            "helmet": { "type": "number" },
+            "equipment": { "type": "number" }
+          }
+        }
+      },
+      "required": ["balanceSatang", "pendingSatang", "lockedSatang", "buckets"]
+    },
+    "Counter": {
+      "title": "Counter",
+      "description": "Global atomic counters such as founding knights limit",
+      "type": "object",
+      "properties": {
+        "count": { "type": "number" },
+        "limit": { "type": "number" }
+      },
+      "required": ["count", "limit"]
+    },
+    "FeeRule": {
+      "title": "FeeRule",
+      "description": "Dynamic fee matrix rule storing satang amounts and bucket cuts",
+      "type": "object",
+      "properties": {
+        "serviceType": { "type": "string" },
+        "payerRole": { "type": "string" },
+        "fareMinSatang": { "type": "number" },
+        "fareMaxSatang": { "type": "number" },
+        "amountSatang": { "type": "number" },
+        "percentBps": { "type": "number" },
+        "tier": { "type": "string" },
+        "buckets": { "type": "object" },
+        "activeFrom": { "type": "string" }
+      },
+      "required": ["serviceType", "payerRole", "buckets"]
+    },
+    "LedgerEntry": {
+      "title": "LedgerEntry",
+      "description": "Double-entry bookkeeping journal entry recording debit and credit legs",
+      "type": "object",
+      "properties": {
+        "transactionId": { "type": "string" },
+        "idempotencyKey": { "type": "string" },
+        "type": { "type": "string" },
+        "referenceId": { "type": "string" },
+        "totalDebitSatang": { "type": "number" },
+        "totalCreditSatang": { "type": "number" },
+        "balanced": { "type": "boolean" },
+        "legs": { "type": "array" }
+      },
+      "required": ["transactionId", "idempotencyKey", "type", "totalDebitSatang", "totalCreditSatang", "balanced"]
     }
   },
   "firestore": {
-    "users": {
-      "schema": "UserProfile",
-      "description": "Collection of user profiles"
+    "users/{uid}": {
+      "schema": "User",
+      "description": "Core user authentication and profile documents"
     },
-    "rides": {
-      "schema": "RideOrder",
-      "description": "Collection of ride orders"
+    "knights/{uid}": {
+      "schema": "Knight",
+      "description": "Knight driver data and vehicle metadata"
+    },
+    "citizens/{uid}": {
+      "schema": "Citizen",
+      "description": "Citizen passenger profile data"
+    },
+    "merchants/{uid}": {
+      "schema": "Merchant",
+      "description": "Merchant partner profile data"
+    },
+    "partners/{uid}": {
+      "schema": "Partner",
+      "description": "Institutional partner organization data"
+    },
+    "wallets/{uid}": {
+      "schema": "Wallet",
+      "description": "User sovereign wallet in satang (Admin SDK only writes)"
+    },
+    "ledger/{entryId}": {
+      "schema": "LedgerEntry",
+      "description": "Double-entry financial ledger records (Admin SDK only writes)"
+    },
+    "counters/{counterId}": {
+      "schema": "Counter",
+      "description": "Atomic system counters"
+    },
+    "fee_rules/{ruleId}": {
+      "schema": "FeeRule",
+      "description": "Platform transparent fee rules"
     }
   }
 }

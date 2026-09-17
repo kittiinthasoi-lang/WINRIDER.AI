@@ -56,6 +56,7 @@ export const PRESET_ACCOUNTS: UserSession[] = [
   {
     id: 'WIN-KGT-100888',
     name: 'พี่กิตติ อินทะสร้อย',
+    email: 'kitti.knight@winrider.ai',
     phone: '089-445-1234',
     role: 'driver',
     primaryRole: 'driver',
@@ -71,6 +72,7 @@ export const PRESET_ACCOUNTS: UserSession[] = [
   {
     id: 'WIN-CTZ-204551',
     name: 'คุณ จิตใจ สล็อต',
+    email: 'jitjai.citizen@winrider.ai',
     phone: '081-992-5678',
     role: 'customer',
     primaryRole: 'customer',
@@ -84,6 +86,7 @@ export const PRESET_ACCOUNTS: UserSession[] = [
   {
     id: 'WIN-MCH-309112',
     name: 'ร้านข้าวมันไก่เฮียชัย (เอกมัย ซอย 10)',
+    email: 'hiahai.merchant@winrider.ai',
     phone: '085-331-9090',
     role: 'merchant',
     roleTitleTh: 'ร้านค้าพันธมิตร (Merchant)',
@@ -97,6 +100,7 @@ export const PRESET_ACCOUNTS: UserSession[] = [
   {
     id: 'WIN-PTN-401999',
     name: 'รพ.สมิติเวช สุขุมวิท (ศูนย์กู้ชีพ 2฿)',
+    email: 'samitivej.partner@winrider.ai',
     phone: '02-711-8000',
     role: 'partner',
     roleTitleTh: 'พันธมิตรองค์กร & โรงพยาบาล (Partner)',
