@@ -22,7 +22,7 @@ if (!targetEmail) {
 
 admin.initializeApp({
   credential:admin.applicationDefault(),
-  projectId: "decoded-robot-6lkcn",
+  
 });
 
 async function main() {
