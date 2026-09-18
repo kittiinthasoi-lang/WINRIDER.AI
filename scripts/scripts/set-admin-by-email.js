@@ -20,7 +20,7 @@ if (!targetEmail) {
 }
 
 admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
+  credential: admin.applicationDefault(),
 });
 
 async function main() {
