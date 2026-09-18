@@ -286,7 +286,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshUserData = async () => {
-    if (firebaseUser && !activeDevAccount) {
+    if (firebaseUser) {
       await fetchUserProfile(firebaseUser.uid);
     }
   };
