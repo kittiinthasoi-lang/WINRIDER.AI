@@ -56,32 +56,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         partner: 'partner',
       };
 
-      const devUserData: UserDoc = {
-        uid: account.id,
-        email: account.email || `${account.id.toLowerCase()}@winrider.ai`,
-        displayName: account.name,
-        phone: account.phone,
-        role: roleMap[account.role] || 'citizen',
-        status: 'active',
-        level: account.level || 1,
-        xp: account.xp || 0,
-        rating: account.rating || 5.0,
-        avatarUrl: account.avatarEmoji,
-        createdAt: account.registeredAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setUserData(devUserData);
-      setFirebaseUser({
-        uid: account.id,
-        email: devUserData.email,
-        displayName: account.name,
-      } as unknown as FirebaseUser);
-      setLoading(false);
-    } catch (e) {
-      console.error('Error setting dev account:', e);
+        const signInWithDevAccount = (account: UserSession) => {
+    // 🛑 บล็อกการทำงานใน Production เพื่อความปลอดภัย
+    if (import.meta.env.PROD) {
+      console.warn("Dev mode disabled in production");
+      return;
     }
-  };
+
+    try {
+      localStorage.setItem(DEV_STORAGE_KEY, JSON.stringify(account));
+      saveUserSession(account);
+      setActiveDevAccount(account);
+
+      // แทนที่จะสร้าง devUserData ปลอมๆ ขึ้นมา
+      // ให้ตั้งค่า userData เป็น null เพื่อให้ระบบไปดึงจากฐานข้อมูลจริง
+      setUserData(null); 
+      
+      // เรายังคงเก็บ firebaseUser ไว้จำลองสถานะ Login
+      setFirebaseUser({ uid: account.id, email: account.email } as FirebaseUser);
+      
+    } catch (error) {
+      console.error("Dev login failed", error);
+    }
+  
+        const signInWithDevAccount = (account: UserSession) => {
+    if (import.meta.env.PROD) {
+      console.warn("Dev mode disabled in production");
+      return;
+    }
+
+    try {
+      localStorage.setItem(DEV_STORAGE_KEY, JSON.stringify(account));
+      saveUserSession(account);
+      setActiveDevAccount(account);
+      setUserData(null); 
+
+      // ย้ายอันนี้เข้ามาข้างใน try
+      setFirebaseUser({ 
+        uid: account.id, 
+        email: account.email || `${account.id}@dev.winrider.ai` 
+      } as FirebaseUser);
+      
+      setLoading(false);
+      
+    } catch (error) {
+      console.error("Dev login failed", error);
+    }
+  }; // ปีกกาปิดของฟังก์ชันอยู่ตรงนี้ (จบการทำงาน)
 
   // Restore dev account on initial load if present
   useEffect(() => {
