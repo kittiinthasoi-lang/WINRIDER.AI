@@ -41,7 +41,17 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
     setLoading(true);
     try {
       const data = await getSystemWalletBreakdown();
-      setBreakdown(data);
+// ถ้า data มีค่า ก็ใช้ data ถ้าไม่มีให้ใช้ค่าเริ่มต้น (ป้องกัน null/undefined)
+setBreakdown(data || { 
+  totalDebitSatang: 0, 
+  totalCreditSatang: 0, 
+  isBalanced: true,
+  systemSatang: 0, 
+  insuranceSatang: 0, 
+  pensionSatang: 0, 
+  helmetSatang: 0, 
+  equipmentSatang: 0 
+});
     } catch (err) {
       console.error('fetchBreakdown error:', err);
     } finally {
