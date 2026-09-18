@@ -4,7 +4,7 @@ export const LIFESTYLE_PLACES: LifestylePlace[] = [
   // 1. ร้านอาหาร (Restaurants)
   {
     id: 'food_1',
-    name: 'ร้านอาหารตามสั่งป้าสมร (Michelin Local)',
+    name: 'ร้านอาหารตามสั่งคุณกิตติ (Michelin Local)',
     category: 'restaurant',
     categoryLabel: '🍲 ร้านอาหารเด็ด',
     icon: '🍲',
