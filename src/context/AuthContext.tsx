@@ -90,8 +90,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       saveUserSession(account);
       setActiveDevAccount(account);
       setUserData(null); 
+setUserData(devUserData);
 
-      // ย้ายอันนี้เข้ามาข้างใน try
       setFirebaseUser({ 
         uid: account.id, 
         email: account.email || `${account.id}@dev.winrider.ai` 
