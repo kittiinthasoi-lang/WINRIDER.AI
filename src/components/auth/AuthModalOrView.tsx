@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { playTactileBlip } from '../../utils/audio';
-import { PRESET_ACCOUNTS, UserSession } from '../../utils/userSession';
 import { 
   ShieldCheck, 
   LogIn, 
@@ -10,12 +9,11 @@ import {
   Lock, 
   AlertCircle, 
   Loader2, 
-  Sparkles,
-  Wrench
+  Sparkles
 } from 'lucide-react';
 
 export const AuthModalOrView: React.FC = () => {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, signInWithDevAccount } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -267,48 +265,15 @@ export const AuthModalOrView: React.FC = () => {
             </button>
           </form>
 
-          {/* DEVELOPER SAMPLE ACCOUNTS (บัญชีตัวอย่างสำหรับผู้พัฒนา) */}
-          <div className="pt-4 border-t border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
-                <Wrench className="w-3.5 h-3.5 text-amber-400" />
-                <span>บัญชีตัวอย่างสำหรับผู้พัฒนา (Developer Sandbox)</span>
-              </div>
-              <span className="text-[10px] font-mono text-slate-400 bg-amber-500/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
-                1-Click Login
-              </span>
+          {/* Security & Authentication Notice */}
+          <div className="pt-4 border-t border-slate-800/80 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400">
+              <ShieldCheck className="w-4 h-4 text-[#00D4FF]" />
+              <span>การยืนยันตัวตนระดับอธิปไตยดิจิทัล ฐานข้อมูลจริง Firebase</span>
             </div>
-            <p className="text-[11px] text-slate-400">
-              คลิกเพื่อเข้าสู่ระบบทดสอบฟีเจอร์ได้ทันทีโดยไม่ต้องกรอกรหัสผ่าน (ครบทั้ง 4 บทบาทหลัก)
+            <p className="text-[11px] text-slate-500 mt-1">
+              บัญชีใหม่ทุกบทบาทจะเริ่มนับเลเวลและสถิติการใช้งานจริงตามการทำรายการ
             </p>
-
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              {PRESET_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => {
-                    playTactileBlip(800);
-                    signInWithDevAccount(acc);
-                  }}
-                  className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 hover:border-[#00D4FF] hover:bg-[#00D4FF]/10 text-left transition-all group cursor-pointer shadow-sm active:scale-95"
-                  title={`เข้าสู่ระบบด้วย ${acc.name} (${acc.roleTitleTh})`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl group-hover:scale-110 transition-transform">{acc.avatarEmoji}</span>
-                    <span className="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
-                      Lv.{acc.level}
-                    </span>
-                  </div>
-                  <div className="text-xs font-bold text-slate-200 group-hover:text-[#00D4FF] truncate mt-1">
-                    {acc.name}
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate font-mono">
-                    {acc.roleTitleTh.split(' ')[0]}
-                  </div>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </div>

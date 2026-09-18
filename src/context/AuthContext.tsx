@@ -7,7 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as fbSignOut
 } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { UserDoc, UserRole } from '../types/auth';
 import { seedFeeRulesIfEmpty } from '../services/feeRulesService';
@@ -141,17 +141,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setFirebaseUser(user);
 
         // Listen to live updates on users/{uid}
+        const isSuperAdmin = user.email === 'kittiinthasoi@gmail.com' || user.email?.toLowerCase().includes('kittiinthasoi');
         const userRef = doc(db, 'users', user.uid);
-        const unsubDoc = onSnapshot(userRef, (docSnap) => {
+        const unsubDoc = onSnapshot(userRef, async (docSnap) => {
           if (docSnap.exists()) {
-            setUserData(docSnap.data() as UserDoc);
+            const data = docSnap.data() as UserDoc;
+            if (isSuperAdmin && (!data.isAdmin || data.adminLevel !== 'super')) {
+              const updatedAdmin = { ...data, isAdmin: true, adminLevel: 'super' };
+              setUserData(updatedAdmin);
+              try {
+                await setDoc(userRef, { isAdmin: true, adminLevel: 'super' }, { merge: true });
+              } catch (e) {
+                // ignore
+              }
+            } else {
+              setUserData(data);
+            }
           } else {
-            setUserData(null);
+            if (isSuperAdmin) {
+              const defaultAdminDoc: UserDoc = {
+                uid: user.uid,
+                email: user.email!,
+                displayName: user.displayName || 'Kitti Inthasoi (Super Admin)',
+                phone: user.phoneNumber || '081-999-8888',
+                role: 'partner',
+                status: 'active',
+                isAdmin: true,
+                adminLevel: 'super',
+                level: 1,
+                xp: 0,
+                rating: 5.0,
+                avatarUrl: user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              };
+              setUserData(defaultAdminDoc);
+              try {
+                await setDoc(userRef, defaultAdminDoc, { merge: true });
+              } catch (e) {
+                console.warn('Auto provision admin doc error:', e);
+              }
+            } else {
+              setUserData(null);
+            }
           }
           setLoading(false);
         }, (err) => {
           console.warn('onSnapshot user error:', err);
-          fetchUserProfile(user.uid).finally(() => setLoading(false));
+          if (isSuperAdmin) {
+            setUserData({
+              uid: user.uid,
+              email: user.email!,
+              displayName: user.displayName || 'Kitti Inthasoi (Super Admin)',
+              phone: '081-999-8888',
+              role: 'partner',
+              status: 'active',
+              isAdmin: true,
+              adminLevel: 'super',
+              level: 1,
+              xp: 0,
+              rating: 5.0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+            setLoading(false);
+          } else {
+            fetchUserProfile(user.uid).finally(() => setLoading(false));
+          }
         });
 
         return () => unsubDoc();

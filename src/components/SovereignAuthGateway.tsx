@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   UserSession, 
   UserRole,
-  PRESET_ACCOUNTS, 
   registerWithEmailPassword,
   loginWithEmailPassword,
   loginWithPhone,
@@ -78,7 +77,6 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLineModalOpen, setIsLineModalOpen] = useState(false);
-  const [showDevPresets, setShowDevPresets] = useState(false);
 
   const handleSuccess = (session: UserSession) => {
     if (audioEnabled) playLevelUpFanfare();
@@ -212,13 +210,6 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
         setErrorMessage(res.error || 'เกิดข้อผิดพลาด');
       }
     }
-  };
-
-  // Developer Presets handler
-  const handleSelectPreset = async (account: UserSession) => {
-    if (audioEnabled) playLevelUpFanfare();
-    await saveUserSession(account);
-    handleSuccess(account);
   };
 
   return (
@@ -716,39 +707,6 @@ export const SovereignAuthGateway: React.FC<SovereignAuthGatewayProps> = ({
             <span className="font-bold text-cyan-300">ระบบรักษาความปลอดภัยและการแยกข้อมูล (Data Isolation):</span>{' '}
             ทุกการลงทะเบียนใหม่จะสร้าง Unique UID ในระบบ Firebase Firestore ประวัติการเรียกรถ การส่งพัสดุ และคะแนนรีวิวของคุณจะแยกอิสระจากบัญชีอื่นโดยสิ้นเชิง
           </div>
-        </div>
-
-        {/* DEVELOPER SANDBOX ACCORDION (Hidden by default, collapsed at bottom) */}
-        <div className="pt-2 border-t border-white/10 relative z-10">
-          <button
-            type="button"
-            onClick={() => setShowDevPresets(!showDevPresets)}
-            className="w-full flex items-center justify-between text-[11px] font-mono text-slate-500 hover:text-slate-300 transition-colors py-1"
-          >
-            <span>🛠️ สำหรับนักพัฒนาทดสอบระบบ (Developer Test Profiles)</span>
-            {showDevPresets ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-
-          {showDevPresets && (
-            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 animate-fade-in">
-              {PRESET_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => handleSelectPreset(acc)}
-                  className="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:border-cyan-400/50 text-left transition-all group"
-                >
-                  <div className="text-base">{acc.avatarEmoji}</div>
-                  <div className="text-xs font-bold text-slate-200 truncate group-hover:text-cyan-300 mt-1">
-                    {acc.name}
-                  </div>
-                  <div className="text-[9px] font-mono text-slate-400 truncate">
-                    {acc.roleTitleTh.split(' ')[0]}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 

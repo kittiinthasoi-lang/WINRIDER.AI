@@ -1,4 +1,4 @@
-export type AppMode = 'passenger' | 'driver' | 'merchant' | 'partner' | 'market' | 'hospital' | 'register' | 'codex';
+export type AppMode = 'passenger' | 'driver' | 'merchant' | 'partner' | 'market' | 'hospital' | 'register' | 'codex' | 'admin';
 
 export type ChapterId = 
   | 'soul' 

@@ -46,6 +46,62 @@ export interface AuditLogItem {
   createdAt: any;
 }
 
+export type AdminAuditLog = AuditLogItem;
+
+export interface FeeRule {
+  id: string;
+  titleTh: string;
+  serviceType: string;
+  minFareBaht: number;
+  maxFareBaht: number;
+  systemSatang: number;
+  insuranceSatang: number;
+  pensionSatang?: number;
+  activeFrom: string;
+  activeTo?: string | null;
+  supersedesRuleId?: string;
+}
+
+export interface AdminUserSummary {
+  uid: string;
+  displayName: string;
+  email: string;
+  phone: string;
+  role: 'knight' | 'citizen' | 'merchant' | 'partner' | 'admin';
+  status: 'active' | 'pending_review' | 'suspended';
+  level?: number;
+  xp?: number;
+  rating?: number;
+  avatarUrl?: string;
+  isFoundingKnight?: boolean;
+  plateNumber?: string;
+  licenseNumber?: string;
+  suspendedReason?: string;
+  gpRate?: number;
+  createdAt: any;
+  updatedAt?: any;
+}
+
+export interface LedgerLeg {
+  accountId: string;
+  accountType: string;
+  direction: 'DEBIT' | 'CREDIT';
+  amountSatang: number;
+  descriptionTh?: string;
+}
+
+export interface LedgerTransaction {
+  id: string;
+  transactionId: string;
+  type: string;
+  totalDebitSatang: number;
+  totalCreditSatang: number;
+  balanced: boolean;
+  reason: string;
+  createdAt: string | Date;
+  legs: LedgerLeg[];
+}
+
 export interface SystemBucketsBreakdown {
   system: number;
   insurance: number;

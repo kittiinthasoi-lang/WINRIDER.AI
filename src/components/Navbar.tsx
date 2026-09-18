@@ -7,7 +7,6 @@ import {
   Coins, 
   Radio, 
   Shield, 
-  Wrench, 
   Globe2, 
   Rocket, 
   Volume2, 
@@ -31,10 +30,12 @@ import {
   LogOut,
   Lock,
   CheckCircle2,
-  Box
+  Box,
+  SlidersHorizontal
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
-import { UserSession, PRESET_ACCOUNTS, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
+import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
+import { useAuth } from '../context/AuthContext';
 
 interface NavbarProps {
   activeMode: AppMode;
@@ -76,19 +77,41 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [nfcSynced, setNfcSynced] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [showRoleInfoModal, setShowRoleInfoModal] = useState(false);
-  const [showDevModal, setShowDevModal] = useState(false);
+  const [voiceTarget, setVoiceTarget] = useState<'customer' | 'knight'>('customer');
+  const [showVoiceMenu, setShowVoiceMenu] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
+
+  const { firebaseUser, userData } = useAuth();
 
   const isDriver = isDriverAccount(currentUserSession || null);
   const isDriverCitizen = isDriverInCitizenMode(currentUserSession || null);
   const isPureCustomer = currentUserSession?.role === 'customer' && !isDriver;
   const isMerchant = currentUserSession?.role === 'merchant';
   const isPartner = currentUserSession?.role === 'partner';
+  const isAdminSession = 
+    firebaseUser?.email === 'kittiinthasoi@gmail.com' ||
+    firebaseUser?.email?.toLowerCase().includes('kittiinthasoi') ||
+    userData?.isAdmin === true ||
+    userData?.adminLevel === 'super' ||
+    currentUserSession?.email === 'kittiinthasoi@gmail.com' ||
+    currentUserSession?.email?.toLowerCase().includes('kittiinthasoi');
 
   // Role details for profile avatar, icon, and label
   const profileInfo = (() => {
+    if (isAdminSession) {
+      return {
+        name: currentUserSession?.name || userData?.displayName || 'Super Admin',
+        title: `ผู้ดูแลระบบสูงสุด (Super Admin): ${firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}`,
+        roleLabel: 'Super Admin',
+        avatar: '/avatars/partner.jpg',
+        badgeBorder: 'border-amber-400 shadow-[0_0_12px_rgba(255,201,60,0.6)]',
+        buttonClass: 'bg-gradient-to-r from-amber-500/25 to-yellow-500/25 hover:from-amber-500/35 hover:to-yellow-500/35 text-amber-300 border-amber-400/70 shadow-[0_0_15px_rgba(255,201,60,0.35)]',
+        icon: <Crown className="w-3.5 h-3.5 text-amber-300" />
+      };
+    }
     if (!currentUserSession) {
       return {
-        name: 'พลเมือง',
+        name: firebaseUser?.displayName || firebaseUser?.email?.split('@')[0] || 'พลเมือง',
         title: 'โปรไฟล์พลเมือง',
         roleLabel: 'พลเมือง',
         avatar: '/avatars/citizen.jpg',
@@ -193,47 +216,59 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'finance', label: '2. การเงิน $10B', icon: <Coins className="w-3.5 h-3.5" />, num: '02' },
     { id: 'intelligence', label: '3. สมองกล CI Map', icon: <Radio className="w-3.5 h-3.5" />, num: '03' },
     { id: 'armor', label: '4. คัมภีร์ชุดเกราะ', icon: <Shield className="w-3.5 h-3.5" />, num: '04' },
-    { id: 'weapons', label: '5. 10 ศาสตราวุธ', icon: <Wrench className="w-3.5 h-3.5" />, num: '05' },
+    { id: 'weapons', label: '5. 10 ศาสตราวุธ', icon: <Flame className="w-3.5 h-3.5" />, num: '05' },
     { id: 'ecosystem', label: '6. ระบบนิเวศ 8 เสา', icon: <Globe2 className="w-3.5 h-3.5" />, num: '06' },
     { id: 'hub_galactic', label: '7. วินฮับ & อวกาศ', icon: <Rocket className="w-3.5 h-3.5" />, num: '07' },
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-[#070D1E]/95 backdrop-blur-xl border-b border-[#00D2FF]/25 shadow-[0_10px_30px_rgba(0,0,0,0.8)]">
-      {/* Top micro telemetry banner */}
-      <div className="bg-gradient-to-r from-[#070D1E] via-[#0A1B40] to-[#070D1E] border-b border-cyan-500/20 py-1 px-3 sm:px-4 text-xs">
-        <div className="max-w-7xl mx-auto flex items-center justify-between text-slate-300">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/40 shadow-[0_0_10px_rgba(255,215,0,0.2)]">
+    <header className="sticky top-0 z-50 bg-[#060D1E]/95 backdrop-blur-2xl border-b border-white/[0.08] shadow-[0_4px_30px_rgba(0,0,0,0.7)] w-full max-w-full overflow-x-clip select-none">
+      {/* Top micro telemetry & Sovereign status bar */}
+      <div className="bg-[#040816]/90 border-b border-white/[0.06] py-1 px-3 sm:px-4 text-xs select-none overflow-hidden">
+        <div className="max-w-7xl mx-auto flex items-center justify-between text-slate-300 gap-2 overflow-hidden">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/40 shadow-[0_0_10px_rgba(255,215,0,0.2)] flex-shrink-0">
               <Sparkles className="w-2.5 h-2.5 animate-spin" style={{ animationDuration: '6s' }} /> SOVEREIGN OS v4.5
             </span>
-            <span className="hidden md:inline text-slate-300 text-[11px]">
-              จักรวรรดิ <strong className="text-cyan-300 font-mono">WINRIDER.AI</strong> | ซีอีโอ: <strong className="text-cyan-200">Cosmo-Ko</strong> (🦁) & ที่ปรึกษา: <strong className="text-amber-200">จิตใจ</strong> (🦥)
-            </span>
+
+            {isAdminSession ? (
+              <span className="inline-flex items-center gap-1.5 text-amber-300 font-mono text-[11px] truncate">
+                <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                <span className="font-bold">SUPER ADMIN:</span>
+                <span className="text-white/90 truncate">{currentUserSession?.email || 'kittiinthasoi@gmail.com'}</span>
+              </span>
+            ) : (
+              <span className="hidden md:inline text-slate-300 text-[11px] truncate">
+                จักรวรรดิ <strong className="text-cyan-300 font-mono">WINRIDER.AI</strong> | ซีอีโอ: <strong className="text-cyan-200">Cosmo-Ko</strong> (🦁) & ที่ปรึกษา: <strong className="text-amber-200">จิตใจ</strong> (🦥)
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] font-mono">
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+
+          <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-mono flex-shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#10B981]" />
-              <span className="hidden sm:inline">QUANTUM GPS:</span> 100% LOCK (14ms)
+              <span className="hidden md:inline">QUANTUM GPS:</span> 100% LOCK
             </div>
-            <span className="text-slate-400">เวลา กทม.: <strong className="text-cyan-200 font-mono">{currentTime}</strong></span>
+            <span className="text-slate-400">
+              กทม.: <strong className="text-cyan-200 font-mono">{currentTime}</strong>
+            </span>
           </div>
         </div>
       </div>
 
       {/* Main Navbar */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6">
-        <div className="flex items-center justify-between h-16">
-          {/* Brand Logo */}
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-6 w-full">
+        <div className="flex items-center justify-between h-15 sm:h-16 gap-2 sm:gap-4">
+          {/* Brand Logo & Sovereign Emblem */}
           <div 
             id="brand-logo-btn"
             onClick={() => {
               if (audioEnabled) playTactileBlip(600);
               onSelectMode('passenger');
             }}
-            className="flex items-center gap-3 cursor-pointer group select-none"
+            className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none flex-shrink-0"
           >
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#FFD700] via-[#00D2FF] to-[#0A1B40] p-[1.5px] shadow-[0_0_20px_rgba(0,210,255,0.6)] group-hover:shadow-[0_0_30px_rgba(0,210,255,0.9)] transition-all overflow-hidden flex-shrink-0">
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#FFD700] via-[#00D2FF] to-[#0A1B40] p-[1.5px] shadow-[0_0_15px_rgba(0,210,255,0.4)] group-hover:shadow-[0_0_25px_rgba(0,210,255,0.7)] transition-all overflow-hidden flex-shrink-0">
               <img 
                 src="/app-logo.png" 
                 alt="WINRIDER.AI Official Logo" 
@@ -241,62 +276,27 @@ export const Navbar: React.FC<NavbarProps> = ({
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-lg sm:text-xl font-black tracking-wider text-white font-sans">
-                  WINRIDER<span className="text-[#00D2FF] drop-shadow-[0_0_10px_rgba(0,210,255,0.8)]">.AI</span>
+                <span className="text-base sm:text-lg font-black tracking-wider text-white font-sans whitespace-nowrap">
+                  WINRIDER<span className="text-[#00D2FF] drop-shadow-[0_0_8px_rgba(0,210,255,0.7)]">.AI</span>
                 </span>
-                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 hidden sm:inline">
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
                   PRO
                 </span>
               </div>
-              <p className="text-[10px] text-slate-300 -mt-0.5 tracking-tight font-medium">Next-Gen Sovereign Mobility & City AI OS</p>
+              <p className="text-[10px] text-slate-400 -mt-0.5 tracking-tight font-medium hidden xl:block truncate">
+                Next-Gen Sovereign Mobility & City AI OS
+              </p>
             </div>
           </div>
 
-          {/* Role-Locked Navigation on Desktop */}
+          {/* Center: Desktop Navigation & Persona Status Capsule */}
           {currentUserSession ? (
-            <div className="hidden lg:flex items-center gap-3">
-              {/* Role Badge and Identification */}
-              <div 
-                onClick={() => setShowRoleInfoModal(true)}
-                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-[#0B1736] border ${profileInfo.badgeBorder} font-mono cursor-pointer hover:brightness-110 transition-all`}
-                title="คลิกเพื่อดูรายละเอียดบทบาทหรือสลับบทบาท"
-              >
-                <div className="relative w-8 h-8 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
-                  <img 
-                    src={profileInfo.avatar}
-                    alt={currentUserSession.name}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                  {isDriver && (
-                    <div className="absolute -bottom-0.5 -right-0.5 px-1 py-0.2 bg-black/80 rounded text-[9px]">
-                      {isDriverCitizen ? '🦥' : '🛵'}
-                    </div>
-                  )}
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-white tracking-tight">
-                      {currentUserSession.name}
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
-                      LV.{currentUserSession.level}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-cyan-300">
-                    <Lock className="w-2.5 h-2.5 text-cyan-400" />
-                    <span>{currentUserSession.roleTitleTh}</span>
-                    <span className="text-slate-500">•</span>
-                    <span className="text-slate-400 font-mono">{currentUserSession.id}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dual-Role Switcher for Drivers (Prominently next to user card) */}
+            <div className="hidden lg:flex items-center gap-1.5 flex-shrink min-w-0 overflow-hidden">
+              {/* Dual-Persona Switcher Capsule for Drivers */}
               {isDriver && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center flex-shrink-0">
                   {isDriverCitizen ? (
                     <button
                       type="button"
@@ -305,7 +305,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         if (audioEnabled) playTactileBlip(800);
                         onToggleDriverPersona?.('driver');
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/25 to-blue-600/25 hover:from-cyan-500/35 hover:to-blue-600/35 text-cyan-300 border border-cyan-400/60 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,210,255,0.3)] active:scale-95 transition-all cursor-pointer animate-pulse"
+                      className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-600/20 hover:from-cyan-500/30 hover:to-blue-600/30 text-cyan-300 border border-cyan-400/50 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,210,255,0.25)] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                       title="สลับกลับเป็นพี่วิน พร้อมรับงานและเปิดระบบเรดาร์"
                     >
                       <Bike className="w-3.5 h-3.5 text-cyan-400" />
@@ -319,7 +319,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         if (audioEnabled) playTactileBlip(800);
                         onToggleDriverPersona?.('customer');
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 border border-emerald-400/50 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.2)] active:scale-95 transition-all cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 border border-emerald-400/40 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.2)] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                       title="วันไหนไม่อยากวิ่งงาน พี่วินสามารถเลือกเป็นบทบาทพลเมืองได้ โดยเลเวลและข้อมูลเท่ากัน"
                     >
                       <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
@@ -329,18 +329,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
-              {/* Role-allowed Navigation links */}
+              {/* Mode Links */}
               {(currentUserSession.role === 'customer' || isDriverCitizen) && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => {
                       if (audioEnabled) playTactileBlip(700);
                       onSelectMode('passenger');
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
                       activeMode === 'passenger'
-                        ? 'text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 shadow-[0_0_12px_rgba(0,210,255,0.3)]'
+                        ? 'text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 shadow-[0_0_10px_rgba(0,210,255,0.25)]'
                         : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
                     }`}
                   >
@@ -353,87 +353,97 @@ export const Navbar: React.FC<NavbarProps> = ({
                       if (audioEnabled) playTactileBlip(700);
                       onSelectMode('market');
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
                       activeMode === 'market'
-                        ? 'text-pink-300 bg-pink-500/20 border border-pink-400/40 shadow-[0_0_12px_rgba(236,72,153,0.3)]'
+                        ? 'text-pink-300 bg-pink-500/20 border border-pink-400/40 shadow-[0_0_10px_rgba(236,72,153,0.25)]'
                         : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
                     }`}
                   >
                     <ShoppingBag className="w-3.5 h-3.5" />
-                    <span>WIN Street Market</span>
+                    <span>WIN Market</span>
                   </button>
                 </div>
               )}
 
               {currentUserSession.role === 'driver' && !isDriverCitizen && (
-                <div className="flex items-center gap-1">
-                  <div className="px-3 py-1.5 rounded-xl text-xs font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-400/40 flex items-center gap-1.5">
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-400/40 flex items-center gap-1.5 whitespace-nowrap">
                     <Bike className="w-3.5 h-3.5" />
-                    <span>อู่อัศวิน 3D เรดาร์ & แผนที่</span>
+                    <span>อู่อัศวิน & เรดาร์</span>
                   </div>
                 </div>
               )}
 
               {currentUserSession.role === 'merchant' && (
-                <div className="flex items-center gap-1">
-                  <div className="px-3 py-1.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-400/40 flex items-center gap-1.5">
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-400/40 flex items-center gap-1.5 whitespace-nowrap">
                     <Store className="w-3.5 h-3.5" />
-                    <span>ศูนย์ร้านค้า & รับออเดอร์</span>
+                    <span>ศูนย์ร้านค้า</span>
                   </div>
                 </div>
               )}
 
               {currentUserSession.role === 'partner' && (
-                <div className="flex items-center gap-1">
-                  <div className="px-3 py-1.5 rounded-xl text-xs font-bold text-pink-300 bg-pink-500/15 border border-pink-400/40 flex items-center gap-1.5">
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-pink-300 bg-pink-500/15 border border-pink-400/40 flex items-center gap-1.5 whitespace-nowrap">
                     <Building2 className="w-3.5 h-3.5" />
-                    <span>ศูนย์พาร์ทเนอร์ & โรงพยาบาล</span>
+                    <span>ศูนย์พาร์ทเนอร์</span>
                   </div>
                 </div>
               )}
-
-              {/* Sign Out Button */}
-              {onSignOut && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (audioEnabled) playTactileBlip(800);
-                    if (window.confirm(`ต้องการออกจากระบบบัญชี "${currentUserSession.name}" ใช่หรือไม่?`)) {
-                      onSignOut();
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-mono font-bold transition-all shadow-[0_0_10px_rgba(244,63,94,0.15)] active:scale-95 cursor-pointer"
-                  title="ออกจากระบบ เพื่อสลับบัญชีหรือบทบาท"
-                >
-                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                  <span>ออกจากระบบ</span>
-                </button>
-              )}
             </div>
-          ) : (
-            <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-slate-400 bg-black/40 px-3 py-1.5 rounded-xl border border-white/10">
-              <Lock className="w-3.5 h-3.5 text-cyan-400" />
-              <span>โหมดความปลอดภัย: กรุณาลงทะเบียนหรือเข้าสู่ระบบ</span>
+          ) : null}
+
+          {/* Right Action Suite (Strictly Contained, Zero Overflow) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* 1. Voice AI Command Center */}
+            <div className="flex items-center bg-[#081126]/90 rounded-xl border border-cyan-500/30 p-0.5 shadow-[0_0_10px_rgba(0,210,255,0.15)] flex-shrink-0">
+              <button
+                id="navbar-voice-command-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(1200);
+                  if (voiceTarget === 'customer') {
+                    onOpenCustomerVoice();
+                  } else {
+                    if (onOpenWinBuddy) onOpenWinBuddy();
+                    else onOpenCustomerVoice();
+                  }
+                }}
+                className={`p-1.5 sm:px-2 rounded-lg transition-all cursor-pointer flex items-center justify-center group active:scale-95 ${
+                  voiceTarget === 'customer'
+                    ? 'text-[#00D2FF] hover:bg-cyan-500/20'
+                    : 'text-amber-300 hover:bg-amber-500/20'
+                }`}
+                title={
+                  voiceTarget === 'customer'
+                    ? "สั่งการด้วยเสียงลูกค้า (Customer Voice AI)"
+                    : "สั่งการด้วยเสียงพี่วิน/WinBuddy"
+                }
+              >
+                <Bot className={`w-4 h-4 animate-pulse group-hover:scale-110 transition-transform ${
+                  voiceTarget === 'customer' ? 'text-[#00D2FF]' : 'text-amber-300'
+                }`} />
+              </button>
+
+              <button
+                id="navbar-voice-switcher-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(800);
+                  const next = voiceTarget === 'customer' ? 'knight' : 'customer';
+                  setVoiceTarget(next);
+                }}
+                className={`px-1.5 py-1 rounded-md text-[10px] font-mono font-bold transition-all cursor-pointer border ${
+                  voiceTarget === 'customer'
+                    ? 'bg-cyan-500/20 text-[#00D2FF] border-cyan-500/40 hover:bg-cyan-500/30'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                }`}
+                title="คลิกเพื่อสลับระหว่างเสียงลูกค้ากับเสียงพี่วิน"
+              >
+                {voiceTarget === 'customer' ? '👤 ลูกค้า' : '🏍️ วิน'}
+              </button>
             </div>
-          )}
 
-          {/* Action Buttons: Voice Command (Robot AI), Profile (Side-by-side) */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* 1. ไอคอนสั่งการด้วยเสียงของลูกค้าเพื่อใช้งานแอป (Customer Voice Robot AI) */}
-            <button
-              id="navbar-voice-command-btn"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(1200);
-                onOpenCustomerVoice();
-              }}
-              className="relative p-2 rounded-xl bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-[#00D2FF] border border-[#00D2FF]/40 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,210,255,0.3)] active:scale-95 flex items-center justify-center group"
-              title="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป (Customer Voice AI)"
-            >
-              <Bot className="w-4 h-4 animate-pulse text-[#00D2FF] group-hover:scale-110 transition-transform" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00D2FF]" />
-            </button>
-
-            {/* 2. ไอคอนโปรไฟล์ตามแต่ละบทบาทที่เลือก (Profile icon matches active role/persona) */}
+            {/* Profile & Role Capsule Button */}
             <button
               id="navbar-profile-btn"
               onClick={() => {
@@ -441,13 +451,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 if (onOpenProfile) {
                   onOpenProfile();
                 } else {
-                  onSelectMode(isDriverCitizen || currentUserSession?.role === 'customer' ? 'passenger' : 'driver');
+                  setShowRoleInfoModal(true);
                 }
               }}
-              className={`relative p-1.5 sm:px-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${profileInfo.buttonClass}`}
+              className={`p-1 sm:px-2 sm:py-1 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 flex-shrink-0 ${profileInfo.buttonClass}`}
               title={profileInfo.title}
             >
-              <div className={`w-5 h-5 rounded-full overflow-hidden border ${profileInfo.badgeBorder} flex-shrink-0`}>
+              <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden border ${profileInfo.badgeBorder} flex-shrink-0 relative`}>
                 <img 
                   src={profileInfo.avatar}
                   alt={profileInfo.name}
@@ -455,87 +465,121 @@ export const Navbar: React.FC<NavbarProps> = ({
                   referrerPolicy="no-referrer"
                 />
               </div>
-              {profileInfo.icon}
-              <span className="hidden xl:inline text-[11px] font-mono font-bold whitespace-nowrap">
-                {profileInfo.roleLabel}
+              <span className="hidden sm:inline text-xs font-bold text-white max-w-[75px] truncate">
+                {profileInfo.name}
+              </span>
+              <span className="hidden md:inline text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/40 text-cyan-300 border border-white/10">
+                Lv.{currentUserSession?.level || 1}
               </span>
             </button>
 
-            {/* Mobile Sign Out Button */}
-            {currentUserSession && onSignOut && (
+            {/* 4. Luxury Secondary Tools Dropdown (Replaces 4 wide individual buttons) */}
+            <div className="relative flex-shrink-0">
               <button
                 type="button"
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(800);
-                  if (window.confirm(`ต้องการออกจากระบบบัญชี "${currentUserSession.name}" ใช่หรือไม่?`)) {
-                    onSignOut();
-                  }
-                }}
-                className="lg:hidden p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition-all cursor-pointer active:scale-95"
-                title="ออกจากระบบ"
+                id="navbar-tools-menu-btn"
+                onClick={() => setShowToolsMenu(prev => !prev)}
+                className={`p-2 rounded-xl transition-all cursor-pointer border flex items-center justify-center flex-shrink-0 active:scale-95 ${
+                  showToolsMenu
+                    ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(0,210,255,0.3)]'
+                    : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                }`}
+                title="เครื่องมือและเมนูเพิ่มเติม (Tools, GPS, Webhook, PWA, Logout)"
               >
-                <LogOut className="w-4 h-4 text-rose-400" />
+                <SlidersHorizontal className="w-3.5 h-3.5" />
               </button>
-            )}
 
-            {/* Quick Developer Account Switcher Button */}
-            {onSelectDevAccount && (
-              <button
-                type="button"
-                id="navbar-dev-btn"
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(850);
-                  setShowDevModal(true);
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-400/40 text-xs font-mono font-bold transition-all shadow-[0_0_12px_rgba(255,201,60,0.2)] active:scale-95 cursor-pointer"
-                title="สลับบัญชีตัวอย่างสำหรับผู้พัฒนา (4 บทบาทหลัก)"
-              >
-                <Wrench className="w-3.5 h-3.5 text-[#FFC93C]" />
-                <span className="hidden md:inline">บัญชีตัวอย่าง</span>
-              </button>
-            )}
+              {/* Tools Dropdown Menu */}
+              {showToolsMenu && (
+                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-[#09152C]/95 backdrop-blur-xl border border-cyan-500/30 shadow-[0_10px_35px_rgba(0,0,0,0.8)] py-2 z-50 text-xs animate-fade-in font-sans">
+                  {/* Admin Console (Only for Admin) */}
+                  {isAdminSession && (
+                    <button
+                      type="button"
+                      id="tools-admin-console-btn"
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(1000);
+                        setShowToolsMenu(false);
+                        onSelectMode('admin');
+                      }}
+                      className="w-full px-3.5 py-2.5 text-left bg-amber-500/15 hover:bg-amber-500/25 flex items-center gap-2.5 text-amber-300 transition-colors border-b border-amber-500/30"
+                    >
+                      <Crown className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                      <div>
+                        <div className="font-bold flex items-center gap-1.5">
+                          <span>หน้าจอแอดมิน (Admin Console)</span>
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 font-mono">ADMIN</span>
+                        </div>
+                        <div className="text-[10px] text-amber-300/70">คุมระบบหลังบ้าน & ข้อมูลจริง Firebase</div>
+                      </div>
+                    </button>
+                  )}
 
-            {/* No-Code Webhook Bridge Button */}
-            {onOpenWebhookModal && (
-              <button
-                id="navbar-webhook-btn"
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(900);
-                  onOpenWebhookModal();
-                }}
-                className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/15 to-blue-600/15 hover:from-cyan-500/25 hover:to-blue-600/25 text-cyan-300 border border-cyan-400/40 text-xs font-mono font-bold transition-all shadow-[0_0_12px_rgba(0,210,255,0.2)] active:scale-95"
-                title="เชื่อมต่อ Low-Code Webhook (Google Sheets, Make.com, Zapier, LINE OA)"
-              >
-                <Zap className="w-3.5 h-3.5 text-[#00D2FF]" />
-                <span>Webhook</span>
-              </button>
-            )}
+                  {/* Webhook */}
+                  {onOpenWebhookModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(900);
+                        setShowToolsMenu(false);
+                        onOpenWebhookModal();
+                      }}
+                      className="w-full px-3.5 py-2 text-left hover:bg-cyan-500/15 flex items-center gap-2.5 text-slate-200 hover:text-cyan-300 transition-colors"
+                    >
+                      <Zap className="w-4 h-4 text-cyan-400" />
+                      <div>
+                        <div className="font-bold">เชื่อมต่อ Webhook</div>
+                        <div className="text-[10px] text-slate-400">Google Sheets / LINE OA / Zapier</div>
+                      </div>
+                    </button>
+                  )}
 
-            {/* Real GPS Satellite Map Launcher */}
-            {onOpenGpsModal && (
-              <button
-                type="button"
-                id="gps-map-btn"
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(950);
-                  onOpenGpsModal();
-                }}
-                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 text-xs font-mono font-semibold transition-all active:scale-95"
-                title="เปิดแผนที่พิกัดดาวเทียม GPS จริง & นำทาง Google Maps"
-              >
-                <Compass className="w-3.5 h-3.5 text-cyan-400" />
-                <span>GPS จริง</span>
-              </button>
-            )}
+                  {/* GPS Satellite Map */}
+                  {onOpenGpsModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(950);
+                        setShowToolsMenu(false);
+                        onOpenGpsModal();
+                      }}
+                      className="w-full px-3.5 py-2 text-left hover:bg-cyan-500/15 flex items-center gap-2.5 text-slate-200 hover:text-cyan-300 transition-colors"
+                    >
+                      <Compass className="w-4 h-4 text-cyan-400" />
+                      <div>
+                        <div className="font-bold">แผนที่ดาวเทียม GPS จริง</div>
+                        <div className="text-[10px] text-slate-400">นำทาง Google Maps Real-time</div>
+                      </div>
+                    </button>
+                  )}
 
+                  {/* PWA Install */}
+                  <div className="px-3.5 py-1.5 border-t border-white/10">
+                    <PWAInstallButton />
+                  </div>
 
-
-            {/* PWA Install Button */}
-            <div className="hidden sm:block">
-              <PWAInstallButton />
+                  {/* Sign Out */}
+                  {currentUserSession && onSignOut && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(800);
+                        setShowToolsMenu(false);
+                        if (window.confirm(`ต้องการออกจากระบบบัญชี "${currentUserSession.name}" ใช่หรือไม่?`)) {
+                          onSignOut();
+                        }
+                      }}
+                      className="w-full px-3.5 py-2 text-left hover:bg-rose-500/20 flex items-center gap-2.5 text-rose-300 transition-colors border-t border-white/10 mt-1"
+                    >
+                      <LogOut className="w-4 h-4 text-rose-400" />
+                      <span className="font-bold">ออกจากระบบ</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Audio SFX Toggle */}
+            {/* 5. Sound SFX Toggle */}
             <button
               id="audio-toggle-btn"
               onClick={() => {
@@ -543,9 +587,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onToggleAudio();
               }}
               title={audioEnabled ? 'ปิดเอฟเฟกต์เสียง' : 'เปิดเอฟเฟกต์เสียงยุทธวิธี'}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-white/10 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-white/10 transition-colors flex-shrink-0"
             >
-              {audioEnabled ? <Volume2 className="w-4 h-4 text-[#00D2FF]" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+              {audioEnabled ? <Volume2 className="w-3.5 h-3.5 text-[#00D2FF]" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
             </button>
           </div>
         </div>
@@ -740,49 +784,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
-              {/* Dev Accounts Switcher in Profile Modal */}
-              {onSelectDevAccount && (
-                <div className="pt-3 border-t border-white/10 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-mono text-amber-400">
-                    <span className="flex items-center gap-1.5 font-bold">
-                      <Wrench className="w-3.5 h-3.5" />
-                      <span>สลับไปยังบัญชีตัวอย่าง (Dev Accounts):</span>
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {PRESET_ACCOUNTS.map((acc) => {
-                      const isCurrent = currentUserSession?.id === acc.id;
-                      return (
-                        <button
-                          key={acc.id}
-                          type="button"
-                          onClick={() => {
-                            if (audioEnabled) playTactileBlip(800);
-                            onSelectDevAccount(acc);
-                            setShowRoleInfoModal(false);
-                          }}
-                          className={`p-2 rounded-xl text-left transition-all border text-xs cursor-pointer ${
-                            isCurrent
-                              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-sm'
-                              : 'bg-white/5 border-white/10 hover:border-cyan-400/50 hover:bg-white/10 text-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>{acc.avatarEmoji}</span>
-                            <span className="text-[9px] font-mono px-1 rounded bg-black/40 text-cyan-300">
-                              Lv.{acc.level}
-                            </span>
-                          </div>
-                          <div className="font-bold text-white truncate text-[11px] mt-0.5">
-                            {acc.name}
-                          </div>
-                          <div className="text-[9px] text-slate-400 truncate font-mono">
-                            {acc.roleTitleTh.split(' ')[0]}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+              {/* สำหรับผู้ดูแลระบบ: ปุ่มเข้าสู่หน้าจอคุมระบบหลังบ้านแอป */}
+              {isAdminSession && (
+                <div className="pt-3 border-t border-amber-500/30 space-y-1.5">
+                  <button
+                    type="button"
+                    id="profile-open-admin-btn"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(1000);
+                      setShowRoleInfoModal(false);
+                      onSelectMode('admin');
+                    }}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs transition-all shadow-[0_0_20px_rgba(255,201,60,0.5)] flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Crown className="w-4 h-4 text-slate-950 flex-shrink-0" />
+                    <span>👑 เปิดหน้าจอคุมระบบหลังบ้าน (ADMIN CONSOLE)</span>
+                  </button>
+                  <p className="text-[10px] text-center text-amber-300/80 font-mono">
+                    สิทธิ์ Super Admin ({firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'})
+                  </p>
                 </div>
               )}
 
@@ -798,81 +818,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ดูโปรไฟล์และค่าสถานะเต็ม
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Standalone Developer Accounts Switcher Modal */}
-      {showDevModal && onSelectDevAccount && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-lg bg-[#0A1633] border border-amber-400/40 rounded-3xl p-6 shadow-[0_0_40px_rgba(255,201,60,0.25)] text-slate-100">
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/30">
-                  <Wrench className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white font-thai">บัญชีตัวอย่างสำหรับผู้พัฒนา</h3>
-                  <p className="text-xs text-slate-400">เลือกสลับบัญชีเพื่อทดสอบบทบาทและสิทธิ์ของแต่ละระบบทันที</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDevModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center text-sm cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
-              {PRESET_ACCOUNTS.map((acc) => {
-                const isCurrent = currentUserSession?.id === acc.id;
-                return (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    onClick={() => {
-                      if (audioEnabled) playTactileBlip(800);
-                      onSelectDevAccount(acc);
-                      setShowDevModal(false);
-                    }}
-                    className={`p-3.5 rounded-2xl text-left transition-all border group cursor-pointer ${
-                      isCurrent
-                        ? 'bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border-cyan-400 text-white shadow-[0_0_15px_rgba(0,212,255,0.25)]'
-                        : 'bg-white/5 border-white/10 hover:border-amber-400/60 hover:bg-amber-500/10 text-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl group-hover:scale-110 transition-transform">{acc.avatarEmoji}</span>
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/40 text-amber-300 border border-amber-400/30">
-                        Lv.{acc.level}
-                      </span>
-                    </div>
-                    <div className="font-bold text-sm text-white mt-2 group-hover:text-amber-300 transition-colors">
-                      {acc.name}
-                    </div>
-                    <div className="text-xs text-cyan-300 mt-0.5">
-                      {acc.roleTitleTh}
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-1">
-                      ID: {acc.id}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
-              <span>* สลับบัญชีโดยตรง ไม่จำเป็นต้องกรอกรหัสผ่าน</span>
-              <button
-                type="button"
-                onClick={() => setShowDevModal(false)}
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
             </div>
           </div>
         </div>

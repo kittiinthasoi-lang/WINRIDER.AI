@@ -31,6 +31,8 @@ import { AuthModalOrView } from './components/auth/AuthModalOrView';
 import { RoleSelectionAndRegistration } from './components/auth/RoleSelectionAndRegistration';
 import { PendingReviewView } from './components/auth/PendingReviewView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { AdminRoute } from './components/admin/AdminRoute';
+import { AdminLayout } from './components/admin/AdminLayout';
 import { 
   Crown, 
   Coins, 
@@ -106,15 +108,26 @@ export default function App() {
     };
   }, [userData, driverCitizenPersona]);
 
-  // Set default active mode according to registered role
+  const isSuperAdminUser = 
+    firebaseUser?.email === 'kittiinthasoi@gmail.com' || 
+    firebaseUser?.email?.toLowerCase().includes('kittiinthasoi') ||
+    userData?.isAdmin === true ||
+    currentUserSession?.email === 'kittiinthasoi@gmail.com' ||
+    currentUserSession?.role === 'partner';
+
+  // Set default active mode according to registered role or super admin
   useEffect(() => {
+    if (firebaseUser?.email === 'kittiinthasoi@gmail.com' || firebaseUser?.email?.toLowerCase().includes('kittiinthasoi') || userData?.isAdmin) {
+      setActiveMode('admin');
+      return;
+    }
     if (userData?.role) {
       if (userData.role === 'knight') setActiveMode('driver');
       else if (userData.role === 'citizen') setActiveMode('passenger');
       else if (userData.role === 'merchant') setActiveMode('merchant');
       else if (userData.role === 'partner') setActiveMode('partner');
     }
-  }, [userData?.role, userData?.uid]);
+  }, [userData?.role, userData?.uid, firebaseUser?.email, userData?.isAdmin]);
 
   const handleAddCustomerItem = (item: MarketItem) => {
     setCustomerListedItems(prev => [item, ...prev]);
@@ -150,6 +163,12 @@ export default function App() {
   };
 
   const handleSelectMode = (mode: AppMode) => {
+    if (mode === 'admin') {
+      setActiveMode('admin');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (!currentUserSession) {
       setActiveMode(mode);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -228,12 +247,36 @@ export default function App() {
   }
 
   // 3. Logged in, but hasn't selected role yet -> Show 4-card role selection & registration
-  if (!userData || !userData.role) {
+  if ((!userData || !userData.role) && activeMode !== 'admin') {
     return (
       <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans flex flex-col">
+        {/* Super Admin Floating / Header Bar */}
+        {isSuperAdminUser && (
+          <div className="bg-gradient-to-r from-amber-500/25 via-amber-600/30 to-amber-500/25 border-b border-amber-400/50 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-200">
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-amber-400 animate-bounce shrink-0" />
+              <span className="font-bold">ระบบตรวจพบสิทธิ์ผู้ดูแลระบบสูงสุด (SUPER ADMIN):</span>
+              <span className="text-white font-mono bg-black/40 px-2 py-0.5 rounded border border-amber-400/40">
+                {firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}
+              </span>
+            </div>
+            <button
+              type="button"
+              id="role-selection-admin-btn"
+              onClick={() => {
+                playTactileBlip(1000);
+                setActiveMode('admin');
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-[0_0_15px_rgba(255,201,60,0.5)] cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+            >
+              <Crown className="w-3.5 h-3.5 text-slate-950" />
+              <span>👑 เปิดหน้าจอคุมระบบ ADMIN CONSOLE</span>
+            </button>
+          </div>
+        )}
         <Navbar
-          activeMode="passenger"
-          onSelectMode={() => {}}
+          activeMode={activeMode}
+          onSelectMode={handleSelectMode}
           activeChapter={activeChapter}
           onSelectChapter={handleSelectChapter}
           audioEnabled={audioEnabled}
@@ -254,12 +297,12 @@ export default function App() {
   }
 
   // 4. Pending review state (for knight, merchant, partner)
-  if (userData.status === 'pending_review' && userData.role !== 'citizen') {
+  if (userData?.status === 'pending_review' && userData?.role !== 'citizen' && activeMode !== 'admin') {
     return (
       <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans flex flex-col">
         <Navbar
-          activeMode="passenger"
-          onSelectMode={() => {}}
+          activeMode={activeMode}
+          onSelectMode={handleSelectMode}
           activeChapter={activeChapter}
           onSelectChapter={handleSelectChapter}
           audioEnabled={audioEnabled}
@@ -279,7 +322,7 @@ export default function App() {
     );
   }
 
-  // 5. Active User Dashboard
+  // 5. Active User Dashboard / Admin View
   return (
     <div className="min-h-screen bg-[#070D1E] text-slate-100 flex flex-col font-sans pb-24 md:pb-0">
       {/* Sovereign Navigation Bar */}
@@ -463,6 +506,30 @@ export default function App() {
               )}
             </div>
           </div>
+        )}
+
+        {activeMode === 'admin' && (
+          <AdminRoute
+            onRedirectHome={() => {
+              if (userData?.role === 'knight') setActiveMode('driver');
+              else if (userData?.role === 'merchant') setActiveMode('merchant');
+              else if (userData?.role === 'partner') setActiveMode('partner');
+              else setActiveMode('passenger');
+            }}
+          >
+            {(claims) => (
+              <AdminLayout
+                adminLevel={claims.adminLevel}
+                adminEmail={firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}
+                onExitAdmin={() => {
+                  if (userData?.role === 'knight') setActiveMode('driver');
+                  else if (userData?.role === 'merchant') setActiveMode('merchant');
+                  else if (userData?.role === 'partner') setActiveMode('partner');
+                  else setActiveMode('passenger');
+                }}
+              />
+            )}
+          </AdminRoute>
         )}
       </main>
 

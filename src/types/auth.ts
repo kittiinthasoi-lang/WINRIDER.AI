@@ -15,6 +15,8 @@ export interface UserDoc {
   province?: string;
   district?: string;
   status: UserStatus;
+  isAdmin?: boolean;
+  adminLevel?: string;
   pdpaConsent?: PdpaConsent;
   level?: number;
   xp?: number;

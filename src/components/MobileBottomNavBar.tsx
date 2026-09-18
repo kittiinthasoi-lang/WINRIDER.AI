@@ -69,8 +69,8 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
 }) => {
   const [isModesDrawerOpen, setIsModesDrawerOpen] = useState(false);
 
-  // If user is not logged in, do not render bottom navigation
-  if (!currentUserSession) {
+  // If user is not logged in or in admin mode, do not render mobile bottom navigation
+  if (!currentUserSession || activeMode === 'admin') {
     return null;
   }
 
@@ -304,18 +304,33 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
       icon: <BookOpen className="w-5 h-5" />,
       color: 'from-[#FFD700]/20 to-amber-500/10 border-[#FFD700]/40 text-[#FFD700]'
     },
+    { 
+      id: 'admin', 
+      label: 'หน้าจอคุมระบบแอดมิน (Admin Console)', 
+      desc: 'ดูแลระบบหลังบ้านของแอปทั้งหมด ครอบคลุมผู้ใช้ KYC ค่าธรรมเนียม และเซิร์ฟเวอร์', 
+      icon: <Crown className="w-5 h-5 text-amber-400" />,
+      color: 'from-amber-500/30 to-yellow-500/20 border-amber-400/60 text-amber-200 shadow-[0_0_15px_rgba(255,201,60,0.2)]'
+    },
   ];
+
+  const isAdminSession = 
+    currentUserSession?.email === 'kittiinthasoi@gmail.com' ||
+    currentUserSession?.email?.toLowerCase().includes('kittiinthasoi') ||
+    currentUserSession?.role === 'partner' ||
+    currentUserSession?.id?.includes('SOVEREIGN');
 
   // Role-based allowed modes:
   // 1. Driver: Has access to passenger (8 pillars), driver cockpit/garage/nav, market (WIN SHOP), merchant, partner, hospital, codex.
   // 2. Customer, Merchant, and Partner: Can access passenger, market (WIN SHOP), merchant, partner, hospital, codex.
-  const allowedModesForRole = currentUserSession?.role === 'customer'
+  const baseAllowed = currentUserSession?.role === 'customer'
     ? ['passenger', 'market', 'merchant', 'partner', 'hospital', 'codex']
     : currentUserSession?.role === 'driver'
     ? ['passenger', 'driver', 'market', 'merchant', 'partner', 'hospital', 'codex']
     : currentUserSession?.role === 'merchant'
     ? ['merchant', 'passenger', 'market', 'partner', 'hospital', 'codex']
     : ['partner', 'passenger', 'market', 'merchant', 'hospital', 'codex'];
+
+  const allowedModesForRole = isAdminSession ? [...baseAllowed, 'admin'] : baseAllowed;
 
   const filteredAppModesList = appModesList.filter(mode => allowedModesForRole.includes(mode.id));
 

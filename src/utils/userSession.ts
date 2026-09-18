@@ -52,66 +52,7 @@ export interface UserSession {
 
 const STORAGE_KEY = 'WINRIDER_ACTIVE_USER_SESSION';
 
-export const PRESET_ACCOUNTS: UserSession[] = [
-  {
-    id: 'WIN-KGT-100888',
-    name: 'พี่กิตติ อินทะสร้อย',
-    email: 'kitti.knight@winrider.ai',
-    phone: '089-445-1234',
-    role: 'driver',
-    primaryRole: 'driver',
-    activePersona: 'driver',
-    roleTitleTh: 'อัศวินวินมอเตอร์ไซค์ (Knight Driver)',
-    plateNumber: '1กข 7789 กทม.',
-    level: 100,
-    xp: 99999,
-    rating: 5.0,
-    avatarEmoji: '🛵',
-    registeredAt: '2026-01-15T08:30:00Z',
-  },
-  {
-    id: 'WIN-CTZ-204551',
-    name: 'คุณ จิตใจ สล็อต',
-    email: 'jitjai.citizen@winrider.ai',
-    phone: '081-992-5678',
-    role: 'customer',
-    primaryRole: 'customer',
-    roleTitleTh: 'พลเมืองผู้โดยสาร (Citizen Passenger)',
-    level: 12,
-    xp: 2450,
-    rating: 4.95,
-    avatarEmoji: '🦥',
-    registeredAt: '2026-02-10T11:20:00Z',
-  },
-  {
-    id: 'WIN-MCH-309112',
-    name: 'ร้านข้าวมันไก่เฮียชัย (เอกมัย ซอย 10)',
-    email: 'hiahai.merchant@winrider.ai',
-    phone: '085-331-9090',
-    role: 'merchant',
-    roleTitleTh: 'ร้านค้าพันธมิตร (Merchant)',
-    shopName: 'ข้าวมันไก่ตอนสูตรไหหลำเฮียชัย',
-    level: 8,
-    xp: 1800,
-    rating: 4.88,
-    avatarEmoji: '🏪',
-    registeredAt: '2026-03-01T09:00:00Z',
-  },
-  {
-    id: 'WIN-PTN-401999',
-    name: 'รพ.สมิติเวช สุขุมวิท (ศูนย์กู้ชีพ 2฿)',
-    email: 'samitivej.partner@winrider.ai',
-    phone: '02-711-8000',
-    role: 'partner',
-    roleTitleTh: 'พันธมิตรองค์กร & โรงพยาบาล (Partner)',
-    companyName: 'โรงพยาบาลสมิติเวช สุขุมวิท',
-    level: 25,
-    xp: 12000,
-    rating: 5.0,
-    avatarEmoji: '🏥',
-    registeredAt: '2026-01-01T00:00:00Z',
-  },
-];
+export const PRESET_ACCOUNTS: UserSession[] = [];
 
 // Read current user session from LocalStorage
 export function getCurrentUserSession(): UserSession | null {
@@ -160,18 +101,7 @@ export async function authenticateUser(identifier: string): Promise<UserSession 
   const cleanId = identifier.trim().toLowerCase();
   if (!cleanId) return null;
 
-  // 1. Check presets first
-  const preset = PRESET_ACCOUNTS.find(
-    (p) =>
-      p.id.toLowerCase() === cleanId ||
-      p.phone.replace(/[^0-9]/g, '') === cleanId.replace(/[^0-9]/g, '')
-  );
-  if (preset) {
-    await saveUserSession(preset);
-    return preset;
-  }
-
-  // 2. Check Firestore
+  // 1. Authenticate against Firestore directly
   try {
     // Check by ID
     const docSnap = await getDoc(doc(db, 'users', identifier.trim()));
@@ -187,7 +117,7 @@ export async function authenticateUser(identifier: string): Promise<UserSession 
         shopName: data.shopName,
         companyName: data.companyName,
         level: data.level || 1,
-        xp: data.xp || 100,
+        xp: data.xp || 0,
         rating: data.rating || 5.0,
         avatarEmoji: getRoleAvatarEmoji(data.role),
         registeredAt: data.registeredAt || new Date().toISOString(),
@@ -213,7 +143,7 @@ export async function authenticateUser(identifier: string): Promise<UserSession 
           shopName: data.shopName,
           companyName: data.companyName,
           level: data.level || 1,
-          xp: data.xp || 100,
+          xp: data.xp || 0,
           rating: data.rating || 5.0,
           avatarEmoji: getRoleAvatarEmoji(data.role),
           registeredAt: data.registeredAt || new Date().toISOString(),
