@@ -8,7 +8,7 @@ export const LIFESTYLE_PLACES: LifestylePlace[] = [
     category: 'restaurant',
     categoryLabel: '🍲 ร้านอาหารเด็ด',
     icon: '🍲',
-    area: 'ตลาดพลู ฝั่งธนบุรี',
+    area: 'ตลาด79 ฝั่งธนบุรี',
     distanceKm: 1.2,
     rating: 4.9,
     highlight: 'กระเพราหมูกรอบเตาถ่านสูตรโบราณ และต้มยำหัวปลาหม้อไฟ',
