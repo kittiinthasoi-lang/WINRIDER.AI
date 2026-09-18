@@ -11,6 +11,7 @@
  */
 
 const admin = require("firebase-admin");
+const { getAuth } = require("firebase-admin/auth");
 
 const targetEmail = process.argv[2];
 
@@ -20,18 +21,16 @@ if (!targetEmail) {
 }
 
 admin.initializeApp({
-    credential: admin.applicationDefault(),
+  credential: admin.applicationDefault(),
   projectId: "decoded-robot-6lkcn",
 });
 
 async function main() {
   try {
-    // ค้นหา user จากอีเมลโดยตรง — ไม่ต้องรู้ UID มาก่อน
-    const user = await admin.auth().getUserByEmail(targetEmail);
+    const user = await getAuth().getUserByEmail(targetEmail);
     console.log(`พบผู้ใช้: ${user.email} (UID: ${user.uid})`);
 
-    await admin.auth().setCustomUserClaims(user.uid, { admin: true });
-
+    await getAuth().setCustomUserClaims(user.uid, { admin: true });
     console.log(`✅ ตั้งค่า admin: true ให้ ${targetEmail} เรียบร้อยแล้ว`);
     console.log("ℹ️  ให้ logout แล้ว login ใหม่ในเว็บแอป เพื่อให้สิทธิ์มีผล");
 
