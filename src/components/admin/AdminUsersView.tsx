@@ -66,14 +66,22 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
     fetchUsers();
   }, []);
 
-  const handleSelectUser = async (u: AdminUserSummary) => {
+    const handleSelectUser = async (u: AdminUserSummary) => {
+    // กันไว้ถ้าข้อมูลผู้ใช้ไม่มี UID
+    if (!u || !u.uid) {
+      console.error("User or UID is missing!");
+      return;
+    }
+    
     setSelectedUser(u);
     setLedgerLoading(true);
     try {
       const history = await getUserLedgerHistory(u.uid);
-      setUserLedger(history);
+      // เช็คให้แน่ใจว่าเป็น Array ก่อนเซ็ตค่าลง State
+      setUserLedger(Array.isArray(history) ? history : []);
     } catch (err) {
       console.error('getUserLedgerHistory error:', err);
+      setUserLedger([]); 
     } finally {
       setLedgerLoading(false);
     }
