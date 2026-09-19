@@ -769,6 +769,8 @@ Respond concisely in Thai (unless asked otherwise) with clear tactical actions o
 let routesApiRateLimitedUntil = 0;
 
 app.post("/api/routes/compute", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
   try {
     const {
       origin,
