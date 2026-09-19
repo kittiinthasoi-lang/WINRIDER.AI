@@ -246,14 +246,18 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
     return res.status(403).json({ error: "Driver is not eligible to accept orders" });
   }
   const { id } = req.params;
-  const driverInfo = req.body;
-
-  if (!driverInfo?.driverName || !driverInfo?.driverPlate) {
-    return res.status(400).json({ error: "Real driver identity is required" });
+  const driverInfo = {
+    driverUserId: user.uid,
+    driverName: String(eligibility.user.displayName || eligibility.knight.displayName || "Knight"),
+    driverLevel: Number(eligibility.knight.level ?? eligibility.user.level ?? 1),
+    driverPhone: String(eligibility.user.phone || eligibility.knight.phone || ""),
+    driverPlate: String(eligibility.knight.plateNumber || ""),
+    driverAvatarEmoji: String(eligibility.user.avatarEmoji || eligibility.knight.avatarEmoji || "🏍️"),
+    driverVehicle: String(eligibility.knight.vehicle || eligibility.knight.vehicleModel || ""),
+  };
+  if (!driverInfo.driverPlate) {
+    return res.status(409).json({ error: "Verified driver plate is required before accepting orders" });
   }
-  driverInfo.driverUserId = user.uid;
-  driverInfo.driverName = String(eligibility.user.displayName || driverInfo.driverName);
-  driverInfo.driverPlate = String(eligibility.knight.plateNumber || driverInfo.driverPlate);
 
   try {
     const orderRef = ordersCollection.doc(id);
