@@ -23,7 +23,7 @@ export interface GpsLocationState {
   timestamp: number;
   addressLabel: string;
   isRealGps: boolean;
-  status: 'acquiring' | 'locked' | 'denied' | 'simulated';
+  status: 'acquiring' | 'locked' | 'denied';
   errorMsg?: string;
 }
 
@@ -42,26 +42,8 @@ export const useRealtimeGps = (enableHighAccuracy = true) => {
   });
   const [isTracking, setIsTracking] = useState<boolean>(true);
 
-  // Reverse Geocoding Helper (Approximated for Bangkok District)
-  const getReadableAddress = (lat: number, lng: number): string => {
-    // Distance checks to known landmarks
-    if (Math.abs(lat - 13.722) < 0.03 && Math.abs(lng - 100.528) < 0.03) {
-      return 'สีลม - สาทร (BTS ศาลาแดง / ช่องนนทรี)';
-    }
-    if (Math.abs(lat - 13.746) < 0.03 && Math.abs(lng - 100.534) < 0.03) {
-      return 'สยามสแควร์ - เซ็นทรัลเวิลด์ (BTS สยาม)';
-    }
-    if (Math.abs(lat - 13.730) < 0.03 && Math.abs(lng - 100.581) < 0.03) {
-      return 'สุขุมวิท - ทองหล่อ - เอกมัย (BTS ทองหล่อ)';
-    }
-    if (Math.abs(lat - 13.803) < 0.03 && Math.abs(lng - 100.553) < 0.03) {
-      return 'จตุจักร - ลาดพร้าว - หมอชิต (BTS หมอชิต)';
-    }
-    if (Math.abs(lat - 13.706) < 0.03 && Math.abs(lng - 100.490) < 0.03) {
-      return 'ธนบุรี - วงเวียนใหญ่ - คลองสาน (BTS วงเวียนใหญ่)';
-    }
-    return `พิกัดปัจจุบัน: ${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E`;
-  };
+  const getReadableAddress = (lat: number, lng: number): string =>
+    `พิกัด GPS จริง: ${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E`;
 
   const acquireCurrentGps = useCallback(() => {
     if (!navigator.geolocation) {
@@ -87,7 +69,7 @@ export const useRealtimeGps = (enableHighAccuracy = true) => {
           accuracy: Number(pos.coords.accuracy.toFixed(1)),
           heading: pos.coords.heading,
           speed: Number(speedKmH.toFixed(1)),
-          altitude: pos.coords.altitude ? Number(pos.coords.altitude.toFixed(1)) : 15,
+          altitude: pos.coords.altitude == null ? null : Number(pos.coords.altitude.toFixed(1)),
           timestamp: pos.timestamp,
           addressLabel: getReadableAddress(lat, lng),
           isRealGps: true,
@@ -203,7 +185,7 @@ export const GpsRealTimeBadge: React.FC<GpsRealTimeBadgeProps> = ({
       >
         <Crosshair className={`w-3.5 h-3.5 ${gpsState.status === 'acquiring' ? 'animate-spin' : 'animate-pulse'}`} />
         <span className="text-[10px] font-mono font-bold truncate max-w-[140px]">
-          {gpsState.isRealGps ? 'GPS จริง (LIVE)' : 'GPS สตรีม: ' + gpsState.latitude.toFixed(4)}
+          {gpsState.isRealGps ? 'GPS จริง (LIVE)' : gpsState.status === 'acquiring' ? 'กำลังค้นหา GPS' : 'ยังไม่มี GPS'}
         </span>
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
       </div>
@@ -225,7 +207,7 @@ export const GpsRealTimeBadge: React.FC<GpsRealTimeBadgeProps> = ({
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
                   : 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40'
               }`}>
-                {gpsState.isRealGps ? '● HARDWARE LOCKED' : '● SATELLITE SYNC'}
+                {gpsState.isRealGps ? '● GPS LOCKED' : gpsState.status === 'acquiring' ? '● ACQUIRING' : '● GPS UNAVAILABLE'}
               </span>
             </div>
             <p className="text-[10px] text-slate-400 truncate">
