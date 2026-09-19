@@ -65,8 +65,6 @@ export const KnightDashboardView: React.FC<KnightDashboardViewProps> = ({
   const [activeTrip, setActiveTrip] = useState<TripModel | null>(null);
 
   // Incoming missions are supplied by the real dispatch flow; this dashboard never creates synthetic jobs.
-  const missionSource = 'live_dispatch';
-
   // Countdown timer effect
   useEffect(() => {
     if (!incomingMission) return;
