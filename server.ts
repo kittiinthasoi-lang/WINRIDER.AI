@@ -298,6 +298,15 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
         driverAvatarEmoji: acceptedOrder.driverAvatarEmoji || null,
         driverVehicle: acceptedOrder.driverVehicle || null,
       });
+      transaction.set(ordersDb.collection("audit_logs").doc(), {
+        action: "RIDE_ACCEPTED",
+        rideId: id,
+        actorUid: user.uid,
+        actorType: "driver",
+        fromStatus: "pending",
+        toStatus: "accepted",
+        createdAt: FieldValue.serverTimestamp(),
+      });
     });
 
     return res.json({ success: true, order: acceptedOrder });
@@ -379,6 +388,18 @@ app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
         ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
         updatedAt: updatedOrder.updatedAt,
       });
+      if (status) {
+        transaction.set(ordersDb.collection("audit_logs").doc(), {
+          action: "RIDE_STATUS_CHANGED",
+          rideId: id,
+          actorUid: user.uid,
+          actorType: isDriver ? "driver" : "passenger",
+          fromStatus: order.status,
+          toStatus: String(status),
+          ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
     });
 
     return res.json({ success: true, order: updatedOrder });
