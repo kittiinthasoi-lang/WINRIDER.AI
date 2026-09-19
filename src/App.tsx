@@ -6,7 +6,7 @@ import { KnightDriverAppView, DriverTabType } from './components/KnightDriverApp
 import { MerchantCommandCenter } from './components/MerchantCommandCenter';
 import { HospitalCommandCenter } from './components/HospitalCommandCenter';
 import { PartnerProfileView } from './components/PartnerProfileView';
-import { WinStreetMarketView } from './components/WinStreetMarketView';
+import { WinShopHubView } from './components/WinShopHubView';
 import { 
   UserSession, 
   isDriverAccount,
@@ -152,7 +152,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('winrider:set_destination', {
-        detail: { name, address, distanceKm: distanceKm || 2.4 }
+        detail: { name, address, distanceKm: typeof distanceKm === 'number' ? distanceKm : undefined }
       }));
     }, 150);
   };
@@ -478,12 +478,12 @@ export default function App() {
         )}
 
         {activeMode === 'market' && (
-          <WinStreetMarketView
+          <WinShopHubView
             audioEnabled={audioEnabled}
-            onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
             customerListedItems={customerListedItems}
             onAddNewCustomerItem={handleAddCustomerItem}
             onBackToMain={() => setActiveMode('passenger')}
+            onRideToDestination={handleRideToDestination}
           />
         )}
 

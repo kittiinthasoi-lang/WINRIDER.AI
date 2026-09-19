@@ -39,7 +39,10 @@ const RATE_LIMITS: Record<string, number> = {
   "/api/orders/:id/location": 120,
   "/api/routes/compute": 30,
   "/api/pet-care/nearby": 20,
+  "/api/emergency/nearby": 20,
   "/api/places/resolve-routes": 20,
+  "/api/shop/directory": 30,
+  "/api/shop/listings": 20,
   "/api/events/daily": 30,
 };
 
@@ -217,6 +220,58 @@ app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]),
   }
 });
 
+app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง", places: [] });
+  }
+  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY", places: [] });
+  try {
+    const placesResponse = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "places.id,places.displayName,places.primaryType,places.formattedAddress,places.location,places.nationalPhoneNumber,places.googleMapsUri,places.currentOpeningHours.openNow" },
+      body: JSON.stringify({ includedTypes: ["hospital", "fire_station", "police"], maxResultCount: 20,
+        rankPreference: "DISTANCE", languageCode: "th", regionCode: "TH",
+        locationRestriction: { circle: { center: { latitude, longitude }, radius: 20000 } } }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!placesResponse.ok) return res.status(502).json({ error: "ดึงข้อมูลศูนย์ฉุกเฉินจริงไม่สำเร็จ", places: [] });
+    const payload = await placesResponse.json() as { places?: any[] };
+    const raw = (payload.places || []).filter((place) => place?.id && place?.location);
+    let matrix: any[] = [];
+    if (raw.length) {
+      const routeResponse = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration" },
+        body: JSON.stringify({ origins: [{ waypoint: { location: { latLng: { latitude, longitude } } } }],
+          destinations: raw.map((place) => ({ waypoint: { location: { latLng: place.location } } })),
+          travelMode: "TWO_WHEELER", languageCode: "th-TH", units: "METRIC" }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (routeResponse.ok) matrix = await routeResponse.json() as any[];
+    }
+    const routeMap = new Map(matrix.filter((route) => route?.condition === "ROUTE_EXISTS").map((route) => [Number(route.destinationIndex), route]));
+    const places = raw.map((place, index) => {
+      const route = routeMap.get(index) as any;
+      const seconds = route ? Number.parseFloat(String(route.duration || "0").replace("s", "")) : NaN;
+      return { id: String(place.id), name: String(place.displayName?.text || ""), type: String(place.primaryType || "hospital"),
+        address: String(place.formattedAddress || ""), phone: String(place.nationalPhoneNumber || ""), mapsUrl: String(place.googleMapsUri || ""),
+        openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
+        distanceKm: route ? Math.round((Number(route.distanceMeters) / 1000) * 10) / 10 : null,
+        etaMinutes: Number.isFinite(seconds) ? Math.max(1, Math.ceil(seconds / 60)) : null };
+    }).sort((a, b) => (a.distanceKm ?? Number.MAX_VALUE) - (b.distanceKm ?? Number.MAX_VALUE));
+    return res.json({ places, source: "Google Places API (New) + Google Routes API", fetchedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error("[Emergency Nearby]", error instanceof Error ? error.message : error);
+    return res.status(502).json({ error: "เชื่อมต่อข้อมูลศูนย์ฉุกเฉินจริงไม่ได้", places: [] });
+  }
+});
+
 app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolve-routes"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
@@ -305,6 +360,109 @@ app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolv
   } catch (error) {
     console.error("[Resolve Place Routes]", error instanceof Error ? error.message : error);
     return res.status(502).json({ error: "เชื่อมต่อข้อมูลสถานที่และเส้นทางจริงไม่ได้", routes: [] });
+  }
+});
+
+app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const snapshot = await ordersDb.collection("users").limit(300).get();
+    const eligible = snapshot.docs
+      .map((doc) => ({ uid: doc.id, ...doc.data() } as any))
+      .filter((entry) => entry.status === "active" && (entry.role === "merchant" || entry.role === "partner"));
+    const profiles = await Promise.all(eligible.map(async (entry) => {
+      const roleCollection = entry.role === "merchant" ? "merchants" : "partners";
+      const roleData = (await ordersDb.collection(roleCollection).doc(entry.uid).get()).data() || {};
+      const custom = roleData.profileCustomization || entry.profileCustomization || {};
+      const stringArray = (value: unknown) => Array.isArray(value) ? value.filter((item) => typeof item === "string").slice(0, 30) : [];
+      const recordArray = (value: unknown) => Array.isArray(value)
+        ? value.filter((item) => item && typeof item === "object").slice(0, 50)
+        : [];
+      return {
+        id: entry.uid,
+        role: entry.role,
+        name: String(custom.displayName || roleData.shopName || roleData.orgName || entry.displayName || "").trim(),
+        description: String(custom.bioStatus || roleData.description || "").trim(),
+        avatarUrl: String(custom.avatarUrl || entry.avatarUrl || ""),
+        avatarEmoji: String(custom.avatarEmoji || entry.avatarEmoji || (entry.role === "merchant" ? "🏪" : "🏢")),
+        address: String(roleData.address || [entry.district, entry.province].filter(Boolean).join(" ") || "").trim(),
+        phone: String(entry.phone || roleData.phone || ""),
+        category: String(roleData.shopType || roleData.orgType || roleData.category || ""),
+        products: recordArray(roleData.products),
+        services: recordArray(roleData.services),
+        promotions: recordArray(roleData.promotions),
+        highlights: stringArray(roleData.highlights || roleData.amenities),
+        updatedAt: roleData.updatedAt || entry.updatedAt || null,
+      };
+    }));
+    return res.json({ profiles: profiles.filter((profile) => profile.name), source: "Firestore verified registrations" });
+  } catch (error) {
+    console.error("[Shop Directory]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ error: "โหลดรายชื่อร้านค้าและพาร์ทเนอร์จริงไม่ได้", profiles: [] });
+  }
+});
+
+app.get("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const snapshot = await ordersDb.collection("marketListings").orderBy("createdAt", "desc").limit(100).get();
+    const listings = snapshot.docs.map((doc) => doc.data()).filter((item: any) => item.status === "active");
+    return res.json({ listings });
+  } catch (error) {
+    console.error("[Shop Listings GET]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ error: "โหลดสินค้าจากผู้ขายจริงไม่ได้", listings: [] });
+  }
+});
+
+app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const input = req.body || {};
+  const title = String(input.title || "").trim();
+  const price = Number(input.price);
+  const stock = Number(input.stock ?? 1);
+  if (title.length < 3 || !Number.isFinite(price) || price <= 0 || !Number.isFinite(stock) || stock < 1) {
+    return res.status(400).json({ error: "ข้อมูลสินค้าไม่ถูกต้อง" });
+  }
+  try {
+    const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
+    const id = `listing-${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    const listing = {
+      id,
+      sellerUserId: user.uid,
+      sellerType: userData.role === "merchant" ? "merchant" : "citizen",
+      sellerName: String(userData.displayName || user.name || "ผู้ขาย WIN"),
+      sellerAvatar: String(userData.avatarEmoji || "👤"),
+      title,
+      price,
+      originalPrice: Number.isFinite(Number(input.originalPrice)) ? Number(input.originalPrice) : null,
+      category: String(input.category || "second_hand"),
+      categoryLabel: String(input.categoryLabel || "สินค้าทั่วไป"),
+      condition: String(input.condition || "used"),
+      conditionLabel: String(input.conditionLabel || "สภาพดี"),
+      description: String(input.description || "").trim(),
+      imageIcon: String(input.imageIcon || "📦"),
+      imageUrl: String(input.imageUrl || ""),
+      isAiVerified: input.isAiVerified === true,
+      aiCertificateId: input.isAiVerified === true ? String(input.aiCertificateId || "") : "",
+      aiQualityScore: input.isAiVerified === true && Number.isFinite(Number(input.aiQualityScore)) ? Number(input.aiQualityScore) : null,
+      location: String(input.location || "").trim(),
+      stock,
+      tags: Array.isArray(input.tags) ? input.tags.filter((tag: unknown) => typeof tag === "string").slice(0, 10) : [],
+      status: "active",
+      salesCount: 0,
+      createdAt: now,
+      updatedAt: now,
+      serverCreatedAt: FieldValue.serverTimestamp(),
+    };
+    await ordersDb.collection("marketListings").doc(id).create(listing);
+    return res.status(201).json({ listing });
+  } catch (error) {
+    console.error("[Shop Listings POST]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ error: "บันทึกสินค้าไม่สำเร็จ" });
   }
 });
 

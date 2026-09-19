@@ -206,7 +206,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'driver', label: 'อู่อัศวิน', icon: <Bike className="w-3.5 h-3.5" />, badge: 'โรงรถ & แผนที่' },
     { id: 'merchant', label: 'ศูนย์ร้านค้า', icon: <Store className="w-3.5 h-3.5" />, badge: 'รับพัสดุ & ดีล' },
     { id: 'partner', label: 'โปรไฟล์พาร์ทเนอร์', icon: <Building2 className="w-3.5 h-3.5" />, badge: 'โรงแรม/ผับบาร์/บุฟเฟต์' },
-    { id: 'market', label: 'WIN Shop & Market', icon: <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />, badge: 'ร้านค้า & สินค้าชุมชน' },
+    { id: 'market', label: 'WIN Shop & WIN Street Market', icon: <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />, badge: 'ร้านค้า • พาร์ทเนอร์ • ชุมชน' },
     { id: 'hospital', label: 'ศูนย์โรงพยาบาล', icon: <Building2 className="w-3.5 h-3.5" />, badge: 'หน่วยฉุกเฉิน' },
     { id: 'codex', label: 'คัมภีร์ 7 บท', icon: <BookOpen className="w-3.5 h-3.5" />, badge: 'คัมภีร์หลัก' },
   ];

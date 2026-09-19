@@ -947,7 +947,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     if (!newItemName || !newItemPrice) return;
 
     if (!passengerAiVerified) {
-      alert('⚠️ ข้อบังคับตลาด WIN Street Market: กรุณาถ่ายรูปสินค้าให้ AI Vision Guard ตรวจสอบยืนยันก่อนลงขายทุกครั้ง');
+      alert('⚠️ ข้อบังคับตลาดประชาชน: กรุณาถ่ายรูปสินค้าให้ AI Vision Guard ตรวจสอบยืนยันก่อนลงขายทุกครั้ง');
       return;
     }
 
@@ -1971,12 +1971,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     <span>← กลับหน้าหลัก (Home)</span>
                   </button>
                   <span className="text-[10px] text-slate-400 font-mono">
-                    🛍️ WIN Official & Community Shop
+                    🛡️ WIN OFFICIAL SHOP
                   </span>
                 </div>
 
-                {/* Shop Sub-tabs */}
-                <div className="flex rounded-2xl bg-black/40 p-1 border border-white/10">
+                {/* WIN SHOP is reserved for official equipment. Community commerce has its own market. */}
+                <div className="flex items-center gap-2 rounded-2xl bg-black/40 p-1 border border-white/10">
                   <button
                     onClick={() => {
                       if (audioEnabled) playTactileBlip(800);
@@ -1990,18 +1990,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   >
                     🛡️ อุปกรณ์ทางการ (WIN OFFICIAL)
                   </button>
-                  <button
-                    onClick={() => {
-                      if (audioEnabled) playTactileBlip(800);
-                      setShopSubTab('c2c');
-                    }}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold font-mono transition-all ${
-                      shopSubTab === 'c2c'
-                        ? 'bg-[#FFD700] text-slate-950 shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    🎁 ตลาดชุมชน (P2P / C2C)
+                  <button onClick={onNavigateToMarket} className="flex-1 rounded-xl border border-amber-400/40 py-2 text-xs font-bold text-amber-300 hover:bg-amber-400/10">
+                    🏪 เปิดตลาดประชาชน
                   </button>
                 </div>
 
@@ -2385,7 +2375,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           onNavigateToMarket();
                         } else {
                           setActiveTab('shop');
-                          setShopSubTab('c2c');
                         }
                       }}
                       className="w-full py-2.5 px-3 rounded-2xl bg-cyan-950/70 hover:bg-cyan-900/80 border border-cyan-400/50 text-cyan-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"

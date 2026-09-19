@@ -287,8 +287,8 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     },
     { 
       id: 'market', 
-      label: 'ตลาด WIN Street Market', 
-      desc: 'ศูนย์รวมสินค้าชุมชน มอเตอร์ไซค์มือสอง และของแต่งวิน', 
+      label: 'WIN Shop & WIN Street Market',
+      desc: 'ดูร้านค้า พาร์ทเนอร์ โปรโมชัน และสินค้าที่ประชาชนลงขาย',
       icon: <ShoppingBag className="w-5 h-5" />,
       color: 'from-pink-500/20 to-rose-500/10 border-pink-500/40 text-pink-300'
     },
