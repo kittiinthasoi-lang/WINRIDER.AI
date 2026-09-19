@@ -393,6 +393,13 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
 
   // Recharts Telemetry Data
   const telemetryHistory: { time: string; battery: number; earningsPerKm: number; speed: number }[] = [];
+  const trainProgress = 0.65;
+
+  const triggerVoiceGuidance = (text: string) => {
+    if (voiceGuidanceEnabled && audioEnabled) {
+      speakThaiText(text, voicePersona, voiceSpeedRate);
+    }
+  };
 
   // Sync with prop if activeJob changes
   useEffect(() => {
@@ -1615,7 +1622,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             <div className="absolute left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber-400 border-2 border-slate-950 pointer-events-none shadow-[0_0_8px_#F59E0B]" title="จุด B (รับลูกค้า/พัสดุ)" />
           </div>
         </div>
-      </div>
 
       {/* ========================================================================= */}
       {/* 3. MULTI-ROUTE ALTERNATIVES (เลือก 3 เส้นทางนำทาง) */}
@@ -1829,7 +1835,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
           jobId={selectedJob.id}
           audioEnabled={audioEnabled}
         />
-      )}
 
       {/* DIRECT IN-RIDE CHAT WITH PASSENGER */}
       <InRideDirectChatModal

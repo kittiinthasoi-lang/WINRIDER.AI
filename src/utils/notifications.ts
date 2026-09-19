@@ -3,6 +3,17 @@
  */
 
 const STORAGE_KEY_NOTIF_ENABLED = 'winrider_browser_notif_enabled';
+const STORAGE_KEY_LINE_TOKEN = 'winrider_line_notify_token';
+
+export function getSavedLineToken(): string {
+  if (typeof localStorage === 'undefined') return '';
+  return localStorage.getItem(STORAGE_KEY_LINE_TOKEN) || '';
+}
+
+export function saveLineToken(token: string): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY_LINE_TOKEN, token.trim());
+}
 
 export function isNotificationSupported(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;
@@ -63,12 +74,12 @@ export function sendBrowserNotification(title: string, options?: NotificationOpt
 /**
  * Send alert to LINE Notify via server endpoint
  */
-export async function sendLineNotifyAlert(message: string): Promise<{ success: boolean; message: string }> {
+export async function sendLineNotifyAlert(message: string, token?: string): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch('/api/notifications/line', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, token: token || getSavedLineToken() }),
     });
 
     const data = await res.json();

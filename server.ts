@@ -620,7 +620,7 @@ app.post("/api/webhooks/dispatch", rateLimit(10), async (req, res) => {
 // LINE Notify Proxy Endpoint
 app.post("/api/notifications/line", rateLimit(10), async (req, res) => {
   try {
-    const token = process.env.LINE_NOTIFY_TOKEN;
+    const token = req.body?.token || process.env.LINE_NOTIFY_TOKEN;
     if (!token) {
       return res.status(503).json({ status: "error", message: "LINE provider is not configured on the server" });
     }

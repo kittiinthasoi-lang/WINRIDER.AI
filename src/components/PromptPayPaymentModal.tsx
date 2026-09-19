@@ -33,7 +33,7 @@ export const PromptPayPaymentModal: React.FC<PromptPayPaymentModalProps> = ({
   onClose,
   orderId = 'ORDER-' + Date.now().toString().slice(-4),
   payeeName = 'WINRIDER.AI',
-  promptPayId = '',/
+  promptPayId = '',
   amount,
   tipAmount = 0,
   audioEnabled = true,
