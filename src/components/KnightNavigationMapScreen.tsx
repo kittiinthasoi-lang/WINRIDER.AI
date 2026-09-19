@@ -1577,127 +1577,23 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             </div>
           </div>
 
-          {/* Action buttons: Play/Pause, Step Advance, Deliver Proof */}
-          <div className="flex items-center gap-2 self-end sm:self-center">
-            <button
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(800);
-                undefined;
-              }}
-              className={`px-3 py-2 rounded-xl font-mono text-xs font-bold border transition-all ${
-                isPlaying 
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30' 
-                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-              }`}
-            >
-              {isPlaying ? '⏸️ พักจำลอง' : '▶️ เล่นจำลอง'}
-            </button>
-
+          {/* Real trip state controls */}
+          <div className="flex items-center justify-end gap-2 self-end sm:self-center">
             <button
               onClick={handleAdvancePhase}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 text-slate-950 font-black text-xs shadow-[0_0_15px_#00D2FF] hover:brightness-110 flex items-center gap-1.5 transition-all"
             >
-              <span>{navPhase === 'to_pickup' ? '✓ ถึงจุดรับ (ขึ้นรถ)' : navPhase === 'to_destination' ? '✓ ถึงปลายทาง (ส่งงาน)' : '🏁 จบทริป'}</span>
+              <span>{navPhase === 'to_pickup' ? '✓ ถึงจุดรับ' : navPhase === 'at_pickup' ? '✓ เริ่มเดินทางไปส่ง' : navPhase === 'to_destination' ? '✓ ถึงปลายทาง' : '🏁 จบทริป'}</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* 3-Point Stage Buttons (Click to Jump) */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 font-mono text-[10px]">
-          {/* Point A */}
-          <button
-            
-            className={`p-2 rounded-xl border text-left transition-all ${
-              tripProgress <= 0.05
-                ? 'bg-cyan-500 text-slate-950 border-white font-black shadow-[0_0_12px_#00D2FF]'
-                : 'bg-black/40 border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-bold">🚩 จุด A (พี่วิน)</span>
-              <span>0%</span>
-            </div>
-            <p className="text-[9px] opacity-80 truncate mt-0.5">BTS พร้อมพงษ์</p>
-          </button>
-
-          {/* Leg 1: A -> B */}
-          <button
-            
-            className={`p-2 rounded-xl border text-left transition-all ${
-              tripProgress > 0.05 && tripProgress < 0.48
-                ? 'bg-cyan-500 text-slate-950 border-white font-black shadow-[0_0_12px_#00D2FF]'
-                : 'bg-black/40 border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-bold">🛵 ไปจุด B</span>
-              <span>25%</span>
-            </div>
-            <p className="text-[9px] opacity-80 truncate mt-0.5">เข้าซอยสุขุมวิท 39</p>
-          </button>
-
-          {/* Point B: Pickup */}
-          <button
-            
-            className={`p-2 rounded-xl border text-left transition-all ${
-              tripProgress >= 0.48 && tripProgress <= 0.52
-                ? 'bg-amber-400 text-slate-950 border-white font-black shadow-[0_0_12px_#F59E0B]'
-                : 'bg-black/40 border-amber-500/30 text-amber-300 hover:bg-amber-950/40'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-bold">📦 จุด B (รับของ)</span>
-              <span>50%</span>
-            </div>
-            <p className="text-[9px] opacity-80 truncate mt-0.5">{selectedJob.pickupLocation.slice(0, 16)}</p>
-          </button>
-
-          {/* Leg 2: B -> C */}
-          <button
-            
-            className={`p-2 rounded-xl border text-left transition-all ${
-              tripProgress > 0.52 && tripProgress < 0.98
-                ? 'bg-emerald-500 text-slate-950 border-white font-black shadow-[0_0_12px_#10B981]'
-                : 'bg-black/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/40'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-bold">🚀 มุ่งหน้าจุด C</span>
-              <span>75%</span>
-            </div>
-            <p className="text-[9px] opacity-80 truncate mt-0.5">ลัดซอยประสานมิตร 23</p>
-          </button>
-
-          {/* Point C: Destination */}
-          <button
-            
-            className={`p-2 rounded-xl border text-left transition-all ${
-              tripProgress >= 0.98
-                ? 'bg-emerald-400 text-slate-950 border-white font-black shadow-[0_0_12px_#10B981]'
-                : 'bg-black/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/40'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-bold">🏁 จุด C (ถึงที่หมาย)</span>
-              <span>100%</span>
-            </div>
-            <p className="text-[9px] opacity-80 truncate mt-0.5">{selectedJob.dropoffLocation.slice(0, 16)}</p>
-          </button>
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-3 text-[10px] font-mono text-slate-300">
+          สถานะงานจริง: <span className="text-cyan-300 font-bold">{navPhase}</span>
+          <span className="mx-2">•</span>
+          ความคืบหน้าจากสถานะงาน: <span className="text-emerald-300 font-bold">{Math.round(tripProgress * 100)}%</span>
         </div>
-
-        {/* Scrubber Progress Slider */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span className="text-cyan-300 font-bold">
-              ความคืบหน้าทริปจำลอง: {(tripProgress * 100).toFixed(0)}%
-            </span>
-            <span className="text-amber-300 font-bold">
-              {tripProgress < 0.5 
-                ? `ช่วงที่ 1: เดินทางไปรับ (${(tripProgress * 2 * 100).toFixed(0)}%)` 
-                : `ช่วงที่ 2: เดินทางไปส่ง (${((tripProgress - 0.5) * 2 * 100).toFixed(0)}%)`}
-            </span>
-          </div>
           <div className="relative flex items-center">
             <input
               type="range"
