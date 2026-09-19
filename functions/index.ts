@@ -642,6 +642,9 @@ export const requestPayout = onCall(async (request) => {
   const amountSatang = Math.round(Number(data.amountSatang || 0));
   const idempotencyKey = String(data.idempotencyKey || "").trim();
   const bankAccount = data.bankAccount || {};
+  const bankName = String(bankAccount.bankName || "").trim();
+  const accountNumber = String(bankAccount.accountNumber || "").replace(/\D/g, "");
+  const accountName = String(bankAccount.accountName || "").trim();
 
   // ตรวจสอบความถูกต้องของ Input
   if (!amountSatang || amountSatang <= 0 || !Number.isInteger(amountSatang)) {
@@ -650,6 +653,10 @@ export const requestPayout = onCall(async (request) => {
 
   if (!idempotencyKey) {
     throw new HttpsError("invalid-argument", "idempotencyKey จำเป็นต้องระบุเพื่อป้องกันการถอนเงินซ้ำซ้อน");
+  }
+
+  if (!bankName || accountNumber.length < 10 || accountNumber.length > 16 || !accountName) {
+    throw new HttpsError("invalid-argument", "ข้อมูลบัญชีรับเงินไม่ครบถ้วนหรือไม่ถูกต้อง");
   }
 
   const result = await db.runTransaction(async (transaction) => {
@@ -679,6 +686,17 @@ export const requestPayout = onCall(async (request) => {
     }
 
     const walletData = walletSnap.data() || {};
+    const userSnap = await transaction.get(db.collection("users").doc(uid));
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+
+    if (userData.status !== "active") {
+      throw new HttpsError("failed-precondition", "บัญชีผู้ใช้ยังไม่อยู่ในสถานะ active จึงไม่สามารถถอนเงินได้");
+    }
+
+    if (!["citizen", "knight"].includes(String(walletData.role || ""))) {
+      throw new HttpsError("failed-precondition", "ประเภทกระเป๋าเงินไม่สามารถขอถอนได้");
+    }
+
     const currentBalance = Number(walletData.balanceSatang || 0);
     const currentLocked = Number(walletData.lockedSatang || 0);
     const available = currentBalance - currentLocked;
@@ -733,9 +751,9 @@ export const requestPayout = onCall(async (request) => {
       userId: uid,
       amountSatang,
       bankAccount: {
-        bankName: bankAccount.bankName || "PromptPay",
-        accountNumber: bankAccount.accountNumber || "",
-        accountName: bankAccount.accountName || ""
+        bankName,
+        accountNumber,
+        accountName
       },
       status: "PENDING_TRANSFER",
       createdAt: FieldValue.serverTimestamp()
