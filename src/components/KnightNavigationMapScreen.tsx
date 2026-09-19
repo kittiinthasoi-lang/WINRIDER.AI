@@ -173,7 +173,30 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   initialNavMode
 }) => {
   // Active Selected Job
-  const [selectedJob, setSelectedJob] = useState<IncomingJobData | null>(() => activeJob || null);
+  const EMPTY_REAL_JOB: IncomingJobData = {
+    id: '',
+    serviceId: 'knight',
+    serviceTitle: '',
+    serviceIconEmoji: '',
+    customerName: '',
+    customerRating: 0,
+    customerPhone: '',
+    customerAvatarEmoji: '',
+    pickupLocation: '',
+    dropoffLocation: '',
+    distanceKm: 0,
+    driverDistanceToPickupKm: 0,
+    fairDispatchQueueRank: 0,
+    totalCandidatesInRadius: 0,
+    estMinutes: 0,
+    baseFare: 0,
+    tips: 0,
+    netFare: 0,
+    platformFee: 0,
+    xpReward: 0,
+    urgency: 'normal'
+  };
+  const [selectedJob, setSelectedJob] = useState<IncomingJobData>(() => activeJob || EMPTY_REAL_JOB);
   
   // Trip navigation phase for a real accepted order.
   // Phase: 'to_pickup' (A -> B), 'at_pickup' (B), 'to_destination' (B -> C), 'arrived_destination' (C)
