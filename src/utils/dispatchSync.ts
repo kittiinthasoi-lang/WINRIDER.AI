@@ -181,11 +181,6 @@ export async function createLiveOrder(orderInput: {
     updatedAt: now,
   };
 
-  // Save locally
-  const orders = getLocalLiveOrders();
-  orders.unshift(newOrder);
-  saveLocalLiveOrders(orders);
-
   // Server API is the single source of truth for ride creation.
   const createResponse = await fetch('/api/orders', {
     method: 'POST',
@@ -195,6 +190,11 @@ export async function createLiveOrder(orderInput: {
   if (!createResponse.ok) {
     throw new Error(`ORDER_CREATE_FAILED_${createResponse.status}`);
   }
+  const createdServerOrder = await createResponse.json();
+  const persistedOrder = (createdServerOrder?.order || newOrder) as LiveRideOrder;
+  const orders = getLocalLiveOrders();
+  orders.unshift(persistedOrder);
+  saveLocalLiveOrders(orders);
 
   // Broadcast to other tabs
   broadcastEvent(newOrder, 'created');
