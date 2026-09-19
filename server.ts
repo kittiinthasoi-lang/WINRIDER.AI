@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 
 dotenv.config();
 
@@ -103,9 +104,47 @@ function getAdminDb() {
 }
 
 const ordersDb = getAdminDb();
+const adminAuth = getAuth();
+
+async function requireFirebaseUser(req: express.Request, res: express.Response) {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Authentication required" });
+    return null;
+  }
+  try {
+    return await adminAuth.verifyIdToken(header.slice(7));
+  } catch {
+    res.status(401).json({ error: "Invalid authentication token" });
+    return null;
+  }
+}
+
+async function requireEligibleDriver(uid: string) {
+  const [userSnap, knightSnap] = await Promise.all([
+    ordersDb.collection("users").doc(uid).get(),
+    ordersDb.collection("knights").doc(uid).get(),
+  ]);
+  const user = userSnap.data() || {};
+  const knight = knightSnap.data() || {};
+  const kyc = String(knight.kycStatus || "").toLowerCase();
+
+  if (
+    user.role !== "knight" ||
+    user.status !== "active" ||
+    knight.isOnline !== true ||
+    !["approved", "verified"].includes(kyc)
+  ) {
+    return null;
+  }
+  return { user, knight };
+}
+
 const ordersCollection = ordersDb.collection("rides");
 
-app.get("/api/orders", async (_req, res) => {
+app.get("/api/orders", async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
   try {
     const snapshot = await ordersCollection.orderBy("createdAt", "desc").limit(50).get();
     const orders = snapshot.docs.map((doc) => doc.data() as ServerOrder);
@@ -117,8 +156,10 @@ app.get("/api/orders", async (_req, res) => {
 });
 
 app.post("/api/orders", async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
   const newOrder = req.body as ServerOrder;
-  if (!newOrder || !newOrder.id || !newOrder.passengerUserId) {
+  if (!newOrder || !newOrder.id || !newOrder.passengerUserId || newOrder.passengerUserId !== user.uid) {
     return res.status(400).json({ error: "Invalid order data" });
   }
 
@@ -148,12 +189,21 @@ app.post("/api/orders", async (req, res) => {
 });
 
 app.post("/api/orders/:id/accept", async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const eligibility = await requireEligibleDriver(user.uid);
+  if (!eligibility) {
+    return res.status(403).json({ error: "Driver is not eligible to accept orders" });
+  }
   const { id } = req.params;
   const driverInfo = req.body;
 
-  if (!driverInfo?.driverUserId || !driverInfo?.driverName || !driverInfo?.driverPlate) {
+  if (!driverInfo?.driverName || !driverInfo?.driverPlate) {
     return res.status(400).json({ error: "Real driver identity is required" });
   }
+  driverInfo.driverUserId = user.uid;
+  driverInfo.driverName = String(eligibility.user.displayName || driverInfo.driverName);
+  driverInfo.driverPlate = String(eligibility.knight.plateNumber || driverInfo.driverPlate);
 
   try {
     const orderRef = ordersCollection.doc(id);
@@ -210,6 +260,8 @@ app.post("/api/orders/:id/accept", async (req, res) => {
 });
 
 app.post("/api/orders/:id/step", async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
   const { id } = req.params;
   const { status, tipAmount } = req.body;
 
