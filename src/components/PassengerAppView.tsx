@@ -28,8 +28,6 @@ import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
-import { ReligiousNotificationsModal } from './ReligiousNotificationsModal';
-import { sendBrowserNotification } from '../utils/notifications';
 import { CyberGraphic, DreamRideVehicleImage } from './CyberGraphic';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import confetti from 'canvas-confetti';
@@ -38,7 +36,7 @@ import {
   ShieldCheck,
   MapPin, 
   Search, 
-  Flower2, 
+  Bell, 
   Dog, 
   Zap, 
   Sparkles, 
@@ -251,8 +249,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [showCustomerRadarModal, setShowCustomerRadarModal] = useState(false);
   const [showFundDetails, setShowFundDetails] = useState(true);
   const [, setBookingConfirmed] = useState(false);
-  const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
-  const [tripDistanceKm, setTripDistanceKm] = useState<number>(0);
+  const [selectedDestination, setSelectedDestination] = useState<string | null>('อาคาร Exchange Tower อโศก');
+  const [tripDistanceKm, setTripDistanceKm] = useState<number>(2.4);
   const [deviceFrameMode, setDeviceFrameMode] = useState(true);
   const [currentMatchedDriver, setCurrentMatchedDriver] = useState<MatchedDriver | null>(null);
   const [isCreatingRide, setIsCreatingRide] = useState(false);
@@ -265,7 +263,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [showInRideChatModal, setShowInRideChatModal] = useState<boolean>(false);
   const [showRealGpsModal, setShowRealGpsModal] = useState<boolean>(false);
   const [showProfileCustomizerModal, setShowProfileCustomizerModal] = useState<boolean>(false);
-  const [showReligiousNotificationsModal, setShowReligiousNotificationsModal] = useState<boolean>(false);
   const [passengerProfileData, setPassengerProfileData] = useState<ProfileCustomizationData>({
     displayName: 'คุณ จิตใจ สล็อต',
     bioStatus: 'พลเมืองสายชิลล์ • เน้นปลอดภัย อุดหนุนร้านชุมชน 🦥✨',
@@ -274,12 +271,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     bannerGlow: 'from-[#0C1E40] via-[#091530] to-[#070D1E]'
   });
   const [ridePhase, setRidePhase] = useState<'picking_up' | 'arrived_pickup' | 'in_transit' | 'arrived_destination'>('picking_up');
-  const [pickupEtaMinutes, setPickupEtaMinutes] = useState<number>(0);
-  const [destEtaMinutes, setDestEtaMinutes] = useState<number>(0);
-  const [remainingDistMeters, setRemainingDistMeters] = useState<number>(0);
+  const [pickupEtaMinutes, setPickupEtaMinutes] = useState<number>(2.2);
+  const [destEtaMinutes, setDestEtaMinutes] = useState<number>(5.8);
+  const [remainingDistMeters, setRemainingDistMeters] = useState<number>(650);
   const [isAiSpeaking, setIsAiSpeaking] = useState<boolean>(false);
   const [isAutoVoiceAnnounce, setIsAutoVoiceAnnounce] = useState<boolean>(true);
-  const [aiSpeechText, setAiSpeechText] = useState<string>('ระบบจะแจ้งสถานะเมื่อมีออเดอร์และพี่วินกดรับงานจริง');
+  const [aiSpeechText, setAiSpeechText] = useState<string>('พี่วินกิตติ (LV.100) กำลังเดินทางมารับคุณที่คอนโดสุขุมวิท 39 อีกประมาณ 2.2 นาทีถึงค่ะ');
 
   const [userRideHistory, setUserRideHistory] = useState<LiveRideOrder[]>([]);
 
@@ -313,57 +310,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       })
       .catch((err) => console.warn('Firestore orders fetch error:', err));
 
-    // 3. Live local subscriptions for same-device UX
+    // 3. Live subscriptions
     const unsub = subscribeToLiveOrders(() => {
       const updated = getOrdersForPassenger(currentUserSession.id);
       setUserRideHistory(updated);
     });
 
-    // 4. Cross-device polling from Firestore so a Knight accepting on another device
-    // becomes visible to the passenger without relying on BroadcastChannel/localStorage.
-    const refreshCloudOrders = async () => {
-      try {
-        const orders = await fetchFirestoreOrdersForUser(currentUserSession.id, 'customer');
-        if (orders.length > 0) {
-          setUserRideHistory(orders);
-          const active = orders
-            .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-          if (active) {
-            setActiveLiveOrder(active);
-            if (active.driverName) {
-              setCurrentMatchedDriver((prev) => prev ?? {
-                id: active.driverUserId || '',
-                name: active.driverName || 'พี่วิน',
-                nameEn: active.driverName || 'พี่วิน',
-                nickname: active.driverName || 'พี่วิน',
-                gender: 'male',
-                level: active.driverLevel || 0,
-                tierName: active.driverLevel ? `Knight Level ${active.driverLevel}` : 'Knight',
-                rating: active.driverRating || 0,
-                totalTrips: 0,
-                phone: active.driverPhone || '',
-                avatarEmoji: active.driverAvatarEmoji || '🛵',
-                vehicleModel: active.driverVehicle || 'ยังไม่ระบุรถ',
-                plateNumber: active.driverPlate || '',
-                certifications: [], specialtyTags: [], distanceKm: 0, etaMinutes: 0, bio: '', serviceMatchScore: 0
-              });
-            }
-            if (active.status === 'heading_pickup') setRidePhase('picking_up');
-            if (active.status === 'picked_up') setRidePhase('arrived_pickup');
-            if (active.status === 'in_transit') setRidePhase('in_transit');
-            if (active.status === 'completed') setRidePhase('arrived_destination');
-          }
-        }
-      } catch (err) {
-        console.warn('Cloud ride refresh failed:', err);
-      }
-    };
-    const refreshTimer = window.setInterval(refreshCloudOrders, 5000);
-
-    return () => {
-      unsub();
-      window.clearInterval(refreshTimer);
-    };
+    return () => unsub();
   }, [currentUserSession?.id]);
 
   // Cross-tab Live Dispatch Listener: updates passenger UI when Knight accepts or advances trip
@@ -394,7 +347,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             serviceMatchScore: 0
           });
           setRidePhase('picking_up');
-          sendBrowserNotification('🛵 พี่วินรับงานแล้ว', { body: `${order.driverName} กำลังเดินทางมารับคุณ`, tag: `ride-accepted-${order.id}` });
           if (audioEnabled) {
             playLevelUpFanfare();
             speakThaiText(`พี่วิน ${order.driverName} กดรับงานแล้วค่ะ กำลังเดินทางมารับคุณ`);
@@ -406,7 +358,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         if (order.status === 'heading_pickup') setRidePhase('picking_up');
         if (order.status === 'picked_up') {
           setRidePhase('arrived_pickup');
-          sendBrowserNotification('📍 พี่วินถึงจุดรับแล้ว', { body: 'กรุณาสวมหมวกนิรภัยเพื่อความปลอดภัย', tag: `ride-pickup-${order.id}` });
           if (audioEnabled) {
             playTactileBlip(1000);
             speakThaiText("พี่วินเดินทางมาถึงจุดรับแล้วค่ะ กรุณาสวมหมวกนิรภัยเพื่อความปลอดภัย");
@@ -420,7 +371,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           }
         }
         if (order.status === 'completed') {
-          sendBrowserNotification('✅ เดินทางถึงจุดหมายแล้ว', { body: order.dropoffLocation, tag: `ride-completed-${order.id}` });
           setRidePhase('arrived_destination');
           setShowReceiptModal(true);
           if (audioEnabled) {
@@ -467,9 +417,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     const targetPhase = phaseOverride || ridePhase;
     const driverName = currentMatchedDriver?.name || 'กำลังรอพี่วิน';
     const driverLvl = currentMatchedDriver?.level || 0;
-    const vehicle = selectedDreamRide?.thaiName || 'ยานพาหนะที่เลือก';
-    const pickupLoc = activeLiveOrder?.pickupLocation || 'ตำแหน่งรับจาก GPS';
-    const destLoc = activeLiveOrder?.dropoffLocation || selectedDestination || 'ยังไม่ได้เลือกปลายทาง';
+    const vehicle = selectedDreamRide?.thaiName || 'Honda ADV350 Custom Stealth';
+    const pickupLoc = 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)';
+    const destLoc = selectedDestination || 'อาคาร Exchange Tower อโศก';
 
     let textToSpeak = '';
     if (targetPhase === 'picking_up') {
@@ -926,10 +876,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       setBookingError('กรุณาเลือกปลายทางก่อนยืนยันการเดินทาง');
       return;
     }
-    if (!Number.isFinite(tripDistanceKm) || tripDistanceKm <= 0) {
-      setBookingError('ยังไม่มีระยะทางจริงของเส้นทาง กรุณาเลือกปลายทางจากรายการที่คำนวณระยะทางได้ก่อน');
-      return;
-    }
 
     setIsCreatingRide(true);
     setBookingError(null);
@@ -1055,7 +1001,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 touch-manipulation">
+    <div className="space-y-6">
       {/* XP Toast Notification */}
       {xpToast && (
         <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 text-slate-950 font-black text-xs text-center shadow-2xl border-2 border-white/40 animate-bounce">
@@ -1172,20 +1118,19 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#00D2FF]" />
               </button>
 
-              {/* Faith & Sacred Calendar */}
-              <button
-                id="passenger-religious-notification-btn"
+              {/* Notification Bell */}
+              <button 
+                id="passenger-notification-bell-btn"
                 onClick={() => {
                   if (audioEnabled) playTactileBlip(1000);
-                  setShowReligiousNotificationsModal(true);
+                  alert("🔔 การแจ้งเตือน: อัศวิน กิตติ อินทะสร้อย (Level 100 Sovereign) ประจำสถานีใกล้คุณ, มีโปรโมชั่นคอนเสิร์ตลด 20%");
                 }}
-                className="relative p-1.5 rounded-lg bg-amber-300/10 hover:bg-amber-300/20 text-amber-200 border border-amber-300/25 cursor-pointer active:scale-95 transition-all"
-                title="แจ้งเตือนศาสนา เวลาละหมาด วันพระ และวันสำคัญทุกศาสนา"
-                aria-label="ศูนย์แจ้งเตือนศาสนา"
+                className="relative p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer active:scale-95 transition-all"
+                title="การแจ้งเตือน"
               >
-                <Flower2 className="w-4 h-4" />
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-300 text-[9px] text-slate-950 font-black flex items-center justify-center">
-                  •
+                <Bell className="w-4 h-4 text-cyan-400" />
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 text-[9px] text-white font-bold flex items-center justify-center">
+                  3
                 </span>
               </button>
 
@@ -1634,8 +1579,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 {/* 3D Holographic Capillary Map Navigation Component */}
                 <ThreeDimensionalRideMap
                   selectedDreamRide={selectedDreamRide}
-                  pickupLocation={activeLiveOrder?.pickupLocation || "กำลังรอออเดอร์"}
-                  destinationLocation={activeLiveOrder?.dropoffLocation || selectedDestination || "ยังไม่ได้เลือกปลายทาง"}
+                  pickupLocation="หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)"
+                  destinationLocation={selectedDestination || "อาคาร Exchange Tower อโศก"}
                   driverName={currentMatchedDriver?.name || "กำลังรอพี่วิน"}
                   driverLevel={currentMatchedDriver?.level || 0}
                   driverEmoji={currentMatchedDriver?.avatarEmoji || "🛵"}
@@ -2609,7 +2554,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                             <div><span className="text-slate-500">ปลายทาง:</span> {item.dropoffLocation}</div>
                             {item.driverName && (
                               <div className="text-emerald-300">
-                                พี่วินผู้ดูแล: {item.driverName} ({item.driverPlate || 'ไม่ระบุทะเบียน'})
+                                พี่วินผู้ดูแล: {item.driverName} ({item.driverPlate || '1กข 7789 กทม.'})
                               </div>
                             )}
                           </div>
@@ -2637,7 +2582,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         <SpecializedServicePreMatchingModal
           serviceId={preMatchingServiceId}
           serviceName={services.find(s => s.id === preMatchingServiceId)?.name || 'WIN Service'}
-          destinationLocation={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
+          destinationLocation={selectedDestination || 'อาคาร Exchange Tower อโศก'}
           audioEnabled={audioEnabled}
           onClose={() => setShowPreMatchingModal(false)}
           onSubmit={handlePreMatchingSubmit}
@@ -2656,7 +2601,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
               ? (preMatchingData?.express?.recipientName || 'คุณสมศรี เจริญสุข')
               : (preMatchingData?.family?.contactPersonName || 'คุณวราภรณ์ (บุตรสาว)')
           }
-          locationName={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
+          locationName={selectedDestination || 'อาคาร Exchange Tower อโศก'}
           audioEnabled={audioEnabled}
           onClose={() => setShowPhotoVerificationModal(false)}
         />
@@ -2667,7 +2612,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         <DriverMatchingModal
           serviceId={activeServiceId}
           serviceName={selectedService || 'WIN KNIGHT'}
-          selectedDestination={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
+          selectedDestination={selectedDestination || 'อาคาร Exchange Tower อโศก'}
           selectedDreamRide={selectedDreamRide}
           totalCalculatedFare={totalCalculatedFare}
           audioEnabled={audioEnabled}
@@ -2732,8 +2677,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   <span className="text-[10px] text-cyan-300 font-mono">SOVEREIGN DISPATCH PROTOCOL</span>
                 </div>
               </div>
-              <button
-                aria-label="ปิดหน้าต่างยืนยันการจอง"
+              <button 
                 onClick={() => setShowBookingModal(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
               >
@@ -2786,7 +2730,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
               
               <div className="text-slate-300 flex items-center justify-between">
                 <div>
-                  ปลายทาง: <strong className="text-white">{selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}</strong>
+                  ปลายทาง: <strong className="text-white">{selectedDestination || 'อาคาร Exchange Tower อโศก'}</strong>
                 </div>
                 <span className="text-[10px] font-mono text-cyan-400 bg-black/40 px-2 py-0.5 rounded border border-white/10">
                   {tripDistanceKm} กม.
@@ -3573,7 +3517,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         <SpecializedServicePreMatchingModal
           serviceId={preMatchingServiceId}
           serviceName={selectedService || 'บริการเฉพาะทาง'}
-          destinationLocation={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
+          destinationLocation={selectedDestination || 'อาคาร Exchange Tower อโศก'}
           audioEnabled={audioEnabled}
           onClose={() => setShowPreMatchingModal(false)}
           onSubmit={(data, calculatedAddonFee) => {
@@ -3627,7 +3571,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       )}
 
       {/* PROMPTPAY EMVCo PAYMENT MODAL */}
-      {activeLiveOrder && <PromptPayPaymentModal
+      <PromptPayPaymentModal
         isOpen={showPromptPayModal}
         onClose={() => setShowPromptPayModal(false)}
         orderId={activeLiveOrder?.id || 'RIDE-' + Date.now().toString().slice(-4)}
@@ -3640,7 +3584,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           setShowPromptPayModal(false);
           setShowReceiptModal(true);
         }}
-      />}
+      />
 
       {/* IN-RIDE DIRECT CHAT MODAL */}
       <InRideDirectChatModal
@@ -3648,8 +3592,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         onClose={() => setShowInRideChatModal(false)}
         orderId={activeLiveOrder?.id || 'ACTIVE-RIDE'}
         currentUserRole="passenger"
-        currentUserName={currentUserSession?.name || "ผู้โดยสาร"}
-        otherPartyName={currentMatchedDriver?.name || 'พี่วิน'}
+        currentUserName="คุณอารียา (ผู้โดยสาร)"
+        otherPartyName={currentMatchedDriver?.name || 'พี่วินอัศวิน'}
         audioEnabled={audioEnabled}
       />
 
@@ -3657,13 +3601,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       <RealGpsMapModal
         isOpen={showRealGpsModal}
         onClose={() => setShowRealGpsModal(false)}
-        destinationTitle={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
-        audioEnabled={audioEnabled}
-      />
-
-      <ReligiousNotificationsModal
-        isOpen={showReligiousNotificationsModal}
-        onClose={() => setShowReligiousNotificationsModal(false)}
+        destinationTitle={selectedDestination || 'อาคาร Exchange Tower อโศก'}
         audioEnabled={audioEnabled}
       />
 

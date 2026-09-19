@@ -33,6 +33,8 @@ export interface LiveRideOrder {
   driverRating?: number;
   // Trip details
   tipAmount?: number;
+  tips?: number;
+  platformFee?: number;
   ratingGiven?: number;
   reviewComment?: string;
 }
@@ -136,6 +138,25 @@ export function getLocalLiveOrders(): LiveRideOrder[] {
 export function saveLocalLiveOrders(orders: LiveRideOrder[]): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(orders.slice(0, 30)));
+}
+
+/**
+ * Fetch available orders for driver from server or local store fallback
+ */
+export async function fetchAvailableOrdersForDriver(): Promise<LiveRideOrder[]> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/orders', { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.orders)) {
+        return data.orders as LiveRideOrder[];
+      }
+    }
+  } catch (err) {
+    // If not authenticated or network fails, fallback to local storage
+  }
+  return getLocalLiveOrders();
 }
 
 /**
