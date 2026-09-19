@@ -341,6 +341,83 @@ app.post("/api/orders/:id/step", async (req, res) => {
   }
 });
 
+/**
+ * Live driver GPS ingestion.
+ * Only the authenticated driver assigned to an active ride may publish coordinates.
+ * Coordinates are validated server-side and stored separately from the ride state.
+ */
+app.post("/api/orders/:id/location", async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+
+  const { id } = req.params;
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  const accuracyMeters = req.body?.accuracyMeters === undefined ? undefined : Number(req.body.accuracyMeters);
+  const heading = req.body?.heading === undefined ? undefined : Number(req.body.heading);
+  const speedMps = req.body?.speedMps === undefined ? undefined : Number(req.body.speedMps);
+
+  if (
+    !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+    !Number.isFinite(longitude) || longitude < -180 || longitude > 180
+  ) {
+    return res.status(400).json({ error: "Invalid GPS coordinates" });
+  }
+  if (accuracyMeters !== undefined && (!Number.isFinite(accuracyMeters) || accuracyMeters < 0 || accuracyMeters > 10000)) {
+    return res.status(400).json({ error: "Invalid GPS accuracy" });
+  }
+  if (heading !== undefined && (!Number.isFinite(heading) || heading < 0 || heading > 360)) {
+    return res.status(400).json({ error: "Invalid GPS heading" });
+  }
+  if (speedMps !== undefined && (!Number.isFinite(speedMps) || speedMps < 0 || speedMps > 100)) {
+    return res.status(400).json({ error: "Invalid GPS speed" });
+  }
+
+  try {
+    const orderRef = ordersCollection.doc(id);
+    const snapshot = await orderRef.get();
+    if (!snapshot.exists) return res.status(404).json({ error: "Order not found" });
+
+    const order = snapshot.data() as ServerOrder;
+    const activeStatuses = ["accepted", "heading_pickup", "picked_up", "in_transit"];
+    if (order.driverUserId !== user.uid) return res.status(403).json({ error: "Only the assigned driver may publish GPS" });
+    if (!activeStatuses.includes(order.status)) {
+      return res.status(409).json({ error: "GPS updates are not allowed for this ride state" });
+    }
+
+    const locationRef = orderRef.collection("locations").doc();
+    const now = new Date().toISOString();
+    const location = {
+      driverUserId: user.uid,
+      latitude,
+      longitude,
+      ...(accuracyMeters !== undefined ? { accuracyMeters } : {}),
+      ...(heading !== undefined ? { heading } : {}),
+      ...(speedMps !== undefined ? { speedMps } : {}),
+      recordedAt: now,
+      serverRecordedAt: FieldValue.serverTimestamp()
+    };
+    await locationRef.create(location);
+
+    await orderRef.update({
+      lastDriverLocation: {
+        latitude,
+        longitude,
+        ...(accuracyMeters !== undefined ? { accuracyMeters } : {}),
+        ...(heading !== undefined ? { heading } : {}),
+        ...(speedMps !== undefined ? { speedMps } : {}),
+        recordedAt: now
+      },
+      updatedAt: now
+    });
+
+    return res.status(201).json({ success: true, location });
+  } catch (error: any) {
+    console.error("[GPS Location Error]:", error?.message);
+    return res.status(503).json({ error: "Location store unavailable" });
+  }
+});
+
 function validateWebhookTarget(rawUrl: string): URL {
   let target: URL;
   try {
