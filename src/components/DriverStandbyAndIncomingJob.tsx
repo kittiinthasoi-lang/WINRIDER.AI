@@ -43,7 +43,7 @@ import {
   getGoogleMapsNavigationUrl
 } from '../data/realBangkokLocations';
 import { useWakeLock } from '../hooks/useWakeLock';
-import { subscribeToLiveOrders, acceptLiveOrder, advanceLiveOrderStep, LiveRideOrder } from '../utils/dispatchSync';
+import { subscribeToLiveOrders, acceptLiveOrder, advanceLiveOrderStep, fetchAvailableOrdersForDriver, LiveRideOrder } from '../utils/dispatchSync';
 import { getCurrentUserSession } from '../utils/userSession';
 import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { sendJobToLine, chatWithPassengerOnLine } from '../utils/lineIntegration';
@@ -110,7 +110,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   const [countdownSeconds, setCountdownSeconds] = useState<number>(30);
   const [currentActiveTrip, setCurrentActiveTrip] = useState<IncomingJobData | null>(null);
   const [tripStep, setTripStep] = useState<'heading_pickup' | 'picked_up' | 'navigating' | 'completed'>('heading_pickup');
-  const [onlineMinutes, setOnlineMinutes] = useState<number>(142);
+  const [onlineMinutes, setOnlineMinutes] = useState<number>(0);
   const [radarPulseCount, setRadarPulseCount] = useState<number>(0);
   const [showDispatchRulesModal, setShowDispatchRulesModal] = useState<boolean>(false);
   const [showNavigationMapModal, setShowNavigationMapModal] = useState<boolean>(false);
@@ -165,6 +165,52 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
     });
     return () => unsubscribe();
   }, [isOnDuty, audioEnabled, activeVehicle]);
+
+  // Backend polling keeps dispatch visible across devices/instances.
+  useEffect(() => {
+    if (!isOnDuty || activeIncomingJob) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const orders = await fetchAvailableOrdersForDriver();
+        if (cancelled) return;
+        const pending = orders.find((order) => order.status === 'pending');
+        if (!pending) return;
+        const incomingJob: IncomingJobData = {
+          id: pending.id,
+          serviceId: (pending.serviceId as any) || 'knight',
+          serviceTitle: pending.serviceTitle,
+          serviceIconEmoji: pending.serviceIconEmoji || '🛵',
+          customerName: pending.passengerName,
+          customerPhone: pending.passengerPhone,
+          customerAvatarEmoji: '👤',
+          customerRating: 0,
+          customerNote: pending.pickupLocation,
+          pickupLocation: pending.pickupLocation,
+          dropoffLocation: pending.dropoffLocation,
+          distanceKm: pending.distanceKm,
+          driverDistanceToPickupKm: 0,
+          fairDispatchQueueRank: 1,
+          totalCandidatesInRadius: 0,
+          estMinutes: pending.estMinutes,
+          baseFare: pending.fare,
+          tips: pending.tips || 0,
+          netFare: pending.netFare,
+          platformFee: pending.platformFee || 0,
+          xpReward: 0,
+          vehicleRequested: activeVehicle?.name,
+          urgency: 'normal'
+        };
+        setActiveIncomingJob(incomingJob);
+        setCountdownSeconds(30);
+      } catch (err) {
+        console.warn('Driver dispatch refresh failed:', err);
+      }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [isOnDuty, activeIncomingJob, activeVehicle]);
 
   // Online minutes counter
   useEffect(() => {
@@ -224,8 +270,8 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
       driverName: userSession?.name || '',
       driverLevel: userSession?.level || driverLevel || 1,
       driverPlate: userSession?.plateNumber || '',
-      driverAvatarEmoji: userSession?.avatarEmoji || '🦁',
-      driverVehicle: activeVehicle?.name || 'Honda Wave 125i'
+      driverAvatarEmoji: userSession?.avatarEmoji || '🛵',
+      driverVehicle: activeVehicle?.name || ''
     });
   };
 
@@ -267,7 +313,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
         serviceTitle: currentActiveTrip.serviceTitle,
         serviceIconEmoji: currentActiveTrip.serviceIconEmoji,
         passengerName: currentActiveTrip.customerName,
-        passengerPhone: currentActiveTrip.customerPhone || '089-445-1234',
+        passengerPhone: currentActiveTrip.customerPhone || '',
         pickupLocation: currentActiveTrip.pickupLocation,
         dropoffLocation: currentActiveTrip.dropoffLocation,
         distanceKm: currentActiveTrip.distanceKm,
