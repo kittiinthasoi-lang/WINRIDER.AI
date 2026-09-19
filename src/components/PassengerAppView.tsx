@@ -10,7 +10,7 @@ import { ThreeDimensionalRideMap } from './ThreeDimensionalRideMap';
 import { PetCareHospitalSection } from './PetCareHospitalSection';
 import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { WinAlertEventsCard } from './WinAlertEventsCard';
-import { PET_HOSPITALS_AND_CLINICS, PetHospitalClinic, WIN_PET_CARE_REQUIREMENTS } from '../data/petHospitalData';
+import { PetHospitalClinic } from '../data/petHospitalData';
 import { getCitizenTier, CITIZEN_10_TIERS, calculateLevelMaxXp, getLevelDifficultyMetrics } from '../data/tierHierarchyData';
 import { DriverMatchingModal } from './DriverMatchingModal';
 import { VoiceAssistantModal } from './VoiceAssistantModal';
@@ -641,8 +641,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       imageUrl: '/images/pillar_petcare.jpg',
       badge: '24H VET CARE',
       bgGlow: 'from-emerald-400/25 to-transparent',
-      eta: '4-7 นาที',
-      priceEstimate: '฿35 - ฿120',
+      eta: 'คำนวณจาก GPS',
+      priceEstimate: 'คำนวณตามเส้นทางจริง',
       iconEmoji: '🐾 🐶',
       actionText: '🐾 กดเข้าศูนย์ รพ.สัตว์ 24 ชม.',
       actionGradient: 'from-emerald-400 to-teal-500',
@@ -771,19 +771,22 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     { title: 'ท่าเรือสาทร (Central Pier) / BTS ตากสิน', sub: 'สาทรใต้ • 1.9 กม.', icon: '🚢', tag: 'WIN Link Pier' },
     { title: 'ศูนย์การประชุมแห่งชาติสิริกิติ์ (QSNCC)', sub: 'รัชดา-คลองเตย • 2.1 กม.', icon: '📚', tag: 'WIN Link แฟนมีต/งานหนังสือ' },
     { title: 'ร้านกาแฟ ซัมเมอร์เรน คาเฟ่ (Summer Rain Cafe)', sub: 'สุขุมวิท 39 • 2.4 กม.', icon: '☕', tag: 'Cafe & Chill' },
-    { title: 'โรงพยาบาลสัตว์ทองหล่อ 24 ชม.', sub: 'พระราม 9 • 3.2 กม.', icon: '🏥', tag: '24H Pet Vet' },
   ];
 
   const handleSelectHospitalForBooking = (hospital: PetHospitalClinic) => {
+    if (hospital.distanceKm === null || hospital.routeSource !== 'google_routes_api_live') {
+      setBookingError('ยังไม่มีระยะทางจาก Google Routes จึงยังไม่สามารถเริ่มจับคู่ได้');
+      return;
+    }
     if (audioEnabled) {
       playTactileBlip(950);
       speakThaiText(`เตรียมเรียกรถ WIN-Pet Care ส่งไป ${hospital.name}`);
     }
     setActiveServiceId('pet');
     setSelectedService('WIN-Pet Care (รพ.สัตว์ & คลินิก 24 ชม.)');
-    setSelectedDestination(hospital.name);
+    setSelectedDestination(`${hospital.name} (${hospital.address})`);
     setSelectedPetHospital(hospital);
-    setTripDistanceKm(hospital.distanceKm || 3.0);
+    setTripDistanceKm(hospital.distanceKm);
     setShowDriverMatchingModal(true);
   };
 

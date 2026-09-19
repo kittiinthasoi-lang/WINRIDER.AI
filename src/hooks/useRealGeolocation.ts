@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export interface GeolocationPositionState {
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   accuracy: number | null;
   speed: number | null;
   heading: number | null;
@@ -11,12 +11,6 @@ export interface GeolocationPositionState {
   error: string | null;
   isSupported: boolean;
 }
-
-// Default central Bangkok coordinates (Asoke / Sukhumvit 39)
-export const DEFAULT_BANGKOK_COORDS = {
-  latitude: 13.736717,
-  longitude: 100.560417,
-};
 
 export function calculateHaversineDistanceKm(
   lat1: number,
@@ -39,8 +33,8 @@ export function calculateHaversineDistanceKm(
 
 export function useRealGeolocation(enableHighAccuracy = true) {
   const [position, setPosition] = useState<GeolocationPositionState>({
-    latitude: DEFAULT_BANGKOK_COORDS.latitude,
-    longitude: DEFAULT_BANGKOK_COORDS.longitude,
+    latitude: null,
+    longitude: null,
     accuracy: null,
     speed: null,
     heading: null,
@@ -80,7 +74,7 @@ export function useRealGeolocation(enableHighAccuracy = true) {
         console.warn('Geolocation error:', err.message);
         setPosition((prev) => ({
           ...prev,
-          error: `ไม่สามารถดึงตำแหน่งจริงได้ (${err.message}) - สลับใช้พิกัดจำลองกรุงเทพฯ`,
+          error: `ไม่สามารถดึงตำแหน่งจริงได้ (${err.message}) ระบบจะไม่ใช้พิกัดจำลองแทน`,
           isRealGps: false,
         }));
       },

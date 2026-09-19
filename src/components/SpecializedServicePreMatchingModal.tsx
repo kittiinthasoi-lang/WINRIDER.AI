@@ -148,7 +148,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
   const [petCarrierType, setPetCarrierType] = useState<'carrier' | 'leash' | 'lap'>('carrier');
   const [petComfortKit, setPetComfortKit] = useState(true);
   const [petVetDestination, setPetVetDestination] = useState(destinationLocation);
-  const [petSpecialInstructions, setPetSpecialInstructions] = useState('น้องแมวตกใจง่าย ขอพี่วินขับขี่นุ่มนวลและไม่บีบแตร');
+  const [petSpecialInstructions, setPetSpecialInstructions] = useState('');
 
   // 2. MU BUDDY STATE
   const [muWantBuddy, setMuWantBuddy] = useState(true);

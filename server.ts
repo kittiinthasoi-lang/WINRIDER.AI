@@ -38,6 +38,7 @@ const RATE_LIMITS: Record<string, number> = {
   "/api/orders/:id/step": 30,
   "/api/orders/:id/location": 120,
   "/api/routes/compute": 30,
+  "/api/pet-care/nearby": 20,
   "/api/events/daily": 30,
 };
 
@@ -96,6 +97,123 @@ function getAiClient(): GoogleGenAI | null {
 // Health check endpoints (Cloud Run, Kubernetes, AI Studio probes)
 app.get(["/api/health", "/healthz", "/health"], (_req, res) => {
   res.json({ status: "ok", empire: "WINRIDER.AI", timestamp: new Date().toISOString() });
+});
+
+app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  const radiusMeters = Math.min(50_000, Math.max(1_000, Number(req.body?.radiusMeters) || 15_000));
+  const validCoord = Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+  if (!validCoord) return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง" });
+
+  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
+    return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY สำหรับข้อมูลสถานที่จริง", places: [] });
+  }
+
+  try {
+    const placesResponse = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": [
+          "places.id", "places.displayName", "places.formattedAddress", "places.location",
+          "places.rating", "places.userRatingCount", "places.nationalPhoneNumber",
+          "places.regularOpeningHours", "places.currentOpeningHours.openNow", "places.googleMapsUri"
+        ].join(","),
+      },
+      body: JSON.stringify({
+        includedTypes: ["veterinary_care"],
+        maxResultCount: 20,
+        rankPreference: "DISTANCE",
+        languageCode: "th",
+        regionCode: "TH",
+        locationRestriction: { circle: { center: { latitude, longitude }, radius: radiusMeters } },
+      }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!placesResponse.ok) {
+      console.error(`[Pet Care Places] Google returned ${placesResponse.status}`);
+      return res.status(502).json({ error: "ดึงข้อมูลโรงพยาบาลและคลินิกจริงจาก Google Places ไม่สำเร็จ", places: [] });
+    }
+
+    const placesPayload = await placesResponse.json() as { places?: any[] };
+    const rawPlaces = (Array.isArray(placesPayload.places) ? placesPayload.places : []).filter((place) =>
+      place?.id && place?.displayName?.text && Number.isFinite(place?.location?.latitude) && Number.isFinite(place?.location?.longitude)
+    );
+
+    let matrix: any[] = [];
+    if (rawPlaces.length > 0) {
+      const matrixResponse = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration",
+        },
+        body: JSON.stringify({
+          origins: [{ waypoint: { location: { latLng: { latitude, longitude } } } }],
+          destinations: rawPlaces.map((place) => ({
+            waypoint: { location: { latLng: place.location } },
+          })),
+          travelMode: "TWO_WHEELER",
+          languageCode: "th-TH",
+          units: "METRIC",
+        }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (matrixResponse.ok) matrix = await matrixResponse.json() as any[];
+      else console.error(`[Pet Care Routes] Google returned ${matrixResponse.status}`);
+    }
+
+    const routeByDestination = new Map(matrix
+      .filter((item) => item?.condition === "ROUTE_EXISTS" && Number.isFinite(item?.distanceMeters))
+      .map((item) => [Number(item.destinationIndex), item]));
+
+    const places = rawPlaces.map((place, index) => {
+      const route = routeByDestination.get(index);
+      const distanceKm = route ? Math.round((Number(route.distanceMeters) / 1000) * 10) / 10 : null;
+      const durationSeconds = route ? Number.parseFloat(String(route.duration || "0").replace("s", "")) : NaN;
+      const weekdayDescriptions = Array.isArray(place.regularOpeningHours?.weekdayDescriptions)
+        ? place.regularOpeningHours.weekdayDescriptions : [];
+      const alwaysOpen = Array.isArray(place.regularOpeningHours?.periods)
+        && place.regularOpeningHours.periods.length === 1
+        && place.regularOpeningHours.periods[0]?.open?.hour === 0
+        && !place.regularOpeningHours.periods[0]?.close;
+      return {
+        id: String(place.id),
+        name: String(place.displayName.text),
+        address: String(place.formattedAddress || ""),
+        latitude: Number(place.location.latitude),
+        longitude: Number(place.location.longitude),
+        distanceKm,
+        etaMinutes: Number.isFinite(durationSeconds) ? Math.max(1, Math.ceil(durationSeconds / 60)) : null,
+        phoneNumber: String(place.nationalPhoneNumber || ""),
+        rating: Number.isFinite(place.rating) ? Number(place.rating) : null,
+        reviewsCount: Number.isFinite(place.userRatingCount) ? Number(place.userRatingCount) : 0,
+        openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
+        openHours: weekdayDescriptions,
+        is24Hours: alwaysOpen,
+        googleMapsUri: String(place.googleMapsUri || ""),
+        routeSource: route ? "google_routes_api_live" : null,
+      };
+    }).sort((a, b) => (a.distanceKm ?? Number.MAX_VALUE) - (b.distanceKm ?? Number.MAX_VALUE));
+
+    return res.json({
+      places,
+      source: "Google Places API (New) + Google Routes API",
+      origin: { latitude, longitude },
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("[Pet Care Nearby]", error instanceof Error ? error.message : error);
+    return res.status(502).json({ error: "เชื่อมต่อข้อมูลสถานพยาบาลสัตว์จริงไม่ได้", places: [] });
+  }
 });
 
 // Real-world event discovery. PredictHQ remains the source of truth; this route
