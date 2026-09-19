@@ -80,7 +80,7 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
-import { IncomingJobData, SAMPLE_INCOMING_JOBS } from './DriverStandbyAndIncomingJob';
+import { IncomingJobData } from './DriverStandbyAndIncomingJob';
 import { Vehicle } from '../types';
 import { 
   playTactileBlip, 
@@ -173,9 +173,9 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   initialNavMode
 }) => {
   // Active Selected Job
-  const [selectedJob, setSelectedJob] = useState<IncomingJobData>(() => activeJob || SAMPLE_INCOMING_JOBS[0]);
+  const [selectedJob, setSelectedJob] = useState<IncomingJobData | null>(() => activeJob || null);
   
-  // Trip Navigation Phase & Multi-stage A -> B -> C Simulation
+  // Trip navigation phase for a real accepted order.
   // Phase: 'to_pickup' (A -> B), 'at_pickup' (B), 'to_destination' (B -> C), 'arrived_destination' (C)
   const [navPhase, setNavPhase] = useState<'to_pickup' | 'at_pickup' | 'to_destination' | 'arrived_destination'>('to_pickup');
 
