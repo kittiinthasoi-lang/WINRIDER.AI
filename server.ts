@@ -269,26 +269,59 @@ app.post("/api/orders/:id/step", async (req, res) => {
     return res.status(400).json({ error: "Order update is required" });
   }
 
+  const allowedStatuses = ["pending", "accepted", "heading_pickup", "picked_up", "in_transit", "completed", "cancelled"];
+  if (status && !allowedStatuses.includes(String(status))) {
+    return res.status(400).json({ error: "Invalid ride status" });
+  }
+  if (tipAmount !== undefined && (!Number.isFinite(Number(tipAmount)) || Number(tipAmount) < 0)) {
+    return res.status(400).json({ error: "Invalid tip amount" });
+  }
+
   try {
     const orderRef = ordersCollection.doc(id);
     let updatedOrder: ServerOrder | null = null;
 
     await ordersDb.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(orderRef);
-      if (!snapshot.exists) {
-        throw new Error("ORDER_NOT_FOUND");
-      }
+      if (!snapshot.exists) throw new Error("ORDER_NOT_FOUND");
 
       const order = snapshot.data() as ServerOrder;
+      const isPassenger = order.passengerUserId === user.uid;
+      const isDriver = order.driverUserId === user.uid;
+      if (!isPassenger && !isDriver) throw new Error("FORBIDDEN");
+
+      const transitions: Record<string, string[]> = {
+        pending: ["cancelled", "accepted"],
+        accepted: ["heading_pickup", "cancelled"],
+        heading_pickup: ["picked_up", "cancelled"],
+        picked_up: ["in_transit", "cancelled"],
+        in_transit: ["completed", "cancelled"],
+        completed: [],
+        cancelled: []
+      };
+
+      if (status) {
+        const nextStatus = String(status);
+        if (!transitions[order.status]?.includes(nextStatus)) {
+          throw new Error("INVALID_TRANSITION");
+        }
+        const driverOnly = ["heading_pickup", "picked_up", "in_transit", "completed"];
+        const passengerOnly = ["cancelled"];
+        if (driverOnly.includes(nextStatus) && !isDriver) throw new Error("DRIVER_REQUIRED");
+        if (passengerOnly.includes(nextStatus) && !isPassenger && !isDriver) throw new Error("PARTICIPANT_REQUIRED");
+        if (nextStatus === "accepted") throw new Error("USE_ACCEPT_ENDPOINT");
+      }
+
+      if (tipAmount !== undefined && !isPassenger) throw new Error("PASSENGER_REQUIRED");
+
       updatedOrder = {
         ...order,
-        ...(status ? { status } : {}),
+        ...(status ? { status: String(status) } : {}),
         ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
         updatedAt: new Date().toISOString(),
       };
-
       transaction.update(orderRef, {
-        ...(status ? { status } : {}),
+        ...(status ? { status: String(status) } : {}),
         ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
         updatedAt: updatedOrder.updatedAt,
       });
@@ -296,9 +329,13 @@ app.post("/api/orders/:id/step", async (req, res) => {
 
     return res.json({ success: true, order: updatedOrder });
   } catch (error: any) {
-    if (error?.message === "ORDER_NOT_FOUND") {
-      return res.status(404).json({ error: "Order not found" });
-    }
+    if (error?.message === "ORDER_NOT_FOUND") return res.status(404).json({ error: "Order not found" });
+    if (error?.message === "FORBIDDEN") return res.status(403).json({ error: "Not a ride participant" });
+    if (error?.message === "DRIVER_REQUIRED") return res.status(403).json({ error: "Driver action required" });
+    if (error?.message === "PASSENGER_REQUIRED") return res.status(403).json({ error: "Passenger action required" });
+    if (error?.message === "PARTICIPANT_REQUIRED") return res.status(403).json({ error: "Participant action required" });
+    if (error?.message === "USE_ACCEPT_ENDPOINT") return res.status(409).json({ error: "Use the accept endpoint for acceptance" });
+    if (error?.message === "INVALID_TRANSITION") return res.status(409).json({ error: "Invalid ride state transition" });
     console.error("[Orders Step Error]:", error?.message);
     return res.status(503).json({ error: "Order store unavailable" });
   }
