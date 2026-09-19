@@ -84,21 +84,7 @@ export const PromptPayPaymentModal: React.FC<PromptPayPaymentModalProps> = ({
   };
 
   const handleConfirmPaid = () => {
-    setIsPaid(true);
-    if (audioEnabled) {
-      playLevelUpFanfare();
-      speakThaiText(`ได้รับชำระเงิน ${totalAmount} บาทเรียบร้อยแล้วค่ะ ขอบคุณที่สนับสนุนพี่วินและกองทุนสวัสดิการ 2 บาทค่ะ`);
-    }
-    confetti({
-      particleCount: 70,
-      spread: 80,
-      origin: { y: 0.6 },
-      colors: ['#00D2FF', '#10B981', '#FFD700', '#FFFFFF'],
-    });
-
-    if (onPaymentConfirmed) {
-      onPaymentConfirmed();
-    }
+    console.warn('Payment confirmation is disabled until a real payment provider callback is configured.');
   };
 
   return (
@@ -255,10 +241,12 @@ export const PromptPayPaymentModal: React.FC<PromptPayPaymentModalProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmPaid}
-                className="flex-2 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs shadow-[0_0_20px_rgba(0,210,255,0.4)] flex items-center justify-center gap-2 transition-all active:scale-98"
+                disabled
+                className="flex-2 py-3 rounded-2xl bg-white/10 text-slate-500 font-black text-xs flex items-center justify-center gap-2 cursor-not-allowed"
+                title="ต้องเชื่อมต่อ payment provider และ webhook ยืนยันก่อน"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>ฉันโอนเงินเรียบร้อยแล้ว</span>
+                <ShieldCheck className="w-4 h-4" />
+                <span>รอการยืนยันการชำระเงินจริง</span>
               </button>
             </>
           )}
