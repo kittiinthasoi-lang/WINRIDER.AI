@@ -42,9 +42,7 @@ import {
 import { playTactileBlip, playRadarScan } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 
-const GOOGLE_MAPS_API_KEY =
-  (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) ||
-  'AIzaSyCB6IzBTHuQDVGc018yllw4yZVKB-GOhGQ';
+const GOOGLE_MAPS_API_KEY = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
 
 export type RadarPerspective = 'customer' | 'driver' | 'merchant' | 'partner';
 
