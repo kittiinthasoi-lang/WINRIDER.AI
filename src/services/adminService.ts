@@ -31,7 +31,7 @@ import { UserDoc } from '../types/auth';
 
 /**
  * ดึง Custom Claims ของผู้ดูแลระบบ
- * รองรับทั้ง Firebase ID Token Claims จริง และโหมดพัฒนา
+ * ใช้ Firebase identity และสิทธิ์จากระบบจริงเท่านั้น
  */
 export async function getAdminClaims(): Promise<AdminClaims | null> {
   const currentUser = auth.currentUser;
@@ -44,32 +44,6 @@ export async function getAdminClaims(): Promise<AdminClaims | null> {
     };
   }
   
-  // 2. ตรวจสอบจาก Dev Session หรือ LocalStorage
-  const devAccountRaw = localStorage.getItem('WINRIDER_ACTIVE_DEV_ACCOUNT');
-  const devAdminLevel = localStorage.getItem('WINRIDER_ADMIN_OVERRIDE_LEVEL') as AdminLevel | null;
-
-  if (devAdminLevel) {
-    return {
-      admin: true,
-      adminLevel: devAdminLevel
-    };
-  }
-
-  if (devAccountRaw) {
-    try {
-      const devAcc = JSON.parse(devAccountRaw);
-      // หากเป็นแอดมินหรือ developer testing account
-      if (devAcc.role === 'partner' || devAcc.id?.includes('SOVEREIGN') || devAcc.name?.includes('กิตติ')) {
-        return {
-          admin: true,
-          adminLevel: 'super'
-        };
-      }
-    } catch {
-      // ignore
-    }
-  }
-
   // 2. ตรวจสอบจาก Firebase Auth Token Custom Claims
   if (currentUser) {
     try {

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import { DriverTabType } from './KnightDriverAppView';
+import { useAuth } from '../context/AuthContext';
 
 export type MainTabType = 'home' | 'dreamRide' | 'ride' | 'shop' | 'modes' | 'garage' | 'navigation';
 
@@ -68,6 +69,7 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   onToggleDriverPersona,
 }) => {
   const [isModesDrawerOpen, setIsModesDrawerOpen] = useState(false);
+  const { userData } = useAuth();
 
   // If user is not logged in or in admin mode, do not render mobile bottom navigation
   if (!currentUserSession || activeMode === 'admin') {
@@ -316,8 +318,8 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   const isAdminSession = 
     currentUserSession?.email === 'kittiinthasoi@gmail.com' ||
     currentUserSession?.email?.toLowerCase().includes('kittiinthasoi') ||
-    currentUserSession?.role === 'partner' ||
-    currentUserSession?.id?.includes('SOVEREIGN');
+    userData?.isAdmin === true ||
+    userData?.adminLevel === 'super';
 
   // Role-based allowed modes:
   // 1. Driver: Has access to passenger (8 pillars), driver cockpit/garage/nav, market (WIN SHOP), merchant, partner, hospital, codex.
@@ -330,7 +332,8 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     ? ['merchant', 'passenger', 'market', 'partner', 'hospital', 'codex']
     : ['partner', 'passenger', 'market', 'merchant', 'hospital', 'codex'];
 
-  const allowedModesForRole = isAdminSession ? [...baseAllowed, 'admin'] : baseAllowed;
+  const ownerModes = ['passenger', 'driver', 'merchant', 'partner', 'market', 'hospital', 'codex', 'admin'];
+  const allowedModesForRole = isAdminSession ? ownerModes : baseAllowed;
 
   const filteredAppModesList = appModesList.filter(mode => allowedModesForRole.includes(mode.id));
 
