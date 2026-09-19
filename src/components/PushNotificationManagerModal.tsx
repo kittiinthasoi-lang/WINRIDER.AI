@@ -66,6 +66,8 @@ export const PushNotificationManagerModal: React.FC<PushNotificationManagerModal
       <div className="relative w-full max-w-lg bg-gradient-to-b from-slate-900 via-slate-950 to-black border border-cyan-500/30 rounded-3xl p-5 sm:p-6 shadow-[0_0_50px_rgba(0,210,255,0.25)] text-slate-100 max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
+          type="button"
+          aria-label="ปิดหน้าต่างการแจ้งเตือน"
           onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all active:scale-90"
         >
