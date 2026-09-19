@@ -2,7 +2,7 @@
   "name": "winrider-ai-functions",
   "version": "1.0.0",
   "description": "WINRIDER.AI Cloud Functions Double-Entry Financial Engine",
-  "main": "index.ts",
+  "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
     "serve": "firebase emulators:start --only functions",
