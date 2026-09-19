@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAuth } from 'firebase/auth';
 import { 
   Radio, 
   Navigation, 
@@ -90,8 +91,6 @@ interface ThreeDimensionalDriverRadarProps {
   onSelectPing?: (ping: Radar3DPing) => void;
 }
 
-const LIVE_RADAR_PINGS: Radar3DPing[] = [];
-
 export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarProps> = ({
   activeVehicle,
   isOnDuty,
@@ -112,13 +111,79 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
   const [showGroundShadows, setShowGroundShadows] = useState<boolean>(true);
   const [filterCategory, setFilterCategory] = useState<RadarCategory>('all');
   const [filterService, setFilterService] = useState<'all' | 'knight' | 'express' | 'pet' | 'mu' | 'spirit'>('all');
-  const [selectedPing, setSelectedPing] = useState<Radar3DPing | null>(LIVE_RADAR_PINGS[0]);
+  const [radarPings, setRadarPings] = useState<Radar3DPing[]>([]);
+  const [selectedPing, setSelectedPing] = useState<Radar3DPing | null>(null);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [placesError, setPlacesError] = useState('');
   const [radarSweepAngle, setRadarSweepAngle] = useState<number>(0);
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
 
   // Realtime Live GPS Hook
   const { gpsState, acquireCurrentGps } = useRealtimeGps(true);
   const [gpsToast, setGpsToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOnDuty || !gpsState.isRealGps) {
+      setRadarPings([]);
+      setSelectedPing(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      setPlacesLoading(true); setPlacesError('');
+      try {
+        const user = getAuth().currentUser;
+        if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนเปิดเรดาร์');
+        const token = await user.getIdToken();
+        const directoryResponse = await fetch('/api/shop/directory', { headers: { Authorization: `Bearer ${token}` } });
+        const directoryPayload = await directoryResponse.json() as { profiles?: Array<{ id: string; role: 'merchant' | 'partner'; name: string; address: string; category: string }> };
+        const registered = directoryResponse.ok ? (directoryPayload.profiles || []).filter((profile) => profile.address) : [];
+        let sourcePlaces: Array<{ id: string; name: string; category: 'shop' | 'partner'; primaryType: string; address: string; latitude: number; longitude: number; rating: number | null; openNow: boolean | null; distanceMeters: number; source: 'win' | 'google' }> = [];
+
+        if (registered.length > 0) {
+          const routeResponse = await fetch('/api/places/resolve-routes', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ latitude: gpsState.latitude, longitude: gpsState.longitude,
+              places: registered.slice(0, 20).map((profile) => ({ key: profile.id, query: `${profile.name} ${profile.address} ประเทศไทย` })) }),
+          });
+          const routePayload = await routeResponse.json() as { routes?: Array<{ key: string; latitude: number; longitude: number; address: string; distanceKm: number }> };
+          const byId = new Map(registered.map((profile) => [profile.id, profile]));
+          sourcePlaces = (routePayload.routes || []).flatMap((route) => {
+            const profile = byId.get(route.key); if (!profile) return [];
+            return [{ id: profile.id, name: profile.name, category: profile.role === 'merchant' ? 'shop' as const : 'partner' as const,
+              primaryType: profile.category || profile.role, address: route.address || profile.address, latitude: route.latitude, longitude: route.longitude,
+              rating: null, openNow: null, distanceMeters: Math.round(route.distanceKm * 1000), source: 'win' as const }];
+          });
+        }
+
+        if (sourcePlaces.length === 0) {
+          const response = await fetch('/api/radar/nearby-places', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+          body: JSON.stringify({ latitude: gpsState.latitude, longitude: gpsState.longitude }),
+          });
+          const payload = await response.json() as { places?: Array<Omit<(typeof sourcePlaces)[number], 'source'>>; error?: string };
+          if (!response.ok) throw new Error(payload.error || 'โหลดสถานที่จริงไม่สำเร็จ');
+          sourcePlaces = (payload.places || []).map((place) => ({ ...place, source: 'google' }));
+        }
+
+        const next = sourcePlaces.map((place): Radar3DPing => {
+          const northKm = (place.latitude - gpsState.latitude) * 111;
+          const eastKm = (place.longitude - gpsState.longitude) * 111 * Math.cos(gpsState.latitude * Math.PI / 180);
+          return { id: `google:${place.id}`, name: place.name, avatar: place.category === 'shop' ? '🏪' : '🏢', category: place.category,
+            categoryLabel: place.source === 'win' ? (place.category === 'shop' ? 'ร้านค้าในระบบ WIN' : 'พาร์ทเนอร์ในระบบ WIN') : (place.category === 'shop' ? 'ร้านค้าจาก Google Maps' : 'พาร์ทเนอร์/สถานที่จาก Google Maps'),
+            service: place.primaryType, serviceEmoji: place.category === 'shop' ? '🛍️' : '🤝', serviceType: 'knight', fare: 0,
+            distanceMeters: place.distanceMeters, location: place.address, x: Math.max(-100, Math.min(100, eastKm * 20)),
+            y: Math.max(-100, Math.min(100, -northKm * 20)), elevation: 10, urgency: 'normal',
+            specialNote: place.openNow === null ? undefined : place.openNow ? 'เปิดอยู่' : 'ปิดอยู่', badge: place.source === 'win' ? 'WIN VERIFIED' : 'GOOGLE MAPS',
+            details: place.rating ? `คะแนน Google ${place.rating}` : 'ข้อมูลสถานที่จริงจาก Google Places' };
+        });
+        if (!cancelled) { setRadarPings(next); setSelectedPing(next[0] || null); }
+      } catch (error) {
+        if (!cancelled) { setRadarPings([]); setSelectedPing(null); setPlacesError(error instanceof Error ? error.message : 'โหลดสถานที่จริงไม่สำเร็จ'); }
+      } finally { if (!cancelled) setPlacesLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [isOnDuty, gpsState.isRealGps, gpsState.latitude, gpsState.longitude]);
 
   // Real-time Turn-by-Turn Navigation & AR Camera State
   const [isRoutePlannerOpen, setIsRoutePlannerOpen] = useState<boolean>(false);
@@ -272,7 +337,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
     if (onSelectPing) onSelectPing(ping);
   };
 
-  const filteredPings = LIVE_RADAR_PINGS.filter(p => {
+  const filteredPings = radarPings.filter(p => {
     if (filterCategory !== 'all' && p.category !== filterCategory) return false;
     if (filterService !== 'all' && p.serviceType !== filterService) return false;
     return true;
@@ -1001,10 +1066,10 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
             <span>โหมดเรดาร์:</span>
           </span>
           {[
-            { id: 'all' as const, label: '🌐 แสดงทั้งหมด (12)', icon: Eye },
-            { id: 'customer' as const, label: '👤 ลูกค้าผู้โดยสาร (4)', icon: Users },
-            { id: 'shop' as const, label: '🏪 ร้านค้า & พัสดุ (4)', icon: Store },
-            { id: 'partner' as const, label: '⚡ พาร์ทเนอร์ & ศูนย์ (4)', icon: BatteryCharging }
+            { id: 'all' as const, label: `🌐 แสดงทั้งหมด (${radarPings.length})`, icon: Eye },
+            { id: 'customer' as const, label: `👤 ลูกค้าในระบบ (${radarPings.filter((p) => p.category === 'customer').length})`, icon: Users },
+            { id: 'shop' as const, label: `🏪 ร้านค้า (${radarPings.filter((p) => p.category === 'shop').length})`, icon: Store },
+            { id: 'partner' as const, label: `⚡ พาร์ทเนอร์ (${radarPings.filter((p) => p.category === 'partner').length})`, icon: BatteryCharging }
           ].map(cat => (
             <button
               key={cat.id}
@@ -1024,6 +1089,10 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
           ))}
         </div>
       </div>
+
+      {placesLoading && <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-2 text-[10px] text-cyan-200">กำลังค้นหาร้านค้าและพาร์ทเนอร์จริงจาก Google Maps…</div>}
+      {!gpsState.isRealGps && <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-2 text-[10px] text-amber-200">กรุณาอนุญาต GPS จริง ระบบจะไม่ใช้ตำแหน่งหรือบุคคลจำลองแทน</div>}
+      {placesError && <div className="rounded-xl border border-rose-400/30 bg-rose-500/10 p-2 text-[10px] text-rose-200">{placesError}</div>}
 
       {/* SELECTED 3D PING LIVE CARD & INSTANT DISPATCH ACTION */}
       {selectedPing && (
@@ -1138,7 +1207,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
         onLocateMe={handleLocateMe}
         onStartNavigation={handleStartNavigation}
         onStartArCameraNav={handleStartArCameraNav}
-        availablePings={LIVE_RADAR_PINGS}
+        availablePings={radarPings}
         selectedPing={selectedPing}
       />
 
@@ -1173,4 +1242,3 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
     </div>
   );
 };
-

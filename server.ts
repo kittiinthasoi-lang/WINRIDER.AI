@@ -40,6 +40,7 @@ const RATE_LIMITS: Record<string, number> = {
   "/api/routes/compute": 30,
   "/api/pet-care/nearby": 20,
   "/api/emergency/nearby": 20,
+  "/api/radar/nearby-places": 20,
   "/api/places/resolve-routes": 20,
   "/api/shop/directory": 30,
   "/api/shop/listings": 20,
@@ -269,6 +270,60 @@ app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]
   } catch (error) {
     console.error("[Emergency Nearby]", error instanceof Error ? error.message : error);
     return res.status(502).json({ error: "เชื่อมต่อข้อมูลศูนย์ฉุกเฉินจริงไม่ได้", places: [] });
+  }
+});
+
+// Public business fallback for the radar. This never invents riders or customers:
+// when no registered WIN entities are available, only real Google Places are returned.
+app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-places"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: "พิกัด GPS ไม่ถูกต้อง", places: [] });
+  }
+  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY", places: [] });
+  try {
+    const googleResponse = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "places.id,places.displayName,places.primaryType,places.formattedAddress,places.location,places.rating,places.currentOpeningHours.openNow,places.googleMapsUri" },
+      body: JSON.stringify({
+        includedTypes: ["restaurant", "cafe", "convenience_store", "shopping_mall", "store", "lodging", "hospital", "school", "university", "gym", "tourist_attraction"],
+        maxResultCount: 20, rankPreference: "DISTANCE", languageCode: "th", regionCode: "TH",
+        locationRestriction: { circle: { center: { latitude, longitude }, radius: 5000 } },
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!googleResponse.ok) return res.status(502).json({ error: "ดึงร้านค้าและสถานที่จริงจาก Google Places ไม่สำเร็จ", places: [] });
+    const payload = await googleResponse.json() as { places?: any[] };
+    const raw = (payload.places || []).filter((place) => place?.id && place?.location && place?.displayName?.text);
+    let matrix: any[] = [];
+    if (raw.length) {
+      const routeResponse = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration" },
+        body: JSON.stringify({ origins: [{ waypoint: { location: { latLng: { latitude, longitude } } } }],
+          destinations: raw.map((place) => ({ waypoint: { location: { latLng: place.location } } })), travelMode: "TWO_WHEELER", languageCode: "th-TH", units: "METRIC" }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (routeResponse.ok) matrix = await routeResponse.json() as any[];
+    }
+    const routes = new Map(matrix.filter((route) => route?.condition === "ROUTE_EXISTS").map((route) => [Number(route.destinationIndex), route]));
+    const partnerTypes = new Set(["lodging", "hospital", "school", "university", "gym", "tourist_attraction"]);
+    const places = raw.map((place, index) => {
+      const route = routes.get(index) as any;
+      return { id: String(place.id), name: String(place.displayName.text), category: partnerTypes.has(place.primaryType) ? "partner" : "shop",
+        primaryType: String(place.primaryType || "store"), address: String(place.formattedAddress || ""), latitude: Number(place.location.latitude), longitude: Number(place.location.longitude),
+        rating: Number.isFinite(place.rating) ? Number(place.rating) : null, openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
+        distanceMeters: route && Number.isFinite(route.distanceMeters) ? Math.round(Number(route.distanceMeters)) : null, googleMapsUri: String(place.googleMapsUri || "") };
+    }).filter((place) => place.distanceMeters !== null).sort((a, b) => Number(a.distanceMeters) - Number(b.distanceMeters));
+    return res.json({ places, source: "Google Places API (New) + Google Routes API", registeredPeopleSynthesized: false });
+  } catch (error) {
+    console.error("[Radar Nearby Places]", error instanceof Error ? error.message : error);
+    return res.status(502).json({ error: "เชื่อมต่อข้อมูล Google Maps สำหรับเรดาร์ไม่ได้", places: [] });
   }
 });
 
