@@ -32,9 +32,7 @@ import {
   LiveRouteStep
 } from '../services/googleRoutesService';
 
-const GOOGLE_MAPS_API_KEY =
-  (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) ||
-  'AIzaSyCB6IzBTHuQDVGc018yllw4yZVKB-GOhGQ';
+const GOOGLE_MAPS_API_KEY = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
 
 export type NavigationRole = 'customer' | 'driver';
 export type NavigationPhase = 'approaching' | 'in_transit' | 'completed';
