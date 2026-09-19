@@ -2,7 +2,6 @@
  * Web Push & Browser Notification + LINE Alert Utility
  */
 
-const STORAGE_KEY_LINE_TOKEN = 'winrider_line_notify_token';
 const STORAGE_KEY_NOTIF_ENABLED = 'winrider_browser_notif_enabled';
 
 export function isNotificationSupported(): boolean {
@@ -32,16 +31,6 @@ export async function requestNotificationPermission(): Promise<boolean> {
 export function isBrowserNotificationEnabled(): boolean {
   if (!isNotificationSupported()) return false;
   return Notification.permission === 'granted';
-}
-
-export function getSavedLineToken(): string {
-  if (typeof localStorage === 'undefined') return '';
-  return localStorage.getItem(STORAGE_KEY_LINE_TOKEN) || '';
-}
-
-export function saveLineToken(token: string): void {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY_LINE_TOKEN, token.trim());
 }
 
 /**
@@ -74,17 +63,12 @@ export function sendBrowserNotification(title: string, options?: NotificationOpt
 /**
  * Send alert to LINE Notify via server endpoint
  */
-export async function sendLineNotifyAlert(message: string, tokenOverride?: string): Promise<{ success: boolean; message: string }> {
-  const token = tokenOverride || getSavedLineToken();
-  if (!token) {
-    return { success: false, message: 'ไม่มี LINE Token ที่ตั้งค่าไว้' };
-  }
-
+export async function sendLineNotifyAlert(message: string): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch('/api/notifications/line', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, token }),
+      body: JSON.stringify({ message }),
     });
 
     const data = await res.json();
