@@ -161,7 +161,7 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
   };
 
   return (
-    <section id="daily-events-section" className={`space-y-3 ${className}`} aria-labelledby="daily-events-title">
+    <section className={`space-y-3 ${className}`} aria-labelledby="daily-events-title">
       {toastMessage && <div className="fixed left-1/2 top-16 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-cyan-200 bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950 shadow-2xl" role="status"><CheckCircle2 className="h-4 w-4" />{toastMessage}</div>}
 
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">

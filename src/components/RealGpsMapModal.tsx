@@ -27,7 +27,7 @@ interface RealGpsMapModalProps {
 export const RealGpsMapModal: React.FC<RealGpsMapModalProps> = ({
   isOpen,
   onClose,
-  destinationTitle = 'จุดหมายปลายทาง',
+  destinationTitle = 'อาคาร Exchange Tower อโศก',
   destinationCoords = { latitude: 13.7360, longitude: 100.5608 },
   audioEnabled = true,
 }) => {
