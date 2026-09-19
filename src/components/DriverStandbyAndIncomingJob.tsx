@@ -95,137 +95,6 @@ interface DriverStandbyAndIncomingJobProps {
   onAddEarnings: (amount: number) => void;
 }
 
-export const SAMPLE_INCOMING_JOBS: IncomingJobData[] = [
-  {
-    id: 'JOB-KNIGHT-8821',
-    serviceId: 'knight',
-    serviceTitle: 'WIN KNIGHT (รับส่งด่วนเลี่ยงรถติด)',
-    serviceIconEmoji: '🛵',
-    customerName: 'คุณณิชา รัตนเวช',
-    customerGender: 'female',
-    customerRating: 4.9,
-    customerPhone: '089-445-1234',
-    customerAvatarEmoji: '👩‍💼',
-    customerNote: 'รออยู่หน้าคอนโดไอดีโอ ฝั่งถนนเจริญนคร ใส่เสื้อขาวค่ะ',
-    pickupLocation: 'คอนโด ไอดีโอ สาทร-วงเวียนใหญ่',
-    dropoffLocation: 'อาคารสาทรสแควร์ BTS ช่องนนทรี',
-    distanceKm: 3.4,
-    driverDistanceToPickupKm: 0.25, // Closest!
-    fairDispatchQueueRank: 1,
-    totalCandidatesInRadius: 6,
-    estMinutes: 8,
-    baseFare: 65,
-    tips: 10,
-    netFare: 74, // 65 + 10 - 1
-    platformFee: 1,
-    xpReward: 150,
-    specialBadges: ['📍 ใกล้จุดรับที่สุด 250 ม.', '⭐ ลูกค้าชั้น 1 เครดิตดี'],
-    vehicleRequested: 'Honda Wave 125i (ประหยัดสุด)',
-    urgency: 'high'
-  },
-  {
-    id: 'JOB-SPIRIT-4402',
-    serviceId: 'spirit',
-    serviceTitle: 'WIN Spirit (พาคุณตาไปละหมาดที่มัสยิด)',
-    serviceIconEmoji: '🕌 👵',
-    customerName: 'คุณลุงฮาซัน & คุณตาอิบราฮิม',
-    customerRating: 5.0,
-    customerPhone: '081-998-3344',
-    customerAvatarEmoji: '🧓',
-    customerNote: 'พาคุณตาวัย 78 ปีไปละหมาดวันศุกร์ที่มัสยิดบางหลวง ขับนุ่มนวลและช่วยประคองขึ้นลงครับ',
-    pickupLocation: 'ซอยเจริญรัถ 28 (ใกล้วงเวียนใหญ่)',
-    dropoffLocation: 'มัสยิดบางหลวง (กุฎีขาว) คลองบางหลวง',
-    distanceKm: 2.1,
-    driverDistanceToPickupKm: 0.35,
-    fairDispatchQueueRank: 1,
-    totalCandidatesInRadius: 4,
-    estMinutes: 10,
-    baseFare: 80,
-    tips: 20,
-    netFare: 99,
-    platformFee: 1,
-    xpReward: 300,
-    specialBadges: ['🕌 ศาสนกิจทุกศาสนา', '🛡️ อบรมดูแลผู้สูงอายุ', '📍 ใกล้ที่สุด 350 ม.'],
-    urgency: 'normal'
-  },
-  {
-    id: 'JOB-MU-7719',
-    serviceId: 'mu',
-    serviceTitle: 'WIN MU BUDDY (ทริปไหว้พระสายมู 9 วัด)',
-    serviceIconEmoji: '🪷 ✨',
-    customerName: 'คุณแพรวา สายบุญ',
-    customerGender: 'female',
-    customerRating: 4.95,
-    customerPhone: '095-223-8899',
-    customerAvatarEmoji: '🧘‍♀️',
-    customerNote: 'มีบทสวดมนต์และของไหว้พร้อมค่ะ ขอพี่วินที่รู้จุดไหว้ท้าวเวสสุวรรณและพระแม่ลักษมี',
-    pickupLocation: 'วัดระฆังโฆสิตารามวรมหาวิหาร',
-    dropoffLocation: 'วัดกัลยาณมิตรวรมหาวิหาร & ศาลเจ้ากวนอู',
-    distanceKm: 4.8,
-    driverDistanceToPickupKm: 0.4,
-    fairDispatchQueueRank: 1,
-    totalCandidatesInRadius: 5,
-    estMinutes: 14,
-    baseFare: 120,
-    tips: 30,
-    netFare: 149,
-    platformFee: 1,
-    xpReward: 280,
-    specialBadges: ['🪷 สายมู 9 วัด', '📜 มีคลังบทสวด AI', '📍 สุ่มความใกล้ลำดับ 1'],
-    urgency: 'normal'
-  },
-  {
-    id: 'JOB-EXPRESS-1109',
-    serviceId: 'express',
-    serviceTitle: 'WIN Express (ส่งของด่วน + กล่อง 20฿)',
-    serviceIconEmoji: '📦 ⚡',
-    customerName: 'ร้านเค้กเบเกอรี่ โฮมเมด',
-    customerRating: 4.85,
-    customerPhone: '086-771-4567',
-    customerAvatarEmoji: '🧁',
-    customerNote: 'กล่องเค้กวันเกิด 2 ปอนด์ ระวังหน้าเค้กเอียง มีกล่องท้ายรถล็อคกันกระแทกเรียบร้อย',
-    pickupLocation: 'ร้าน Aura Bake ซอยลาดหญ้า 12',
-    dropoffLocation: 'คอนโด The River ถ.เจริญนคร',
-    distanceKm: 2.8,
-    driverDistanceToPickupKm: 0.18,
-    fairDispatchQueueRank: 1,
-    totalCandidatesInRadius: 8,
-    estMinutes: 9,
-    baseFare: 70,
-    tips: 15,
-    netFare: 84,
-    platformFee: 1,
-    xpReward: 200,
-    specialBadges: ['📦 ค่ากล่องพัสดุ +20฿', '📍 ใกล้ที่สุด 180 ม.'],
-    urgency: 'high'
-  },
-  {
-    id: 'JOB-PET-3321',
-    serviceId: 'pet',
-    serviceTitle: 'WIN-Pet Care (ส่งน้องหมาหาหมอฉุกเฉิน)',
-    serviceIconEmoji: '🐾 🏥',
-    customerName: 'คุณหมอทราย (เจ้าของน้องปอม)',
-    customerRating: 5.0,
-    customerPhone: '083-112-9900',
-    customerAvatarEmoji: '🐶',
-    customerNote: 'น้องปอมมีไข้ซึม ต้องการพัดลมระบายอากาศในกล่อง WIN-Pet Space Pod ขอบคุณค่ะ',
-    pickupLocation: 'ซอยกรุงธนบุรี 4 (BTS กรุงธนบุรี)',
-    dropoffLocation: 'โรงพยาบาลสัตว์ตากสิน 24 ชม.',
-    distanceKm: 2.5,
-    driverDistanceToPickupKm: 0.28,
-    fairDispatchQueueRank: 1,
-    totalCandidatesInRadius: 3,
-    estMinutes: 7,
-    baseFare: 110,
-    tips: 25,
-    netFare: 134,
-    platformFee: 1,
-    xpReward: 320,
-    specialBadges: ['🐾 WIN-Pet Pod มีแอร์', '📍 เลเวล 10+ & ใกล้สุด'],
-    urgency: 'urgent'
-  }
-];
-
 export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobProps> = ({
   isOnDuty,
   onToggleDuty,
@@ -331,22 +200,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   }, [activeIncomingJob, audioEnabled]);
 
   // Production mode: jobs are created only by real passenger orders.
-  const triggerRealGoogleMapsJob = (_customZone?: string, _customService?: string) => {
-    if (audioEnabled) playTactileBlip(400);
-    alert('ระบบ Production จะไม่สร้างงานจำลอง กรุณารอคำสั่งเรียกรถจริงจากผู้โดยสาร');
-  };
-
-  const triggerRandomJob = (_specificIndex?: number) => {
-    if (audioEnabled) playTactileBlip(400);
-    alert('ระบบ Production ยกเลิกงานจำลอง กรุณารอคำสั่งเรียกรถจริงจากผู้โดยสาร');
-  };
-
-  const triggerServiceJob = (serviceType: 'knight' | 'express' | 'pet' | 'mu' |  const triggerServiceJob = (_serviceType: 'knight' | 'express' | 'pet' | 'mu' | 'spirit') => {
-    if (audioEnabled) playTactileBlip(400);
-    alert('ระบบ Production ยกเลิกงานจำลอง กรุณารอคำสั่งเรียกรถจริงจากผู้โดยสาร');
-  };
-
-  const handleConfirmAccept = () => {
+  const triggerServiceJob = (serviceType: 'knight' | 'express' | 'pet' | 'mu' |  const handleConfirmAccept = () => {
     if (!activeIncomingJob) return;
 
     if (audioEnabled) {
@@ -587,7 +441,6 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
               isOnDuty={isOnDuty}
               driverLevel={driverLevel}
               audioEnabled={audioEnabled}
-              onTriggerJob={(serviceType) => triggerServiceJob(serviceType)}
             />
 
             {/* Telemetry and Stats Row */}
