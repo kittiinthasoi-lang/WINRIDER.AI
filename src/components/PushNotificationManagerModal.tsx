@@ -1,17 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Bell, 
-  BellRing, 
-  CheckCircle2, 
-  X, 
-  Send, 
-  ShieldCheck, 
-  Smartphone, 
-  ExternalLink,
-  MessageSquare,
-  Sparkles,
-  Info
-} from 'lucide-react';
+import { Bell, BellRing, X, Smartphone, Info } from 'lucide-react';
 import { 
   getNotificationPermission, 
   requestNotificationPermission, 
