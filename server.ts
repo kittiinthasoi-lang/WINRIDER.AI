@@ -774,7 +774,7 @@ app.post("/api/routes/compute", rateLimit(30), async (req, res) => {
       });
     }
 
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCB6IzBTHuQDVGc018yllw4yZVKB-GOhGQ";
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || "";
 
     // 1. If live Google Maps API Key is available and not rate-limited, request Google Routes API REST endpoint
     if (apiKey && apiKey.trim() !== "" && !apiKey.includes("MY_GOOGLE_MAPS") && Date.now() > routesApiRateLimitedUntil) {
