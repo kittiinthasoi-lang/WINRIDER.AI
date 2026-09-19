@@ -27,23 +27,17 @@ export interface GpsLocationState {
   errorMsg?: string;
 }
 
-// Bangkok Center Fallback / Default
-export const DEFAULT_BANGKOK_LOCATION: GpsLocationState = {
-  latitude: 13.7563,
-  longitude: 100.5018,
-  accuracy: 8.5,
-  heading: 45,
-  speed: 0,
-  altitude: 12,
-  timestamp: Date.now(),
-  addressLabel: 'กรุงเทพมหานคร (Bangkok Central Hub)',
-  isRealGps: false,
-  status: 'simulated'
-};
-
 export const useRealtimeGps = (enableHighAccuracy = true) => {
   const [gpsState, setGpsState] = useState<GpsLocationState>({
-    ...DEFAULT_BANGKOK_LOCATION,
+    latitude: 0,
+    longitude: 0,
+    accuracy: 0,
+    heading: null,
+    speed: null,
+    altitude: null,
+    timestamp: Date.now(),
+    addressLabel: 'กำลังขอตำแหน่ง GPS จริง…',
+    isRealGps: false,
     status: 'acquiring'
   });
   const [isTracking, setIsTracking] = useState<boolean>(true);
@@ -104,8 +98,8 @@ export const useRealtimeGps = (enableHighAccuracy = true) => {
         console.warn('GPS location request fallback:', err.message);
         setGpsState(prev => ({
           ...prev,
-          status: 'simulated',
-          errorMsg: 'ใช้ตำแหน่งจำลองความแม่นยำสูง (GPS Fallback Active)'
+          status: 'denied',
+          errorMsg: err.message || 'ไม่สามารถอ่านตำแหน่ง GPS จริงได้'
         }));
       },
       {
@@ -143,8 +137,7 @@ export const useRealtimeGps = (enableHighAccuracy = true) => {
           });
         },
         (err) => {
-          // If in iframe without direct hardware GPS, gently simulate realistic live jitter
-          console.log('GPS watchPosition using high-precision telemetry stream:', err.message);
+          console.warn('GPS watchPosition failed:', err.message);
         },
         {
           enableHighAccuracy: enableHighAccuracy,
