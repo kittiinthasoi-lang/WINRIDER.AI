@@ -42,14 +42,12 @@ export const PromptPayPaymentModal: React.FC<PromptPayPaymentModalProps> = ({
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
-  const [isPaid, setIsPaid] = useState<boolean>(false);
   const [customTip, setCustomTip] = useState<number>(tipAmount);
 
   const totalAmount = amount + customTip;
 
   useEffect(() => {
     if (!isOpen) {
-      setIsPaid(false);
       return;
     }
 
@@ -109,7 +107,7 @@ export const PromptPayPaymentModal: React.FC<PromptPayPaymentModalProps> = ({
             <span className="text-cyan-400">QR</span>
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            โอนตรงเข้าบัญชีพี่วินทันที ไม่หักหัวคิว (เข้ากองทุน 2 บาทเต็มจำนวน)
+            QR นี้ใช้สำหรับแสดงช่องทางชำระเงินเท่านั้น ระบบจะถือว่าชำระสำเร็จเมื่อ payment provider ส่งผลยืนยันกลับมา
           </p>
         </div>
 
@@ -224,32 +222,15 @@ export const PromptPayPaymentModal: React.FC<PromptPayPaymentModalProps> = ({
 
         {/* Action Confirmation Button */}
         <div className="mt-4 pt-3 border-t border-white/10 flex gap-2">
-          {isPaid ? (
-            <div className="w-full py-3 rounded-2xl bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-bold text-sm flex items-center justify-center gap-2 animate-bounce">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span>ยืนยันการชำระเงินสำเร็จแล้ว!</span>
-            </div>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-300 font-semibold text-xs transition-all active:scale-98"
-              >
-                ปิดหน้าต่าง
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmPaid}
-                disabled
-                className="flex-2 py-3 rounded-2xl bg-white/10 text-slate-500 font-black text-xs flex items-center justify-center gap-2 cursor-not-allowed"
-                title="ต้องเชื่อมต่อ payment provider และ webhook ยืนยันก่อน"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>รอการยืนยันการชำระเงินจริง</span>
-              </button>
-            </>
-          )}
+          <>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-300 font-semibold text-xs transition-all active:scale-98"
+            >
+              ปิดหน้าต่าง — รอผลยืนยันจากผู้ให้บริการชำระเงิน
+            </button>
+          </>
         </div>
       </div>
     </div>
