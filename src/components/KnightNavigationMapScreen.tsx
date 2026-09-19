@@ -588,35 +588,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             </div>
           </div>
 
-          {/* Speed Multiplier Quick Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              if (audioEnabled) playTactileBlip(750);
-              const nextSpeed = speedMultiplier === 1 ? 2 : speedMultiplier === 2 ? 4 : speedMultiplier === 4 ? 0.5 : 1;
-              setSpeedMultiplier(nextSpeed);
-            }}
-            className="px-2 py-1 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 text-[10px] font-bold flex items-center gap-1 transition-all"
-            title="เปลี่ยนความเร็วจำลอง (0.5x - 4x)"
-          >
-            <Gauge className="w-3.5 h-3.5" />
-            <span>⚡ {speedMultiplier}x</span>
-          </button>
-
-          {/* Realistic Bangkok Job Randomizer */}
-          <button
-            type="button"
-            onClick={() => {
-              if (audioEnabled) playTactileBlip(900);
-              setShowRandomSimModal(true);
-            }}
-            className="px-2 py-1 rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 border border-amber-400/50 text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all"
-            title="สุ่มสภาพแวดล้อมจริง: พิกัดกทม., การจราจร, สภาพอากาศ, ลูกค้า, ระยะทาง"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" style={{ animationDuration: '6s' }} />
-            <span>🎲 สุ่มสถานการณ์</span>
-          </button>
-
           {/* Proof of Delivery / End Job Button */}
           <button
             type="button"
