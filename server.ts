@@ -240,20 +240,89 @@ app.post("/api/orders/:id/step", async (req, res) => {
   }
 });
 
+function validateWebhookTarget(rawUrl: string): URL {
+  let target: URL;
+  try {
+    target = new URL(rawUrl);
+  } catch {
+    throw new Error("Invalid webhook URL");
+  }
+
+  if (target.protocol !== "https:") {
+    throw new Error("Webhook URL must use HTTPS");
+  }
+
+  const hostname = target.hostname.toLowerCase();
+  const blockedHostnames = new Set([
+    "localhost",
+    "localhost.localdomain",
+    "metadata.google.internal",
+    "metadata",
+    "host.docker.internal"
+  ]);
+  if (blockedHostnames.has(hostname)) {
+    throw new Error("Webhook host is not allowed");
+  }
+
+  // Reject literal loopback/private/link-local IPv4 targets.
+  const ipv4 = hostname.match(/^(d+)\.(d+)\.(d+)\.(d+)$/);
+  if (ipv4) {
+    const octets = ipv4.slice(1).map(Number);
+    const [a, b] = octets;
+    if (
+      octets.some((n) => n < 0 || n > 255) ||
+      a === 127 ||
+      a === 10 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      a === 0
+    ) {
+      throw new Error("Private or local webhook targets are not allowed");
+    }
+  }
+
+  const allowedHosts = (process.env.WEBHOOK_ALLOWED_HOSTS || "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowedHosts.length === 0) {
+    throw new Error("No webhook destinations are configured");
+  }
+
+  const allowed = allowedHosts.some(
+    (host) => hostname === host || hostname.endsWith("." + host)
+  );
+  if (!allowed) {
+    throw new Error("Webhook destination is not allowlisted");
+  }
+
+  return target;
+}
+
 // Low-Code Webhook Dispatch Proxy (bypasses browser CORS for Make.com / Zapier / Google Sheets)
 app.post("/api/webhooks/dispatch", async (req, res) => {
   try {
-    const { webhookUrl, event, payload } = req.body;
+    const { webhookUrl, payload } = req.body;
     if (!webhookUrl) {
       return res.status(400).json({ success: false, error: "Webhook URL is required" });
+    }
+
+    let targetUrl: URL;
+    try {
+      targetUrl = validateWebhookTarget(String(webhookUrl));
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error?.message || "Invalid webhook destination" });
     }
 
     const startTime = Date.now();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(targetUrl, {
       method: "POST",
+      redirect: "manual",
       headers: {
         "Content-Type": "application/json",
         "User-Agent": "WINRIDER-Sovereign-Webhook/1.0"
