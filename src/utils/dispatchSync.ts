@@ -14,11 +14,6 @@ export interface LiveRideOrder {
   passengerAvatarEmoji?: string;
   pickupLocation: string;
   dropoffLocation: string;
-  pickupContactName?: string;
-  pickupContactPhone?: string;
-  dropoffContactName?: string;
-  dropoffContactPhone?: string;
-  specialRequirements?: string;
   distanceKm: number;
   fare: number;
   welfareFund2Baht: number; // 2.00 Baht
@@ -48,6 +43,7 @@ type OrderEventCallback = (order: LiveRideOrder, eventType: 'created' | 'accepte
 
 const STORAGE_KEY_ORDERS = 'winrider_live_orders_list';
 const BROADCAST_CHANNEL_NAME = 'winrider_dispatch_sync_channel';
+const DISPATCH_FRESHNESS_MS = 15 * 60 * 1000;
 
 // Singleton Broadcast Channel
 let broadcastChannel: BroadcastChannel | null = null;
@@ -166,11 +162,20 @@ export function saveLocalLiveOrders(orders: LiveRideOrder[]): void {
 export async function fetchAvailableOrdersForDriver(): Promise<LiveRideOrder[]> {
   try {
     const headers = await getAuthHeaders();
-    const res = await fetch('/api/orders', { headers });
+    const currentUserId = getAuth().currentUser?.uid;
+    const res = await fetch('/api/orders?scope=dispatch', { headers });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data?.orders)) {
-        return data.orders as LiveRideOrder[];
+        const freshnessCutoff = Date.now() - DISPATCH_FRESHNESS_MS;
+        return (data.orders as LiveRideOrder[]).filter((order) => {
+          const createdAtMs = Date.parse(order.createdAt);
+          return isValidLiveOrder(order)
+            && order.status === 'pending'
+            && order.passengerUserId !== currentUserId
+            && Number.isFinite(createdAtMs)
+            && createdAtMs >= freshnessCutoff;
+        });
       }
     }
   } catch (err) {
@@ -191,11 +196,6 @@ export async function createLiveOrder(orderInput: {
   passengerPhone: string;
   pickupLocation: string;
   dropoffLocation: string;
-  pickupContactName?: string;
-  pickupContactPhone?: string;
-  dropoffContactName?: string;
-  dropoffContactPhone?: string;
-  specialRequirements?: string;
   distanceKm: number;
   fare: number;
   estMinutes?: number;
@@ -218,11 +218,6 @@ export async function createLiveOrder(orderInput: {
     passengerPhone: orderInput.passengerPhone,
     pickupLocation: orderInput.pickupLocation,
     dropoffLocation: orderInput.dropoffLocation,
-    pickupContactName: orderInput.pickupContactName,
-    pickupContactPhone: orderInput.pickupContactPhone,
-    dropoffContactName: orderInput.dropoffContactName,
-    dropoffContactPhone: orderInput.dropoffContactPhone,
-    specialRequirements: orderInput.specialRequirements,
     distanceKm: orderInput.distanceKm,
     fare,
     welfareFund2Baht,

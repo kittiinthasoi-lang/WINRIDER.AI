@@ -133,178 +133,6 @@ function classifyRealEvent(category: string, title: string, labels: string[] = [
   return "other";
 }
 
-function cleanThaiDescription(rawDesc?: string): string {
-  if (!rawDesc) return "";
-  return rawDesc
-    .replace(/^Sourced from predicthq\.com\s*[-–—:]*\s*/i, "")
-    .replace(/Sourced from predicthq\.com/gi, "")
-    .trim();
-}
-
-function ruleBasedThaiFormat(event: NearbyEventResult): NearbyEventResult {
-  let title = event.title;
-  let venueName = event.venueName;
-  let venueArea = event.venueArea;
-  let description = cleanThaiDescription(event.description);
-
-  // Sports translation (e.g. Thai League matches)
-  const thaiLeagueMatch = title.match(/Thai League\s*(\d+)\s*[-–:]\s*(.+?)\s+vs\s+(.+)/i);
-  if (thaiLeagueMatch) {
-    const leagueTier = thaiLeagueMatch[1];
-    const teamA = thaiLeagueMatch[2].trim();
-    const teamB = thaiLeagueMatch[3].trim();
-    title = `ฟุตบอลไทยลีก ${leagueTier}: ${teamA} พบ ${teamB}`;
-  } else if (/vs\.?/i.test(title) && event.category === "sports") {
-    title = title.replace(/\s+vs\.?\s+/i, " พบ ");
-  }
-
-  // Concert / Event prefixes
-  if (/^Concert\s*[-–:]\s*/i.test(title)) {
-    title = title.replace(/^Concert\s*[-–:]\s*/i, "คอนเสิร์ต ");
-  }
-
-  // Venue cleanup to Thai
-  venueName = venueName
-    .replace(/Thunder Dome Stadium/gi, "ธันเดอร์โดม สเตเดียม (เมืองทองธานี)")
-    .replace(/Singha Stadium/gi, "สิงห์ สเตเดียม (เชียงราย)")
-    .replace(/Pitchaya Stadium/gi, "พิชญ สเตเดียม (หนองบัวลำภู)")
-    .replace(/Tinsulanonda Stadium/gi, "ติณสูลานนท์ สเตเดียม (สงขลา)")
-    .replace(/80th Birthday Stadium/gi, "สนามกีฬาเฉลิมพระเกียรติ 80 พรรษา (นครราชสีมา)")
-    .replace(/Narathiwat Provincial Administrative Organization Stadium/gi, "สนามกีฬา อบจ. นราธิวาส")
-    .replace(/Culture Cafe Bangkok/gi, "คัลเจอร์ คาเฟ่ กรุงเทพฯ")
-    .replace(/Bangkok Island/gi, "แบงค็อก ไอแลนด์ (Bangkok Island)")
-    .replace(/Siwilai Radical Club/gi, "ศิวิไล เรดิคัล คลับ (ทองหล่อ/สุขุมวิท)")
-    .replace(/Bar Temp/gi, "บาร์ เทมป์ (Bar Temp ป้อมปราบฯ)")
-    .replace(/Cafe Del Mar/gi, "คาเฟ่ เดล มาร์ (ภูเก็ต)")
-    .replace(/Dirty Rabbit Hidden Bar/gi, "เดอร์ตี้ แรบบิท ฮิดเดนบาร์ (ยานนาวา)")
-    .replace(/Stadium/gi, "สเตเดียม")
-    .replace(/Provincial Administrative Organization/gi, "อบจ.")
-    .replace(/Hidden Bar/gi, "ฮิดเดนบาร์")
-    .replace(/Cafe/gi, "คาเฟ่")
-    .trim();
-
-  // Area cleanup to Thai
-  venueArea = venueArea
-    .replace(/^Tambon\s+Ban Mai/i, "ต.บ้านใหม่ (ปากเกร็ด นนทบุรี)")
-    .replace(/^Tambon\s+/i, "ต.")
-    .replace(/^Khet\s+/i, "เขต")
-    .replace(/^Khwaeng\s+/i, "แขวง")
-    .replace(/^Amphoe\s+/i, "อ.")
-    .replace(/Bangkok/i, "กรุงเทพฯ")
-    .trim();
-
-  // If description has no Thai or is purely technical, craft a rich Thai description with transit guidance
-  if (!description || !/[\u0E00-\u0E7F]/.test(description)) {
-    const attendanceText = event.attendance && event.attendance > 0
-      ? ` คาดการณ์ผู้เข้าร่วมประมาณ ${event.attendance.toLocaleString("th-TH")} คน (มีผู้โดยสารเรียกรถหนาแน่น)`
-      : "";
-
-    switch (event.category) {
-      case "sports":
-        description = `การแข่งขันกีฬา ณ ${venueName}${venueArea ? ` (${venueArea})` : ""}${attendanceText} แนะนำให้ผู้โดยสารและพี่วินนัดหมายจุดรับ-ส่งบริเวณด้านหน้าทางเข้าหลักเพื่อเลี่ยงการจราจรติดขัด`;
-        break;
-      case "concert":
-        description = `งานแสดงดนตรีและคอนเสิร์ต ณ ${venueName}${venueArea ? ` (${venueArea})` : ""}${attendanceText} เหมาะสำหรับการเดินทางด้วยวินมอเตอร์ไซค์รับจ้างเพื่อความสะดวกรวดเร็ว`;
-        break;
-      case "festival":
-        description = `งานเทศกาลและกิจกรรมพิเศษ ณ ${venueName}${venueArea ? ` (${venueArea})` : ""}${attendanceText} มีผู้คนสัญจรและร่วมงานอย่างคึกคัก`;
-        break;
-      case "market":
-      case "sale":
-        description = `งานตลาดนัด นิทรรศการ และโปรโมชั่นสินค้า ณ ${venueName}${venueArea ? ` (${venueArea})` : ""}${attendanceText} แนะนำจุดจอดรับ-ส่งตามจุดบริการ`;
-        break;
-      default:
-        description = `กิจกรรมอีเวนต์จริง ณ ${venueName}${venueArea ? ` (${venueArea})` : ""}${attendanceText} รองรับการเดินทางและส่งผู้โดยสารถึงจุดหมายอย่างรวดเร็ว`;
-        break;
-    }
-  }
-
-  return {
-    ...event,
-    title,
-    venueName,
-    venueArea,
-    description,
-  };
-}
-
-async function localizeEventsToThai(events: NearbyEventResult[]): Promise<NearbyEventResult[]> {
-  if (events.length === 0) return [];
-
-  // Deterministic rule-based baseline
-  const baselineEvents = events.map(ruleBasedThaiFormat);
-
-  // Gemini AI enrichment for high-quality natural Thai translation
-  const ai = getAiClient();
-  if (!ai) return baselineEvents;
-
-  try {
-    const sampleToTranslate = baselineEvents.slice(0, 20).map((e) => ({
-      id: e.id,
-      title: e.title,
-      venueName: e.venueName,
-      venueArea: e.venueArea,
-      category: e.category,
-      attendance: e.attendance,
-      rawDescription: cleanThaiDescription(e.description),
-    }));
-
-    const prompt = `คุณคือผู้เชี่ยวชาญการแปลและสรุปข้อมูลอีเวนต์ในประเทศไทยสำหรับแอปพลิเคชัน WINRIDER.AI
-แปลและปรับข้อมูลกิจกรรมต่อไปนี้ให้เป็นภาษาไทยที่กระชับ สละสลวย ชัดเจน และน่าสนใจสำหรับผู้โดยสารและพี่วินมอเตอร์ไซค์:
-1. title: ชื่อกิจกรรมเป็นภาษาไทยที่คุ้นเคย (หากเป็นชื่อเฉพาะ ศิลปิน หรือแบรนด์ ให้คงชื่อเดิมหรือทับศัพท์ตามความเหมาะสม)
-2. description: สรุปกิจกรรมเป็นภาษาไทย 1-2 ประโยค พร้อมคำแนะนำจุดรับ-ส่งหรือความหนาแน่นของผู้โดยสาร
-3. venueName: ชื่อสถานที่ภาษาไทย
-4. venueArea: ย่าน/ตำบล/เขต/จังหวัด เป็นภาษาไทย เช่น "เขตยานนาวา, กทม.", "อ.เมือง จ.เชียงราย"
-
-ข้อมูลกิจกรรม:
-${JSON.stringify(sampleToTranslate)}
-
-ตอบกลับเป็น JSON Array โดยตรง ห้ามมี markdown หรือข้อความอื่น:
-[{"id": "...", "title": "...", "description": "...", "venueName": "...", "venueArea": "..."}]`;
-
-    const aiPromise = ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      },
-    });
-
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8_000));
-    const result = await Promise.race([aiPromise, timeoutPromise]);
-
-    if (result && typeof (result as any).text === "string") {
-      const rawText = (result as any).text.trim();
-      const parsed = JSON.parse(rawText) as Array<{
-        id: string;
-        title?: string;
-        description?: string;
-        venueName?: string;
-        venueArea?: string;
-      }>;
-
-      if (Array.isArray(parsed)) {
-        const translationMap = new Map(parsed.map((item) => [item.id, item]));
-        return baselineEvents.map((evt) => {
-          const trans = translationMap.get(evt.id);
-          if (!trans) return evt;
-          return {
-            ...evt,
-            title: trans.title?.trim() || evt.title,
-            description: trans.description?.trim() || evt.description,
-            venueName: trans.venueName?.trim() || evt.venueName,
-            venueArea: trans.venueArea?.trim() || evt.venueArea,
-          };
-        });
-      }
-    }
-  } catch (aiErr) {
-    console.warn("[Events API] Gemini Thai localization fallback used:", aiErr instanceof Error ? aiErr.message : aiErr);
-  }
-
-  return baselineEvents;
-}
-
 app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
   const eventDate = String(req.query.date || "");
   const country = "TH";
@@ -320,17 +148,16 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
 
   const accessToken = process.env.PREDICTHQ_ACCESS_TOKEN?.trim();
   if (!accessToken) {
-    return res.status(200).json({
-      message: "พร้อมเชื่อมโยงข้อมูลอีเวนต์จริงเมื่อระบุ PREDICTHQ_ACCESS_TOKEN (ทางเลือก)",
+    return res.status(503).json({
+      message: "ยังไม่ได้เชื่อม PREDICTHQ_ACCESS_TOKEN สำหรับข้อมูลอีเวนต์จริง",
       events: [],
-      source: "PredictHQ Events API (ไม่ได้ระบุคีย์)",
     });
   }
 
   const cacheKey = `${country}:${eventDate}`;
   const cached = dailyEventsCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    return res.json({ events: cached.value, source: "PredictHQ Events API (ภาษาไทย)", fetchedAt: new Date().toISOString(), eventDate, country, cached: true });
+    return res.json({ events: cached.value, source: "PredictHQ Events API", fetchedAt: new Date().toISOString(), eventDate, country, cached: true });
   }
 
   const params = new URLSearchParams({
@@ -359,7 +186,7 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
     }
 
     const payload = await providerResponse.json() as { results?: any[] };
-    const rawEvents = (Array.isArray(payload.results) ? payload.results : []).flatMap((item): NearbyEventResult[] => {
+    const events = (Array.isArray(payload.results) ? payload.results : []).flatMap((item): NearbyEventResult[] => {
       const coordinates = Array.isArray(item.location) ? item.location : [];
       const eventLongitude = Number(coordinates[0]);
       const eventLatitude = Number(coordinates[1]);
@@ -391,11 +218,8 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
       }];
     }).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt) || (b.rank || 0) - (a.rank || 0));
 
-    // Localize and enrich all event details to natural Thai
-    const events = await localizeEventsToThai(rawEvents);
-
     dailyEventsCache.set(cacheKey, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
-    return res.json({ events, source: "PredictHQ Events API (ภาษาไทย)", fetchedAt: new Date().toISOString(), eventDate, country, cached: false });
+    return res.json({ events, source: "PredictHQ Events API", fetchedAt: new Date().toISOString(), eventDate, country, cached: false });
   } catch (error) {
     console.error("[Events API] Fetch failed:", error instanceof Error ? error.message : error);
     return res.status(502).json({ message: "เชื่อมต่อผู้ให้บริการข้อมูลอีเวนต์จริงไม่ได้", events: [] });
@@ -413,11 +237,6 @@ interface ServerOrder {
   passengerPhone: string;
   pickupLocation: string;
   dropoffLocation: string;
-  pickupContactName?: string;
-  pickupContactPhone?: string;
-  dropoffContactName?: string;
-  dropoffContactPhone?: string;
-  specialRequirements?: string;
   distanceKm: number;
   fare: number;
   welfareFund2Baht: number;
@@ -510,6 +329,25 @@ app.get("/api/orders", async (req, res) => {
     const allOrders = snapshot.docs.map((doc) => doc.data() as ServerOrder);
     const isAdmin = user.admin === true;
     const driverEligibility = isAdmin ? null : await requireEligibleDriver(user.uid);
+    const isDispatchRequest = req.query.scope === "dispatch";
+
+    // A driver must only receive recent, unassigned requests made by another account.
+    // This prevents an admin's historical/self-created test orders from resurfacing
+    // as a new incoming job whenever the driver screen polls the API.
+    if (isDispatchRequest) {
+      if (!isAdmin && !driverEligibility) {
+        return res.json({ orders: [] });
+      }
+      const pendingFreshnessCutoff = Date.now() - 15 * 60 * 1000;
+      const dispatchOrders = allOrders.filter((order) => {
+        const createdAtMs = Date.parse(order.createdAt);
+        return order.status === "pending"
+          && order.passengerUserId !== user.uid
+          && Number.isFinite(createdAtMs)
+          && createdAtMs >= pendingFreshnessCutoff;
+      });
+      return res.json({ orders: dispatchOrders });
+    }
 
     // Never expose every ride to an ordinary authenticated user.
     const orders = isAdmin

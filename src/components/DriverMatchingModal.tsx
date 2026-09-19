@@ -83,6 +83,7 @@ interface DriverMatchingModalProps {
   customerGender?: 'female' | 'male';
   isAutoSelectedVehicle?: boolean;
   onClose: () => void;
+  onDestinationChange: (destination: string) => void;
   onConfirmMatch: (driver: MatchedDriver) => void;
   onSelectLifestylePlace?: (place: LifestylePlace) => void;
   onSelectReligiousDestination?: (placeName: string) => void;
@@ -99,18 +100,23 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   customerGender = 'female',
   isAutoSelectedVehicle = false,
   onClose,
+  onDestinationChange,
   onConfirmMatch,
   onSelectLifestylePlace,
   onSelectReligiousDestination,
   onChangeCustomerGender
 }) => {
-  const [matchingStep, setMatchingStep] = useState<'scanning' | 'results'>('scanning');
+  const [matchingStep, setMatchingStep] = useState<'idle' | 'scanning' | 'results'>('idle');
   const [selectedDriver, setSelectedDriver] = useState<MatchedDriver | null>(null);
   const [activeLifestyleCategory, setActiveLifestyleCategory] = useState<'all' | 'restaurant' | 'cafe' | 'pub' | 'chill' | 'pet_cafe' | 'temple'>('all');
   const [matchingProgress, setMatchingProgress] = useState(15);
   const [liveDrivers, setLiveDrivers] = useState<MatchedDriver[]>([]);
-  const [driversLoading, setDriversLoading] = useState(true);
+  const [driversLoading, setDriversLoading] = useState(false);
   const [driversError, setDriversError] = useState<string | null>(null);
+  const [destinationInput, setDestinationInput] = useState(selectedDestination);
+  const [destinationError, setDestinationError] = useState('');
+  const [matchingStarted, setMatchingStarted] = useState(false);
+  const destinationRequiredBeforeMatching = ['knight', 'express', 'spirit', 'family'].includes(serviceId);
   
   // Local gender state for reactive switching
   const [currentGender, setCurrentGender] = useState<'female' | 'male'>(customerGender);
@@ -143,8 +149,14 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   }, [customerGender]);
 
   useEffect(() => {
+    setDestinationInput(selectedDestination);
+  }, [selectedDestination]);
+
+  useEffect(() => {
+    if (!matchingStarted) return;
     let active = true;
     setDriversLoading(true);
+    setDriversError(null);
     fetchLiveDrivers().then((drivers) => {
       if (active) setLiveDrivers(drivers);
     }).catch((error) => {
@@ -152,7 +164,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
       if (active) { setLiveDrivers([]); setDriversError('ไม่สามารถเชื่อมต่อรายชื่อพี่วินจากระบบจริงได้'); }
     }).finally(() => { if (active) setDriversLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [matchingStarted]);
 
   // Criteria rules based on service and gender
   const serviceCriteria = useMemo(() => {
@@ -316,6 +328,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
   // Real driver matching state: progress reflects the actual Firestore query lifecycle.
   useEffect(() => {
+    if (!matchingStarted) return;
     setMatchingStep(driversLoading ? 'scanning' : 'results');
     setMatchingProgress(driversLoading ? 40 : 100);
     if (!driversLoading && candidateDrivers.length > 0) {
@@ -327,7 +340,25 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     } else if (!driversLoading && audioEnabled) {
       playTactileBlip(500);
     }
-  }, [candidateDrivers, driversLoading, audioEnabled]);
+  }, [candidateDrivers, driversLoading, audioEnabled, matchingStarted]);
+
+  const handleStartMatching = () => {
+    const destination = destinationInput.trim();
+    if (destinationRequiredBeforeMatching && destination.length < 3) {
+      setDestinationError('กรุณากรอกปลายทางจริงอย่างน้อย 3 ตัวอักษรก่อนเริ่มจับคู่');
+      return;
+    }
+    setDestinationError('');
+    setSelectedDriver(null);
+    setLiveDrivers([]);
+    if (destination) onDestinationChange(destination);
+    setMatchingStep('scanning');
+    setMatchingStarted(true);
+    if (audioEnabled) {
+      playRadarScan();
+      speakThaiText(destination ? `เริ่มค้นหาพี่วินสำหรับปลายทาง ${destination}` : 'เริ่มค้นหาพี่วินสำหรับบริการที่เลือก');
+    }
+  };
 
   const handleGenderToggle = (newGender: 'female' | 'male') => {
     if (audioEnabled) playTactileBlip(1000);
@@ -434,8 +465,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                 </span>
               </h3>
               <p className="text-[11px] text-slate-300 font-mono flex items-center gap-1">
-                <span>ปลายทาง:</span>
-                <strong className="text-white truncate max-w-[200px] sm:max-w-xs">{selectedDestination}</strong>
+                <span>{matchingStarted ? 'กำลังจับคู่จากข้อมูลจริง' : destinationRequiredBeforeMatching ? 'กรอกปลายทางก่อนเริ่มจับคู่' : 'ระบุปลายทางได้ภายหลัง'}</span>
               </p>
             </div>
           </div>
@@ -445,6 +475,55 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-3">
+          <label htmlFor="matching-destination" className="mb-2 block text-sm font-bold text-white">
+            ปลายทางจริง {destinationRequiredBeforeMatching ? <span className="text-rose-300">*</span> : <span className="text-slate-400 font-normal">(ไม่บังคับ)</span>}
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex-1">
+              <div className="relative">
+                <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300" />
+                <input
+                  id="matching-destination"
+                  value={destinationInput}
+                  onChange={(event) => {
+                    setDestinationInput(event.target.value);
+                    setDestinationError('');
+                    if (matchingStarted) {
+                      setMatchingStarted(false);
+                      setMatchingStep('idle');
+                      setSelectedDriver(null);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleStartMatching();
+                    }
+                  }}
+                  placeholder="พิมพ์ชื่อสถานที่ อาคาร ซอย หรือที่อยู่ปลายทาง"
+                  autoComplete="street-address"
+                  className="min-h-12 w-full rounded-xl border border-white/15 bg-black/35 py-3 pl-10 pr-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300"
+                />
+              </div>
+              {destinationError && <p className="mt-1.5 text-xs font-bold text-rose-300" role="alert">{destinationError}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={handleStartMatching}
+              disabled={matchingStarted && driversLoading}
+              className="min-h-12 rounded-xl bg-gradient-to-r from-amber-300 to-cyan-400 px-5 text-sm font-black text-slate-950 disabled:opacity-50"
+            >
+              {matchingStarted && driversLoading ? 'กำลังค้นหา...' : matchingStarted ? 'จับคู่ใหม่' : 'เริ่มจับคู่'}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            {destinationRequiredBeforeMatching
+              ? 'บริการนี้ต้องระบุปลายทางจริงก่อนค้นหาพี่วิน และระบบจะไม่ใส่ข้อมูลตัวอย่างให้'
+              : 'บริการนี้เริ่มจับคู่ได้ทันที โดยเลือกสถานที่หรือระบุปลายทางภายหลังได้'}
+          </p>
         </div>
 
         {/* Customer Gender Switcher (Crucial for WIN MU BUDDY & personalized matching) */}
@@ -606,7 +685,13 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
         {/* TAB 1: DRIVERS MATCHING */}
         {activeTab === 'drivers' && (
           <div>
-            {matchingStep === 'scanning' ? (
+            {matchingStep === 'idle' ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-8 text-center">
+                <MapPin className="mx-auto h-8 w-8 text-cyan-300" />
+                <h4 className="mt-3 text-sm font-bold text-white">ยังไม่ได้เริ่มจับคู่</h4>
+                <p className="mt-1 text-xs text-slate-400">{destinationRequiredBeforeMatching ? 'กรอกปลายทางจริงด้านบน แล้วกด “เริ่มจับคู่”' : 'กด “เริ่มจับคู่” ได้ทันที หรือระบุปลายทางก่อนก็ได้'}</p>
+              </div>
+            ) : matchingStep === 'scanning' ? (
               <div className="py-8 text-center space-y-4">
                 <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
                   <div className="absolute inset-0 rounded-full border-2 border-cyan-400 animate-ping opacity-40" />

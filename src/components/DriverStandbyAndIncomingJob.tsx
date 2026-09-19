@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { playTactileBlip, playRadarScan, playEngineRev, playLevelUpFanfare, speakThaiText } from '../utils/audio';
 import confetti from 'canvas-confetti';
+import { getAuth } from 'firebase/auth';
 import {
   Radio,
   MapPin,
@@ -124,7 +125,15 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   // Live Order Listener (Real-Time Passenger <-> Driver Cross-Screen Sync)
   useEffect(() => {
     const unsubscribe = subscribeToLiveOrders((order, type) => {
-      if (type === 'created' && order.status === 'pending' && order.passengerUserId && isOnDuty) {
+      const currentUserId = getAuth().currentUser?.uid;
+      if (
+        type === 'created'
+        && order.status === 'pending'
+        && order.passengerUserId
+        && order.passengerUserId !== currentUserId
+        && order.id !== lastDeclinedJobId
+        && isOnDuty
+      ) {
         const incomingJob: IncomingJobData = {
           id: order.id,
           serviceId: (order.serviceId as any) || 'knight',
@@ -161,7 +170,14 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
       }
     });
     return () => unsubscribe();
-  }, [isOnDuty, audioEnabled, activeVehicle]);
+  }, [isOnDuty, audioEnabled, activeVehicle, lastDeclinedJobId]);
+
+  useEffect(() => {
+    if (!isOnDuty) {
+      setActiveIncomingJob(null);
+      setCountdownSeconds(30);
+    }
+  }, [isOnDuty]);
 
   // Backend polling keeps dispatch visible across devices/instances.
   useEffect(() => {
@@ -171,7 +187,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
       try {
         const orders = await fetchAvailableOrdersForDriver();
         if (cancelled) return;
-        const pending = orders.find((order) => order.status === 'pending');
+        const pending = orders.find((order) => order.status === 'pending' && order.id !== lastDeclinedJobId);
         if (!pending) return;
         const incomingJob: IncomingJobData = {
           id: pending.id,
@@ -207,7 +223,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
     refresh();
     const timer = window.setInterval(refresh, 5000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [isOnDuty, activeIncomingJob, activeVehicle]);
+  }, [isOnDuty, activeIncomingJob, activeVehicle, lastDeclinedJobId]);
 
   // Online minutes counter
   useEffect(() => {

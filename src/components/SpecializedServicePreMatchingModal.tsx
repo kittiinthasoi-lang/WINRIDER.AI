@@ -30,7 +30,6 @@ export interface SpecializedPreMatchingData {
   serviceId: 'knight' | 'express' | 'pet' | 'mu' | 'lifestyle' | 'spirit' | 'family' | 'link' | string;
   // Knight fields
   knight?: {
-    destinationAddress?: string;
     expressHighway: boolean;
     highwayFee: number;
     goldHelmetVIP: boolean;
@@ -79,7 +78,6 @@ export interface SpecializedPreMatchingData {
   };
   // Spirit fields
   spirit?: {
-    destinationAddress?: string;
     wantStopBuyItems: boolean;
     selectedSacredItems: { id: string; name: string; price: number; count: number; icon: string }[];
     stopMarketName: string;
@@ -89,15 +87,12 @@ export interface SpecializedPreMatchingData {
   // Family fields
   family?: {
     passengerType: 'disabled' | 'elderly' | 'student';
-    pickupLocationType?: 'home' | 'school' | 'hospital' | 'other';
     pickupSpecificPoint: string;
-    pickupSenderName: string;
-    pickupSenderPhone: string;
     destinationSpecificPoint: string;
-    dropoffReceiverName: string;
-    dropoffReceiverPhone: string;
-    contactPersonName: string; // for backwards compatibility
-    contactPersonPhone: string; // for backwards compatibility
+    pickupContactName: string;
+    pickupContactPhone: string;
+    dropoffContactName: string;
+    dropoffContactPhone: string;
     specialCareRequirements: string[];
     safeArrivalPhotoVerification: boolean;
     emergencyNote: string;
@@ -134,75 +129,75 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
   onSubmit
 }) => {
   // 0. KNIGHT STATE
-  const [knightDestination, setKnightDestination] = useState(destinationLocation || '');
   const [knightExpressHighway, setKnightExpressHighway] = useState(false);
   const [knightGoldHelmetVIP, setKnightGoldHelmetVIP] = useState(true);
   const [knightQuietRide, setKnightQuietRide] = useState(false);
-  const [knightLuggageBrief, setKnightLuggageBrief] = useState('');
+  const [knightLuggageBrief, setKnightLuggageBrief] = useState('มีกระเป๋าเป้ 1 ใบ');
 
-  // 1. EXPRESS STATE (No dummy defaults - real inputs required)
-  const [expressRecipientName, setExpressRecipientName] = useState('');
-  const [expressRecipientPhone, setExpressRecipientPhone] = useState('');
-  const [expressDestination, setExpressDestination] = useState(destinationLocation || '');
-  const [expressPackageType, setExpressPackageType] = useState('');
-  const [expressTransparentAgreed, setExpressTransparentAgreed] = useState(false);
+  // 1. EXPRESS STATE
+  const [expressRecipientName, setExpressRecipientName] = useState('คุณสมศรี เจริญสุข');
+  const [expressRecipientPhone, setExpressRecipientPhone] = useState('089-123-4567');
+  const [expressDestination, setExpressDestination] = useState(destinationLocation);
+  const [expressPackageType, setExpressPackageType] = useState('เอกสาร & แฟ้มสัญญาสำคัญ');
+  const [expressTransparentAgreed, setExpressTransparentAgreed] = useState(true);
   const [expressRequirePhotoProof, setExpressRequirePhotoProof] = useState(true);
 
-  // 1.5 PET CARE STATE (No dummy defaults)
-  const [petType, setPetType] = useState<'dog' | 'cat' | 'exotic'>('dog');
+  // 1.5 PET CARE STATE
+  const [petType, setPetType] = useState<'dog' | 'cat' | 'exotic'>('cat');
   const [petWeight, setPetWeight] = useState<'<5kg' | '5-10kg' | '10-15kg'>('<5kg');
   const [petCarrierType, setPetCarrierType] = useState<'carrier' | 'leash' | 'lap'>('carrier');
   const [petComfortKit, setPetComfortKit] = useState(true);
-  const [petVetDestination, setPetVetDestination] = useState(destinationLocation || '');
-  const [petSpecialInstructions, setPetSpecialInstructions] = useState('');
+  const [petVetDestination, setPetVetDestination] = useState(destinationLocation);
+  const [petSpecialInstructions, setPetSpecialInstructions] = useState('น้องแมวตกใจง่าย ขอพี่วินขับขี่นุ่มนวลและไม่บีบแตร');
 
-  // 2. MU BUDDY STATE (No dummy defaults)
-  const [muWantBuddy, setMuWantBuddy] = useState(false);
+  // 2. MU BUDDY STATE
+  const [muWantBuddy, setMuWantBuddy] = useState(true);
   const [muExtraTime, setMuExtraTime] = useState<number>(0); // 0, 15, 30, 45, 60
-  const [muTravelObjective, setMuTravelObjective] = useState('');
-  const [muSpecificRitual, setMuSpecificRitual] = useState('');
+  const [muTravelObjective, setMuTravelObjective] = useState('⛩️ ไหว้พระ 9 วัด เสริมสิริมงคล');
+  const [muSpecificRitual, setMuSpecificRitual] = useState('ขอพรเรื่องความรัก & ความสำเร็จในหน้าที่การงาน');
 
-  // 3. LIFESTYLE STATE (No dummy defaults)
-  const [lifestyleWantPhoto, setLifestyleWantPhoto] = useState(false);
-  const [lifestyleTheme, setLifestyleTheme] = useState('');
-  const [lifestyleCameraAngle, setLifestyleCameraAngle] = useState('');
-  const [lifestyleNote, setLifestyleNote] = useState('');
+  // 3. LIFESTYLE STATE
+  const [lifestyleWantPhoto, setLifestyleWantPhoto] = useState(true);
+  const [lifestyleTheme, setLifestyleTheme] = useState('📸 ถ่ายรูปคาเฟ่ชิคๆ & มินิมอล (Cafe Hopping)');
+  const [lifestyleCameraAngle, setLifestyleCameraAngle] = useState('มุมมองกว้าง Ultra-Wide ถ่ายคู่กับรถและบรรยากาศ');
+  const [lifestyleNote, setLifestyleNote] = useState('ช่วยถ่ายรูปสวยๆ ลง IG Story / TikTok');
 
-  // 4. SPIRIT STATE (Must specify real sacred destination)
-  const [spiritWantStop, setSpiritWantStop] = useState(false);
-  const [spiritDestination, setSpiritDestination] = useState(destinationLocation || '');
-  const [spiritMarketName, setSpiritMarketName] = useState('');
+  // 4. SPIRIT STATE
+  const [spiritWantStop, setSpiritWantStop] = useState(true);
+  const [spiritMarketName, setSpiritMarketName] = useState('แผงพวงมาลัยและดอกไม้สดหน้าวัด');
   const [spiritItems, setSpiritItems] = useState([
-    { id: '1', name: 'พวงมาลัยดาวเรืองสด 2 ชาย', price: 30, count: 0, icon: '🌸' },
-    { id: '2', name: 'ชุดธูป เทียน ทองคำเปลว & ไม้ขีด', price: 20, count: 0, icon: '🕯️' },
-    { id: '3', name: 'ดอกบัวหลวงสดพับกลีบ (กำละ 3 ดอก)', price: 35, count: 0, icon: '🪷' },
+    { id: '1', name: 'พวงมาลัยดาวเรืองสด 2 ชาย', price: 30, count: 2, icon: '🌸' },
+    { id: '2', name: 'ชุดธูป เทียน ทองคำเปลว & ไม้ขีด', price: 20, count: 1, icon: '🕯️' },
+    { id: '3', name: 'ดอกบัวหลวงสดพับกลีบ (กำละ 3 ดอก)', price: 35, count: 1, icon: '🪷' },
     { id: '4', name: 'ไข่ต้มแก้บน (10 ฟอง พร้อมน้ำปลา)', price: 80, count: 0, icon: '🥚' },
     { id: '5', name: 'ผลไม้มงคล 5 อย่าง (ส้ม, แอปเปิ้ล, กล้วย)', price: 150, count: 0, icon: '🍎' },
     { id: '6', name: 'ชุดสังฆทานยา & น้ำดื่มขวดแก้ว', price: 120, count: 0, icon: '🧴' },
     { id: '7', name: 'น้ำแดงเฮลบลูบอย & ของเซ่นไหว้ศาล', price: 25, count: 0, icon: '🥤' },
   ]);
 
-  // 5. FAMILY STATE (Strict separate Sender at Pickup & Receiver at Dropoff - Zero dummy defaults)
+  // 5. FAMILY STATE
   const [familyPassengerType, setFamilyPassengerType] = useState<'disabled' | 'elderly' | 'student'>('elderly');
-  const [familyPickupType, setFamilyPickupType] = useState<'home' | 'school' | 'hospital' | 'other'>('home');
   const [familyPickupPoint, setFamilyPickupPoint] = useState('');
-  const [familyPickupSenderName, setFamilyPickupSenderName] = useState('');
-  const [familyPickupSenderPhone, setFamilyPickupSenderPhone] = useState('');
-  const [familyDropPoint, setFamilyDropPoint] = useState(destinationLocation || '');
-  const [familyDropReceiverName, setFamilyDropReceiverName] = useState('');
-  const [familyDropReceiverPhone, setFamilyDropReceiverPhone] = useState('');
+  const [familyDropPoint, setFamilyDropPoint] = useState(destinationLocation);
+  const [familyPickupContactName, setFamilyPickupContactName] = useState('');
+  const [familyPickupContactPhone, setFamilyPickupContactPhone] = useState('');
+  const [familyDropoffContactName, setFamilyDropoffContactName] = useState('');
+  const [familyDropoffContactPhone, setFamilyDropoffContactPhone] = useState('');
   const [familySafePhoto, setFamilySafePhoto] = useState(true);
-  const [familyCareReqs, setFamilyCareReqs] = useState<string[]>([]);
+  const [familyCareReqs, setFamilyCareReqs] = useState<string[]>([
+    'ช่วยประคองขึ้น-ลงรถอย่างนุ่มนวล',
+    'จำกัดความเร็วไม่เกิน 40 กม./ชม.'
+  ]);
 
-  // 6. WIN LINK (CONCERT & SPORTS TICKET CONCIERGE & TRANSIT - No dummy defaults)
+  // 6. WIN LINK (CONCERT & SPORTS TICKET CONCIERGE & TRANSIT)
   const [linkCategory, setLinkCategory] = useState<'concert' | 'sports' | 'transit' | 'festival' | 'expo' | 'other'>('concert');
-  const [linkEventOrVenue, setLinkEventOrVenue] = useState(destinationLocation || '');
+  const [linkEventOrVenue, setLinkEventOrVenue] = useState(destinationLocation);
   const [linkBookingType, setLinkBookingType] = useState<'book_ticket' | 'queue_stand' | 'collect_physical_ticket' | 'express_ride_only'>('book_ticket');
-  const [linkTicketQuantity, setLinkTicketQuantity] = useState<number>(1);
-  const [linkSeatZone, setLinkSeatZone] = useState('');
-  const [linkBudgetLimit, setLinkBudgetLimit] = useState<number>(2000);
-  const [linkUrgentQueue, setLinkUrgentQueue] = useState<boolean>(false);
-  const [linkCustomInstructions, setLinkCustomInstructions] = useState('');
+  const [linkTicketQuantity, setLinkTicketQuantity] = useState<number>(2);
+  const [linkSeatZone, setLinkSeatZone] = useState('โซนบัตรยืน VIP / หรือบัตรนั่งแถวหน้า');
+  const [linkBudgetLimit, setLinkBudgetLimit] = useState<number>(2500);
+  const [linkUrgentQueue, setLinkUrgentQueue] = useState<boolean>(true);
+  const [linkCustomInstructions, setLinkCustomInstructions] = useState('ช่วยกดบัตรคอนเสิร์ตรอบพรีเซลล์ / ไปต่อคิวรับสายรัดข้อมือหน้าฮอลล์ล่วงหน้า');
 
   // Calculate dynamic fees
   const calculateTotalAddon = (): number => {
@@ -243,58 +238,23 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 0. Strict WIN Knight validation: ต้องกรอกปลายทางจริง
-    if (serviceId === 'knight') {
-      if (!knightDestination.trim()) {
-        alert('⚠️ กรุณากรอกสถานที่หรือจุดหมายปลายทางจริงก่อนเริ่มระบบจับคู่อัศวิน WIN Knight');
-        return;
-      }
+    if (serviceId === 'express' && !expressTransparentAgreed) {
+      alert('⚠️ กรุณากดยอมรับข้อกำหนดบรรจุภัณฑ์โปร่งใส/เจาะรู เพื่อความปลอดภัยตามกฎหมายก่อนส่งพัสดุ');
+      return;
     }
 
-    // 1. Strict WIN Express validation: ต้องกรอกจุดส่งจริง
-    if (serviceId === 'express') {
-      if (!expressDestination.trim()) {
-        alert('⚠️ กรุณากรอกจุดส่งพัสดุจริงก่อนเริ่มจับคู่อัศวิน WIN Express');
-        return;
-      }
-      if (!expressRecipientName.trim() || !expressRecipientPhone.trim()) {
-        alert('⚠️ กรุณากรอกชื่อและเบอร์โทรศัพท์ของผู้รับจริง');
-        return;
-      }
-      if (!expressPackageType.trim()) {
-        alert('⚠️ กรุณาระบุประเภทสิ่งของหรือเอกสารที่ต้องการส่ง');
-        return;
-      }
-      if (!expressTransparentAgreed) {
-        alert('⚠️ กรุณากดยอมรับข้อกำหนดบรรจุภัณฑ์โปร่งใส/เจาะรู เพื่อความปลอดภัยตามกฎหมายก่อนส่งพัสดุ');
-        return;
-      }
-    }
-
-    // 2. Strict WIN Spirit validation: ต้องกรอกสถานที่หรือจุดหมายจริง
-    if (serviceId === 'spirit') {
-      if (!spiritDestination.trim()) {
-        alert('⚠️ กรุณากรอกสถานที่หรือจุดหมายจริง (เช่น วัด ศาลเจ้า หรือสถานที่ปฏิบัติธรรม) ก่อนเริ่มจับคู่');
-        return;
-      }
-    }
-
-    // 3. Strict WIN Family validation: บังคับตรวจข้อมูลจุดรับ จุดส่ง และเบอร์โทรก่อนจับคู่
     if (serviceId === 'family') {
-      if (!familyPickupPoint.trim()) {
-        alert('⚠️ กรุณาระบุจุดรับบุคคลจริง (เช่น โรงเรียน โรงพยาบาล หรือบ้าน)');
+      const phoneIsValid = (phone: string) => phone.replace(/\D/g, '').length >= 9;
+      if (familyPickupPoint.trim().length < 3 || familyDropPoint.trim().length < 3) {
+        alert('⚠️ กรุณาระบุจุดรับและจุดส่งจริงให้ครบถ้วนก่อนเริ่มจับคู่');
         return;
       }
-      if (!familyPickupSenderName.trim() || !familyPickupSenderPhone.trim()) {
-        alert('⚠️ กรุณากรอกชื่อและเบอร์โทรศัพท์ของผู้ส่งมอบ ณ จุดรับ ให้ครบถ้วน');
+      if (!familyPickupContactName.trim() || !phoneIsValid(familyPickupContactPhone)) {
+        alert('⚠️ กรุณาระบุชื่อและเบอร์โทรผู้ส่งมอบ ณ จุดรับให้ถูกต้อง');
         return;
       }
-      if (!familyDropPoint.trim()) {
-        alert('⚠️ กรุณาระบุจุดส่ง/สถานที่ดูแลจริง');
-        return;
-      }
-      if (!familyDropReceiverName.trim() || !familyDropReceiverPhone.trim()) {
-        alert('⚠️ กรุณากรอกชื่อและเบอร์โทรศัพท์ของผู้รับมอบ ณ จุดส่ง ให้ครบถ้วน');
+      if (!familyDropoffContactName.trim() || !phoneIsValid(familyDropoffContactPhone)) {
+        alert('⚠️ กรุณาระบุชื่อและเบอร์โทรผู้รับมอบ ณ จุดส่งให้ถูกต้อง');
         return;
       }
     }
@@ -304,7 +264,6 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
     const data: SpecializedPreMatchingData = {
       serviceId,
       knight: serviceId === 'knight' ? {
-        destinationAddress: knightDestination.trim(),
         expressHighway: knightExpressHighway,
         highwayFee: knightExpressHighway ? 25 : 0,
         goldHelmetVIP: knightGoldHelmetVIP,
@@ -312,10 +271,10 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
         specialBrief: knightLuggageBrief
       } : undefined,
       express: serviceId === 'express' ? {
-        recipientName: expressRecipientName.trim(),
-        recipientPhone: expressRecipientPhone.trim(),
-        destinationAddress: expressDestination.trim(),
-        packageType: expressPackageType.trim(),
+        recipientName: expressRecipientName,
+        recipientPhone: expressRecipientPhone,
+        destinationAddress: expressDestination,
+        packageType: expressPackageType,
         transparentPackagingAccepted: expressTransparentAgreed,
         requirePhotoProof: expressRequirePhotoProof,
         boxFee: 5
@@ -326,8 +285,8 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
         carrierType: petCarrierType,
         petComfortKit,
         petComfortKitFee: petComfortKit ? 15 : 0,
-        vetClinicDestination: petVetDestination.trim(),
-        specialCareNote: petSpecialInstructions.trim()
+        vetClinicDestination: petVetDestination,
+        specialCareNote: petSpecialInstructions
       } : undefined,
       mu: serviceId === 'mu' ? {
         wantBuddy: muWantBuddy,
@@ -336,50 +295,46 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
         extraTimeFee: (muExtraTime / 15) * 50,
         totalBuddyFee: muWantBuddy ? 100 + (muExtraTime / 15) * 50 : 0,
         totalDurationMinutes: 30 + muExtraTime,
-        travelObjective: muTravelObjective.trim(),
-        specificRitualOrTemple: muSpecificRitual.trim()
+        travelObjective: muTravelObjective,
+        specificRitualOrTemple: muSpecificRitual
       } : undefined,
       lifestyle: serviceId === 'lifestyle' ? {
         wantPhotoService: lifestyleWantPhoto,
         photoServiceFee: lifestyleWantPhoto ? 20 : 0,
         photoDurationMinutes: 10,
-        photoTheme: lifestyleTheme.trim(),
-        cameraAnglePreference: lifestyleCameraAngle.trim(),
-        customNote: lifestyleNote.trim()
+        photoTheme: lifestyleTheme,
+        cameraAnglePreference: lifestyleCameraAngle,
+        customNote: lifestyleNote
       } : undefined,
       spirit: serviceId === 'spirit' ? {
-        destinationAddress: spiritDestination.trim(),
         wantStopBuyItems: spiritWantStop,
         selectedSacredItems: spiritItems.filter(it => it.count > 0),
-        stopMarketName: spiritMarketName.trim(),
+        stopMarketName: spiritMarketName,
         totalItemsCost: spiritItems.reduce((sum, it) => sum + it.price * it.count, 0),
         careNote: 'พี่วินช่วยแวะซื้อของไหว้และดูแลระหว่างทำศาสนกิจ'
       } : undefined,
       family: serviceId === 'family' ? {
         passengerType: familyPassengerType,
-        pickupLocationType: familyPickupType,
         pickupSpecificPoint: familyPickupPoint.trim(),
-        pickupSenderName: familyPickupSenderName.trim(),
-        pickupSenderPhone: familyPickupSenderPhone.trim(),
         destinationSpecificPoint: familyDropPoint.trim(),
-        dropoffReceiverName: familyDropReceiverName.trim(),
-        dropoffReceiverPhone: familyDropReceiverPhone.trim(),
-        contactPersonName: `${familyPickupSenderName.trim()} / ${familyDropReceiverName.trim()}`,
-        contactPersonPhone: `${familyPickupSenderPhone.trim()} / ${familyDropReceiverPhone.trim()}`,
+        pickupContactName: familyPickupContactName.trim(),
+        pickupContactPhone: familyPickupContactPhone.trim(),
+        dropoffContactName: familyDropoffContactName.trim(),
+        dropoffContactPhone: familyDropoffContactPhone.trim(),
         specialCareRequirements: familyCareReqs,
         safeArrivalPhotoVerification: familySafePhoto,
-        emergencyNote: `ผู้ส่งมอบ: ${familyPickupSenderName.trim()} (${familyPickupSenderPhone.trim()}) | ผู้รับมอบ: ${familyDropReceiverName.trim()} (${familyDropReceiverPhone.trim()})`
+        emergencyNote: `ผู้ส่งมอบที่จุดรับ: ${familyPickupContactName} (${familyPickupContactPhone}) • ผู้รับมอบที่จุดส่ง: ${familyDropoffContactName} (${familyDropoffContactPhone})`
       } : undefined,
       link: serviceId === 'link' ? {
         ticketBookingCategory: linkCategory,
-        eventOrVenueName: linkEventOrVenue.trim(),
+        eventOrVenueName: linkEventOrVenue,
         bookingType: linkBookingType,
         ticketQuantity: linkTicketQuantity,
-        seatZonePreference: linkSeatZone.trim(),
+        seatZonePreference: linkSeatZone,
         ticketBudgetLimitThb: linkBudgetLimit,
         isUrgentQueue: linkUrgentQueue,
         ticketServiceFee: addonFee,
-        customInstructions: linkCustomInstructions.trim()
+        customInstructions: linkCustomInstructions
       } : undefined
     };
 
@@ -565,25 +520,6 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
              ========================================================================= */}
           {serviceId === 'knight' && (
             <div className="space-y-3.5 animate-fadeIn">
-              {/* Mandatory Real Destination Input */}
-              <div className="p-3.5 rounded-2xl bg-black/50 border border-[#00D2FF]/40 space-y-1.5 shadow-[0_0_15px_rgba(0,210,255,0.15)]">
-                <label className="block text-[11px] font-mono font-bold text-[#00D2FF] uppercase flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-[#00D2FF]" />
-                    <span>สถานที่หรือจุดหมายปลายทางจริง (บังคับกรอก) *</span>
-                  </span>
-                  <span className="text-[9px] text-rose-400 font-normal">ไม่มีค่าเริ่มต้นจำลอง</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={knightDestination}
-                  onChange={(e) => setKnightDestination(e.target.value)}
-                  placeholder="เช่น ตึกสิงห์คอมเพล็กซ์ อโศก, อาคารสาทรสแควร์, ซอยสุขุมวิท 24"
-                  className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#00D2FF] text-xs placeholder:text-slate-500"
-                />
-              </div>
-
               {/* Escort Features Card */}
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#061A30] via-[#041224] to-[#020A14] border-2 border-[#00D2FF]/60 shadow-[0_0_25px_rgba(0,210,255,0.25)] space-y-3">
                 <div className="flex items-center gap-2.5">
@@ -1222,25 +1158,6 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
           {serviceId === 'spirit' && (
             <div className="space-y-3.5 animate-fadeIn">
               
-              {/* Mandatory Real Sacred/Worship Destination Input */}
-              <div className="p-3.5 rounded-2xl bg-black/50 border border-[#FACC15]/40 space-y-2">
-                <label className="block text-xs font-bold text-[#FDE047] flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-[#FACC15]" />
-                  <span>สถานที่หรือจุดหมายปลายทางจริง (บังคับ) *</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={spiritDestination}
-                  onChange={(e) => setSpiritDestination(e.target.value)}
-                  placeholder="เช่น วัดพระแก้ว, วัดอรุณฯ, วัดมังกร, ศาลท้าวมหาพรหม, หรือสถานที่ปฏิบัติธรรม"
-                  className="w-full px-3 py-2.5 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#FACC15] text-xs"
-                />
-                <p className="text-[10px] text-slate-400">
-                  ⚠️ บริการ WIN Spirit ต้องระบุจุดหมายจริงก่อนเริ่มระบบจับคู่อัศวิน
-                </p>
-              </div>
-
               {/* Want Stop Buy Toggle */}
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#2B2304] via-[#1A1502] to-[#0D0B01] border-2 border-[#FACC15]/60 shadow-[0_0_20px_rgba(250,204,21,0.25)] space-y-3">
                 <div className="flex items-center justify-between">
@@ -1408,154 +1325,90 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
                 </div>
               </div>
 
-              {/* Specific Pickup & Dropoff Location + Separate Sender / Receiver Contacts */}
-              <div className="p-4 rounded-2xl bg-black/50 border border-[#38BDF8]/40 space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <h5 className="text-[11px] font-mono font-bold text-[#38BDF8] uppercase flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-[#38BDF8]" />
-                    <span>ข้อมูลจุดรับ-ส่ง & ผู้ติดต่อสองฝั่ง (บังคับตรวจสอบ)</span>
-                  </h5>
-                  <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/40 font-bold">
-                    ใช้จุดรับจริง • ไม่ใช้ GPS ผู้จอง
-                  </span>
-                </div>
+              {/* Specific Pickup & Dropoff Location + Contact */}
+              <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+                <h5 className="text-[11px] font-mono font-bold text-[#38BDF8] uppercase flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-[#38BDF8]" />
+                  <span>จุดรับ-ส่งจริง & ผู้ส่งมอบ/ผู้รับมอบ</span>
+                </h5>
 
-                {/* 1. Pickup Location Type & Details */}
-                <div className="p-3 rounded-xl bg-[#041220] border border-[#38BDF8]/30 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-[#7DD3FC] flex items-center gap-1">
-                      <span>📍 จุดรับบุคคลจริง (Pickup Point) *</span>
-                    </label>
-                    <span className="text-[9px] text-slate-400 font-mono">เลือกประเภทสถานที่รับ:</span>
-                  </div>
-
-                  {/* Pickup Type Selector Chips */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                    {[
-                      { id: 'school', label: '🏫 โรงเรียน/มหาวิทยาลัย' },
-                      { id: 'hospital', label: '🏥 โรงพยาบาล/คลินิก' },
-                      { id: 'home', label: '🏡 บ้าน/คอนโด' },
-                      { id: 'other', label: '🏢 สถานที่ดูแล/อื่นๆ' },
-                    ].map((type) => (
-                      <button
-                        key={type.id}
-                        type="button"
-                        onClick={() => {
-                          if (audioEnabled) playTactileBlip(800);
-                          setFamilyPickupType(type.id as any);
-                        }}
-                        className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition-all ${
-                          familyPickupType === type.id
-                            ? 'bg-[#38BDF8] text-slate-950 border-[#38BDF8] font-black shadow-sm'
-                            : 'bg-black/40 border-white/10 text-slate-300 hover:border-white/20'
-                        }`}
-                      >
-                        {type.label}
-                      </button>
-                    ))}
-                  </div>
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[11px] text-slate-300 mb-1 font-semibold">
-                      ระบุจุดรับจริงอย่างละเอียด (เช่น ชื่อโรงเรียน ประตู หน้าอาคาร หรือเลขที่บ้าน) *:
-                    </label>
+                    <label className="block text-slate-300 mb-1 font-bold">จุดรับบุคคลจริง *:</label>
                     <input
                       type="text"
                       required
                       value={familyPickupPoint}
                       onChange={(e) => setFamilyPickupPoint(e.target.value)}
-                      placeholder="เช่น โรงเรียนสาธิตฯ ประตู 2 หรือ บ้านเลขที่ 88/1 ซอยอารีย์"
+                      placeholder="เช่น ประตู 2 โรงเรียน หรือแผนกผู้ป่วยนอก รพ."
                       className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs"
                     />
                   </div>
 
-                  {/* Sender at Pickup info */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-white/10">
-                    <div>
-                      <label className="block text-[10px] text-slate-300 mb-1 font-bold">
-                        ชื่อ "ผู้ส่งมอบ ณ จุดรับ" *:
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={familyPickupSenderName}
-                        onChange={(e) => setFamilyPickupSenderName(e.target.value)}
-                        placeholder="เช่น คุณแม่วรรณา, ครูประจำชั้น"
-                        className="w-full px-3 py-1.5 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-300 mb-1 font-bold">
-                        เบอร์โทรศัพท์ผู้ส่งมอบ *:
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        value={familyPickupSenderPhone}
-                        onChange={(e) => setFamilyPickupSenderPhone(e.target.value)}
-                        placeholder="เช่น 081-234-5678"
-                        className="w-full px-3 py-1.5 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Dropoff Location & Details */}
-                <div className="p-3 rounded-xl bg-[#031524] border border-[#38BDF8]/30 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-[#7DD3FC] flex items-center gap-1">
-                      <span>🏁 จุดส่ง-มอบ / สถานที่ดูแลจริง (Dropoff Point) *</span>
-                    </label>
-                  </div>
-
                   <div>
-                    <label className="block text-[11px] text-slate-300 mb-1 font-semibold">
-                      ระบุจุดส่งจริงอย่างละเอียด (เช่น แผนกผู้ป่วยนอก ล็อบบี้ หรือหน้าบ้าน) *:
-                    </label>
+                    <label className="block text-slate-300 mb-1 font-bold">จุดส่งบุคคลจริง *:</label>
                     <input
                       type="text"
                       required
                       value={familyDropPoint}
                       onChange={(e) => setFamilyDropPoint(e.target.value)}
-                      placeholder="เช่น โรงพยาบาลจุฬาฯ อาคาร ภปร ชั้น 1 หรือ บ้านคุณยาย ซอยทองหล่อ"
+                      placeholder="เช่น ประตูหน้าโรงเรียน หรือ ล็อบบี้โรงพยาบาล"
+                      className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-300 mb-1 font-bold">ผู้ส่งมอบ ณ จุดรับ *:</label>
+                    <input
+                      type="text"
+                      required
+                      value={familyPickupContactName}
+                      onChange={(e) => setFamilyPickupContactName(e.target.value)}
+                      placeholder="เช่น คุณครูสมใจ / พยาบาลประจำแผนก"
                       className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs"
                     />
                   </div>
 
-                  {/* Receiver at Dropoff info */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-white/10">
-                    <div>
-                      <label className="block text-[10px] text-slate-300 mb-1 font-bold">
-                        ชื่อ "ผู้รับมอบ ณ จุดส่ง" *:
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={familyDropReceiverName}
-                        onChange={(e) => setFamilyDropReceiverName(e.target.value)}
-                        placeholder="เช่น คุณป้ามาลี (ผู้ดูแล), เจ้าหน้าที่ศูนย์"
-                        className="w-full px-3 py-1.5 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-300 mb-1 font-bold">
-                        เบอร์โทรศัพท์ผู้รับมอบ *:
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        value={familyDropReceiverPhone}
-                        onChange={(e) => setFamilyDropReceiverPhone(e.target.value)}
-                        placeholder="เช่น 089-876-5432"
-                        className="w-full px-3 py-1.5 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs font-mono"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-slate-300 mb-1 font-bold">เบอร์โทรผู้ส่งมอบ *:</label>
+                    <input
+                      type="tel"
+                      required
+                      value={familyPickupContactPhone}
+                      onChange={(e) => setFamilyPickupContactPhone(e.target.value)}
+                      placeholder="เช่น 08X-XXX-XXXX"
+                      className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs font-mono"
+                    />
                   </div>
                 </div>
 
-                <p className="text-[10px] text-slate-400 leading-relaxed">
-                  ⚠️ ระบบจะส่ง SMS/แจ้งเตือนการเดินทางให้แก่ทั้งผู้ส่งมอบและผู้รับมอบ เพื่อตรวจสอบสถานะการเดินทางแบบเรียลไทม์
-                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-300 mb-1 font-bold">ผู้รับมอบ ณ จุดส่ง *:</label>
+                    <input
+                      type="text"
+                      required
+                      value={familyDropoffContactName}
+                      onChange={(e) => setFamilyDropoffContactName(e.target.value)}
+                      placeholder="เช่น คุณแม่ / ญาติ / เจ้าหน้าที่ผู้รับมอบ"
+                      className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 mb-1 font-bold">เบอร์โทรผู้รับมอบ *:</label>
+                    <input
+                      type="tel"
+                      required
+                      value={familyDropoffContactPhone}
+                      onChange={(e) => setFamilyDropoffContactPhone(e.target.value)}
+                      placeholder="เช่น 08X-XXX-XXXX"
+                      className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#38BDF8] text-xs font-mono"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Safe Arrival Photo Verification System */}
