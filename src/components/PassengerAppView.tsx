@@ -1582,8 +1582,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 {/* 3D Holographic Capillary Map Navigation Component */}
                 <ThreeDimensionalRideMap
                   selectedDreamRide={selectedDreamRide}
-                  pickupLocation="หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)"
-                  destinationLocation={selectedDestination || "อาคาร Exchange Tower อโศก"}
+                  pickupLocation={activeLiveOrder?.pickupLocation || "กำลังรอออเดอร์"}
+                  destinationLocation={activeLiveOrder?.dropoffLocation || selectedDestination || "ยังไม่ได้เลือกปลายทาง"}
                   driverName={currentMatchedDriver?.name || "กำลังรอพี่วิน"}
                   driverLevel={currentMatchedDriver?.level || 0}
                   driverEmoji={currentMatchedDriver?.avatarEmoji || "🛵"}
@@ -3574,7 +3574,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       )}
 
       {/* PROMPTPAY EMVCo PAYMENT MODAL */}
-      <PromptPayPaymentModal
+      {activeLiveOrder && <PromptPayPaymentModal
         isOpen={showPromptPayModal}
         onClose={() => setShowPromptPayModal(false)}
         orderId={activeLiveOrder?.id || 'RIDE-' + Date.now().toString().slice(-4)}
@@ -3587,7 +3587,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           setShowPromptPayModal(false);
           setShowReceiptModal(true);
         }}
-      />
+      />}
 
       {/* IN-RIDE DIRECT CHAT MODAL */}
       <InRideDirectChatModal
@@ -3595,8 +3595,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         onClose={() => setShowInRideChatModal(false)}
         orderId={activeLiveOrder?.id || 'ACTIVE-RIDE'}
         currentUserRole="passenger"
-        currentUserName="คุณอารียา (ผู้โดยสาร)"
-        otherPartyName={currentMatchedDriver?.name || 'พี่วินอัศวิน'}
+        currentUserName={currentUserSession?.name || "ผู้โดยสาร"}
+        otherPartyName={currentMatchedDriver?.name || 'พี่วิน'}
         audioEnabled={audioEnabled}
       />
 
