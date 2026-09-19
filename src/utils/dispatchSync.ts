@@ -63,7 +63,7 @@ function isValidLiveOrder(value: unknown): value is LiveRideOrder {
   );
 }
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
+export async function getAuthHeaders(): Promise<Record<string, string>> {
   const user = getAuth().currentUser;
   if (!user) throw new Error('AUTH_REQUIRED');
   const token = await user.getIdToken();
