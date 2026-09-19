@@ -314,32 +314,20 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     return RELIGIOUS_SERVICES_DATA.filter(r => r.religion === activeReligiousCategory);
   }, [activeReligiousCategory]);
 
-  // Simulated AI Radar Matching
+  // Real driver matching state: progress reflects the actual Firestore query lifecycle.
   useEffect(() => {
-    if (audioEnabled) playRadarScan();
-    setMatchingProgress(15);
-    setMatchingStep('scanning');
-    
-    const timer1 = setTimeout(() => setMatchingProgress(45), 350);
-    const timer2 = setTimeout(() => setMatchingProgress(85), 750);
-    const timer3 = setTimeout(() => {
-      setMatchingProgress(100);
-      setMatchingStep('results');
-      if (candidateDrivers.length > 0) {
-        setSelectedDriver(candidateDrivers[0]);
-        if (audioEnabled) {
-          playTactileBlip(1200);
-          speakThaiText(`พบอัศวินที่ตรงตามเงื่อนไขของ ${serviceName} แล้ว: ${candidateDrivers[0].name} ระดับเลเวล ${candidateDrivers[0].level}`);
-        }
+    setMatchingStep(driversLoading ? 'scanning' : 'results');
+    setMatchingProgress(driversLoading ? 40 : 100);
+    if (!driversLoading && candidateDrivers.length > 0) {
+      setSelectedDriver(candidateDrivers[0]);
+      if (audioEnabled) {
+        playTactileBlip(1200);
+        speakThaiText(`พบอัศวินที่ออนไลน์และผ่านเกณฑ์จากระบบจริง: ${candidateDrivers[0].name}`);
       }
-    }, 1100);
-
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-    };
-  }, [candidateDrivers, serviceName, audioEnabled, currentGender]);
+    } else if (!driversLoading && audioEnabled) {
+      playTactileBlip(500);
+    }
+  }, [candidateDrivers, driversLoading, audioEnabled]);
 
   const handleGenderToggle = (newGender: 'female' | 'male') => {
     if (audioEnabled) playTactileBlip(1000);
