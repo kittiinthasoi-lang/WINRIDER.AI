@@ -196,8 +196,18 @@ app.get("/api/orders", async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   try {
-    const snapshot = await ordersCollection.orderBy("createdAt", "desc").limit(50).get();
-    const orders = snapshot.docs.map((doc) => doc.data() as ServerOrder);
+    const snapshot = await ordersCollection.orderBy("createdAt", "desc").limit(100).get();
+    const allOrders = snapshot.docs.map((doc) => doc.data() as ServerOrder);
+    const isAdmin = user.admin === true;
+    const driverEligibility = isAdmin ? null : await requireEligibleDriver(user.uid);
+
+    // Never expose every ride to an ordinary authenticated user.
+    const orders = isAdmin
+      ? allOrders
+      : driverEligibility
+        ? allOrders.filter((order) => order.status === "pending" || order.driverUserId === user.uid)
+        : allOrders.filter((order) => order.passengerUserId === user.uid);
+
     return res.json({ orders });
   } catch (error: any) {
     console.error("[Orders GET Error]:", error?.message);
