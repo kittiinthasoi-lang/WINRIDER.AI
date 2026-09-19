@@ -38,6 +38,7 @@ const RATE_LIMITS: Record<string, number> = {
   "/api/orders/:id/step": 30,
   "/api/orders/:id/location": 120,
   "/api/routes/compute": 30,
+  "/api/events/daily": 30,
 };
 
 function rateLimitKey(req: express.Request): string {
@@ -95,6 +96,134 @@ function getAiClient(): GoogleGenAI | null {
 // Health check endpoints (Cloud Run, Kubernetes, AI Studio probes)
 app.get(["/api/health", "/healthz", "/health"], (_req, res) => {
   res.json({ status: "ok", empire: "WINRIDER.AI", timestamp: new Date().toISOString() });
+});
+
+// Real-world event discovery. PredictHQ remains the source of truth; this route
+// intentionally returns an empty/error state instead of substituting mock events.
+type EventCategory = "sale" | "market" | "concert" | "sports" | "festival" | "community" | "other";
+
+interface NearbyEventResult {
+  id: string;
+  title: string;
+  category: EventCategory;
+  venueName: string;
+  venueArea: string;
+  latitude: number;
+  longitude: number;
+  startAt: string;
+  endAt?: string;
+  description?: string;
+  sourceName: string;
+  providerEventId: string;
+  attendance?: number;
+  rank?: number;
+}
+
+const dailyEventsCache = new Map<string, { expiresAt: number; value: NearbyEventResult[] }>();
+const EVENT_CACHE_MS = 5 * 60 * 1000;
+
+function classifyRealEvent(category: string, title: string, labels: string[] = []): EventCategory {
+  const searchable = `${category} ${title} ${labels.join(" ")}`.toLowerCase();
+  if (/sale|discount|ลดราคา|clearance|shopping/.test(searchable)) return "sale";
+  if (/market|bazaar|popup|pop-up|ตลาด|fair|expo/.test(searchable)) return "market";
+  if (/concert|music|performing-arts|ดนตรี|คอนเสิร์ต/.test(searchable)) return "concert";
+  if (/sport|football|soccer|basketball|กีฬา|แข่งขัน/.test(searchable)) return "sports";
+  if (/festival|เทศกาล/.test(searchable)) return "festival";
+  if (/community|academic|school|public-holiday|daylight-savings|observance/.test(searchable)) return "community";
+  return "other";
+}
+
+app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
+  const eventDate = String(req.query.date || "");
+  const country = "TH";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง" });
+  }
+
+  const dayStart = new Date(`${eventDate}T00:00:00+07:00`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+  if (Number.isNaN(dayStart.getTime())) {
+    return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง" });
+  }
+
+  const accessToken = process.env.PREDICTHQ_ACCESS_TOKEN?.trim();
+  if (!accessToken) {
+    return res.status(503).json({
+      message: "ยังไม่ได้เชื่อม PREDICTHQ_ACCESS_TOKEN สำหรับข้อมูลอีเวนต์จริง",
+      events: [],
+    });
+  }
+
+  const cacheKey = `${country}:${eventDate}`;
+  const cached = dailyEventsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return res.json({ events: cached.value, source: "PredictHQ Events API", fetchedAt: new Date().toISOString(), eventDate, country, cached: true });
+  }
+
+  const params = new URLSearchParams({
+    country,
+    "active.gte": dayStart.toISOString(),
+    "active.lte": dayEnd.toISOString(),
+    "active.tz": "Asia/Bangkok",
+    category: "concerts,sports,festivals,community,expos,performing-arts",
+    sort: "start",
+    limit: "100",
+  });
+
+  try {
+    const providerResponse = await fetch(`https://api.predicthq.com/v1/events/?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(12_000),
+    });
+
+    if (!providerResponse.ok) {
+      const providerStatus = providerResponse.status;
+      console.error(`[Events API] PredictHQ returned ${providerStatus}`);
+      return res.status(502).json({ message: "ผู้ให้บริการข้อมูลอีเวนต์จริงไม่พร้อมใช้งาน", events: [] });
+    }
+
+    const payload = await providerResponse.json() as { results?: any[] };
+    const events = (Array.isArray(payload.results) ? payload.results : []).flatMap((item): NearbyEventResult[] => {
+      const coordinates = Array.isArray(item.location) ? item.location : [];
+      const eventLongitude = Number(coordinates[0]);
+      const eventLatitude = Number(coordinates[1]);
+      if (!item.id || !item.title || !item.start || !Number.isFinite(eventLatitude) || !Number.isFinite(eventLongitude)) return [];
+
+      const venueEntity = Array.isArray(item.entities)
+        ? item.entities.find((entity: any) => entity?.type === "venue")
+        : undefined;
+      const venueName = String(venueEntity?.name || item.geo?.address?.formatted_address || "สถานที่ตามพิกัดผู้จัดงาน");
+      const venueArea = String(item.geo?.address?.locality || item.geo?.address?.region || item.country || "");
+      const attendance = Number(item.phq_attendance);
+      const rank = Number(item.rank);
+
+      return [{
+        id: `predicthq-${item.id}`,
+        title: String(item.title),
+        category: classifyRealEvent(String(item.category || ""), String(item.title), Array.isArray(item.labels) ? item.labels : []),
+        venueName,
+        venueArea,
+        latitude: eventLatitude,
+        longitude: eventLongitude,
+        startAt: String(item.start),
+        endAt: item.end ? String(item.end) : undefined,
+        description: typeof item.description === "string" ? item.description : undefined,
+        sourceName: "PredictHQ Events API",
+        providerEventId: String(item.id),
+        attendance: Number.isFinite(attendance) && attendance > 0 ? attendance : undefined,
+        rank: Number.isFinite(rank) ? rank : undefined,
+      }];
+    }).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt) || (b.rank || 0) - (a.rank || 0));
+
+    dailyEventsCache.set(cacheKey, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
+    return res.json({ events, source: "PredictHQ Events API", fetchedAt: new Date().toISOString(), eventDate, country, cached: false });
+  } catch (error) {
+    console.error("[Events API] Fetch failed:", error instanceof Error ? error.message : error);
+    return res.status(502).json({ message: "เชื่อมต่อผู้ให้บริการข้อมูลอีเวนต์จริงไม่ได้", events: [] });
+  }
 });
 
 // Persistent order store: Firestore is the source of truth across instances/restarts.
