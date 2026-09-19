@@ -3196,34 +3196,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 />
               </div>
 
-              {/* Quick Sample Presets */}
-              <div>
-                <label className="block text-[10px] text-slate-400 font-mono mb-1">⚡ เลือกตัวอย่างด่วน:</label>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    { name: 'ส้มโอทับทิมสยามหวานฉ่ำ', price: '120', tag: 'ผัก & ผลไม้สด', icon: '🍊', cond: 'มือหนึ่ง' },
-                    { name: 'สร้อยข้อมือหินมงคลนำโชค', price: '290', tag: 'เครื่องประดับ & อัญมณี', icon: '💍', cond: 'มือหนึ่ง' },
-                    { name: 'คุกกี้เนยสดแท้โฮมเมด', price: '65', tag: 'ขนม & เบเกอรี่', icon: '🍪', cond: 'มือหนึ่ง' },
-                    { name: 'พัดลมไอเย็นพกพา (สภาพ 95%)', price: '350', tag: 'เครื่องใช้ไฟฟ้า & ไอที', icon: '💨', cond: 'มือสอง' },
-                    { name: 'ชุดยาสามัญประจำบ้าน WIN Care', price: '140', tag: 'ยารักษาโรค & ยาสามัญ', icon: '💊', cond: 'มือหนึ่ง' }
-                  ].map((preset, pIdx) => (
-                    <button
-                      key={pIdx}
-                      type="button"
-                      onClick={() => {
-                        setNewItemName(preset.name);
-                        setNewItemPrice(preset.price);
-                        setNewItemTag(preset.tag);
-                        setNewItemIcon(preset.icon);
-                        setNewItemCondition(preset.cond as any);
-                        if (audioEnabled) playTactileBlip(800);
-                      }}
-                      className="px-2 py-0.5 rounded-lg bg-white/5 hover:bg-amber-400/20 text-[9px] text-slate-300 hover:text-amber-300 border border-white/10 font-mono"
-                    >
-                      {preset.icon} {preset.name.split(' ')[0]}
-                    </button>
-                  ))}
-                </div>
+              {/* Product catalog is populated from real merchant data. */}
+
               </div>
 
               {/* Item Name */}
@@ -3495,14 +3469,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         initialRole={tiersModalInitialRole}
         currentLevel={citizenLevel}
         audioEnabled={audioEnabled}
-        onApplySimulatedLevel={(role, lvl) => {
-          if (role === 'citizen') {
-            setCitizenLevel(lvl);
-            const req = calculateLevelMaxXp(lvl, 'citizen');
-            setCitizenNextXp(req);
-            setCitizenXp(Math.round(req * 0.45));
-          }
-        }}
+        
       />
 
       {/* 3D DENSITY RADAR OVERLAY MODAL (2.5 KM) FOR CUSTOMER */}
