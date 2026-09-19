@@ -1,473 +1,259 @@
 # 🛡️ WINRIDER.AI
 
-### Thailand is Home 🇹🇭
+**Thailand is Home 🇹🇭 — รับหน้าบ้าน**
 
-### “รับหน้าบ้าน” — ทุกจุดหมายคือบ้านของเรา
+WINRIDER.AI เป็นเว็บแอป Mobility / Super App ที่รวมงานรับส่งผู้โดยสาร งานส่งพัสดุ บริการเฉพาะทาง ระบบแผนที่ การชำระเงิน กระเป๋าเงิน และเครื่องมือ AI/การจัดการไว้ในแพลตฟอร์มเดียว
 
-WINRIDER.AI คือแพลตฟอร์ม Mobility & Super App ที่มีแนวคิดในการเชื่อมต่อ **ผู้โดยสาร, WINRIDER, สถานที่ และบริการต่าง ๆ** เข้าด้วยกันบนแพลตฟอร์มเดียว
+> เอกสารนี้อธิบายสถานะของ repository ตามโค้ดที่มีอยู่จริง ไม่ใช่ roadmap หรือโครงสร้างสมมติ
 
-แนวคิดหลักของ WINRIDER.AI คือ
+## สถานะสำคัญ
 
-> **Thailand is Home — ประเทศไทยคือบ้านของเรา**
+ระบบ dispatch ใน production mode ใช้ **คำสั่งงานจริงจากผู้โดยสาร** เป็นแหล่งกำเนิดงาน
 
-และสร้างประสบการณ์การเดินทางในรูปแบบ
+- ไม่มีการสร้างงานผู้โดยสารปลอมเพื่อให้พี่วินรับงาน
+- ไม่มี fallback ที่สร้างตัวตนพี่วินปลอมตอนรับงาน
+- การรับงานต้องอ้างอิง order ที่มีอยู่จริง
+- ข้อมูลพี่วินที่ส่งไปยังระบบต้องมาจาก session/account ของพี่วิน
+- การ sync ระหว่างหน้าจอใช้ order event และ Firestore/server ตาม implementation ปัจจุบัน
+- ฟังก์ชัน/หน้าจอที่เป็น testing simulator บางส่วนยังอาจมีอยู่ใน repository แต่ไม่ถูกใช้เป็นกลไก dispatch production
 
-> **“รับหน้าบ้าน”**
-
-ทุกสถานที่ที่ผู้ใช้ปักหมุด ไม่ว่าจะเป็นคาเฟ่ วัด โรงเรียน โรงแรม ร้านอาหาร ผับ/บาร์ คอนเสิร์ต แลนด์มาร์ค หรือสถานที่อื่น ๆ สามารถกลายเป็น **Host Point** ที่ WINRIDER ทำหน้าที่เป็น “อัศวินเจ้าบ้าน” คอยรับและดูแลผู้โดยสาร
-
----
-
-## 🎯 Vision
-
-สร้างระบบ Mobility Platform ของไทยที่ไม่ได้มองเพียงว่า
-
-**“ผู้โดยสารเรียกรถ”**
-
-แต่เปลี่ยนเป็น
-
-**“ผู้โดยสารได้รับการต้อนรับกลับบ้าน”**
-
-WINRIDER.AI ต้องการเชื่อมโยงการเดินทางเข้ากับสถานที่ ผู้คน ธุรกิจ และบริการในพื้นที่ เพื่อสร้าง ecosystem ที่เติบโตไปพร้อมกับประเทศไทย
-
----
-
-## 🛡️ Core Principles
-
-### 1. Safety First
-
-WINRIDER.AI ให้ความสำคัญกับความปลอดภัยและการดำเนินงานที่ถูกต้องตามกฎหมาย
-
-### 2. Legal Operation
-
-ระบบออกแบบโดยยึดหลักการให้บริการผ่านยานพาหนะและผู้ให้บริการที่มีคุณสมบัติตามกฎหมายและข้อกำหนดที่เกี่ยวข้อง
-
-### 3. Host Mindset
-
-WINRIDER ไม่ใช่เพียงผู้ขับขี่ แต่คือ **“เจ้าบ้าน”**
-
-ผู้โดยสารไม่ได้เป็นเพียงลูกค้า แต่คือแขกของบ้าน
-
-### 4. Technology for People
-
-AI และเทคโนโลยีถูกนำมาใช้เพื่อทำให้การเดินทางง่าย ปลอดภัย และมีประสิทธิภาพมากขึ้น
-
----
-
-# 🚀 Core Platform
-
-WINRIDER.AI มีเป้าหมายในการพัฒนา ecosystem ที่ประกอบด้วยหลายส่วน
+## Architecture
 
 ```text
-                    WINRIDER.AI
-                         │
-          ┌──────────────┼──────────────┐
-          │              │              │
-       CUSTOMER        WINRIDER       HOST
-          │              │              │
-          └──────────────┼──────────────┘
-                         │
-                    MOBILITY
-                         │
-        ┌────────────────┼────────────────┐
-        │                │                │
-       MAP            BOOKING           AI
-        │                │                │
-        └────────────────┼────────────────┘
-                         │
-                    SUPER APP
+React 19 + Vite
+       │
+       ├── UI / Customer / Driver / Admin
+       │
+       ├── Firebase Auth / Firestore
+       │
+       ├── Express server.ts
+       │     ├── Orders API
+       │     ├── Google Routes proxy
+       │     ├── WIN Buddy AI
+       │     └── Webhook / Notification endpoints
+       │
+       └── Firebase Functions
+             ├── wallet / ledger
+             ├── KYC / admin
+             ├── trip settlement
+             └── backend business logic
 ```
 
----
+## Technology Stack
 
-# 📱 Main User Experience
+- **Frontend:** React 19, TypeScript, Vite 6
+- **Styling:** Tailwind CSS 4
+- **Backend:** Node.js 20+, Express 4
+- **Database/Auth:** Firebase / Firestore / Firebase Authentication
+- **Serverless:** Firebase Functions
+- **Maps:** Google Maps / Google Maps Platform Routes API
+- **AI:** Google GenAI
+- **Charts/UI:** Recharts, Lucide React, Motion
+- **PWA:** vite-plugin-pwa
+- **Tests:** Node test runner ผ่าน `tsx`
 
-แนวคิดพื้นฐานของการเดินทาง:
-
-```text
-เปิด WINRIDER.AI
-       ↓
-เลือก / ปักหมุดสถานที่
-       ↓
-ระบุจุดรับและจุดหมาย
-       ↓
-เรียก WINRIDER
-       ↓
-ระบบค้นหา WINRIDER ที่เหมาะสม
-       ↓
-WINRIDER “รับหน้าบ้าน”
-       ↓
-เดินทาง
-       ↓
-ชำระเงิน
-       ↓
-จบทริป
-       ↓
-Rating / Feedback
-```
-
----
-
-# 🗺️ Host Point
-
-หนึ่งในแนวคิดสำคัญของ WINRIDER.AI คือ **Host Point**
-
-สถานที่ต่าง ๆ สามารถเป็นจุดเชื่อมต่อระหว่างผู้ใช้กับ WINRIDER ได้ เช่น
-
-* ☕ Cafe
-* 🛕 วัด
-* 🏫 โรงเรียน
-* 🏨 โรงแรม
-* 🍽️ ร้านอาหาร
-* 🎵 Concert
-* 🌆 Landmark
-* 🏪 ร้านค้า
-* 🏢 อาคาร / สำนักงาน
-* 🎉 Event
-
-เป้าหมายคือสร้างเครือข่ายของ “จุดรับหน้าบ้าน” ทั่วประเทศ
-
----
-
-# 🤖 AI
-
-AI เป็นส่วนสำคัญของ WINRIDER.AI
-
-ระบบสามารถต่อยอดไปสู่ความสามารถ เช่น
-
-* Intelligent Driver Matching
-* Route Optimization
-* Demand Prediction
-* Location Intelligence
-* Fraud Detection
-* Safety Monitoring
-* Customer Support
-* Driver Assistance
-* Business Intelligence
-* Personalized Mobility Experience
-
-> รายการความสามารถจะพัฒนาตาม architecture และ product roadmap ของระบบจริง
-
----
-
-# 👤 Customer
-
-Customer สามารถใช้แพลตฟอร์มเพื่อ
-
-* ค้นหาสถานที่
-* ปักหมุดสถานที่
-* เรียกรถ
-* ติดตามการเดินทาง
-* ดูข้อมูล WINRIDER
-* ชำระเงิน
-* ประเมินการให้บริการ
-* ติดต่อ Support
-
----
-
-# 🛵 WINRIDER
-
-WINRIDER คือผู้ให้บริการการเดินทางและ “เจ้าบ้าน” ของแพลตฟอร์ม
-
-ระบบสามารถรองรับความสามารถ เช่น
-
-* Driver Registration
-* Driver Verification
-* Vehicle Verification
-* Online / Offline
-* รับงาน
-* Navigation
-* Trip Management
-* Earnings
-* Rating
-* Safety System
-
----
-
-# 🔐 Safety & Compliance
-
-WINRIDER.AI ให้ความสำคัญกับ
-
-* Driver Verification
-* Vehicle Verification
-* Identity Verification
-* Trip Tracking
-* Location Tracking
-* Safety Monitoring
-* Fraud Prevention
-* Incident Management
-* Legal / Regulatory Compliance
-
-ข้อมูลจริงเกี่ยวกับข้อกำหนดทางกฎหมายต้องได้รับการตรวจสอบตามกฎหมายและพื้นที่ให้บริการก่อนนำระบบไปใช้งานจริง
-
----
-
-# 🏗️ Project Architecture
-
-โครงสร้างระบบจะถูกพัฒนาให้สามารถแยกส่วน Frontend, Backend, AI, Database และ Infrastructure ได้อย่างชัดเจน
-
-ตัวอย่างโครงสร้าง:
+## Repository Structure
 
 ```text
 WINRIDER.AI/
-│
-├── frontend/
-│   ├── pages/
-│   ├── components/
-│   ├── navigation/
-│   └── services/
-│
-├── backend/
-│   ├── api/
-│   ├── controllers/
-│   ├── services/
-│   ├── models/
-│   └── middleware/
-│
-├── ai/
-│   ├── models/
-│   ├── services/
-│   └── intelligence/
-│
-├── database/
-│
-├── infrastructure/
-│
-├── docs/
-│
-├── tests/
-│
-├── .env.example
+├── src/
+│   ├── components/       # UI และ feature screens
+│   ├── core/             # business logic และ unit tests
+│   ├── services/         # service integrations
+│   ├── adapters/         # provider adapters
+│   ├── hooks/            # React hooks
+│   ├── utils/            # dispatch, notifications, integrations
+│   ├── data/             # domain/reference data
+│   └── types/            # TypeScript types
+├── functions/             # Firebase Functions
+├── server.ts              # Express application/server
+├── scripts/               # build/generation scripts
+├── public/                # static assets
 ├── package.json
 └── README.md
 ```
 
-> โครงสร้างด้านบนเป็นตัวอย่างเชิงสถาปัตยกรรม ไม่ได้หมายความว่า repository ปัจจุบันมีโฟลเดอร์เหล่านี้ทั้งหมด
-
----
-
-# ⚙️ Technology Stack
-
-ส่วนนี้ควรระบุเทคโนโลยีที่ใช้จริงใน repository เช่น
+## Real Dispatch Flow
 
 ```text
-Frontend
-- React / Next.js / React Native
-
-Backend
-- Node.js / Python / etc.
-
-Database
-- PostgreSQL / MongoDB / etc.
-
-Maps
-- Mapping Provider / GPS
-
-AI
-- AI / Machine Learning Services
-
-Infrastructure
-- Cloud / Docker / CI/CD
+Passenger
+   │
+   │ createLiveOrder()
+   ▼
+Firestore / server order
+   │
+   │ status = pending
+   ▼
+Live dispatch event
+   │
+   ▼
+Online verified WINRIDER
+   │
+   │ accepts the existing order
+   ▼
+status = accepted
+   │
+   ▼
+heading_pickup
+   │
+   ▼
+picked_up
+   │
+   ▼
+in_transit
+   │
+   ▼
+completed
 ```
 
-**ต้องปรับรายการนี้ให้ตรงกับโค้ดจริงของ repository ก่อนใช้งานเป็นเอกสารทางการ**
+หากไม่มี order จริง ระบบจะ **ไม่สร้างงานขึ้นมาเอง** เพื่อสาธิตการรับงาน
 
----
+## Financial Core
 
-# 🔑 Environment Variables
+ระบบมี financial engine แบบ integer satang และ double-entry ledger
 
-ห้าม commit API Keys หรือ Secret Keys ลง GitHub
+แนวคิดที่มี test รองรับ ได้แก่:
 
-ให้สร้างไฟล์:
+- Tiered Knight fee
+- Founding Knight fee
+- Equipment contribution
+- Citizen fee buckets
+- Merchant GP
+- Debit/Credit balance invariant
+- Idempotency
+- Wallet available-balance constraints
+
+ชุดทดสอบหลักอยู่ใน:
 
 ```text
-.env
+src/core/feeEngine.test.ts
+src/core/walletDoubleEntry.test.ts
 ```
 
-และเก็บตัวอย่าง configuration ไว้ใน:
+## Admin / Security
+
+Firebase Functions รองรับงาน เช่น:
+
+- KYC approval / rejection
+- User suspension / unsuspension
+- Wallet adjustment
+- Fee rule versioning
+- Admin role management
+- Audit logging
+
+Admin levels ที่มีในโค้ด:
 
 ```text
-.env.example
+super
+reviewer
+support
 ```
 
-ตัวอย่าง:
+สิทธิ์จริงต้องตรวจที่ backend/Firebase Functions ไม่ควรพึ่ง UI อย่างเดียว
+
+## AI
+
+`server.ts` มี WIN Buddy AI ซึ่งใช้ Google GenAI เมื่อมี `GEMINI_API_KEY` และมี local response engine สำหรับกรณีที่ AI provider ไม่พร้อม
+
+## Maps
+
+ระบบมี integration กับ Google Maps Platform Routes API ผ่าน backend endpoint:
+
+```text
+POST /api/routes/compute
+```
+
+Frontend ใช้ service:
+
+```text
+src/services/googleRoutesService.ts
+```
+
+> สำหรับ production navigation ควรใช้ผล route จาก provider จริง และไม่ควรนำข้อมูลจำลองไปตีความเป็นตำแหน่งหรือเส้นทางจริง
+
+## Environment Variables
+
+Secrets ต้องเก็บผ่าน environment / secret management และ **ห้าม commit secret จริงลง repository**
+
+ตัวแปรที่โค้ดอ้างถึง ได้แก่:
 
 ```env
-DATABASE_URL=
-API_KEY=
-MAPS_API_KEY=
-AUTH_SECRET=
+GEMINI_API_KEY=
+GOOGLE_MAPS_API_KEY=
+VITE_GOOGLE_MAPS_API_KEY=
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+FIRESTORE_DATABASE_ID=
+PORT=
+CONTROL_PLANE_PORT=
+DEFAULT_APP_PORT=
 ```
 
-> ห้ามใส่ค่า Secret จริงใน `.env.example`
+ค่าจริงขึ้นอยู่กับ deployment environment
 
----
+## Development
 
-# 🚀 Getting Started
-
-## 1. Clone Repository
-
-```bash
-git clone https://github.com/kittiinthasoi-lang/WINRIDER.AI.git
-```
-
-## 2. เข้าโฟลเดอร์
-
-```bash
-cd WINRIDER.AI
-```
-
-## 3. ติดตั้ง Dependencies
+ต้องใช้ Node.js 20 ขึ้นไป
 
 ```bash
 npm install
-```
-
-> คำสั่งนี้ต้องปรับตาม Technology Stack จริงของ repository
-
-## 4. ตั้งค่า Environment
-
-```bash
-cp .env.example .env
-```
-
-จากนั้นกรอกค่าที่จำเป็น
-
-## 5. Run Development Server
-
-```bash
 npm run dev
 ```
 
-> คำสั่งจริงต้องตรวจสอบจาก `package.json`
+Build:
 
----
-
-# 🧪 Testing
-
-ระบบควรมีการทดสอบในระดับ
-
-```text
-Unit Tests
-Integration Tests
-API Tests
-End-to-End Tests
-Security Tests
+```bash
+npm run build
+npm start
 ```
 
-ก่อนนำระบบไปใช้งาน Production
+Type check:
 
----
-
-# 🔒 Security
-
-หลักการสำคัญ:
-
-* ไม่เก็บ Secret ใน Git
-* ใช้ Environment Variables
-* Validate Input
-* Authentication / Authorization
-* Rate Limiting
-* API Security
-* Database Security
-* Logging & Monitoring
-* Dependency Security
-* Secure Payment Processing
-
----
-
-# 📊 Development Roadmap
-
-### Phase 1 — Foundation
-
-* Core application
-* Authentication
-* User system
-* Driver system
-* Maps
-* Basic booking
-
-### Phase 2 — Mobility
-
-* Driver matching
-* Real-time trip tracking
-* Navigation
-* Payment
-* Rating
-* Safety
-
-### Phase 3 — Host Network
-
-* Host Point
-* Business integration
-* Venue integration
-* Event integration
-* Local ecosystem
-
-### Phase 4 — AI
-
-* Intelligent matching
-* Demand prediction
-* Route intelligence
-* Safety intelligence
-* Customer AI assistant
-
-### Phase 5 — Super App Ecosystem
-
-ต่อยอด Mobility ไปสู่บริการอื่น ๆ ที่เกี่ยวข้องกับการเดินทาง สถานที่ และ ecosystem ของผู้ใช้งาน
-
----
-
-# 🤝 Contributing
-
-การพัฒนา WINRIDER.AI ควรยึดหลัก
-
-```text
-Safety
-Privacy
-Security
-Legality
-Scalability
-User Experience
-Maintainability
+```bash
+npm run lint
 ```
 
-Pull Requests และข้อเสนอแนะควรมีรายละเอียดที่ชัดเจนและสามารถตรวจสอบได้
+Tests:
 
----
-
-# 📄 License
-
-ระบุ License ของโปรเจกต์ที่นี่ เช่น
-
-```text
-License: TBD
+```bash
+npm test
 ```
 
-ไม่ควรระบุ License ที่ไม่ตรงกับเจตนาของเจ้าของโครงการ
+## Production Notes
+
+ก่อน production deployment ควรตรวจเพิ่มเติม:
+
+1. Secret/API key exposure
+2. Firestore security rules
+3. Firebase Authentication claims
+4. Webhook SSRF protection / domain allowlist
+5. Rate limiting
+6. Persistent order consistency across multiple server instances
+7. Payment verification with a real payment provider
+8. Real GPS / routing availability
+9. Monitoring and audit logs
+10. Legal and regulatory requirements for mobility services in Thailand
+
+## Testing / Simulation Policy
+
+Repository นี้เคยมี component และ data สำหรับ demo/testing หลายส่วน
+
+ตั้งแต่ production dispatch flow นี้เป็นต้นไป:
+
+**ห้ามใช้ simulated passenger / simulated driver / fake order เพื่อเปลี่ยนสถานะงานจริง**
+
+ถ้าต้องการทดสอบระบบ ควรใช้ test environment หรือ automated tests ที่แยกจาก production data
+
+## License
+
+ยังไม่มี license ที่ระบุอย่างเป็นทางการใน repository
 
 ---
 
-# 🇹🇭 WINRIDER.AI
+## 🇹🇭 WINRIDER.AI
 
-## Thailand is Home
+**Thailand is Home**
 
-**รับหน้าบ้าน**
-
-จากการเดินทางธรรมดา
-
-สู่การสร้างเครือข่าย Mobility ที่มี “หัวใจของเจ้าบ้าน”
-
----
-
-### Project
-
-**WINRIDER.AI**
-
-**Founder / CEO:** กิตติ อินทะสร้อย
-
-**Vision:** Thailand is Home 🇹🇭
-
-**Concept:** รับหน้าบ้าน
-
-**Mission:** Build a safe, legal, intelligent and people-centered mobility ecosystem for Thailand.
+**รับหน้าบ้าน — Mobility ที่สร้างจากข้อมูลจริง การเดินทางจริง และผู้ให้บริการจริง**
