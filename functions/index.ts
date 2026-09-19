@@ -638,6 +638,9 @@ export const topUpWallet = onCall(async (request) => {
  */
 export const updatePayoutStatus = onCall(async (request) => {
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "ต้องเข้าสู่ระบบก่อนอัปเดตสถานะการถอนเงิน");
+  if (request.auth.token.admin !== true || request.auth.token.adminLevel !== "super") {
+    throw new HttpsError("permission-denied", "เฉพาะ Super Admin เท่านั้นที่อัปเดตสถานะ payout ได้");
+  }
 
   const payoutId = String(request.data?.payoutId || "").trim();
   const nextStatus = String(request.data?.status || "").trim().toUpperCase();
@@ -718,7 +721,7 @@ export const updatePayoutStatus = onCall(async (request) => {
         status: nextStatus,
         at: FieldValue.serverTimestamp(),
         actorUid: request.auth!.uid,
-        actorType: "backend"
+        actorType: "super_admin"
       }],
       updatedAt: FieldValue.serverTimestamp(),
       ...(nextStatus === "COMPLETED" ? { completedAt: FieldValue.serverTimestamp() } : {}),
