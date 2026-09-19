@@ -29,6 +29,7 @@ import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { ReligiousNotificationsModal } from './ReligiousNotificationsModal';
+import { sendBrowserNotification } from '../utils/notifications';
 import { CyberGraphic, DreamRideVehicleImage } from './CyberGraphic';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import confetti from 'canvas-confetti';
@@ -349,6 +350,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             serviceMatchScore: 0
           });
           setRidePhase('picking_up');
+          sendBrowserNotification('🛵 พี่วินรับงานแล้ว', { body: `${order.driverName} กำลังเดินทางมารับคุณ`, tag: `ride-accepted-${order.id}` });
           if (audioEnabled) {
             playLevelUpFanfare();
             speakThaiText(`พี่วิน ${order.driverName} กดรับงานแล้วค่ะ กำลังเดินทางมารับคุณ`);
@@ -360,6 +362,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         if (order.status === 'heading_pickup') setRidePhase('picking_up');
         if (order.status === 'picked_up') {
           setRidePhase('arrived_pickup');
+          sendBrowserNotification('📍 พี่วินถึงจุดรับแล้ว', { body: 'กรุณาสวมหมวกนิรภัยเพื่อความปลอดภัย', tag: `ride-pickup-${order.id}` });
           if (audioEnabled) {
             playTactileBlip(1000);
             speakThaiText("พี่วินเดินทางมาถึงจุดรับแล้วค่ะ กรุณาสวมหมวกนิรภัยเพื่อความปลอดภัย");
@@ -373,6 +376,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           }
         }
         if (order.status === 'completed') {
+          sendBrowserNotification('✅ เดินทางถึงจุดหมายแล้ว', { body: order.dropoffLocation, tag: `ride-completed-${order.id}` });
           setRidePhase('arrived_destination');
           setShowReceiptModal(true);
           if (audioEnabled) {
@@ -1003,7 +1007,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 touch-manipulation">
       {/* XP Toast Notification */}
       {xpToast && (
         <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 text-slate-950 font-black text-xs text-center shadow-2xl border-2 border-white/40 animate-bounce">
@@ -2680,7 +2684,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   <span className="text-[10px] text-cyan-300 font-mono">SOVEREIGN DISPATCH PROTOCOL</span>
                 </div>
               </div>
-              <button 
+              <button
+                aria-label="ปิดหน้าต่างยืนยันการจอง"
                 onClick={() => setShowBookingModal(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
               >
