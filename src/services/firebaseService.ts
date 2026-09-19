@@ -51,10 +51,8 @@ export class FirebaseService {
       const user = cred.user;
       return await this.createUserProfile(user.uid, role, displayName, phone, email);
     } catch (err: unknown) {
-      console.warn('Firebase Auth registration error, falling back to sovereign offline account:', err);
-      // Fallback Sovereign User
-      const fallbackUid = `USR-${Date.now()}`;
-      return await this.createUserProfile(fallbackUid, role, displayName, phone, email);
+      console.error('Firebase Auth registration failed:', err);
+      throw err;
     }
   }
 
