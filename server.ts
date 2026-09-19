@@ -367,13 +367,14 @@ app.post("/api/webhooks/dispatch", async (req, res) => {
 // LINE Notify Proxy Endpoint
 app.post("/api/notifications/line", async (req, res) => {
   try {
-    const { message, token } = req.body;
+    const token = process.env.LINE_NOTIFY_TOKEN;
     if (!token) {
-      return res.status(400).json({ status: "error", message: "Missing LINE Notify Token" });
+      return res.status(503).json({ status: "error", message: "LINE provider is not configured on the server" });
     }
 
+    const { message } = req.body;
     const params = new URLSearchParams();
-    params.append("message", message || "WINRIDER.AI notification alert");
+    params.append("message", String(message || "WINRIDER.AI notification alert"));
 
     const lineRes = await fetch("https://notify-api.line.me/api/notify", {
       method: "POST",
