@@ -200,20 +200,27 @@ interface MerchantCommandCenterProps {
   onOpenWinBuddy?: () => void;
   onRideToStore?: (storeName: string, storeAddress: string, distanceKm?: number) => void;
   initialPerspective?: 'owner' | 'customer';
+  canEdit?: boolean;
 }
 
 export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({ 
   audioEnabled, 
   onOpenWinBuddy,
   onRideToStore,
-  initialPerspective
+  initialPerspective,
+  canEdit = false
 }) => {
   // Perspective state: แบบที่ 1 (ของร้านค้าเอง) หรือ แบบที่ 2 (หน้าร้านสำหรับลูกค้า)
   const [perspective, setPerspective] = useState<'owner' | 'customer'>(() => {
+    if (!canEdit) return 'customer';
     if (initialPerspective) return initialPerspective;
     const session = getCurrentUserSession();
     return session?.role === 'merchant' ? 'owner' : 'customer';
   });
+
+  React.useEffect(() => {
+    setPerspective(canEdit && initialPerspective === 'owner' ? 'owner' : 'customer');
+  }, [canEdit, initialPerspective]);
 
   const [knightsAvailable, setKnightsAvailable] = useState(14);
   const [merchantLevel, setMerchantLevel] = useState(75);
@@ -365,6 +372,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   };
 
   const handleTogglePerspective = (mode: 'owner' | 'customer') => {
+    if (mode === 'owner' && !canEdit) return;
     if (audioEnabled) playTactileBlip(1000);
     setPerspective(mode);
   };
@@ -576,11 +584,13 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
         {/* Mode Switch Toggle Button */}
         <div className="flex items-center gap-1.5 p-1.5 bg-black/60 rounded-2xl border border-white/10 w-full md:w-auto justify-center">
           <button
+            disabled={!canEdit}
+            title={canEdit ? 'เปิดมุมมองหลังร้าน' : 'สงวนสิทธิ์เฉพาะเจ้าของร้าน'}
             onClick={() => handleTogglePerspective('owner')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
               perspective === 'owner'
                 ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-[0_0_15px_rgba(255,215,0,0.4)]'
-                : 'text-slate-400 hover:text-white'
+                : canEdit ? 'text-slate-400 hover:text-white' : 'text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
             <Store className="w-4 h-4" />

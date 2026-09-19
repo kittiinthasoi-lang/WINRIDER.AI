@@ -41,6 +41,15 @@ export const ProtectedRoute: React.FC<Props> = ({
     return <RoleSelectionAndRegistration />;
   }
 
+  const isOwnerAdmin =
+    firebaseUser.email === 'kittiinthasoi@gmail.com' ||
+    firebaseUser.email?.toLowerCase().includes('kittiinthasoi') ||
+    userData.isAdmin === true ||
+    userData.adminLevel === 'super';
+
+  // เจ้าของระบบใช้ UID เดียวเพื่อเปิดหน้าตัวอย่างทุกบทบาท
+  if (isOwnerAdmin) return <>{children}</>;
+
   // 3. Status is pending_review (and not citizen) -> Show Pending Review
   if (userData.status === 'pending_review' && userData.role !== 'citizen') {
     return <PendingReviewView />;
