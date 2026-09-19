@@ -64,31 +64,8 @@ export const KnightDashboardView: React.FC<KnightDashboardViewProps> = ({
   const [countdown, setCountdown] = useState<number>(15);
   const [activeTrip, setActiveTrip] = useState<TripModel | null>(null);
 
-  // Periodic incoming mission simulation when online
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isOnline && !incomingMission && !activeTrip) {
-      timer = setTimeout(() => {
-        const baseFare = 45;
-        const feeCalc = globalFeeEngine.calculateTripFees(baseFare, 'WIN_KNIGHT');
-
-        setIncomingMission({
-          id: `TRIP-${Date.now().toString().slice(-4)}`,
-          pillar: 'WIN_KNIGHT',
-          pillarName: 'WIN KNIGHT (รับส่งด่วนประจำจุด)',
-          citizenName: 'คุณกิตติ (พลเมืองอัศวิน)',
-          pickupLocation: 'สถานีรถไฟฟ้า BTS สยาม ประตู 3',
-          dropoffLocation: 'อาคารสามย่านมิตรทาวน์ ถนนพระราม 4',
-          distanceKm: 2.1,
-          fare: baseFare,
-          feeCalc
-        });
-        setCountdown(15);
-        defaultNotifyProvider.playAlertSound('mission_incoming');
-      }, 5000);
-    }
-    return () => clearTimeout(timer);
-  }, [isOnline, incomingMission, activeTrip]);
+  // Incoming missions are supplied by the real dispatch flow; this dashboard never creates synthetic jobs.
+  const missionSource = 'live_dispatch';
 
   // Countdown timer effect
   useEffect(() => {
@@ -113,10 +90,10 @@ export const KnightDashboardView: React.FC<KnightDashboardViewProps> = ({
     const newTrip = TripStateMachine.createNewTrip({
       id: incomingMission.id,
       pillar: 'WIN_KNIGHT',
-      citizenId: 'CITIZEN-DEMO-01',
+      citizenId: incomingMission.id,
       citizenName: incomingMission.citizenName,
-      citizenPhone: '089-999-8888',
-      knightId: 'KNT-SOVEREIGN-01',
+      citizenPhone: '',
+      knightId: userName,
       knightName: userName,
       originName: incomingMission.pickupLocation,
       destinationName: incomingMission.dropoffLocation,
