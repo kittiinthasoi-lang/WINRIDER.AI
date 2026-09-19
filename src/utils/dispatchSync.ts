@@ -14,6 +14,11 @@ export interface LiveRideOrder {
   passengerAvatarEmoji?: string;
   pickupLocation: string;
   dropoffLocation: string;
+  pickupContactName?: string;
+  pickupContactPhone?: string;
+  dropoffContactName?: string;
+  dropoffContactPhone?: string;
+  specialRequirements?: string;
   distanceKm: number;
   fare: number;
   welfareFund2Baht: number; // 2.00 Baht
@@ -186,6 +191,11 @@ export async function createLiveOrder(orderInput: {
   passengerPhone: string;
   pickupLocation: string;
   dropoffLocation: string;
+  pickupContactName?: string;
+  pickupContactPhone?: string;
+  dropoffContactName?: string;
+  dropoffContactPhone?: string;
+  specialRequirements?: string;
   distanceKm: number;
   fare: number;
   estMinutes?: number;
@@ -208,6 +218,11 @@ export async function createLiveOrder(orderInput: {
     passengerPhone: orderInput.passengerPhone,
     pickupLocation: orderInput.pickupLocation,
     dropoffLocation: orderInput.dropoffLocation,
+    pickupContactName: orderInput.pickupContactName,
+    pickupContactPhone: orderInput.pickupContactPhone,
+    dropoffContactName: orderInput.dropoffContactName,
+    dropoffContactPhone: orderInput.dropoffContactPhone,
+    specialRequirements: orderInput.specialRequirements,
     distanceKm: orderInput.distanceKm,
     fare,
     welfareFund2Baht,

@@ -90,8 +90,8 @@ function RidePolylineRenderer({
  */
 export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = ({
   selectedDreamRide,
-  pickupLocation = 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)',
-  destinationLocation = 'อาคาร Exchange Tower อโศก',
+  pickupLocation = 'จุดรับผู้โดยสาร',
+  destinationLocation = 'จุดหมายปลายทาง',
   driverName = 'กิตติ อินทะสร้อย',
   driverLevel = 100,
   driverEmoji = '🦁',

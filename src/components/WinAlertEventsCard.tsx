@@ -11,6 +11,7 @@ import {
   Navigation,
   RefreshCw,
   Share2,
+  Users,
   X,
 } from 'lucide-react';
 import { NearbyEventsResponse, WinAlertCategory, WinAlertEvent } from '../data/winAlertEventsData';
@@ -160,7 +161,7 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
   };
 
   return (
-    <section className={`space-y-3 ${className}`} aria-labelledby="daily-events-title">
+    <section id="daily-events-section" className={`space-y-3 ${className}`} aria-labelledby="daily-events-title">
       {toastMessage && <div className="fixed left-1/2 top-16 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-cyan-200 bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950 shadow-2xl" role="status"><CheckCircle2 className="h-4 w-4" />{toastMessage}</div>}
 
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
@@ -187,14 +188,31 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
         return <article key={event.id} onClick={() => { if (audioEnabled) playTactileBlip(900); setSelectedEventModal(event); onSelectEvent?.(event); }} className="cursor-pointer rounded-2xl border border-white/10 bg-gradient-to-b from-[#0F2248] to-[#060E22] p-4 shadow-lg transition-colors hover:border-cyan-400/50">
           <div className="flex items-start justify-between gap-3"><span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${meta.className}`}>{meta.icon} {meta.label}</span><div className="flex gap-1"><button type="button" onClick={(clickEvent) => toggleBookmark(event.id, clickEvent)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/30 text-amber-300" aria-label={saved ? 'ยกเลิกบันทึกกิจกรรม' : 'บันทึกกิจกรรม'}>{saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}</button><button type="button" onClick={(clickEvent) => void shareEvent(event, clickEvent)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/30 text-slate-300" aria-label="แชร์กิจกรรม"><Share2 className="h-4 w-4" /></button></div></div>
           <h4 className="mt-3 text-base font-black leading-snug text-white">{event.title}</h4>
-          <div className="mt-3 space-y-2 text-sm text-slate-300"><div className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" /><span>{event.venueName}{event.venueArea ? ` • ${event.venueArea}` : ''}</span></div><div className="flex items-start gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><span>{formatDateTime(event.startAt)}{event.endAt ? ` – ${formatDateTime(event.endAt)}` : ''}</span></div></div>
+          <div className="mt-3 space-y-2 text-sm text-slate-300">
+            <div className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" /><span>{event.venueName}{event.venueArea ? ` • ${event.venueArea}` : ''}</span></div>
+            <div className="flex items-start gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><span>{formatDateTime(event.startAt)}{event.endAt ? ` – ${formatDateTime(event.endAt)}` : ''}</span></div>
+            {typeof event.attendance === 'number' && event.attendance > 0 && (
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                <span>คาดการณ์ผู้เข้าร่วม ~{event.attendance.toLocaleString('th-TH')} คน</span>
+                {event.attendance >= 2500 && (
+                  <span className="rounded bg-rose-500/80 px-1.5 py-0.5 text-[10px] font-bold text-white">หนาแน่นสูง</span>
+                )}
+              </div>
+            )}
+            {event.description && (
+              <p className="line-clamp-2 text-xs leading-relaxed text-slate-400">
+                {event.description}
+              </p>
+            )}
+          </div>
           <button type="button" onClick={(clickEvent) => { clickEvent.stopPropagation(); bookRide(event); }} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 px-4 text-sm font-black text-slate-950"><Navigation className="h-4 w-4" />เรียกพี่วินไปงานนี้</button>
         </article>;
       })}</div>}
 
       {sourceName && !loading && <p className="text-xs text-slate-500">แหล่งข้อมูล: {sourceName} • อัปเดต {formatDateTime(fetchedAt)} • แสดงเฉพาะกิจกรรมที่มีผลในวันที่เลือก</p>}
 
-      {selectedEventModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="event-detail-title"><div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-cyan-400/30 bg-[#071126] p-5 text-slate-100 shadow-2xl"><div className="flex items-start justify-between gap-3"><div><span className={`inline-block rounded-full border px-2.5 py-1 text-xs font-bold ${categoryMeta[selectedEventModal.category].className}`}>{categoryMeta[selectedEventModal.category].icon} {categoryMeta[selectedEventModal.category].label}</span><h3 id="event-detail-title" className="mt-3 text-xl font-black">{selectedEventModal.title}</h3></div><button type="button" onClick={() => setSelectedEventModal(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5" aria-label="ปิดรายละเอียด"><X className="h-5 w-5" /></button></div><div className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm"><p className="flex gap-2"><MapPin className="h-4 w-4 shrink-0 text-cyan-300" /><span>{selectedEventModal.venueName}{selectedEventModal.venueArea ? ` • ${selectedEventModal.venueArea}` : ''}</span></p><p className="flex gap-2"><CalendarDays className="h-4 w-4 shrink-0 text-amber-300" /><span>{formatDateTime(selectedEventModal.startAt)}{selectedEventModal.endAt ? ` – ${formatDateTime(selectedEventModal.endAt)}` : ''}</span></p></div>{selectedEventModal.description && <p className="mt-4 text-sm leading-relaxed text-slate-300">{selectedEventModal.description}</p>}<p className="mt-4 text-xs text-slate-500">รหัสผู้ให้บริการ: {selectedEventModal.providerEventId} • {selectedEventModal.sourceName}</p><div className="mt-5 flex gap-2"><button type="button" onClick={() => { setSelectedEventModal(null); bookRide(selectedEventModal); }} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 to-cyan-400 px-4 text-sm font-black text-slate-950"><Navigation className="h-4 w-4" />เรียกพี่วินไป–กลับ</button><button type="button" onClick={() => setSelectedEventModal(null)} className="min-h-12 rounded-xl bg-slate-800 px-5 text-sm font-bold">ปิด</button></div></div></div>}
+      {selectedEventModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="event-detail-title"><div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-cyan-400/30 bg-[#071126] p-5 text-slate-100 shadow-2xl"><div className="flex items-start justify-between gap-3"><div><span className={`inline-block rounded-full border px-2.5 py-1 text-xs font-bold ${categoryMeta[selectedEventModal.category].className}`}>{categoryMeta[selectedEventModal.category].icon} {categoryMeta[selectedEventModal.category].label}</span><h3 id="event-detail-title" className="mt-3 text-xl font-black">{selectedEventModal.title}</h3></div><button type="button" onClick={() => setSelectedEventModal(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5" aria-label="ปิดรายละเอียด"><X className="h-5 w-5" /></button></div><div className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm"><p className="flex gap-2"><MapPin className="h-4 w-4 shrink-0 text-cyan-300" /><span>{selectedEventModal.venueName}{selectedEventModal.venueArea ? ` • ${selectedEventModal.venueArea}` : ''}</span></p><p className="flex gap-2"><CalendarDays className="h-4 w-4 shrink-0 text-amber-300" /><span>{formatDateTime(selectedEventModal.startAt)}{selectedEventModal.endAt ? ` – ${formatDateTime(selectedEventModal.endAt)}` : ''}</span></p>{typeof selectedEventModal.attendance === 'number' && selectedEventModal.attendance > 0 && (<p className="flex items-center gap-2 font-semibold text-amber-300"><Users className="h-4 w-4 shrink-0" /><span>คาดการณ์ผู้เข้าร่วม: ~{selectedEventModal.attendance.toLocaleString('th-TH')} คน {selectedEventModal.attendance >= 2500 ? '(จุดหนาแน่นสูง แนะนำเลี่ยงรถติดด้วยวิน)' : ''}</span></p>)}</div>{selectedEventModal.description && (<div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-950/30 p-4 text-sm leading-relaxed text-slate-200"><p className="mb-1 font-bold text-cyan-300">รายละเอียดกิจกรรม & ข้อแนะนำการเดินทาง:</p><p>{selectedEventModal.description}</p></div>)}<p className="mt-4 text-xs text-slate-500">รหัสผู้ให้บริการ: {selectedEventModal.providerEventId} • {selectedEventModal.sourceName}</p><div className="mt-5 flex gap-2"><button type="button" onClick={() => { setSelectedEventModal(null); bookRide(selectedEventModal); }} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 to-cyan-400 px-4 text-sm font-black text-slate-950"><Navigation className="h-4 w-4" />เรียกพี่วินไป–กลับ</button><button type="button" onClick={() => setSelectedEventModal(null)} className="min-h-12 rounded-xl bg-slate-800 px-5 text-sm font-bold">ปิด</button></div></div></div>}
     </section>
   );
 };
