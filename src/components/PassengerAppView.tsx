@@ -329,7 +329,31 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           const active = orders
             .filter((order) => !['completed', 'cancelled'].includes(order.status))
             .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-          if (active) setActiveLiveOrder(active);
+          if (active) {
+            setActiveLiveOrder(active);
+            if (active.driverName) {
+              setCurrentMatchedDriver((prev) => prev ?? {
+                id: active.driverUserId || '',
+                name: active.driverName || 'พี่วิน',
+                nameEn: active.driverName || 'พี่วิน',
+                nickname: active.driverName || 'พี่วิน',
+                gender: 'male',
+                level: active.driverLevel || 0,
+                tierName: active.driverLevel ? `Knight Level ${active.driverLevel}` : 'Knight',
+                rating: active.driverRating || 0,
+                totalTrips: 0,
+                phone: active.driverPhone || '',
+                avatarEmoji: active.driverAvatarEmoji || '🛵',
+                vehicleModel: active.driverVehicle || 'ยังไม่ระบุรถ',
+                plateNumber: active.driverPlate || '',
+                certifications: [], specialtyTags: [], distanceKm: 0, etaMinutes: 0, bio: '', serviceMatchScore: 0
+              });
+            }
+            if (active.status === 'heading_pickup') setRidePhase('picking_up');
+            if (active.status === 'picked_up') setRidePhase('arrived_pickup');
+            if (active.status === 'in_transit') setRidePhase('in_transit');
+            if (active.status === 'completed') setRidePhase('arrived_destination');
+          }
         }
       } catch (err) {
         console.warn('Cloud ride refresh failed:', err);
