@@ -243,7 +243,6 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   const [tripStep, setTripStep] = useState<'heading_pickup' | 'picked_up' | 'navigating' | 'completed'>('heading_pickup');
   const [onlineMinutes, setOnlineMinutes] = useState<number>(142);
   const [radarPulseCount, setRadarPulseCount] = useState<number>(0);
-  const [autoSimulateToggle, setAutoSimulateToggle] = useState<boolean>(true);
   const [showDispatchRulesModal, setShowDispatchRulesModal] = useState<boolean>(false);
   const [showNavigationMapModal, setShowNavigationMapModal] = useState<boolean>(false);
   const [navModalInitialMode, setNavModalInitialMode] = useState<'3d_map' | 'google_maps' | 'live_camera_ar'>('3d_map');
@@ -331,67 +330,20 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
     return () => clearInterval(timer);
   }, [activeIncomingJob, audioEnabled]);
 
-  // Periodic incoming job trigger simulation if on-duty and no active trip/job
-  useEffect(() => {
-    if (!isOnDuty || activeIncomingJob || currentActiveTrip || !autoSimulateToggle) return;
-
-    const randomDelay = Math.floor(Math.random() * 8000) + 12000; // 12-20s interval
-    const timeout = setTimeout(() => {
-      triggerRealGoogleMapsJob();
-    }, randomDelay);
-
-    return () => clearTimeout(timeout);
-  }, [isOnDuty, activeIncomingJob, currentActiveTrip, autoSimulateToggle, selectedZone]);
-
-  const triggerRealGoogleMapsJob = (customZone?: string, customService?: string) => {
-    if (!isOnDuty) {
-      if (audioEnabled) playTactileBlip(400);
-      alert('กรุณาเปิดสถานะ "🟢 พร้อมรับงาน (ON DUTY)" ก่อนครับ');
-      return;
-    }
-
-    const zoneToUse = customZone || (selectedZone !== 'all' ? selectedZone : undefined);
-    const serviceToUse = customService || (selectedServiceFilter !== 'all' ? selectedServiceFilter : undefined);
-
-    const realJob = generateRealGoogleMapsJob({
-      zone: zoneToUse,
-      serviceId: serviceToUse
-    });
-
-    setActiveIncomingJob(realJob);
-    if (audioEnabled) {
-      playRadarScan();
-      playTactileBlip(1200);
-      speakThaiText(`มีงานใหม่จาก ${realJob.pickupLocation.split('(')[0]} ไป ${realJob.dropoffLocation.split('(')[0]} ระยะทาง ${realJob.distanceKm} กิโลเมตรค่ะ`);
-    }
+  // Production mode: jobs are created only by real passenger orders.
+  const triggerRealGoogleMapsJob = (_customZone?: string, _customService?: string) => {
+    if (audioEnabled) playTactileBlip(400);
+    alert('ระบบ Production จะไม่สร้างงานจำลอง กรุณารอคำสั่งเรียกรถจริงจากผู้โดยสาร');
   };
 
-  const triggerRandomJob = (specificIndex?: number) => {
-    if (!isOnDuty) {
-      if (audioEnabled) playTactileBlip(400);
-      alert('กรุณาเปิดสถานะ "🟢 พร้อมรับงาน (ON DUTY)" ก่อนครับ');
-      return;
-    }
-
-    if (specificIndex !== undefined && SAMPLE_INCOMING_JOBS[specificIndex]) {
-      setActiveIncomingJob(SAMPLE_INCOMING_JOBS[specificIndex]);
-    } else {
-      triggerRealGoogleMapsJob();
-    }
-
-    if (audioEnabled) {
-      playRadarScan();
-      playTactileBlip(1200);
-    }
+  const triggerRandomJob = (_specificIndex?: number) => {
+    if (audioEnabled) playTactileBlip(400);
+    alert('ระบบ Production ยกเลิกงานจำลอง กรุณารอคำสั่งเรียกรถจริงจากผู้โดยสาร');
   };
 
-  const triggerServiceJob = (serviceType: 'knight' | 'express' | 'pet' | 'mu' | 'spirit') => {
-    if (!isOnDuty) {
-      if (audioEnabled) playTactileBlip(400);
-      alert('กรุณาเปิดสถานะ "🟢 พร้อมรับงาน (ON DUTY)" ก่อนครับ');
-      return;
-    }
-    triggerRealGoogleMapsJob(undefined, serviceType);
+  const triggerServiceJob = (serviceType: 'knight' | 'express' | 'pet' | 'mu' |  const triggerServiceJob = (_serviceType: 'knight' | 'express' | 'pet' | 'mu' | 'spirit') => {
+    if (audioEnabled) playTactileBlip(400);
+    alert('ระบบ Production ยกเลิกงานจำลอง กรุณารอคำสั่งเรียกรถจริงจากผู้โดยสาร');
   };
 
   const handleConfirmAccept = () => {
@@ -416,9 +368,9 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
     const userSession = getCurrentUserSession();
     acceptLiveOrder(job.id, {
       driverUserId: userSession?.id,
-      driverName: userSession?.name || 'พี่สมศักดิ์ ไนท์สายฟ้า',
+      driverName: userSession?.name || '',
       driverLevel: userSession?.level || driverLevel || 1,
-      driverPlate: userSession?.plateNumber || '1กข 7789 กทม.',
+      driverPlate: userSession?.plateNumber || '',
       driverAvatarEmoji: userSession?.avatarEmoji || '🦁',
       driverVehicle: activeVehicle?.name || 'Honda Wave 125i'
     });
@@ -473,9 +425,9 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
         status: 'completed',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        driverName: 'พี่สมศักดิ์ ไนท์สายฟ้า',
-        driverLevel: driverLevel || 100,
-        driverPlate: '1กข 7789 กทม.',
+        driverName: getCurrentUserSession()?.name || '',
+        driverLevel: driverLevel || 1,
+        driverPlate: getCurrentUserSession()?.plateNumber || '',
         driverAvatarEmoji: '🦁'
       };
       setCompletedOrderForReceipt(receiptOrder);
