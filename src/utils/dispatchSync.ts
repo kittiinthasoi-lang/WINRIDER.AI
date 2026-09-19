@@ -1,6 +1,7 @@
 import { buildWebhookPayload, dispatchToWebhook, isAutoDispatchEnabled } from './webhookDispatcher';
 import { db } from '../lib/firebase';
 import { doc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 export interface LiveRideOrder {
   id: string;
@@ -44,6 +45,16 @@ const BROADCAST_CHANNEL_NAME = 'winrider_dispatch_sync_channel';
 // Singleton Broadcast Channel
 let broadcastChannel: BroadcastChannel | null = null;
 const listeners: Set<OrderEventCallback> = new Set();
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const user = getAuth().currentUser;
+  if (!user) throw new Error('AUTH_REQUIRED');
+  const token = await user.getIdToken();
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  };
+}
 
 function getChannel(): BroadcastChannel | null {
   if (typeof window === 'undefined') return null;
@@ -179,7 +190,7 @@ export async function createLiveOrder(orderInput: {
   try {
     fetch('/api/orders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders(),
       body: JSON.stringify(newOrder),
     }).catch(() => {});
   } catch {}
@@ -257,7 +268,7 @@ export async function acceptLiveOrder(
   try {
     fetch(`/api/orders/${orderId}/accept`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders(),
       body: JSON.stringify(driverInfo),
     }).catch(() => {});
   } catch {}
