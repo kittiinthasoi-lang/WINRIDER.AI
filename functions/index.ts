@@ -493,6 +493,11 @@ export const topUpWallet = onCall(async (request) => {
   const amountSatang = Math.round(Number(data.amountSatang || 0));
   const idempotencyKey = String(data.idempotencyKey || "").trim();
   const paymentMethod = String(data.paymentMethod || "PROMPTPAY").trim();
+  const providerTransactionId = String(data.providerTransactionId || "").trim();
+
+  if (!providerTransactionId) {
+    throw new HttpsError("failed-precondition", "ต้องยืนยัน transaction จาก payment provider ก่อนเครดิตเงินเข้ากระเป๋า");
+  }
 
   // ตรวจสอบความถูกต้องของ Input
   if (!amountSatang || amountSatang <= 0 || !Number.isInteger(amountSatang)) {
@@ -502,6 +507,11 @@ export const topUpWallet = onCall(async (request) => {
   if (!idempotencyKey) {
     throw new HttpsError("invalid-argument", "idempotencyKey จำเป็นต้องระบุเพื่อป้องกันการทำรายการซ้ำ");
   }
+
+  // Never credit a wallet from a client-declared amount alone.
+  // The provider adapter must return a verified transaction and matching amount.
+  // Real provider integration is required before TOP_UP can be settled.
+  throw new HttpsError("failed-precondition", "Payment provider verification is not configured; wallet top-up is disabled");
 
   // ดำเนินการใน Firestore Transaction
   const result = await db.runTransaction(async (transaction) => {
