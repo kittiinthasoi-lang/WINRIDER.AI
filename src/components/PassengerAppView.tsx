@@ -876,6 +876,16 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setIsCreatingRide(true);
     setBookingError(null);
     try {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        throw new Error('GPS_UNAVAILABLE');
+      }
+      const pickupLocation = await new Promise<string>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve(`GPS ${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`),
+          () => reject(new Error('GPS_PERMISSION_OR_FIX_FAILED')),
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+        );
+      });
       if (audioEnabled) playRadarScan();
       const pName = currentUserSession.name || passengerProfileData.displayName;
       const pPhone = currentUserSession.phone || '';
@@ -886,7 +896,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         passengerUserId: currentUserSession.id,
         passengerName: `${pName} (${currentUserSession.level ? `LV.${currentUserSession.level}` : 'Citizen'})`,
         passengerPhone: pPhone,
-        pickupLocation: 'ตำแหน่ง GPS ปัจจุบันของผู้โดยสาร',
+        pickupLocation,
         dropoffLocation: selectedDestination,
         distanceKm: tripDistanceKm,
         fare: totalCalculatedFare || 45
@@ -898,7 +908,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       if (audioEnabled) speakThaiText('สร้างออเดอร์สำเร็จ กำลังรอพี่วินที่ผ่านเกณฑ์กดรับงานค่ะ');
     } catch (err) {
       console.error('Failed to create live order:', err);
-      setBookingError('สร้างออเดอร์ไม่สำเร็จ กรุณาตรวจสอบการเข้าสู่ระบบและลองใหม่อีกครั้ง');
+      const message = err instanceof Error && err.message.startsWith('GPS_')
+        ? 'ไม่สามารถอ่านตำแหน่ง GPS ได้ กรุณาอนุญาต Location แล้วลองใหม่'
+        : 'สร้างออเดอร์ไม่สำเร็จ กรุณาตรวจสอบการเข้าสู่ระบบและลองใหม่อีกครั้ง';
+      setBookingError(message);
     } finally {
       setIsCreatingRide(false);
     }
@@ -3133,6 +3146,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
               </p>
             </div>
 
+            {bookingError && (
+              <div role="alert" className="rounded-xl border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-200">
+                {bookingError}
+              </div>
+            )}
+
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setShowBookingModal(false)}
@@ -3142,10 +3161,11 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
               </button>
               <button
                 onClick={handleConfirmRide}
+                disabled={isCreatingRide}
                 className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg flex items-center justify-center gap-1.5 transition-all"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>ยืนยันเรียกรถ (฿{totalCalculatedFare.toFixed(2)})</span>
+                {isCreatingRide ? <Activity className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                <span>{isCreatingRide ? 'กำลังสร้างออเดอร์...' : `ยืนยันเรียกรถ (฿${totalCalculatedFare.toFixed(2)})`}</span>
               </button>
             </div>
           </div>
