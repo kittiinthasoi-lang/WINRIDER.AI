@@ -77,34 +77,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         try {
           const user = await FirebaseService.loginWithEmail(email, password);
-          if (user) {
-            onAuthenticated(user);
-            onClose();
-          } else {
-            // Create session fallback
-            const fallbackUid = `USR-${Date.now()}`;
-            const created = await FirebaseService.createUserProfile(
-              fallbackUid,
-              role,
-              email.split('@')[0],
-              phone || '0812345678',
-              email
-            );
-            onAuthenticated(created);
-            onClose();
-          }
-        } catch {
-          // Graceful fallback for demo/sandbox environments
-          const fallbackUid = `USR-${Date.now()}`;
-          const created = await FirebaseService.createUserProfile(
-            fallbackUid,
-            role,
-            email.split('@')[0],
-            phone || '0812345678',
-            email
-          );
-          onAuthenticated(created);
+          if (!user) throw new Error('ไม่พบโปรไฟล์ผู้ใช้งาน');
+          onAuthenticated(user);
           onClose();
+        } catch (err) {
+          throw err;
         }
       }
     } catch (err: unknown) {
