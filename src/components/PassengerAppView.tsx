@@ -2634,8 +2634,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           onDestinationChange={(destination) => setSelectedDestination(destination)}
           onConfirmMatch={handleConfirmMatch}
           onSelectLifestylePlace={handleSelectLifestylePlace}
-          onSelectReligiousDestination={(dest) => {
+          onSelectReligiousDestination={(dest, distanceKm) => {
             setSelectedDestination(dest);
+            if (typeof distanceKm === 'number') setTripDistanceKm(distanceKm);
             if (audioEnabled) playTactileBlip(900);
           }}
           onChangeCustomerGender={(gender) => setCustomerGender(gender)}

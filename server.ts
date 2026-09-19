@@ -39,6 +39,7 @@ const RATE_LIMITS: Record<string, number> = {
   "/api/orders/:id/location": 120,
   "/api/routes/compute": 30,
   "/api/pet-care/nearby": 20,
+  "/api/places/resolve-routes": 20,
   "/api/events/daily": 30,
 };
 
@@ -213,6 +214,97 @@ app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]),
   } catch (error) {
     console.error("[Pet Care Nearby]", error instanceof Error ? error.message : error);
     return res.status(502).json({ error: "เชื่อมต่อข้อมูลสถานพยาบาลสัตว์จริงไม่ได้", places: [] });
+  }
+});
+
+app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolve-routes"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  const requestedPlaces = Array.isArray(req.body?.places) ? req.body.places.slice(0, 20) : [];
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง", routes: [] });
+  }
+  const places = requestedPlaces
+    .map((item: any) => ({ key: String(item?.key || "").trim(), query: String(item?.query || "").trim() }))
+    .filter((item: { key: string; query: string }) => item.key && item.query);
+  if (places.length === 0) return res.status(400).json({ error: "ไม่มีสถานที่สำหรับคำนวณเส้นทาง", routes: [] });
+
+  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
+    return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY", routes: [] });
+  }
+
+  try {
+    const resolved = await Promise.all(places.map(async (item: { key: string; query: string }) => {
+      const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri",
+        },
+        body: JSON.stringify({
+          textQuery: item.query,
+          languageCode: "th",
+          regionCode: "TH",
+          locationBias: { circle: { center: { latitude, longitude }, radius: 50_000 } },
+          maxResultCount: 1,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) return null;
+      const data = await response.json() as { places?: any[] };
+      const place = data.places?.[0];
+      if (!place?.id || !Number.isFinite(place?.location?.latitude) || !Number.isFinite(place?.location?.longitude)) return null;
+      return { ...item, place };
+    }));
+    const found = resolved.filter(Boolean) as Array<{ key: string; query: string; place: any }>;
+    if (found.length === 0) return res.json({ routes: [], source: "Google Places API (New) + Google Routes API" });
+
+    const matrixResponse = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration",
+      },
+      body: JSON.stringify({
+        origins: [{ waypoint: { location: { latLng: { latitude, longitude } } } }],
+        destinations: found.map((item) => ({ waypoint: { location: { latLng: item.place.location } } })),
+        travelMode: "TWO_WHEELER",
+        languageCode: "th-TH",
+        units: "METRIC",
+      }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!matrixResponse.ok) return res.status(502).json({ error: "คำนวณระยะทางจริงจาก Google Routes ไม่สำเร็จ", routes: [] });
+    const matrix = await matrixResponse.json() as any[];
+    const routeByDestination = new Map(matrix
+      .filter((item) => item?.condition === "ROUTE_EXISTS" && Number.isFinite(item?.distanceMeters))
+      .map((item) => [Number(item.destinationIndex), item]));
+
+    const routes = found.flatMap((item, index) => {
+      const route = routeByDestination.get(index);
+      if (!route) return [];
+      const durationSeconds = Number.parseFloat(String(route.duration || "0").replace("s", ""));
+      return [{
+        key: item.key,
+        placeId: String(item.place.id),
+        name: String(item.place.displayName?.text || item.query),
+        address: String(item.place.formattedAddress || ""),
+        latitude: Number(item.place.location.latitude),
+        longitude: Number(item.place.location.longitude),
+        distanceKm: Math.round((Number(route.distanceMeters) / 1000) * 10) / 10,
+        etaMinutes: Number.isFinite(durationSeconds) ? Math.max(1, Math.ceil(durationSeconds / 60)) : null,
+        googleMapsUri: String(item.place.googleMapsUri || ""),
+      }];
+    }).sort((a, b) => a.distanceKm - b.distanceKm);
+    return res.json({ routes, source: "Google Places API (New) + Google Routes API", fetchedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error("[Resolve Place Routes]", error instanceof Error ? error.message : error);
+    return res.status(502).json({ error: "เชื่อมต่อข้อมูลสถานที่และเส้นทางจริงไม่ได้", routes: [] });
   }
 });
 

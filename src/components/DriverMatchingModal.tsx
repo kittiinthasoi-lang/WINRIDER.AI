@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getAuth } from 'firebase/auth';
 import { MatchedDriver, DreamRideVehicle, LifestylePlace } from '../types';
 import { fetchLiveDrivers } from '../services/liveDriversService';
 import { LIFESTYLE_PLACES } from '../data/lifestyleData';
@@ -14,6 +15,7 @@ import {
   TransitStation 
 } from '../data/transitData';
 import { playTactileBlip, playRadarScan, speakThaiText } from '../utils/audio';
+import { useRealGeolocation } from '../hooks/useRealGeolocation';
 import confetti from 'canvas-confetti';
 import { 
   ShieldCheck, 
@@ -86,7 +88,7 @@ interface DriverMatchingModalProps {
   onDestinationChange: (destination: string) => void;
   onConfirmMatch: (driver: MatchedDriver) => void;
   onSelectLifestylePlace?: (place: LifestylePlace) => void;
-  onSelectReligiousDestination?: (placeName: string) => void;
+  onSelectReligiousDestination?: (placeName: string, distanceKm?: number) => void;
   onChangeCustomerGender?: (gender: 'female' | 'male') => void;
 }
 
@@ -106,6 +108,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   onSelectReligiousDestination,
   onChangeCustomerGender
 }) => {
+  const geo = useRealGeolocation(true);
   const [matchingStep, setMatchingStep] = useState<'idle' | 'scanning' | 'results'>('idle');
   const [selectedDriver, setSelectedDriver] = useState<MatchedDriver | null>(null);
   const [activeLifestyleCategory, setActiveLifestyleCategory] = useState<'all' | 'restaurant' | 'cafe' | 'pub' | 'chill' | 'pet_cafe' | 'temple'>('all');
@@ -130,6 +133,9 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   const [activeTransitCategory, setActiveTransitCategory] = useState<string>('all');
   const [transitSearchQuery, setTransitSearchQuery] = useState<string>('');
   const [selectedTransitStation, setSelectedTransitStation] = useState<TransitStation | null>(null);
+  const [resolvedRoutes, setResolvedRoutes] = useState<Record<string, { distanceKm: number; etaMinutes: number | null; address: string }>>({});
+  const [routesLoading, setRoutesLoading] = useState(false);
+  const [routesError, setRoutesError] = useState('');
 
   const [activeTab, setActiveTab] = useState<'drivers' | 'sacred_mu' | 'religion_spirit' | 'transit_hub'>(
     serviceId === 'link' ? 'transit_hub' : 'drivers'
@@ -319,6 +325,69 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     if (activeLifestyleCategory === 'all') return LIFESTYLE_PLACES;
     return LIFESTYLE_PLACES.filter(p => p.category === activeLifestyleCategory);
   }, [activeLifestyleCategory]);
+
+  const filteredTransitStations = useMemo(() => BANGKOK_TRANSIT_STATIONS.filter((station) => {
+    const matchesCategory =
+      activeTransitCategory === 'all' ||
+      (activeTransitCategory === 'concert_event' && (station.category === 'concert_arena' || station.category === 'sports_stadium' || station.category === 'entertainment_event' || station.ticketServiceAvailable)) ||
+      (activeTransitCategory === 'bts' && station.category === 'bts') ||
+      (activeTransitCategory === 'mrt' && station.category === 'mrt') ||
+      (activeTransitCategory === 'train_srt' && (station.category === 'train_srt' || station.category === 'train' || station.category === 'srt_red' || station.category === 'arl')) ||
+      (activeTransitCategory === 'bus_stop' && station.category === 'bus_stop') ||
+      (activeTransitCategory === 'bus_terminal' && station.category === 'bus_terminal') ||
+      (activeTransitCategory === 'pier' && station.category === 'pier') ||
+      (activeTransitCategory === 'airport' && (station.category === 'airport' || station.category === 'other'));
+    const q = transitSearchQuery.toLowerCase().trim();
+    const matchesQuery = !q || station.name.toLowerCase().includes(q) || station.nameEn.toLowerCase().includes(q) ||
+      station.lineName.toLowerCase().includes(q) || station.highlight.toLowerCase().includes(q) ||
+      station.popularConnections.some((connection) => connection.toLowerCase().includes(q));
+    return matchesCategory && matchesQuery;
+  }), [activeTransitCategory, transitSearchQuery]);
+
+  const activeRouteRequests = useMemo(() => {
+    if (activeTab === 'drivers' && serviceId === 'lifestyle') {
+      return filteredLifestylePlaces.map((place) => ({ key: `lifestyle:${place.id}`, query: `${place.name} ${place.area} ประเทศไทย` }));
+    }
+    if (activeTab === 'sacred_mu') {
+      return SACRED_MU_PRAYERS.map((prayer) => ({ key: `prayer:${prayer.id}`, query: `${prayer.location} ประเทศไทย` }));
+    }
+    if (activeTab === 'transit_hub') {
+      return filteredTransitStations.slice(0, 20).map((station) => ({ key: `transit:${station.id}`, query: `${station.name} กรุงเทพมหานคร ประเทศไทย` }));
+    }
+    return [];
+  }, [activeTab, serviceId, filteredLifestylePlaces, filteredTransitStations]);
+
+  useEffect(() => {
+    if (!geo.isRealGps || geo.latitude === null || geo.longitude === null || activeRouteRequests.length === 0) return;
+    let cancelled = false;
+    const loadRoutes = async () => {
+      setRoutesLoading(true);
+      setRoutesError('');
+      try {
+        const user = getAuth().currentUser;
+        if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนคำนวณระยะทางจริง');
+        const response = await fetch('/api/places/resolve-routes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+          body: JSON.stringify({ latitude: geo.latitude, longitude: geo.longitude, places: activeRouteRequests }),
+        });
+        const payload = await response.json() as { routes?: Array<{ key: string; distanceKm: number; etaMinutes: number | null; address: string }>; error?: string };
+        if (!response.ok) throw new Error(payload.error || 'คำนวณระยะทางจริงไม่สำเร็จ');
+        if (!cancelled) {
+          setResolvedRoutes(Object.fromEntries((payload.routes || []).map((route) => [route.key, route])));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setResolvedRoutes({});
+          setRoutesError(error instanceof Error ? error.message : 'คำนวณระยะทางจริงไม่สำเร็จ');
+        }
+      } finally {
+        if (!cancelled) setRoutesLoading(false);
+      }
+    };
+    void loadRoutes();
+    return () => { cancelled = true; };
+  }, [geo.isRealGps, geo.latitude, geo.longitude, activeRouteRequests]);
 
   // Religious activities filtered list
   const filteredReligiousActivities = useMemo(() => {
@@ -950,16 +1019,18 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
-                      {filteredLifestylePlaces.map((place) => (
-                        <div
+                      {filteredLifestylePlaces.map((place) => {
+                        const route = resolvedRoutes[`lifestyle:${place.id}`];
+                        return <div
                           key={place.id}
                           onClick={() => {
+                            if (!route) return;
                             if (audioEnabled) playTactileBlip(950);
                             if (onSelectLifestylePlace) {
-                              onSelectLifestylePlace(place);
+                              onSelectLifestylePlace({ ...place, distanceKm: route.distanceKm });
                             }
                           }}
-                          className="p-2 rounded-xl bg-black/40 border border-white/10 hover:border-purple-400 hover:bg-purple-900/20 transition-all cursor-pointer space-y-1"
+                          className={`p-2 rounded-xl bg-black/40 border border-white/10 transition-all space-y-1 ${route ? 'hover:border-purple-400 hover:bg-purple-900/20 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
                         >
                           <div className="flex items-center justify-between text-xs font-bold text-white">
                             <span className="flex items-center gap-1 truncate">
@@ -973,11 +1044,13 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                           <p className="text-[10px] text-slate-400 line-clamp-1">{place.highlight}</p>
                           <div className="flex items-center justify-between text-[9px] text-slate-400 font-mono">
                             <span>📍 {place.area}</span>
-                            <span className="text-[#FFD700]">★ {place.rating} • {place.distanceKm} กม.</span>
+                            <span className="text-[#FFD700]">★ {place.rating} • {route ? `${route.distanceKm} กม. • ${route.etaMinutes || '—'} นาที` : 'รอ GPS/เส้นทางจริง'}</span>
                           </div>
                         </div>
-                      ))}
+                      })}
                     </div>
+                    {routesLoading && <p className="text-[10px] text-cyan-300">กำลังคำนวณระยะทางจากตำแหน่งปัจจุบัน…</p>}
+                    {routesError && <p className="text-[10px] text-rose-300">{routesError} — ไม่แสดงระยะทางจำลองแทน</p>}
                   </div>
                 )}
               </div>
@@ -1078,16 +1151,19 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                 </div>
 
                 <button
+                  disabled={!resolvedRoutes[`prayer:${selectedPrayer.id}`]}
                   onClick={() => {
+                    const route = resolvedRoutes[`prayer:${selectedPrayer.id}`];
+                    if (!route) return;
                     if (onSelectReligiousDestination) {
-                      onSelectReligiousDestination(selectedPrayer.location);
+                      onSelectReligiousDestination(selectedPrayer.location, route.distanceKm);
                     }
                     if (audioEnabled) playTactileBlip(1200);
                   }}
-                  className="w-full py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-amber-500 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-lg"
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-amber-500 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <MapPin className="w-3.5 h-3.5" />
-                  <span>ปักหมุดสถานที่นี้เป็นปลายทางทริป</span>
+                  <span>{resolvedRoutes[`prayer:${selectedPrayer.id}`] ? `ปักหมุด • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].distanceKm} กม. • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].etaMinutes || '—'} นาที` : 'กำลังรอ GPS และเส้นทางจริง'}</span>
                 </button>
               </div>
             )}
@@ -1154,29 +1230,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
             {/* Filtered Transit Stations Grid */}
             {(() => {
-              const filteredStations = BANGKOK_TRANSIT_STATIONS.filter(station => {
-                const matchesCategory = 
-                  activeTransitCategory === 'all' ||
-                  (activeTransitCategory === 'concert_event' && (station.category === 'concert_arena' || station.category === 'sports_stadium' || station.category === 'entertainment_event' || station.ticketServiceAvailable)) ||
-                  (activeTransitCategory === 'bts' && station.category === 'bts') ||
-                  (activeTransitCategory === 'mrt' && station.category === 'mrt') ||
-                  (activeTransitCategory === 'train_srt' && (station.category === 'train_srt' || station.category === 'train' || station.category === 'srt_red' || station.category === 'arl')) ||
-                  (activeTransitCategory === 'bus_stop' && station.category === 'bus_stop') ||
-                  (activeTransitCategory === 'bus_terminal' && station.category === 'bus_terminal') ||
-                  (activeTransitCategory === 'pier' && station.category === 'pier') ||
-                  (activeTransitCategory === 'airport' && (station.category === 'airport' || station.category === 'other'));
-
-                const q = transitSearchQuery.toLowerCase().trim();
-                const matchesQuery = !q || 
-                  station.name.toLowerCase().includes(q) ||
-                  station.nameEn.toLowerCase().includes(q) ||
-                  station.lineName.toLowerCase().includes(q) ||
-                  station.highlight.toLowerCase().includes(q) ||
-                  station.popularConnections.some(c => c.toLowerCase().includes(q)) ||
-                  (station.upcomingEvents && station.upcomingEvents.some(ev => ev.title.toLowerCase().includes(q) || ev.tag.toLowerCase().includes(q)));
-
-                return matchesCategory && matchesQuery;
-              });
+              const filteredStations = filteredTransitStations;
 
               if (filteredStations.length === 0) {
                 return (
@@ -1195,8 +1249,10 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
               return (
                 <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                  {filteredStations.map((st) => (
-                    <div
+                  {filteredStations.map((st) => {
+                    const route = resolvedRoutes[`transit:${st.id}`];
+                    const routeFare = route ? 15 + Math.round(Math.max(0, route.distanceKm - 1) * 7.5) + 5 : null;
+                    return <div
                       key={st.id}
                       className={`p-3 rounded-2xl bg-black/40 border transition-all space-y-2 ${
                         st.ticketServiceAvailable 
@@ -1228,36 +1284,12 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                         </div>
 
                         <div className="text-right font-mono flex-shrink-0">
-                          <span className="text-xs font-bold text-[#FFD700] block">~฿{st.estimatedFareThb}</span>
-                          <span className="text-[9px] text-emerald-400">{st.distanceKm} กม.</span>
+                          <span className="text-xs font-bold text-[#FFD700] block">{routeFare !== null ? `ประมาณ ฿${routeFare}` : 'รอเส้นทางจริง'}</span>
+                          <span className="text-[9px] text-emerald-400">{route ? `${route.distanceKm} กม. • ${route.etaMinutes || '—'} นาที` : 'ไม่ใช้ระยะทางจำลอง'}</span>
                         </div>
                       </div>
 
                       <p className="text-[11px] text-slate-300 leading-tight">{st.highlight}</p>
-
-                      {/* Upcoming Events for Concerts and Sports */}
-                      {st.upcomingEvents && st.upcomingEvents.length > 0 && (
-                        <div className="p-2 rounded-xl bg-[#06182B] border border-cyan-500/30 space-y-1.5">
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="font-bold text-cyan-300 flex items-center gap-1">
-                              <span>🔥</span> อีเวนต์ & การแข่งขันเร็วๆ นี้ (พี่วินช่วยกดตั๋ว/ต่อคิวได้):
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            {st.upcomingEvents.map((ev, eIdx) => (
-                              <div key={eIdx} className="p-1.5 rounded-lg bg-black/40 border border-white/5 flex items-center justify-between gap-1 text-[9px]">
-                                <div className="truncate">
-                                  <span className="font-bold text-white block truncate">{ev.icon} {ev.title}</span>
-                                  <span className="text-slate-400 font-mono text-[8px]">{ev.date} • {ev.tag}</span>
-                                </div>
-                                <span className="text-amber-300 font-mono font-bold flex-shrink-0">
-                                  {ev.priceThb > 0 ? `฿${ev.priceThb}` : 'เข้าฟรี'}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
 
                       {/* Transfer and Popular Connections Chips */}
                       <div className="flex flex-wrap gap-1 pt-1 border-t border-white/5">
@@ -1270,29 +1302,29 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
                       {/* One-Click Destination Button */}
                       <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                        <span className="text-[9px] text-slate-400 font-mono">
-                          🛵 วินพร้อมบริการ: <strong className="text-cyan-300">{st.winStandCount} คัน</strong>
-                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono">{route ? '✓ Google Routes ยืนยันเส้นทางแล้ว' : 'กำลังรอ GPS และเส้นทางจริง'}</span>
 
                         <button
+                          disabled={!route}
                           onClick={() => {
+                            if (!route) return;
                             if (audioEnabled) {
                               playTactileBlip(1200);
                               speakThaiText(`ปักหมุดปลายทางไปยัง ${st.name}`);
                             }
                             if (onSelectReligiousDestination) {
-                              onSelectReligiousDestination(st.name);
+                              onSelectReligiousDestination(st.name, route.distanceKm);
                             }
                             setActiveTab('drivers');
                           }}
-                          className="px-3 py-1 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-[10px] font-mono flex items-center gap-1 shadow-md transition-all"
+                          className="px-3 py-1 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-[10px] font-mono flex items-center gap-1 shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <MapPin className="w-3 h-3" />
                           <span>ปักหมุดไปสถานที่นี้ & จับคู่วิน</span>
                         </button>
                       </div>
                     </div>
-                  ))}
+                  })}
                 </div>
               );
             })()}
