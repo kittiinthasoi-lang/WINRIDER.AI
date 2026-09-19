@@ -200,7 +200,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   }, [activeIncomingJob, audioEnabled]);
 
   // Production mode: jobs are created only by real passenger orders.
-  const triggerServiceJob = (serviceType: 'knight' | 'express' | 'pet' | 'mu' |  const handleConfirmAccept = () => {
+  const handleConfirmAccept = () => {
     if (!activeIncomingJob) return;
 
     if (audioEnabled) {
@@ -499,16 +499,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[10px]">
-                  <label className="flex items-center gap-1.5 text-cyan-300 cursor-pointer bg-black/40 px-2.5 py-1 rounded-xl border border-white/10">
-                    <input
-                      type="checkbox"
-                      checked={autoSimulateToggle}
-                      onChange={(e) => setAutoSimulateToggle(e.target.checked)}
-                      className="w-3.5 h-3.5 rounded text-cyan-400 bg-black/40"
-                    />
-                    <span>สุ่มงานอัตโนมัติ (12-20s)</span>
-                  </label>
-                </div>
+                    </div>
               </div>
 
               {/* Zone Filter Chips */}
