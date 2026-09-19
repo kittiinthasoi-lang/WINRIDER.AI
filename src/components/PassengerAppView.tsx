@@ -28,6 +28,7 @@ import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
+import { ReligiousNotificationsModal } from './ReligiousNotificationsModal';
 import { CyberGraphic, DreamRideVehicleImage } from './CyberGraphic';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import confetti from 'canvas-confetti';
@@ -36,7 +37,7 @@ import {
   ShieldCheck,
   MapPin, 
   Search, 
-  Bell, 
+  Flower2, 
   Dog, 
   Zap, 
   Sparkles, 
@@ -261,6 +262,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [showInRideChatModal, setShowInRideChatModal] = useState<boolean>(false);
   const [showRealGpsModal, setShowRealGpsModal] = useState<boolean>(false);
   const [showProfileCustomizerModal, setShowProfileCustomizerModal] = useState<boolean>(false);
+  const [showReligiousNotificationsModal, setShowReligiousNotificationsModal] = useState<boolean>(false);
   const [passengerProfileData, setPassengerProfileData] = useState<ProfileCustomizationData>({
     displayName: 'คุณ จิตใจ สล็อต',
     bioStatus: 'พลเมืองสายชิลล์ • เน้นปลอดภัย อุดหนุนร้านชุมชน 🦥✨',
@@ -1097,19 +1099,20 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#00D2FF]" />
               </button>
 
-              {/* Notification Bell */}
-              <button 
-                id="passenger-notification-bell-btn"
+              {/* Faith & Sacred Calendar */}
+              <button
+                id="passenger-religious-notification-btn"
                 onClick={() => {
                   if (audioEnabled) playTactileBlip(1000);
-                  alert("🔔 การแจ้งเตือน: อัศวิน กิตติ อินทะสร้อย (Level 100 Sovereign) ประจำสถานีใกล้คุณ, มีโปรโมชั่นคอนเสิร์ตลด 20%");
+                  setShowReligiousNotificationsModal(true);
                 }}
-                className="relative p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer active:scale-95 transition-all"
-                title="การแจ้งเตือน"
+                className="relative p-1.5 rounded-lg bg-amber-300/10 hover:bg-amber-300/20 text-amber-200 border border-amber-300/25 cursor-pointer active:scale-95 transition-all"
+                title="แจ้งเตือนศาสนา เวลาละหมาด วันพระ และวันสำคัญทุกศาสนา"
+                aria-label="ศูนย์แจ้งเตือนศาสนา"
               >
-                <Bell className="w-4 h-4 text-cyan-400" />
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 text-[9px] text-white font-bold flex items-center justify-center">
-                  3
+                <Flower2 className="w-4 h-4" />
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-300 text-[9px] text-slate-950 font-black flex items-center justify-center">
+                  •
                 </span>
               </button>
 
@@ -3593,6 +3596,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         isOpen={showRealGpsModal}
         onClose={() => setShowRealGpsModal(false)}
         destinationTitle={selectedDestination || 'อาคาร Exchange Tower อโศก'}
+        audioEnabled={audioEnabled}
+      />
+
+      <ReligiousNotificationsModal
+        isOpen={showReligiousNotificationsModal}
+        onClose={() => setShowReligiousNotificationsModal(false)}
         audioEnabled={audioEnabled}
       />
 
