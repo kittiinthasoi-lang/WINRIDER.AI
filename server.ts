@@ -417,90 +417,16 @@ app.post("/api/routes/compute", async (req, res) => {
       }
     }
 
-    // 2. High-Fidelity Tactical Routing Engine Fallback (Real Bangkok Network Calculation)
-    // Ensures uninterrupted Turn-by-Turn AR Navigation and 3D Arrow guidance even without Cloud key
-    const origLat = Number(origin.latitude || origin.lat || 13.7563);
-    const origLng = Number(origin.longitude || origin.lng || 100.5018);
-    const destLat = Number(destination.latitude || destination.lat || 13.7300);
-    const destLng = Number(destination.longitude || destination.lng || 100.5810);
-
-    // Calculate straight-line and road-adjusted distance
-    const dLat = (destLat - origLat) * 111.32;
-    const dLng = (destLng - origLng) * 105.0;
-    const directDistKm = Math.sqrt(dLat * dLat + dLng * dLng);
-    const estRoadDistKm = Math.max(0.8, Number((directDistKm * 1.32).toFixed(1)));
-    const estDurationSec = Math.round((estRoadDistKm / 28) * 3600); // 28 km/h motorcycle city avg
-
-    // Generate Turn-by-Turn steps tailored to destination
-    const destTitle = destination.name || destination.address || "จุดหมายปลายทาง";
-    const steps = [
-      {
-        navigationInstruction: {
-          instructions: "มุ่งหน้าออกจากจุดเริ่มต้นตามแนวถนนใหญ่",
-          maneuver: "STRAIGHT"
-        },
-        distanceMeters: Math.round(estRoadDistKm * 280),
-        staticDuration: `${Math.round(estDurationSec * 0.25)}s`,
-        startLocation: { latLng: { latitude: origLat, longitude: origLng } },
-        endLocation: { latLng: { latitude: origLat + (destLat - origLat) * 0.3, longitude: origLng + (destLng - origLng) * 0.3 } }
-      },
-      {
-        navigationInstruction: {
-          instructions: `เตรียมชิดซ้าย เลี้ยวเข้าสู่ถนนมุ่งหน้า ${destTitle}`,
-          maneuver: "TURN_LEFT"
-        },
-        distanceMeters: Math.round(estRoadDistKm * 320),
-        staticDuration: `${Math.round(estDurationSec * 0.35)}s`,
-        startLocation: { latLng: { latitude: origLat + (destLat - origLat) * 0.3, longitude: origLng + (destLng - origLng) * 0.3 } },
-        endLocation: { latLng: { latitude: origLat + (destLat - origLat) * 0.7, longitude: origLng + (destLng - origLng) * 0.7 } }
-      },
-      {
-        navigationInstruction: {
-          instructions: "ตรงไปตามเส้นทางหลัก ข้ามสะพานและผ่านแยกไฟแดง",
-          maneuver: "STRAIGHT"
-        },
-        distanceMeters: Math.round(estRoadDistKm * 300),
-        staticDuration: `${Math.round(estDurationSec * 0.3)}s`,
-        startLocation: { latLng: { latitude: origLat + (destLat - origLat) * 0.7, longitude: origLng + (destLng - origLng) * 0.7 } },
-        endLocation: { latLng: { latitude: origLat + (destLat - origLat) * 0.95, longitude: origLng + (destLng - origLng) * 0.95 } }
-      },
-      {
-        navigationInstruction: {
-          instructions: `เลี้ยวขวาเข้าสู่จุดหมาย ${destTitle} (ถึงปลายทาง)`,
-          maneuver: "TURN_RIGHT"
-        },
-        distanceMeters: Math.round(estRoadDistKm * 100),
-        staticDuration: `${Math.round(estDurationSec * 0.1)}s`,
-        startLocation: { latLng: { latitude: origLat + (destLat - origLat) * 0.95, longitude: origLng + (destLng - origLng) * 0.95 } },
-        endLocation: { latLng: { latitude: destLat, longitude: destLng } }
-      }
-    ];
-
-    return res.json({
-      success: true,
-      source: "google_routes_api_live",
-      provider: "Google Maps Platform Routes API",
-      travelMode,
-      route: {
-        distanceMeters: Math.round(estRoadDistKm * 1000),
-        duration: `${estDurationSec}s`,
-        description: `เส้นทางมอเตอร์ไซค์เลี่ยงรถติด มุ่งหน้า ${destTitle}`,
-        legs: [
-          {
-            distanceMeters: Math.round(estRoadDistKm * 1000),
-            duration: `${estDurationSec}s`,
-            startLocation: { latLng: { latitude: origLat, longitude: origLng } },
-            endLocation: { latLng: { latitude: destLat, longitude: destLng } },
-            steps
-          }
-        ]
-      },
-      timestamp: new Date().toISOString()
+    return res.status(503).json({
+      success: false,
+      error: "Google Routes API unavailable",
+      message: "Real routing data is required; synthetic routing has been disabled."
     });
+
   } catch (error: any) {
     console.error("[Routes API Endpoint Error]:", error);
-    res.status(500).json({
-      error: "เกิดข้อผิดพลาดในการคำนวณเส้นทาง",
+    res.status(502).json({
+      error: "Google Routes API failed",
       message: error?.message
     });
   }
