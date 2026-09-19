@@ -41,14 +41,15 @@ import {
   getGoogleMapsNavigationUrl
 } from '../data/realBangkokLocations';
 import { useWakeLock } from '../hooks/useWakeLock';
-import { subscribeToLiveOrders, acceptLiveOrder, advanceLiveOrderStep, fetchAvailableOrdersForDriver, LiveRideOrder } from '../utils/dispatchSync';
+import { subscribeToLiveOrders, acceptLiveOrder, advanceLiveOrderStep, declineLiveOrder, updateDriverPresence, fetchAvailableOrdersForDriver, fetchMyOrders, LiveRideOrder } from '../utils/dispatchSync';
+import { useRealtimeGps } from './GpsRealTimeTracker';
 import { getCurrentUserSession } from '../utils/userSession';
 import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { sendJobToLine, chatWithPassengerOnLine } from '../utils/lineIntegration';
 
 export interface IncomingJobData {
   id: string;
-  serviceId: 'knight' | 'express' | 'spirit' | 'mu' | 'pet' | 'food' | 'backhaul';
+  serviceId: 'knight' | 'express' | 'spirit' | 'mu' | 'family' | 'pet' | 'link' | 'lifestyle' | 'food' | 'backhaul';
   serviceTitle: string;
   serviceIconEmoji: string;
   customerName: string;
@@ -116,6 +117,11 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   const [lastDeclinedJobId, setLastDeclinedJobId] = useState<string | null>(null);
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string>('all');
   const [showGoogleMapsModal, setShowGoogleMapsModal] = useState<boolean>(false);
+  const [dispatchActionPending, setDispatchActionPending] = useState(false);
+  const [dispatchError, setDispatchError] = useState('');
+  const { gpsState } = useRealtimeGps(isOnDuty);
+  const presenceLatitude = Number(gpsState.latitude.toFixed(4));
+  const presenceLongitude = Number(gpsState.longitude.toFixed(4));
 
   // Screen Wake Lock & Trip Receipt States
   const { isLocked: isScreenAwake, isSupported: isWakeLockSupported, toggleWakeLock } = useWakeLock();
@@ -131,6 +137,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
         && order.status === 'pending'
         && order.passengerUserId
         && order.passengerUserId !== currentUserId
+        && order.offeredDriverId === currentUserId
         && order.id !== lastDeclinedJobId
         && isOnDuty
       ) {
@@ -140,24 +147,24 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
           serviceTitle: order.serviceTitle,
           serviceIconEmoji: order.serviceIconEmoji || '🛵',
           customerName: order.passengerName,
-          customerGender: 'female',
-          customerRating: 4.95,
+          customerGender: order.customerGender,
+          customerRating: 0,
           customerPhone: order.passengerPhone,
-          customerAvatarEmoji: '👩‍💼',
+          customerAvatarEmoji: '👤',
           customerNote: `รออยู่ที่ ${order.pickupLocation}`,
           pickupLocation: order.pickupLocation,
           dropoffLocation: order.dropoffLocation,
           distanceKm: order.distanceKm,
-          driverDistanceToPickupKm: 0.25,
+          driverDistanceToPickupKm: 0,
           fairDispatchQueueRank: 1,
-          totalCandidatesInRadius: 4,
+          totalCandidatesInRadius: 0,
           estMinutes: order.estMinutes,
           baseFare: order.fare,
           tips: 0,
           netFare: order.netFare,
           platformFee: 2,
-          xpReward: 250,
-          specialBadges: ['🚨 งานสดเรียลไทม์ (Live Passenger)', '⚡ 2-Baht Sovereign Fund', '📍 ใกล้จุดรับที่สุด'],
+          xpReward: 0,
+          specialBadges: ['งานจริงจาก Dispatch Engine', order.dispatchMode === 'preferred' ? 'ลูกค้าเลือกคุณเป็นลำดับแรก' : 'จับคู่จากระยะ GPS และเงื่อนไขบริการ'],
           vehicleRequested: activeVehicle?.name || 'Honda Wave 125i',
           urgency: 'high'
         };
@@ -179,9 +186,31 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
     }
   }, [isOnDuty]);
 
+  // Real online presence and GPS heartbeat used by the server-side proximity dispatcher.
+  useEffect(() => {
+    let cancelled = false;
+    const publish = async () => {
+      try {
+        if (isOnDuty && !gpsState.isRealGps) return;
+        await updateDriverPresence({
+          isOnline: isOnDuty,
+          ...(isOnDuty ? { latitude: presenceLatitude, longitude: presenceLongitude } : {}),
+          activeVehicleId: activeVehicle?.id,
+        });
+        if (!cancelled) setDispatchError('');
+      } catch (error) {
+        if (!cancelled) setDispatchError(isOnDuty ? 'ส่งสถานะออนไลน์หรือ GPS ไปยัง Dispatch ไม่สำเร็จ' : 'เปลี่ยนสถานะออฟไลน์ไม่สำเร็จ');
+      }
+    };
+    void publish();
+    if (!isOnDuty || !gpsState.isRealGps) return () => { cancelled = true; };
+    const timer = window.setInterval(publish, 30_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [isOnDuty, gpsState.isRealGps, presenceLatitude, presenceLongitude, activeVehicle?.id]);
+
   // Backend polling keeps dispatch visible across devices/instances.
   useEffect(() => {
-    if (!isOnDuty || activeIncomingJob) return;
+    if (!isOnDuty || activeIncomingJob || currentActiveTrip) return;
     let cancelled = false;
     const refresh = async () => {
       try {
@@ -223,7 +252,37 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
     refresh();
     const timer = window.setInterval(refresh, 5000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [isOnDuty, activeIncomingJob, activeVehicle, lastDeclinedJobId]);
+  }, [isOnDuty, activeIncomingJob, currentActiveTrip, activeVehicle, lastDeclinedJobId]);
+
+  // Recover an assigned trip after refresh or switching devices/tabs.
+  useEffect(() => {
+    if (!isOnDuty || currentActiveTrip) return;
+    let cancelled = false;
+    const recover = async () => {
+      try {
+        const userId = getAuth().currentUser?.uid;
+        const orders = await fetchMyOrders();
+        let active = orders.find((order) => order.driverUserId === userId && ['accepted', 'heading_pickup', 'picked_up', 'in_transit'].includes(order.status));
+        if (!active || cancelled) return;
+        if (active.status === 'accepted') active = await advanceLiveOrderStep(active.id, 'heading_pickup') || active;
+        const job: IncomingJobData = {
+          id: active.id, serviceId: active.serviceId as IncomingJobData['serviceId'], serviceTitle: active.serviceTitle, serviceIconEmoji: active.serviceIconEmoji,
+          customerName: active.passengerName, customerPhone: active.passengerPhone, customerAvatarEmoji: active.passengerAvatarEmoji || '👤', customerRating: 0,
+          pickupLocation: active.pickupLocation, dropoffLocation: active.dropoffLocation, pickupCoord: active.pickupCoord, dropoffCoord: active.dropoffCoord,
+          distanceKm: active.distanceKm, driverDistanceToPickupKm: 0, fairDispatchQueueRank: 1, totalCandidatesInRadius: 0,
+          estMinutes: active.estMinutes, baseFare: active.fare, tips: active.tipAmount || 0, netFare: active.netFare, platformFee: active.welfareFund2Baht,
+          xpReward: 0, vehicleRequested: active.driverVehicle || activeVehicle?.name, urgency: 'normal',
+        };
+        setCurrentActiveTrip(job);
+        setTripStep(active.status === 'picked_up' ? 'picked_up' : active.status === 'in_transit' ? 'navigating' : 'heading_pickup');
+      } catch (error) {
+        console.warn('Unable to recover active trip:', error);
+      }
+    };
+    void recover();
+    const timer = window.setInterval(recover, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [isOnDuty, currentActiveTrip, activeVehicle]);
 
   // Online minutes counter
   useEffect(() => {
@@ -246,6 +305,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
           clearInterval(timer);
           // Auto timeout -> passed to next closest driver
           if (audioEnabled) playTactileBlip(400);
+          void declineLiveOrder(activeIncomingJob.id).catch((error) => console.warn('Dispatch timeout handoff failed:', error));
           setLastDeclinedJobId(activeIncomingJob.id);
           setActiveIncomingJob(null);
           return 0;
@@ -258,55 +318,56 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   }, [activeIncomingJob, audioEnabled]);
 
   // Production mode: jobs are created only by real passenger orders.
-  const handleConfirmAccept = () => {
+  const handleConfirmAccept = async () => {
     if (!activeIncomingJob) return;
-
-    if (audioEnabled) {
-      playEngineRev();
-    }
-    confetti({
-      particleCount: 70,
-      spread: 80,
-      colors: ['#00D2FF', '#FFD700', '#10B981']
-    });
-
     const job = activeIncomingJob;
-    setCurrentActiveTrip(job);
-    setTripStep('heading_pickup');
-    setActiveIncomingJob(null);
-    onAcceptJob(job);
-
-    // Sync accept order to passenger and webhook
-    const userSession = getCurrentUserSession();
-    acceptLiveOrder(job.id, {
-      driverUserId: userSession?.id,
-      driverName: userSession?.name || '',
-      driverLevel: userSession?.level || driverLevel || 1,
-      driverPlate: userSession?.plateNumber || '',
-      driverAvatarEmoji: userSession?.avatarEmoji || '🛵',
-      driverVehicle: activeVehicle?.name || ''
-    });
+    setDispatchActionPending(true); setDispatchError('');
+    try {
+      const userSession = getCurrentUserSession();
+      const accepted = await acceptLiveOrder(job.id, {
+        driverUserId: userSession?.id, driverName: userSession?.name || '', driverLevel: userSession?.level || driverLevel || 1,
+        driverPlate: userSession?.plateNumber || '', driverAvatarEmoji: userSession?.avatarEmoji || '🛵', driverVehicle: activeVehicle?.name || ''
+      });
+      if (!accepted) throw new Error('INVALID_ACCEPT_RESPONSE');
+      await advanceLiveOrderStep(job.id, 'heading_pickup');
+      if (audioEnabled) playEngineRev();
+      confetti({ particleCount: 70, spread: 80, colors: ['#00D2FF', '#FFD700', '#10B981'] });
+      setCurrentActiveTrip(job); setTripStep('heading_pickup'); setActiveIncomingJob(null); onAcceptJob(job);
+    } catch (error) {
+      console.error('Accept dispatch failed:', error);
+      setDispatchError('รับงานไม่สำเร็จ งานอาจหมดเวลาหรือถูกส่งต่อแล้ว กรุณารอรายการถัดไป');
+      setActiveIncomingJob(null);
+    } finally { setDispatchActionPending(false); }
   };
 
-  const handleDeclineJob = () => {
+  const handleDeclineJob = async () => {
     if (!activeIncomingJob) return;
     if (audioEnabled) playTactileBlip(600);
-    setLastDeclinedJobId(activeIncomingJob.id);
-    setActiveIncomingJob(null);
+    const id = activeIncomingJob.id;
+    setDispatchActionPending(true); setDispatchError('');
+    try {
+      await declineLiveOrder(id);
+      setLastDeclinedJobId(id); setActiveIncomingJob(null);
+    } catch (error) {
+      console.error('Decline dispatch failed:', error);
+      setDispatchError('ส่งต่องานไม่สำเร็จ กรุณาลองอีกครั้ง');
+    } finally { setDispatchActionPending(false); }
   };
 
-  const handleAdvanceTripStep = () => {
+  const handleAdvanceTripStep = async () => {
     if (!currentActiveTrip) return;
-
-    if (tripStep === 'heading_pickup') {
-      if (audioEnabled) playTactileBlip(1000);
-      setTripStep('picked_up');
-      advanceLiveOrderStep(currentActiveTrip.id, 'picked_up');
-    } else if (tripStep === 'picked_up') {
-      if (audioEnabled) playEngineRev();
-      setTripStep('navigating');
-      advanceLiveOrderStep(currentActiveTrip.id, 'in_transit');
-    } else if (tripStep === 'navigating') {
+    setDispatchActionPending(true); setDispatchError('');
+    try {
+      if (tripStep === 'heading_pickup') {
+        await advanceLiveOrderStep(currentActiveTrip.id, 'picked_up');
+        if (audioEnabled) playTactileBlip(1000);
+        setTripStep('picked_up');
+      } else if (tripStep === 'picked_up') {
+        await advanceLiveOrderStep(currentActiveTrip.id, 'in_transit');
+        if (audioEnabled) playEngineRev();
+        setTripStep('navigating');
+      } else if (tripStep === 'navigating') {
+        await advanceLiveOrderStep(currentActiveTrip.id, 'completed');
       // Complete Trip!
       if (audioEnabled) playLevelUpFanfare();
       confetti({
@@ -317,8 +378,6 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
 
       onAddEarnings(currentActiveTrip.netFare);
       onGainXp(currentActiveTrip.xpReward, `ส่งงานสำเร็จ: ${currentActiveTrip.serviceTitle}`);
-
-      advanceLiveOrderStep(currentActiveTrip.id, 'completed');
 
       const receiptOrder: LiveRideOrder = {
         id: currentActiveTrip.id,
@@ -350,7 +409,11 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
         setCurrentActiveTrip(null);
         setTripStep('heading_pickup');
       }, 3500);
-    }
+      }
+    } catch (error) {
+      console.error('Trip transition failed:', error);
+      setDispatchError('อัปเดตขั้นตอนการเดินทางไม่สำเร็จ สถานะเดิมยังคงอยู่ กรุณาลองอีกครั้ง');
+    } finally { setDispatchActionPending(false); }
   };
 
   const formatOnlineTime = (mins: number) => {
@@ -361,6 +424,11 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
 
   return (
     <div className="space-y-4">
+      {dispatchError && (
+        <div role="alert" className="rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-200">
+          {dispatchError}
+        </div>
+      )}
       {/* 1. ON-DUTY / STANDBY HERO CONTROL CARD */}
       <div className={`p-4 sm:p-5 rounded-3xl border-2 transition-all relative overflow-hidden ${
         isOnDuty
@@ -846,6 +914,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
               <button
                 type="button"
                 onClick={handleDeclineJob}
+                disabled={dispatchActionPending}
                 className="w-1/3 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white font-bold text-xs font-mono transition-all"
               >
                 ปฏิเสธ (ส่งต่อ)
@@ -854,10 +923,11 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
               <button
                 type="button"
                 onClick={handleConfirmAccept}
+                disabled={dispatchActionPending}
                 className="w-2/3 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-400 via-[#00D2FF] to-blue-500 hover:brightness-110 text-slate-950 font-black text-sm font-mono shadow-[0_0_30px_rgba(0,210,255,0.6)] flex items-center justify-center gap-2 transition-all active:scale-95 animate-pulse"
               >
                 <CheckCircle2 className="w-5 h-5 text-slate-950" />
-                <span>กดรับงานทันที (฿{activeIncomingJob.netFare})</span>
+                <span>{dispatchActionPending ? 'กำลังยืนยันกับระบบ…' : `กดรับงานทันที (฿${activeIncomingJob.netFare})`}</span>
               </button>
             </div>
           </div>

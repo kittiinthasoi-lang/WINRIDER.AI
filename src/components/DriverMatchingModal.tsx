@@ -86,7 +86,7 @@ interface DriverMatchingModalProps {
   isAutoSelectedVehicle?: boolean;
   onClose: () => void;
   onDestinationChange: (destination: string) => void;
-  onConfirmMatch: (driver: MatchedDriver) => void;
+  onConfirmMatch: (driver: MatchedDriver | null) => void;
   onSelectLifestylePlace?: (place: LifestylePlace) => void;
   onSelectReligiousDestination?: (placeName: string, distanceKm?: number) => void;
   onChangeCustomerGender?: (gender: 'female' | 'male') => void;
@@ -141,14 +141,6 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     serviceId === 'link' ? 'transit_hub' : 'drivers'
   );
 
-  // Mutual Consent & Pre-Ride Detail Chat Dialog
-  const [showConsentModal, setShowConsentModal] = useState<boolean>(false);
-  const [consentDriver, setConsentDriver] = useState<MatchedDriver | null>(null);
-  const [preTripNote, setPreTripNote] = useState<string>('');
-  const [consentAgreed, setConsentAgreed] = useState<boolean>(false);
-  const [consentMessages, setConsentMessages] = useState<{ sender: 'user' | 'driver'; text: string; time: string }[]>([]);
-  const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false);
-
   // Sync prop gender
   useEffect(() => {
     setCurrentGender(customerGender);
@@ -163,14 +155,16 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     let active = true;
     setDriversLoading(true);
     setDriversError(null);
-    fetchLiveDrivers().then((drivers) => {
+    fetchLiveDrivers(geo.isRealGps && geo.latitude !== null && geo.longitude !== null
+      ? { latitude: geo.latitude, longitude: geo.longitude }
+      : undefined).then((drivers) => {
       if (active) setLiveDrivers(drivers);
     }).catch((error) => {
       console.error('Unable to load live drivers:', error);
       if (active) { setLiveDrivers([]); setDriversError('ไม่สามารถเชื่อมต่อรายชื่อพี่วินจากระบบจริงได้'); }
     }).finally(() => { if (active) setDriversLoading(false); });
     return () => { active = false; };
-  }, [matchingStarted]);
+  }, [matchingStarted, geo.isRealGps, geo.latitude, geo.longitude]);
 
   // Criteria rules based on service and gender
   const serviceCriteria = useMemo(() => {
@@ -280,6 +274,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   // Filter available drivers according to service and gender rules, plus Dream Ride vehicle matching
   const candidateDrivers = useMemo(() => {
     return liveDrivers.filter(driver => {
+      const capabilities = [...driver.certifications, ...driver.specialtyTags].join(' ').toLowerCase();
       if (serviceId === 'express') {
         return driver.level >= 10 && driver.hasDeliveryBox;
       }
@@ -294,10 +289,13 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
         }
       }
       if (serviceId === 'spirit') {
-        return driver.level >= 20;
+        return driver.level >= 20 && ['spirit', 'ผู้สูงอายุ', 'ศาสนา', 'elder'].some((tag) => capabilities.includes(tag));
       }
       if (serviceId === 'family') {
-        return driver.level >= 15;
+        return driver.level >= 15 && ['family', 'เด็ก', 'ผู้สูงอายุ', 'ผู้พิการ', 'child', 'elder', 'disabled'].some((tag) => capabilities.includes(tag));
+      }
+      if (serviceId === 'pet') {
+        return ['pet', 'สัตว์'].some((tag) => capabilities.includes(tag));
       }
       if (serviceId === 'lifestyle') {
         return driver.specialtyTags.some(t => t.includes('Lifestyle') || t.includes('คาเฟ่') || t.includes('สตรีทฟู้ด'));
@@ -401,10 +399,9 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     setMatchingStep(driversLoading ? 'scanning' : 'results');
     setMatchingProgress(driversLoading ? 40 : 100);
     if (!driversLoading && candidateDrivers.length > 0) {
-      setSelectedDriver(candidateDrivers[0]);
       if (audioEnabled) {
         playTactileBlip(1200);
-        speakThaiText(`พบอัศวินที่ออนไลน์และผ่านเกณฑ์จากระบบจริง: ${candidateDrivers[0].name}`);
+        speakThaiText(`พบอัศวินที่ออนไลน์และผ่านเกณฑ์ ${candidateDrivers.length} คน คุณเลือกเองหรือให้ระบบจับคู่คนที่ใกล้ที่สุดได้`);
       }
     } else if (!driversLoading && audioEnabled) {
       playTactileBlip(500);
@@ -437,75 +434,15 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     }
   };
 
-  // Open consent dialog when custom choosing a driver
   const handleInitiateConsent = (driver: MatchedDriver) => {
     if (audioEnabled) playTactileBlip(1100);
-    setConsentDriver(driver);
-    setShowConsentModal(true);
-    setConsentAgreed(false);
-    
-    const defaultNote = serviceId === 'mu' 
-      ? 'ขอให้พาไหว้พระขอพรและแนะนำบทสวดมนต์ที่ถูกต้อง พร้อมช่วยถือของไหว้'
-      : serviceId === 'spirit'
-      ? 'ขอให้ช่วยประคองคุณตา/คุณยายขึ้นลงรถอย่างระมัดระวัง และรอรับกลับหลังเสร็จสิ้นศาสนกิจ'
-      : 'ยินดีปฏิบัติตามมาตรฐานความปลอดภัยและการบริการอย่างสุภาพ';
-    
-    setPreTripNote(defaultNote);
-    
-    // Seed initial message exchange
-    setConsentMessages([
-      {
-        sender: 'driver',
-        text: `สวัสดีครับ/ค่ะ ผม/ดิฉัน ${driver.nickname} (เลเวล ${driver.level}) ยินดีให้บริการครับ/ค่ะ กรุณาระบุรายละเอียดที่ต้องการให้ดูแลเพิ่มเติม หรือสอบถามเงื่อนไขได้เลยครับ/ค่ะ`,
-        time: 'เมื่อสักครู่'
-      }
-    ]);
-  };
-
-  const handleSendConsentMessage = () => {
-    if (!preTripNote.trim() || !consentDriver) return;
-    if (audioEnabled) playTactileBlip(1300);
-    
-    const userMsg = preTripNote.trim();
-    const newMessages = [
-      ...consentMessages,
-      { sender: 'user' as const, text: userMsg, time: 'ตอนนี้' }
-    ];
-    setConsentMessages(newMessages);
-    setIsSendingMessage(true);
-    
-    setTimeout(() => {
-      setIsSendingMessage(false);
-      const replyMsg = serviceId === 'mu'
-        ? `ยินดีรับงานและเข้าใจรายละเอียดเรียบร้อยแล้วครับ/ค่ะ พร้อมพาไหว้ตามเส้นทางและมีบทสวดมนต์จัดเตรียมไว้ให้เรียบร้อยครับ`
-        : serviceId === 'spirit'
-        ? `เข้าใจและพร้อมดูแลผู้สูงอายุอย่างนุ่มนวล ปลอดภัย และจะคอยรอรับกลับตามเวลาที่กำหนดแน่นอนครับ/ค่ะ`
-        : `รับทราบรายละเอียดเรียบร้อยครับ/ค่ะ ยินดีรับงานและออกเดินทางทันทีครับ`;
-      
-      setConsentMessages([
-        ...newMessages,
-        { sender: 'driver' as const, text: replyMsg, time: 'ตอนนี้' }
-      ]);
-      setConsentAgreed(true);
-      if (audioEnabled) {
-        playTactileBlip(1500);
-        speakThaiText(`พี่วิน ${consentDriver.nickname} ให้ความยินยอมและตอบรับข้อตกลงเรียบร้อยแล้ว`);
-      }
-    }, 900);
-  };
-
-  const handleConfirmConsent = () => {
-    if (!consentDriver) return;
-    setSelectedDriver(consentDriver);
-    setShowConsentModal(false);
-    if (audioEnabled) playTactileBlip(1200);
+    setSelectedDriver(driver);
   };
 
   const handleConfirm = () => {
-    if (!selectedDriver) return;
     if (audioEnabled) {
       playRadarScan();
-      speakThaiText(`ยืนยันเรียกรถ ${selectedDriver.nickname} มารับเรียบร้อยแล้ว`);
+      speakThaiText(selectedDriver ? `ส่งคำขอถึง ${selectedDriver.nickname} ก่อน หากไม่ตอบรับระบบจะส่งต่ออัตโนมัติ` : 'ยืนยันให้ระบบจับคู่พี่วินที่ใกล้ที่สุดและผ่านเงื่อนไขบริการ');
     }
     confetti({
       particleCount: 70,
@@ -911,7 +848,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                               className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] text-cyan-300 border border-cyan-500/30 flex items-center gap-1 font-mono transition-all"
                             >
                               <MessageSquare className="w-2.5 h-2.5" />
-                              <span>ถามรายละเอียด/ขอความยินยอม</span>
+                              <span>เลือกพี่วินคนนี้</span>
                             </button>
                           </div>
                         </div>
@@ -971,7 +908,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                         <p className="text-[9px] text-slate-300 line-clamp-1">{othDriver.vehicleModel}</p>
                         <button className="w-full py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-mono font-bold flex items-center justify-center gap-1">
                           <MessageSquare className="w-2.5 h-2.5" />
-                          <span>ขอความยินยอม & แชต</span>
+                          <span>เลือกพี่วินคนนี้</span>
                         </button>
                       </div>
                     ))}
@@ -1367,170 +1304,25 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                   ยกเลิก
                 </button>
                 <button
+                  type="button"
+                  onClick={() => setSelectedDriver(null)}
+                  className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${!selectedDriver ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300' : 'border-white/15 bg-white/5 text-slate-300'}`}
+                >
+                  จับคู่อัตโนมัติใกล้ที่สุด
+                </button>
+                <button
                   onClick={handleConfirm}
-                  disabled={!selectedDriver}
+                  disabled={!matchingStarted || driversLoading}
                   className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>ยืนยันให้อัศวินออกมารับทันที</span>
+                  <span>{selectedDriver ? `ส่งคำขอถึง ${selectedDriver.nickname}` : 'ยืนยันจับคู่อัตโนมัติ'}</span>
                 </button>
               </div>
             </div>
           );
         })()}
 
-        {/* DIALOG: DRIVER CONSENT & PRE-TRIP DETAIL CONFIRMATION MODAL */}
-        {showConsentModal && consentDriver && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90 backdrop-blur-lg animate-fade-in">
-            <div className="relative w-full max-w-lg bg-[#0C1B38] rounded-3xl border-2 border-amber-400/80 p-5 shadow-[0_0_50px_rgba(245,158,11,0.5)] space-y-4 max-h-[90vh] overflow-y-auto">
-              
-              {/* Consent Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shadow-lg">
-                    <UserCheck className="w-5 h-5 text-slate-950" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-white flex items-center gap-1.5">
-                      <span>ขอความสมัครใจ & ตกลงรายละเอียดก่อนเริ่มงาน</span>
-                    </h3>
-                    <p className="text-[10px] text-amber-300 font-mono">
-                      ระบบให้ความยินยอมสองฝ่าย (Mutual Consent & Pre-Ride Agreement)
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setShowConsentModal(false)}
-                  className="p-1 rounded-xl text-slate-400 hover:text-white"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Driver Info Card */}
-              <div className="p-3 rounded-2xl bg-black/50 border border-white/10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl overflow-hidden border border-amber-400 flex items-center justify-center flex-shrink-0 shadow-lg">
-                    <img
-                      src={consentDriver.imageUrl || (consentDriver.gender === 'female' ? '/images/avatar_driver_female.jpg' : '/images/avatar_driver_male.jpg')}
-                      alt={consentDriver.name}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white">{consentDriver.name} ({consentDriver.nickname})</h4>
-                    <span className="text-[10px] font-mono text-[#FFD700] flex items-center gap-1">
-                      LV.{consentDriver.level} • {consentDriver.gender === 'female' ? 'สุภาพสตรี' : 'สุภาพบุรุษ'} • {consentDriver.tierName}
-                    </span>
-                    <p className="text-[10px] text-slate-300 mt-0.5">{consentDriver.vehicleModel}</p>
-                  </div>
-                </div>
-                <div className="text-right font-mono text-[10px]">
-                  <span className="text-emerald-400 font-bold block">★ {consentDriver.rating.toFixed(2)}</span>
-                  <span className="text-slate-400">{consentDriver.totalTrips} เที่ยว</span>
-                </div>
-              </div>
-
-              {/* Notice Banner */}
-              <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-[11px] text-amber-200 space-y-1">
-                <div className="flex items-center gap-1 font-bold">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                  <span>เงื่อนไขการให้บริการด้วยความสมัครใจ:</span>
-                </div>
-                <p className="text-[10px] text-slate-300 leading-relaxed pl-4">
-                  เพื่อความปลอดภัยและความสบายใจสูงสุดของทั้งผู้โดยสารและพี่วิน 
-                  {currentGender !== consentDriver.gender && ' (กรณีเลือกผู้ให้บริการต่างเพศ)'} 
-                  ระบบเปิดให้ส่งข้อความระบุขอบเขตงานและความต้องการพิเศษ โดยพี่วินต้องกดให้ความยินยอมก่อนเริ่มการเดินทาง
-                </p>
-              </div>
-
-              {/* Simulated Chat Feed */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono text-slate-400 font-bold block">
-                  บทสนทนาตกลงเงื่อนไข (Pre-Trip Chat):
-                </span>
-                <div className="p-3 rounded-2xl bg-black/60 border border-white/10 min-h-32 max-h-44 overflow-y-auto space-y-2">
-                  {consentMessages.map((msg, mIdx) => (
-                    <div
-                      key={mIdx}
-                      className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
-                    >
-                      <div
-                        className={`max-w-[85%] p-2.5 rounded-2xl text-xs leading-relaxed ${
-                          msg.sender === 'user'
-                            ? 'bg-cyan-600 text-white rounded-br-none'
-                            : 'bg-white/10 text-slate-200 rounded-bl-none border border-white/10'
-                        }`}
-                      >
-                        <span className="text-[9px] font-mono text-white/70 block mb-0.5">
-                          {msg.sender === 'user' ? 'ผู้โดยสาร' : `${consentDriver.nickname} (พี่วิน)`} • {msg.time}
-                        </span>
-                        {msg.text}
-                      </div>
-                    </div>
-                  ))}
-                  {isSendingMessage && (
-                    <div className="text-[10px] text-cyan-300 font-mono animate-pulse">
-                      พี่วินกำลังอ่านรายละเอียดและพิมพ์ตอบกลับ...
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Message Input / Special Detail Form */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-mono text-slate-300 font-bold block">
-                  ระบุรายละเอียดที่ต้องการสอบถามหรือให้ดูแลเป็นพิเศษ:
-                </span>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={preTripNote}
-                    onChange={(e) => setPreTripNote(e.target.value)}
-                    placeholder="เช่น ช่วยพาไหว้พระ 3 วัด, ช่วยพยุงคุณตาขึ้นมัสยิด, หรือเดินทางเวลากลางคืน..."
-                    className="flex-1 px-3 py-2 rounded-xl bg-black/50 border border-white/15 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
-                  />
-                  <button
-                    onClick={handleSendConsentMessage}
-                    disabled={!preTripNote.trim() || isSendingMessage}
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1 disabled:opacity-50"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>ส่ง</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Consent Agreement Box */}
-              <div className="p-3 rounded-2xl bg-[#091224] border border-cyan-500/30 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center ${consentAgreed ? 'bg-emerald-500 text-slate-950' : 'bg-white/10 text-slate-500'}`}>
-                    <Check className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-white block">
-                      {consentAgreed ? 'พี่วินตกลงและยินดีรับงานแล้ว 100%' : 'รอการตกลงรายละเอียดและยินยอม'}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {consentAgreed ? 'ทั้งสองฝ่ายเห็นพ้องในเงื่อนไขการเดินทาง' : 'กดส่งรายละเอียดด้านบนเพื่อรับการตอบรับ'}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleConfirmConsent}
-                  disabled={!consentAgreed}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg disabled:opacity-40 transition-all"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>เลือกพี่วินคนนี้</span>
-                </button>
-              </div>
-
-            </div>
-          </div>
-        )}
 
       </div>
     </div>

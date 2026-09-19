@@ -22,7 +22,7 @@ import { AIProductPhotoVerifier, AIVerificationResult } from './AIProductPhotoVe
 import { SpecializedServicePreMatchingModal, SpecializedPreMatchingData } from './SpecializedServicePreMatchingModal';
 import { ServicePhotoVerificationModal } from './ServicePhotoVerificationModal';
 import { CustomerPaymentQrCodeModal } from './CustomerPaymentQrCodeModal';
-import { createLiveOrder, subscribeToLiveOrders, getOrdersForPassenger, fetchFirestoreOrdersForUser, LiveRideOrder } from '../utils/dispatchSync';
+import { createLiveOrder, cancelLiveOrder, subscribeToLiveOrders, getOrdersForPassenger, fetchFirestoreOrdersForUser, fetchMyOrders, getAuthHeaders, LiveRideOrder } from '../utils/dispatchSync';
 import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
@@ -321,6 +321,49 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     return () => unsub();
   }, [currentUserSession?.id]);
 
+  // Cross-device synchronization: BroadcastChannel only covers tabs on one device,
+  // so the active ride is also refreshed from the trusted server.
+  React.useEffect(() => {
+    if (!currentUserSession?.id) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const orders = await fetchMyOrders();
+        if (cancelled) return;
+        setUserRideHistory(orders);
+        setActiveLiveOrder((previous) => {
+          if (!previous) return previous;
+          const latest = orders.find((order) => order.id === previous.id);
+          return latest || previous;
+        });
+        const currentLatest = activeLiveOrder ? orders.find((order) => order.id === activeLiveOrder.id) : undefined;
+        if (currentLatest?.status === 'completed') setRidePhase('arrived_destination');
+        const active = orders.find((order) => !['completed', 'cancelled'].includes(order.status));
+        if (active) {
+          setActiveLiveOrder(active);
+          if (active.status === 'heading_pickup' || active.status === 'accepted' || active.status === 'pending') setRidePhase('picking_up');
+          if (active.status === 'picked_up') setRidePhase('arrived_pickup');
+          if (active.status === 'in_transit') setRidePhase('in_transit');
+          if (active.driverUserId && active.driverName) {
+            setCurrentMatchedDriver((previous) => ({
+              id: active.driverUserId || previous?.id || '', name: active.driverName || previous?.name || 'พี่วิน', nameEn: active.driverName || 'Knight', nickname: active.driverName || 'พี่วิน',
+              gender: previous?.gender || 'male', level: active.driverLevel || previous?.level || 1, tierName: previous?.tierName || 'WIN Knight',
+              rating: active.driverRating || previous?.rating || 0, totalTrips: previous?.totalTrips || 0, phone: active.driverPhone || '', avatarEmoji: active.driverAvatarEmoji || '🏍️',
+              imageUrl: previous?.imageUrl, vehicleModel: active.driverVehicle || previous?.vehicleModel || 'มอเตอร์ไซค์รับจ้าง', plateNumber: active.driverPlate || '',
+              hasDeliveryBox: previous?.hasDeliveryBox, certifications: previous?.certifications || [], specialtyTags: previous?.specialtyTags || [], distanceKm: previous?.distanceKm || 0,
+              etaMinutes: previous?.etaMinutes || 0, bio: previous?.bio || '', serviceMatchScore: previous?.serviceMatchScore || 0,
+            }));
+          }
+        }
+      } catch (error) {
+        console.warn('Passenger ride refresh failed:', error);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(refresh, 4000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [currentUserSession?.id, activeLiveOrder?.id]);
+
   // Cross-tab Live Dispatch Listener: updates passenger UI when Knight accepts or advances trip
   React.useEffect(() => {
     const unsubscribe = subscribeToLiveOrders((order, type) => {
@@ -445,15 +488,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setTimeout(() => {
       setIsAiSpeaking(false);
     }, 4500);
-  };
-
-  // Switch phase handler with optional auto voice
-  const handleSwitchRidePhase = (newPhase: 'picking_up' | 'arrived_pickup' | 'in_transit' | 'arrived_destination') => {
-    if (audioEnabled) playTactileBlip(950);
-    setRidePhase(newPhase);
-    if (isAutoVoiceAnnounce) {
-      speakRideAiAnnouncement(newPhase);
-    }
   };
 
   // --- Citizen Level & XP System for Customer Profile (Progressive Proportional Scaling) ---
@@ -857,13 +891,15 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setShowDriverMatchingModal(true);
   };
 
-  const handleConfirmMatch = (driver: MatchedDriver) => {
+  const handleConfirmMatch = (driver: MatchedDriver | null) => {
     setCurrentMatchedDriver(driver);
     setShowDriverMatchingModal(false);
     setShowBookingModal(true);
     if (audioEnabled) {
       playRadarScan();
-      speakThaiText(`จับคู่กับ ${driver.name} เลเวล ${driver.level} เรียบร้อย กรุณายืนยันการเดินทาง`);
+      speakThaiText(driver
+        ? `ระบบจะส่งคำขอถึง ${driver.name} ก่อน หากไม่ตอบรับจะส่งต่ออัตโนมัติ กรุณายืนยันการเดินทาง`
+        : 'ระบบจะจับคู่พี่วินที่ใกล้ที่สุดและผ่านเงื่อนไขบริการ กรุณายืนยันการเดินทาง');
     }
   };
 
@@ -892,17 +928,40 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       const familyPickupLocation = activeServiceId === 'family'
         ? preMatchingData?.family?.pickupSpecificPoint.trim()
         : '';
-      const pickupLocation = familyPickupLocation || await new Promise<string>((resolve, reject) => {
+      const currentPosition = await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
         if (typeof navigator === 'undefined' || !navigator.geolocation) {
           reject(new Error('GPS_UNAVAILABLE'));
           return;
         }
         navigator.geolocation.getCurrentPosition(
-          (position) => resolve(`GPS ${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`),
+          (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
           () => reject(new Error('GPS_PERMISSION_OR_FIX_FAILED')),
           { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
         );
       });
+      let pickupCoord = currentPosition;
+      let pickupLocation = `GPS ${currentPosition.lat.toFixed(5)}, ${currentPosition.lng.toFixed(5)}`;
+      if (familyPickupLocation) {
+        const response = await fetch('/api/places/resolve-routes', {
+          method: 'POST', headers: await getAuthHeaders(),
+          body: JSON.stringify({ latitude: currentPosition.lat, longitude: currentPosition.lng, places: [{ key: 'family-pickup', query: `${familyPickupLocation} ประเทศไทย` }] }),
+        });
+        const payload = await response.json() as { routes?: Array<{ latitude: number; longitude: number; address: string }> };
+        const resolved = payload.routes?.[0];
+        if (!response.ok || !resolved) throw new Error('PICKUP_LOCATION_NOT_RESOLVED');
+        pickupCoord = { lat: resolved.latitude, lng: resolved.longitude };
+        pickupLocation = resolved.address || familyPickupLocation;
+      }
+      const destinationResponse = await fetch('/api/places/resolve-routes', {
+        method: 'POST', headers: await getAuthHeaders(),
+        body: JSON.stringify({ latitude: pickupCoord.lat, longitude: pickupCoord.lng, places: [{ key: 'ride-destination', query: `${selectedDestination} ประเทศไทย` }] }),
+      });
+      const destinationPayload = await destinationResponse.json() as { routes?: Array<{ latitude: number; longitude: number; address: string; distanceKm: number; etaMinutes: number | null }> };
+      const resolvedDestination = destinationPayload.routes?.[0];
+      if (!destinationResponse.ok || !resolvedDestination) throw new Error('DESTINATION_NOT_RESOLVED');
+      const resolvedDistanceKm = resolvedDestination.distanceKm;
+      const resolvedDistanceFare = resolvedDistanceKm <= 1 ? 0 : Math.round((resolvedDistanceKm - 1) * 7.5);
+      const resolvedFare = 15 + resolvedDistanceFare + expressBoxFee + selectedDreamRide.priceAddon + amenitiesSummary.totalPrice + 5 + serviceAddonFee;
       if (audioEnabled) playRadarScan();
       const pName = currentUserSession.name || passengerProfileData.displayName;
       const pPhone = currentUserSession.phone || '';
@@ -914,9 +973,14 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         passengerName: `${pName} (${currentUserSession.level ? `LV.${currentUserSession.level}` : 'Citizen'})`,
         passengerPhone: pPhone,
         pickupLocation,
-        dropoffLocation: selectedDestination,
-        distanceKm: tripDistanceKm,
-        fare: totalCalculatedFare || 45
+        dropoffLocation: resolvedDestination.address || selectedDestination,
+        distanceKm: resolvedDistanceKm,
+        fare: resolvedFare,
+        pickupCoord,
+        dropoffCoord: { lat: resolvedDestination.latitude, lng: resolvedDestination.longitude },
+        estMinutes: resolvedDestination.etaMinutes || undefined,
+        customerGender,
+        preferredDriverId: currentMatchedDriver?.id,
       });
       setActiveLiveOrder(liveOrder);
       setBookingConfirmed(true);
@@ -940,6 +1004,21 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       speakThaiText("สัญญาณฉุกเฉิน SOS ส่งถึงศูนย์บัญชาการ Cosmo-Ko และอัศวินรอบข้างในรัศมี 1 กิโลเมตรแล้ว");
     }
     setIsSosActive(true);
+  };
+
+  const handleCancelActiveRide = async () => {
+    if (!activeLiveOrder || ['completed', 'cancelled'].includes(activeLiveOrder.status)) return;
+    if (!window.confirm('ยืนยันยกเลิกการเรียกรถรายการนี้?')) return;
+    setBookingError(null);
+    try {
+      const cancelled = await cancelLiveOrder(activeLiveOrder.id);
+      if (cancelled) setActiveLiveOrder(cancelled);
+      setCurrentMatchedDriver(null);
+      if (audioEnabled) speakThaiText('ยกเลิกการเรียกรถเรียบร้อยแล้ว');
+    } catch (error) {
+      console.error('Cancel ride failed:', error);
+      setBookingError('ยกเลิกการเรียกรถไม่สำเร็จ กรุณาลองอีกครั้ง');
+    }
   };
 
   const handleAddC2c = (e: React.FormEvent) => {
@@ -1600,6 +1679,16 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   onEmergencyClick={handleTriggerSos}
                 />
 
+                {activeLiveOrder && !['completed', 'cancelled'].includes(activeLiveOrder.status) && (
+                  <button
+                    type="button"
+                    onClick={handleCancelActiveRide}
+                    className="w-full rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-200 hover:bg-rose-500/20"
+                  >
+                    ยกเลิกการเรียกรถรายการนี้
+                  </button>
+                )}
+
                 {/* Knight Driver & Chosen Dream Ride Card (ข้อมูลโปรไฟล์พี่วิน & รถในฝัน) */}
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0D1C38] via-[#09142B] to-[#070D1E] border border-[#FFD700]/50 space-y-3 shadow-[0_0_20px_rgba(255,215,0,0.15)]">
                   <div className="flex items-center justify-between">
@@ -1835,68 +1924,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       </button>
                     </div>
                   </div>
-
-                  {/* Live Interactive Phase Selector (Simulator) */}
-                  <div className="space-y-1.5 font-mono">
-                    <div className="flex items-center justify-between text-[10px] text-slate-400">
-                      <span>ขั้นตอนการเดินทางจำลอง (สลับดูสถานะ):</span>
-                      <span className="text-amber-300">คลิกเพื่อเปลี่ยนสถานะ & ฟังเสียง</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
-                      <button
-                        type="button"
-                        onClick={() => handleSwitchRidePhase('picking_up')}
-                        className={`p-2 rounded-xl border text-left transition-all ${
-                          ridePhase === 'picking_up'
-                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-md font-bold'
-                            : 'bg-black/40 border-white/10 text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="block text-[11px]">1. 🛵 พี่วินกำลังมา</span>
-                        <span className="text-[9px] text-amber-300">อีก ~{pickupEtaMinutes} นาที</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSwitchRidePhase('arrived_pickup')}
-                        className={`p-2 rounded-xl border text-left transition-all ${
-                          ridePhase === 'arrived_pickup'
-                            ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-md font-bold'
-                            : 'bg-black/40 border-white/10 text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="block text-[11px]">2. 📍 ถึงจุดรับแล้ว</span>
-                        <span className="text-[9px] text-emerald-300">รอขึ้นรถ</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSwitchRidePhase('in_transit')}
-                        className={`p-2 rounded-xl border text-left transition-all ${
-                          ridePhase === 'in_transit'
-                            ? 'bg-purple-500/20 border-purple-400 text-purple-300 shadow-md font-bold'
-                            : 'bg-black/40 border-white/10 text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="block text-[11px]">3. 🚀 มุ่งหน้าจุดหมาย</span>
-                        <span className="text-[9px] text-purple-300">อีก ~{destEtaMinutes} นาที</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSwitchRidePhase('arrived_destination')}
-                        className={`p-2 rounded-xl border text-left transition-all ${
-                          ridePhase === 'arrived_destination'
-                            ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md font-bold'
-                            : 'bg-black/40 border-white/10 text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="block text-[11px]">4. 🏁 ถึงปลายทาง</span>
-                        <span className="text-[9px] text-amber-300">เสร็จสิ้นทริป</span>
-                      </button>
-                    </div>
-
+                  <div className="space-y-2 font-mono">
                     {/* In-Ride Tactical Actions: Chat, PromptPay QR, Real GPS Navigation */}
                     <div className="grid grid-cols-3 gap-2 pt-2">
                       <button

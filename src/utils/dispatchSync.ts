@@ -37,6 +37,13 @@ export interface LiveRideOrder {
   platformFee?: number;
   ratingGiven?: number;
   reviewComment?: string;
+  pickupCoord?: { lat: number; lng: number };
+  dropoffCoord?: { lat: number; lng: number };
+  customerGender?: 'female' | 'male';
+  preferredDriverId?: string;
+  offeredDriverId?: string;
+  offerExpiresAt?: string;
+  dispatchMode?: 'preferred' | 'automatic';
 }
 
 type OrderEventCallback = (order: LiveRideOrder, eventType: 'created' | 'accepted' | 'step_changed' | 'completed') => void;
@@ -199,6 +206,10 @@ export async function createLiveOrder(orderInput: {
   distanceKm: number;
   fare: number;
   estMinutes?: number;
+  pickupCoord: { lat: number; lng: number };
+  dropoffCoord?: { lat: number; lng: number };
+  customerGender?: 'female' | 'male';
+  preferredDriverId?: string;
 }): Promise<LiveRideOrder> {
   if (!orderInput.passengerUserId) throw new Error('AUTHENTICATED_PASSENGER_REQUIRED');
   const now = new Date().toISOString();
@@ -226,6 +237,10 @@ export async function createLiveOrder(orderInput: {
     status: 'pending',
     createdAt: now,
     updatedAt: now,
+    pickupCoord: orderInput.pickupCoord,
+    ...(orderInput.dropoffCoord ? { dropoffCoord: orderInput.dropoffCoord } : {}),
+    ...(orderInput.customerGender ? { customerGender: orderInput.customerGender } : {}),
+    ...(orderInput.preferredDriverId ? { preferredDriverId: orderInput.preferredDriverId } : {}),
   };
 
   // Server API is the single source of truth for ride creation.
@@ -244,7 +259,7 @@ export async function createLiveOrder(orderInput: {
   saveLocalLiveOrders(orders);
 
   // Broadcast to other tabs
-  broadcastEvent(newOrder, 'created');
+  broadcastEvent(persistedOrder, 'created');
 
   // Trigger Low-Code Webhook (Make.com, Zapier, Google Sheets, LINE OA)
   if (isAutoDispatchEnabled()) {
@@ -264,7 +279,7 @@ export async function createLiveOrder(orderInput: {
     dispatchToWebhook(payload).catch((e) => console.warn('Webhook auto-dispatch:', e));
   }
 
-  return newOrder;
+  return persistedOrder;
 }
 
 /**
@@ -369,18 +384,6 @@ export async function advanceLiveOrderStep(
   orderId: string,
   newStatus: LiveRideOrder['status']
 ): Promise<LiveRideOrder | null> {
-  const orders = getLocalLiveOrders();
-  const orderIndex = orders.findIndex((o) => o.id === orderId);
-  if (orderIndex < 0) return null;
-
-  const updatedOrder: LiveRideOrder = {
-    ...orders[orderIndex],
-    status: newStatus,
-    updatedAt: new Date().toISOString(),
-  };
-  orders[orderIndex] = updatedOrder;
-  saveLocalLiveOrders(orders);
-
   const stepResponse = await fetch(`/api/orders/${orderId}/step`, {
     method: 'POST',
     headers: await getAuthHeaders(),
@@ -389,9 +392,45 @@ export async function advanceLiveOrderStep(
   if (!stepResponse.ok) {
     throw new Error(`ORDER_STEP_FAILED_${stepResponse.status}`);
   }
+  const payload = await stepResponse.json();
+  if (!isValidLiveOrder(payload?.order)) return null;
+  const updatedOrder = payload.order as LiveRideOrder;
+  const orders = getLocalLiveOrders().filter((order) => order.id !== orderId);
+  orders.unshift(updatedOrder);
+  saveLocalLiveOrders(orders);
 
   broadcastEvent(updatedOrder, 'step_changed');
   return updatedOrder;
+}
+
+export async function declineLiveOrder(orderId: string): Promise<void> {
+  const response = await fetch(`/api/orders/${orderId}/decline`, {
+    method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({}),
+  });
+  if (!response.ok) throw new Error(`ORDER_DECLINE_FAILED_${response.status}`);
+}
+
+export async function cancelLiveOrder(orderId: string): Promise<LiveRideOrder | null> {
+  return advanceLiveOrderStep(orderId, 'cancelled');
+}
+
+export async function updateDriverPresence(input: {
+  isOnline: boolean;
+  latitude?: number;
+  longitude?: number;
+  activeVehicleId?: string;
+}): Promise<void> {
+  const response = await fetch('/api/knights/presence', {
+    method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(`DRIVER_PRESENCE_FAILED_${response.status}`);
+}
+
+export async function fetchMyOrders(): Promise<LiveRideOrder[]> {
+  const response = await fetch('/api/orders', { headers: await getAuthHeaders() });
+  if (!response.ok) throw new Error(`ORDER_FETCH_FAILED_${response.status}`);
+  const payload = await response.json();
+  return Array.isArray(payload?.orders) ? payload.orders.filter(isValidLiveOrder) : [];
 }
 
 /**
@@ -409,28 +448,23 @@ export async function completeLiveOrder(
   const orderIndex = orders.findIndex((o) => o.id === orderId);
   if (orderIndex < 0) return null;
 
-  const completedOrder: LiveRideOrder = {
-    ...orders[orderIndex],
-    status: 'completed',
-    tipAmount: summary.tipAmount || 0,
-    ratingGiven: summary.ratingGiven || 5,
-    reviewComment: summary.reviewComment || 'ยอดเยี่ยม ขับขี่ปลอดภัย',
-    updatedAt: new Date().toISOString(),
-  };
-  orders[orderIndex] = completedOrder;
-  saveLocalLiveOrders(orders);
-
   const completeResponse = await fetch(`/api/orders/${orderId}/step`, {
     method: 'POST',
     headers: await getAuthHeaders(),
     body: JSON.stringify({
-      status: 'completed',
-      tipAmount: completedOrder.tipAmount,
+      tipAmount: summary.tipAmount || 0,
+      ratingGiven: summary.ratingGiven || 5,
+      reviewComment: summary.reviewComment || 'ยอดเยี่ยม ขับขี่ปลอดภัย',
     }),
   });
   if (!completeResponse.ok) {
     throw new Error(`ORDER_COMPLETE_FAILED_${completeResponse.status}`);
   }
+  const payload = await completeResponse.json();
+  if (!isValidLiveOrder(payload?.order)) return null;
+  const completedOrder = payload.order as LiveRideOrder;
+  orders[orderIndex] = completedOrder;
+  saveLocalLiveOrders(orders);
 
   broadcastEvent(completedOrder, 'completed');
 

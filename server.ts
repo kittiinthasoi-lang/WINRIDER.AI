@@ -742,6 +742,16 @@ interface ServerOrder {
   tipAmount?: number;
   ratingGiven?: number;
   reviewComment?: string;
+  pickupCoord?: { lat: number; lng: number };
+  dropoffCoord?: { lat: number; lng: number };
+  customerGender?: "female" | "male";
+  preferredDriverId?: string;
+  offeredDriverId?: string;
+  offerExpiresAt?: string;
+  dispatchCandidateIds?: string[];
+  dispatchCandidateIndex?: number;
+  dispatchAttempt?: number;
+  dispatchMode?: "preferred" | "automatic";
 }
 
 function getAdminDb() {
@@ -806,6 +816,87 @@ async function requireEligibleDriver(uid: string) {
   return { user, knight };
 }
 
+function validCoordinates(value: any): value is { lat: number; lng: number } {
+  return value && Number.isFinite(Number(value.lat)) && Number.isFinite(Number(value.lng))
+    && Number(value.lat) >= -90 && Number(value.lat) <= 90
+    && Number(value.lng) >= -180 && Number(value.lng) <= 180;
+}
+
+function distanceKmBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const toRad = (value: number) => value * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const value = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function hasAnyText(values: unknown, needles: string[]) {
+  const haystack = Array.isArray(values) ? values.map(String).join(" ").toLowerCase() : String(values || "").toLowerCase();
+  return needles.some((needle) => haystack.includes(needle.toLowerCase()));
+}
+
+function driverMeetsService(order: ServerOrder, userData: any, knight: any) {
+  const level = Number(knight.level ?? userData.level ?? 1);
+  const certifications = knight.certifications || [];
+  const specialties = knight.specialtyTags || [];
+  switch (order.serviceId) {
+    case "express": return level >= 10 && knight.hasDeliveryBox === true;
+    case "mu": return level >= 15 && (!order.customerGender || userData.gender === order.customerGender);
+    case "spirit": return level >= 20 && hasAnyText([...certifications, ...specialties], ["spirit", "ผู้สูงอายุ", "ศาสนา", "elder"]);
+    case "family": return level >= 15 && hasAnyText([...certifications, ...specialties], ["family", "เด็ก", "ผู้สูงอายุ", "ผู้พิการ", "child", "elder", "disabled"]);
+    case "pet": return hasAnyText([...certifications, ...specialties], ["pet", "สัตว์"]);
+    case "link": return hasAnyText(specialties, ["link", "express", "ขนส่ง", "ส่ง"]);
+    case "lifestyle": return hasAnyText(specialties, ["lifestyle", "คาเฟ่", "ร้านอาหาร", "สตรีทฟู้ด"]);
+    default: return true;
+  }
+}
+
+async function buildDispatchCandidates(order: ServerOrder) {
+  if (!order.pickupCoord || !validCoordinates(order.pickupCoord)) return [] as string[];
+  const [usersSnap, knightsSnap] = await Promise.all([
+    ordersDb.collection("users").where("role", "==", "knight").where("status", "==", "active").get(),
+    ordersDb.collection("knights").where("isOnline", "==", true).get(),
+  ]);
+  const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
+  const now = Date.now();
+  const candidates = knightsSnap.docs.flatMap((doc) => {
+    const knight = doc.data();
+    const userData = usersById.get(doc.id);
+    const kyc = String(knight.kycStatus || "").toLowerCase();
+    const location = knight.lastDispatchLocation;
+    const heartbeatMs = Date.parse(String(knight.dispatchHeartbeatAt || ""));
+    if (!userData || !["approved", "verified"].includes(kyc) || !validCoordinates(location) || !Number.isFinite(heartbeatMs) || now - heartbeatMs > 120_000) return [];
+    if (!driverMeetsService(order, userData, knight)) return [];
+    const distanceKm = distanceKmBetween(order.pickupCoord!, { lat: Number(location.lat), lng: Number(location.lng) });
+    if (distanceKm > 15) return [];
+    return [{ id: doc.id, distanceKm, lastOfferMs: Date.parse(String(knight.lastDispatchOfferAt || "")) || 0, jobsAccepted: Number(knight.dispatchJobsAccepted || 0), tie: crypto.randomInt(0, 1_000_000) }];
+  });
+  if (!candidates.length) return [];
+
+  const closestDistance = Math.min(...candidates.map((candidate) => candidate.distanceKm));
+  const closestBand = candidates.filter((candidate) => candidate.distanceKm <= closestDistance + 0.75)
+    .sort((a, b) => a.lastOfferMs - b.lastOfferMs || a.jobsAccepted - b.jobsAccepted || a.tie - b.tie);
+  const farther = candidates.filter((candidate) => candidate.distanceKm > closestDistance + 0.75)
+    .sort((a, b) => a.distanceKm - b.distanceKm || a.lastOfferMs - b.lastOfferMs || a.tie - b.tie);
+  const ordered = [...closestBand, ...farther].map((candidate) => candidate.id);
+  if (order.preferredDriverId && ordered.includes(order.preferredDriverId)) {
+    return [order.preferredDriverId, ...ordered.filter((id) => id !== order.preferredDriverId)];
+  }
+  return ordered;
+}
+
+function nextDispatchOffer(order: ServerOrder, now = new Date()) {
+  const candidates = Array.isArray(order.dispatchCandidateIds) ? order.dispatchCandidateIds : [];
+  const nextIndex = Number(order.dispatchCandidateIndex ?? -1) + 1;
+  return {
+    offeredDriverId: candidates[nextIndex] || null,
+    dispatchCandidateIndex: nextIndex,
+    dispatchAttempt: Number(order.dispatchAttempt || 0) + 1,
+    offerExpiresAt: candidates[nextIndex] ? new Date(now.getTime() + 30_000).toISOString() : null,
+    updatedAt: now.toISOString(),
+  };
+}
+
 const ordersCollection = ordersDb.collection("rides");
 
 // Approved, online knights for driver-matching. Reads through the trusted Admin
@@ -822,19 +913,77 @@ app.get("/api/knights/available", rateLimit(30), async (req, res) => {
       ordersDb.collection("knights").where("isOnline", "==", true).get(),
     ]);
     const knightsById = new Map(knightsSnap.docs.map((doc) => [doc.id, doc.data()]));
+    const origin = validCoordinates({ lat: Number(req.query.latitude), lng: Number(req.query.longitude) })
+      ? { lat: Number(req.query.latitude), lng: Number(req.query.longitude) }
+      : null;
+    const now = Date.now();
     const knights = usersSnap.docs
       .map((doc) => ({ uid: doc.id, user: doc.data(), knight: knightsById.get(doc.id) }))
       .filter(({ knight }) => {
         const kyc = String((knight as any)?.kycStatus || "").toLowerCase();
-        return knight && ["approved", "verified"].includes(kyc);
+        const heartbeatMs = Date.parse(String((knight as any)?.dispatchHeartbeatAt || ""));
+        return knight && ["approved", "verified"].includes(kyc) && Number.isFinite(heartbeatMs) && now - heartbeatMs <= 120_000;
       })
-      .map(({ uid, user: userData, knight }) => ({ uid, user: userData, knight }));
+      .map(({ uid, user: userData, knight }) => {
+        const driverLocation = validCoordinates((knight as any).lastDispatchLocation) ? (knight as any).lastDispatchLocation : null;
+        const distanceKm = origin && driverLocation ? distanceKmBetween(origin, driverLocation) : null;
+        return {
+          id: uid,
+          name: String(userData.displayName || (knight as any).displayName || "พี่วิน"),
+          nameEn: String(userData.displayNameEn || userData.displayName || "Knight"),
+          nickname: String(userData.nickname || userData.displayName || "พี่วิน"),
+          gender: userData.gender === "female" ? "female" : "male",
+          level: Number((knight as any).level ?? userData.level ?? 1),
+          tierName: String((knight as any).tierName || "WIN Knight"),
+          rating: Number((knight as any).rating ?? userData.rating ?? 0),
+          totalTrips: Number((knight as any).totalTrips || 0),
+          avatarEmoji: String(userData.avatarEmoji || "🏍️"),
+          imageUrl: String(userData.avatarUrl || ""),
+          vehicleModel: String((knight as any).vehicleModel || (knight as any).vehicleType || "มอเตอร์ไซค์รับจ้าง"),
+          plateNumber: String((knight as any).plateNumber || ""),
+          hasDeliveryBox: (knight as any).hasDeliveryBox === true,
+          certifications: Array.isArray((knight as any).certifications) ? (knight as any).certifications : [],
+          specialtyTags: Array.isArray((knight as any).specialtyTags) ? (knight as any).specialtyTags : [],
+          distanceKm,
+          etaMinutes: distanceKm === null ? null : Math.max(1, Math.ceil(distanceKm * 3.5)),
+          bio: String((knight as any).bio || ""),
+        };
+      })
+      .sort((a, b) => (a.distanceKm ?? Number.MAX_VALUE) - (b.distanceKm ?? Number.MAX_VALUE));
 
     return res.json({ knights });
   } catch (error: any) {
     console.error("[Knights Available GET Error]:", error?.message);
     return res.status(503).json({ error: "Knight directory unavailable", knights: [] });
   }
+});
+
+app.post("/api/knights/presence", rateLimit(120), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const [userSnap, knightSnap] = await Promise.all([
+    ordersDb.collection("users").doc(user.uid).get(),
+    ordersDb.collection("knights").doc(user.uid).get(),
+  ]);
+  const userData = userSnap.data() || {};
+  const knight = knightSnap.data() || {};
+  const kyc = String(knight.kycStatus || "").toLowerCase();
+  if (userData.role !== "knight" || userData.status !== "active" || !["approved", "verified"].includes(kyc)) {
+    return res.status(403).json({ error: "Verified active driver account required" });
+  }
+  const isOnline = req.body?.isOnline === true;
+  if (!isOnline && knight.activeRideId) return res.status(409).json({ error: "Complete or cancel the active ride before going offline" });
+  const location = { lat: Number(req.body?.latitude), lng: Number(req.body?.longitude) };
+  if (isOnline && !validCoordinates(location)) return res.status(400).json({ error: "Real GPS is required to go online" });
+  const now = new Date().toISOString();
+  await knightSnap.ref.set({
+    isOnline,
+    dispatchHeartbeatAt: now,
+    ...(isOnline ? { lastDispatchLocation: location } : {}),
+    ...(typeof req.body?.activeVehicleId === "string" ? { activeVehicleId: req.body.activeVehicleId } : {}),
+    updatedAt: now,
+  }, { merge: true });
+  return res.json({ success: true, isOnline, heartbeatAt: now });
 });
 
 app.get("/api/orders", async (req, res) => {
@@ -855,12 +1004,43 @@ app.get("/api/orders", async (req, res) => {
         return res.json({ orders: [] });
       }
       const pendingFreshnessCutoff = Date.now() - 15 * 60 * 1000;
-      const dispatchOrders = allOrders.filter((order) => {
+      const pendingOrders = allOrders.filter((order) => {
         const createdAtMs = Date.parse(order.createdAt);
         return order.status === "pending"
           && order.passengerUserId !== user.uid
           && Number.isFinite(createdAtMs)
           && createdAtMs >= pendingFreshnessCutoff;
+      });
+      const refreshedOrders = await Promise.all(pendingOrders.map(async (order) => {
+        const expiryMs = Date.parse(String(order.offerExpiresAt || ""));
+        const needsCandidates = !Array.isArray(order.dispatchCandidateIds) || order.dispatchCandidateIds.length === 0;
+        const offerExpired = order.offeredDriverId && Number.isFinite(expiryMs) && expiryMs <= Date.now();
+        const missingOffer = !order.offeredDriverId;
+        if (!needsCandidates && !offerExpired && !missingOffer) return order;
+
+        const candidateIds = needsCandidates ? await buildDispatchCandidates(order) : order.dispatchCandidateIds!;
+        const orderRef = ordersCollection.doc(order.id);
+        let refreshed = order;
+        await ordersDb.runTransaction(async (transaction) => {
+          const currentSnap = await transaction.get(orderRef);
+          if (!currentSnap.exists) return;
+          const current = currentSnap.data() as ServerOrder;
+          if (current.status !== "pending") { refreshed = current; return; }
+          const currentExpiry = Date.parse(String(current.offerExpiresAt || ""));
+          if (current.offeredDriverId && Number.isFinite(currentExpiry) && currentExpiry > Date.now()) { refreshed = current; return; }
+          const base = { ...current, dispatchCandidateIds: Array.isArray(current.dispatchCandidateIds) && current.dispatchCandidateIds.length ? current.dispatchCandidateIds : candidateIds };
+          const offer = nextDispatchOffer(base);
+          transaction.update(orderRef, { dispatchCandidateIds: base.dispatchCandidateIds, ...offer });
+          refreshed = { ...base, ...offer } as ServerOrder;
+        });
+        if (refreshed.offeredDriverId) {
+          await ordersDb.collection("knights").doc(refreshed.offeredDriverId).set({ lastDispatchOfferAt: new Date().toISOString() }, { merge: true });
+        }
+        return refreshed;
+      }));
+      const dispatchOrders = refreshedOrders.filter((order) => {
+        const expiryMs = Date.parse(String(order.offerExpiresAt || ""));
+        return order.offeredDriverId === user.uid && Number.isFinite(expiryMs) && expiryMs > Date.now();
       });
       return res.json({ orders: dispatchOrders });
     }
@@ -882,12 +1062,65 @@ app.get("/api/orders", async (req, res) => {
 app.post("/api/orders", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const newOrder = req.body as ServerOrder;
-  if (!newOrder || !newOrder.id || !newOrder.passengerUserId || newOrder.passengerUserId !== user.uid) {
+  const input = req.body as ServerOrder;
+  if (!input || !input.id || !input.passengerUserId || input.passengerUserId !== user.uid) {
     return res.status(400).json({ error: "Invalid order data" });
   }
 
+  const allowedServices = new Set(["knight", "express", "mu", "spirit", "family", "pet", "link", "lifestyle", "food", "backhaul"]);
+  const distanceKm = Number(input.distanceKm);
+  const requestedFare = Number(input.fare);
+  if (!allowedServices.has(String(input.serviceId)) || !validCoordinates(input.pickupCoord)
+    || typeof input.dropoffLocation !== "string" || input.dropoffLocation.trim().length < 3
+    || !Number.isFinite(distanceKm) || distanceKm < 0 || distanceKm > 500
+    || !Number.isFinite(requestedFare) || requestedFare < 10 || requestedFare > 100_000) {
+    return res.status(400).json({ error: "Invalid service, route, or fare data" });
+  }
+
   try {
+    const existingRideSnap = await ordersCollection.where("passengerUserId", "==", user.uid).limit(20).get();
+    const hasActiveRide = existingRideSnap.docs.some((doc) => !["completed", "cancelled"].includes(String(doc.data().status)));
+    if (hasActiveRide) return res.status(409).json({ error: "Passenger already has an active ride" });
+    const passengerSnap = await ordersDb.collection("users").doc(user.uid).get();
+    const passenger = passengerSnap.data() || {};
+    const now = new Date();
+    const welfareFund2Baht = 2;
+    const minimumFare = 15 + Math.max(0, Math.round((distanceKm - 1) * 7.5)) + (input.serviceId === "express" ? 5 : 0) + 5;
+    const fare = Math.max(requestedFare, minimumFare);
+    const normalizedOrder: ServerOrder = {
+      id: String(input.id),
+      serviceId: String(input.serviceId),
+      serviceTitle: String(input.serviceTitle || input.serviceId).slice(0, 120),
+      serviceIconEmoji: String(input.serviceIconEmoji || "🛵").slice(0, 16),
+      passengerUserId: user.uid,
+      passengerName: String(passenger.displayName || input.passengerName || "ผู้โดยสาร").slice(0, 120),
+      passengerPhone: String(passenger.phone || ""),
+      pickupLocation: String(input.pickupLocation || "ตำแหน่ง GPS ปัจจุบัน").slice(0, 300),
+      dropoffLocation: input.dropoffLocation.trim().slice(0, 300),
+      pickupCoord: { lat: Number(input.pickupCoord!.lat), lng: Number(input.pickupCoord!.lng) },
+      ...(validCoordinates(input.dropoffCoord) ? { dropoffCoord: { lat: Number(input.dropoffCoord.lat), lng: Number(input.dropoffCoord.lng) } } : {}),
+      distanceKm,
+      fare,
+      welfareFund2Baht,
+      netFare: Math.max(0, fare - welfareFund2Baht),
+      estMinutes: Math.max(1, Math.min(1440, Math.round(Number(input.estMinutes) || distanceKm * 3.5))),
+      status: "pending",
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      ...(input.customerGender === "female" || input.customerGender === "male" ? { customerGender: input.customerGender } : {}),
+      ...(typeof input.preferredDriverId === "string" && input.preferredDriverId ? { preferredDriverId: input.preferredDriverId } : {}),
+      dispatchMode: input.preferredDriverId ? "preferred" : "automatic",
+    };
+    const candidateIds = await buildDispatchCandidates(normalizedOrder);
+    const firstDriverId = candidateIds[0] || null;
+    const newOrder: ServerOrder = {
+      ...normalizedOrder,
+      dispatchCandidateIds: candidateIds,
+      dispatchCandidateIndex: firstDriverId ? 0 : -1,
+      dispatchAttempt: firstDriverId ? 1 : 0,
+      offeredDriverId: firstDriverId || undefined,
+      offerExpiresAt: firstDriverId ? new Date(now.getTime() + 30_000).toISOString() : undefined,
+    };
     const orderRef = ordersCollection.doc(newOrder.id);
     await ordersDb.runTransaction(async (transaction) => {
       const existing = await transaction.get(orderRef);
@@ -896,13 +1129,11 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       }
       transaction.create(orderRef, {
         ...newOrder,
-        status: "pending",
-        createdAt: newOrder.createdAt || new Date().toISOString(),
-        updatedAt: newOrder.updatedAt || new Date().toISOString(),
         serverCreatedAt: FieldValue.serverTimestamp(),
       });
     });
-    return res.status(201).json({ success: true, order: newOrder });
+    if (firstDriverId) await ordersDb.collection("knights").doc(firstDriverId).set({ lastDispatchOfferAt: now.toISOString() }, { merge: true });
+    return res.status(201).json({ success: true, order: newOrder, dispatch: { matched: Boolean(firstDriverId), mode: newOrder.dispatchMode } });
   } catch (error: any) {
     if (error?.message === "ORDER_ALREADY_EXISTS") {
       return res.status(409).json({ error: "Order already exists" });
@@ -947,6 +1178,13 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
       if (order.status !== "pending") {
         throw new Error("ORDER_NOT_PENDING");
       }
+      if (order.offeredDriverId !== user.uid) throw new Error("ORDER_NOT_OFFERED_TO_DRIVER");
+      const offerExpiry = Date.parse(String(order.offerExpiresAt || ""));
+      if (!Number.isFinite(offerExpiry) || offerExpiry <= Date.now()) throw new Error("ORDER_OFFER_EXPIRED");
+      if (!driverMeetsService(order, eligibility.user, eligibility.knight)) throw new Error("SERVICE_REQUIREMENTS_NOT_MET");
+      const knightRef = ordersDb.collection("knights").doc(user.uid);
+      const knightSnapshot = await transaction.get(knightRef);
+      if (knightSnapshot.data()?.activeRideId) throw new Error("DRIVER_ALREADY_ON_RIDE");
 
       acceptedOrder = {
         ...order,
@@ -971,7 +1209,14 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
         driverPlate: acceptedOrder.driverPlate,
         driverAvatarEmoji: acceptedOrder.driverAvatarEmoji || null,
         driverVehicle: acceptedOrder.driverVehicle || null,
+        offeredDriverId: null,
+        offerExpiresAt: null,
       });
+      transaction.set(knightRef, {
+        activeRideId: id,
+        dispatchJobsAccepted: FieldValue.increment(1),
+        lastAcceptedAt: acceptedOrder.updatedAt,
+      }, { merge: true });
       transaction.set(ordersDb.collection("audit_logs").doc(), {
         action: "RIDE_ACCEPTED",
         rideId: id,
@@ -991,7 +1236,45 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
     if (error?.message === "ORDER_NOT_PENDING") {
       return res.status(409).json({ error: "Order has already been accepted or is no longer pending" });
     }
+    if (error?.message === "ORDER_NOT_OFFERED_TO_DRIVER") return res.status(403).json({ error: "This order is not currently offered to this driver" });
+    if (error?.message === "ORDER_OFFER_EXPIRED") return res.status(409).json({ error: "Dispatch offer expired" });
+    if (error?.message === "SERVICE_REQUIREMENTS_NOT_MET") return res.status(403).json({ error: "Driver does not meet service requirements" });
+    if (error?.message === "DRIVER_ALREADY_ON_RIDE") return res.status(409).json({ error: "Driver already has an active ride" });
     console.error("[Orders Accept Error]:", error?.message);
+    return res.status(503).json({ error: "Order store unavailable" });
+  }
+});
+
+app.post("/api/orders/:id/decline", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const { id } = req.params;
+  try {
+    const orderRef = ordersCollection.doc(id);
+    let updatedOrder: ServerOrder | null = null;
+    await ordersDb.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(orderRef);
+      if (!snapshot.exists) throw new Error("ORDER_NOT_FOUND");
+      const order = snapshot.data() as ServerOrder;
+      if (order.status !== "pending") throw new Error("ORDER_NOT_PENDING");
+      if (order.offeredDriverId !== user.uid) throw new Error("ORDER_NOT_OFFERED_TO_DRIVER");
+      const offer = nextDispatchOffer(order);
+      updatedOrder = { ...order, ...offer } as ServerOrder;
+      transaction.update(orderRef, offer);
+      transaction.set(ordersDb.collection("audit_logs").doc(), {
+        action: "RIDE_OFFER_DECLINED", rideId: id, actorUid: user.uid,
+        nextDriverUid: offer.offeredDriverId, createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+    if (updatedOrder?.offeredDriverId) {
+      await ordersDb.collection("knights").doc(updatedOrder.offeredDriverId).set({ lastDispatchOfferAt: new Date().toISOString() }, { merge: true });
+    }
+    return res.json({ success: true });
+  } catch (error: any) {
+    if (error?.message === "ORDER_NOT_FOUND") return res.status(404).json({ error: "Order not found" });
+    if (error?.message === "ORDER_NOT_PENDING") return res.status(409).json({ error: "Order is no longer pending" });
+    if (error?.message === "ORDER_NOT_OFFERED_TO_DRIVER") return res.status(403).json({ error: "This order is not offered to this driver" });
+    console.error("[Orders Decline Error]:", error?.message);
     return res.status(503).json({ error: "Order store unavailable" });
   }
 });
@@ -1000,9 +1283,9 @@ app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const { id } = req.params;
-  const { status, tipAmount } = req.body;
+  const { status, tipAmount, ratingGiven, reviewComment } = req.body;
 
-  if (!status && tipAmount === undefined) {
+  if (!status && tipAmount === undefined && ratingGiven === undefined && reviewComment === undefined) {
     return res.status(400).json({ error: "Order update is required" });
   }
 
@@ -1012,6 +1295,9 @@ app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
   }
   if (tipAmount !== undefined && (!Number.isFinite(Number(tipAmount)) || Number(tipAmount) < 0)) {
     return res.status(400).json({ error: "Invalid tip amount" });
+  }
+  if (ratingGiven !== undefined && (!Number.isFinite(Number(ratingGiven)) || Number(ratingGiven) < 1 || Number(ratingGiven) > 5)) {
+    return res.status(400).json({ error: "Invalid rating" });
   }
 
   try {
@@ -1049,19 +1335,30 @@ app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
         if (nextStatus === "accepted") throw new Error("USE_ACCEPT_ENDPOINT");
       }
 
-      if (tipAmount !== undefined && !isPassenger) throw new Error("PASSENGER_REQUIRED");
+      if ((tipAmount !== undefined || ratingGiven !== undefined || reviewComment !== undefined) && !isPassenger) throw new Error("PASSENGER_REQUIRED");
+      if ((ratingGiven !== undefined || reviewComment !== undefined) && order.status !== "completed") throw new Error("RIDE_NOT_COMPLETED");
 
       updatedOrder = {
         ...order,
         ...(status ? { status: String(status) } : {}),
         ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
+        ...(ratingGiven !== undefined ? { ratingGiven: Number(ratingGiven) } : {}),
+        ...(reviewComment !== undefined ? { reviewComment: String(reviewComment).slice(0, 1000) } : {}),
         updatedAt: new Date().toISOString(),
       };
       transaction.update(orderRef, {
         ...(status ? { status: String(status) } : {}),
         ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
+        ...(ratingGiven !== undefined ? { ratingGiven: Number(ratingGiven) } : {}),
+        ...(reviewComment !== undefined ? { reviewComment: String(reviewComment).slice(0, 1000) } : {}),
         updatedAt: updatedOrder.updatedAt,
       });
+      if (status && ["completed", "cancelled"].includes(String(status)) && order.driverUserId) {
+        transaction.set(ordersDb.collection("knights").doc(order.driverUserId), {
+          activeRideId: FieldValue.delete(),
+          lastRideFinishedAt: updatedOrder.updatedAt,
+        }, { merge: true });
+      }
       if (status) {
         transaction.set(ordersDb.collection("audit_logs").doc(), {
           action: "RIDE_STATUS_CHANGED",
@@ -1085,6 +1382,7 @@ app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
     if (error?.message === "PARTICIPANT_REQUIRED") return res.status(403).json({ error: "Participant action required" });
     if (error?.message === "USE_ACCEPT_ENDPOINT") return res.status(409).json({ error: "Use the accept endpoint for acceptance" });
     if (error?.message === "INVALID_TRANSITION") return res.status(409).json({ error: "Invalid ride state transition" });
+    if (error?.message === "RIDE_NOT_COMPLETED") return res.status(409).json({ error: "Ride must be completed before rating" });
     console.error("[Orders Step Error]:", error?.message);
     return res.status(503).json({ error: "Order store unavailable" });
   }

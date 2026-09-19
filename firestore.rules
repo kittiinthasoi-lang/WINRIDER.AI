@@ -127,11 +127,9 @@ service cloud.firestore {
         )
       );
 
-      allow create: if signedIn()
-        && request.resource.data.passengerUserId == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.createdAt is string
-        && request.resource.data.updatedAt is string;
+      // Ride creation also goes through the trusted API so fare, coordinates,
+      // service requirements and dispatch assignment cannot be forged by clients.
+      allow create: if false;
 
       allow update: if isAdmin();
       allow delete: if isAdmin();
