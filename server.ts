@@ -808,6 +808,35 @@ async function requireEligibleDriver(uid: string) {
 
 const ordersCollection = ordersDb.collection("rides");
 
+// Approved, online knights for driver-matching. Reads through the trusted Admin
+// SDK on the server because the client SDK cannot list the whole `users`/`knights`
+// collections directly: firestore.rules only grants read on a document a caller
+// owns (or is admin), and Firestore denies an unfiltered "list" query unless the
+// rule can be proven true for every possible document in the collection.
+app.get("/api/knights/available", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const [usersSnap, knightsSnap] = await Promise.all([
+      ordersDb.collection("users").where("role", "==", "knight").where("status", "==", "active").get(),
+      ordersDb.collection("knights").where("isOnline", "==", true).get(),
+    ]);
+    const knightsById = new Map(knightsSnap.docs.map((doc) => [doc.id, doc.data()]));
+    const knights = usersSnap.docs
+      .map((doc) => ({ uid: doc.id, user: doc.data(), knight: knightsById.get(doc.id) }))
+      .filter(({ knight }) => {
+        const kyc = String((knight as any)?.kycStatus || "").toLowerCase();
+        return knight && ["approved", "verified"].includes(kyc);
+      })
+      .map(({ uid, user: userData, knight }) => ({ uid, user: userData, knight }));
+
+    return res.json({ knights });
+  } catch (error: any) {
+    console.error("[Knights Available GET Error]:", error?.message);
+    return res.status(503).json({ error: "Knight directory unavailable", knights: [] });
+  }
+});
+
 app.get("/api/orders", async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
