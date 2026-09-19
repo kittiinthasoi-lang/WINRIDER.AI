@@ -71,7 +71,7 @@ export default function App() {
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState<boolean>(false);
   const [customerListedItems, setCustomerListedItems] = useState<MarketItem[]>([]);
   const [driverCitizenPersona, setDriverCitizenPersona] = useState<'driver' | 'customer'>('driver');
-  const [ownerPersona, setOwnerPersona] = useState<'customer' | 'driver' | 'merchant' | 'partner'>('customer');
+  const [ownerPersona, setOwnerPersona] = useState<'customer' | 'driver' | 'merchant' | 'partner'>('driver');
 
   // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดหน้าตัวอย่างได้ครบทั้ง 4 บทบาท
   // โดยยังคงใช้ Firebase UID เดิมเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
@@ -108,13 +108,13 @@ export default function App() {
     return {
       id: userData.uid,
       email: userData.email,
-      name: userData.displayName || 'อัศวินผู้กล้า',
+      name: isOwnerAdmin ? 'กิตติ อินทะสร้อย' : (userData.displayName || 'อัศวินผู้กล้า'),
       phone: userData.phone || '',
       role: mappedRole,
       primaryRole: mappedRole,
       activePersona: mappedRole === 'driver' ? driverCitizenPersona : 'customer',
       roleTitleTh: roleTitle,
-      level: userData.level !== undefined ? userData.level : 1,
+      level: isOwnerAdmin ? 100 : (userData.level !== undefined ? userData.level : 1),
       xp: userData.xp !== undefined ? userData.xp : 0,
       rating: userData.rating !== undefined ? userData.rating : 5.0,
       avatarEmoji: userData.avatarUrl || avatar,
@@ -127,7 +127,9 @@ export default function App() {
   // Set default active mode according to registered role or super admin
   useEffect(() => {
     if (firebaseUser?.email === 'kittiinthasoi@gmail.com' || firebaseUser?.email?.toLowerCase().includes('kittiinthasoi') || userData?.isAdmin) {
-      setActiveMode('admin');
+      setOwnerPersona('driver');
+      setDriverCitizenPersona('driver');
+      setActiveMode('driver');
       return;
     }
     if (userData?.role) {
@@ -184,8 +186,6 @@ export default function App() {
     if (isOwnerAdmin) {
       if (mode === 'passenger' || mode === 'market') setOwnerPersona('customer');
       else if (mode === 'driver') setOwnerPersona('driver');
-      else if (mode === 'merchant') setOwnerPersona('merchant');
-      else if (mode === 'partner' || mode === 'hospital') setOwnerPersona('partner');
       setActiveMode(mode);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -226,6 +226,18 @@ export default function App() {
     }
 
     setActiveMode(mode);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSelectOwnerPersona = (persona: 'customer' | 'driver' | 'merchant' | 'partner') => {
+    if (!isOwnerAdmin) return;
+    setOwnerPersona(persona);
+    setDriverCitizenPersona(persona === 'driver' ? 'driver' : 'customer');
+    setActiveMode(
+      persona === 'customer' ? 'passenger' :
+      persona === 'driver' ? 'driver' :
+      persona
+    );
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -365,6 +377,7 @@ export default function App() {
         currentUserSession={currentUserSession}
         onSignOut={handleSignOut}
         onToggleDriverPersona={handleToggleDriverPersona}
+        onSelectOwnerPersona={handleSelectOwnerPersona}
       />
 
       {/* Main Viewport Content with ProtectedRoute */}
@@ -425,6 +438,8 @@ export default function App() {
               audioEnabled={audioEnabled}
               onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
               onRideToStore={handleRideToDestination}
+              initialPerspective={ownerPersona === 'merchant' ? 'owner' : 'customer'}
+              canEdit={ownerPersona === 'merchant'}
             />
           </ProtectedRoute>
         )}
@@ -442,6 +457,8 @@ export default function App() {
               audioEnabled={audioEnabled}
               onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
               onRideToPartner={handleRideToDestination}
+              initialPerspective={ownerPersona === 'partner' ? 'owner' : 'customer'}
+              canEdit={ownerPersona === 'partner'}
             />
           </ProtectedRoute>
         )}

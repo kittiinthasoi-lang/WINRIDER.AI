@@ -63,6 +63,7 @@ interface PartnerProfileViewProps {
   onOpenWinBuddy?: () => void;
   onRideToPartner?: (partnerName: string, partnerAddress: string, distanceKm?: number) => void;
   initialPerspective?: 'owner' | 'customer';
+  canEdit?: boolean;
 }
 
 export const SAMPLE_PARTNERS: PartnerProfile[] = [
@@ -287,7 +288,8 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   audioEnabled = true,
   onOpenWinBuddy,
   onRideToPartner,
-  initialPerspective
+  initialPerspective,
+  canEdit = false
 }) => {
   const [selectedPartner, setSelectedPartner] = useState<PartnerProfile>(SAMPLE_PARTNERS[0]);
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
@@ -296,10 +298,15 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   
   // Perspective state: แบบที่ 1 (ของพาร์ทเนอร์เอง) หรือ แบบที่ 2 (หน้าร้านสำหรับลูกค้า)
   const [perspective, setPerspective] = useState<'owner' | 'customer'>(() => {
+    if (!canEdit) return 'customer';
     if (initialPerspective) return initialPerspective;
     const session = getCurrentUserSession();
     return session?.role === 'partner' ? 'owner' : 'customer';
   });
+
+  useEffect(() => {
+    setPerspective(canEdit && initialPerspective === 'owner' ? 'owner' : 'customer');
+  }, [canEdit, initialPerspective]);
 
   // Modal for Customer claiming a promotion QR voucher
   const [selectedClaimPromo, setSelectedClaimPromo] = useState<PartnerPromotion | null>(null);
@@ -359,6 +366,7 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   };
 
   const handleTogglePerspective = (newMode: 'owner' | 'customer') => {
+    if (newMode === 'owner' && !canEdit) return;
     if (audioEnabled) playTactileBlip(1000);
     setPerspective(newMode);
     if (newMode === 'customer') {
@@ -456,11 +464,13 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
         {/* Mode Switch Toggle Button */}
         <div className="flex items-center gap-1.5 p-1.5 bg-black/60 rounded-2xl border border-white/10 w-full md:w-auto justify-center">
           <button
+            disabled={!canEdit}
+            title={canEdit ? 'เปิดมุมมองจัดการพาร์ทเนอร์' : 'สงวนสิทธิ์เฉพาะเจ้าของพาร์ทเนอร์'}
             onClick={() => handleTogglePerspective('owner')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
               perspective === 'owner'
                 ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-[0_0_15px_rgba(255,215,0,0.4)]'
-                : 'text-slate-400 hover:text-white'
+                : canEdit ? 'text-slate-400 hover:text-white' : 'text-slate-600 cursor-not-allowed opacity-60'
             }`}
           >
             <Store className="w-4 h-4" />
