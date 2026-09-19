@@ -15,10 +15,7 @@ import {
 import { 
   getNotificationPermission, 
   requestNotificationPermission, 
-  sendBrowserNotification, 
-  getSavedLineToken, 
-  saveLineToken, 
-  sendLineNotifyAlert 
+  sendBrowserNotification 
 } from '../utils/notifications';
 import { playTactileBlip, playLevelUpFanfare } from '../utils/audio';
 
@@ -34,16 +31,10 @@ export const PushNotificationManagerModal: React.FC<PushNotificationManagerModal
   audioEnabled = true,
 }) => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
-  const [lineToken, setLineToken] = useState<string>('');
-  const [lineStatus, setLineStatus] = useState<{ loading: boolean; message: string; success?: boolean }>({
-    loading: false,
-    message: '',
-  });
 
   useEffect(() => {
     if (!isOpen) return;
     setPermission(getNotificationPermission());
-    setLineToken(getSavedLineToken());
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -68,35 +59,7 @@ export const PushNotificationManagerModal: React.FC<PushNotificationManagerModal
     if (audioEnabled) playTactileBlip(1000);
   };
 
-  const handleSaveLineToken = () => {
-    saveLineToken(lineToken);
-    setLineStatus({ loading: false, message: 'บันทึก LINE Token เรียบร้อยแล้ว', success: true });
-    if (audioEnabled) playTactileBlip(900);
-    setTimeout(() => setLineStatus({ loading: false, message: '' }), 3000);
-  };
 
-  const handleTestLineNotify = async () => {
-    if (!lineToken.trim()) {
-      setLineStatus({ loading: false, message: 'กรุณากรอก LINE Notify Token ก่อนทดสอบ', success: false });
-      return;
-    }
-
-    setLineStatus({ loading: true, message: 'กำลังส่งข้อความเข้า LINE...' });
-    const result = await sendLineNotifyAlert(
-      `\n🚨 [WINRIDER.AI] ทดสอบการแจ้งเตือนสำเร็จ!\nเวลา: ${new Date().toLocaleTimeString('th-TH')}\nระบบพร้อมส่งสัญญาณงานอัศวินเรียบร้อย`,
-      lineToken.trim()
-    );
-
-    setLineStatus({
-      loading: false,
-      message: result.message,
-      success: result.success,
-    });
-
-    if (result.success && audioEnabled) {
-      playLevelUpFanfare();
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
@@ -168,68 +131,13 @@ export const PushNotificationManagerModal: React.FC<PushNotificationManagerModal
           </div>
         </div>
 
-        {/* Section 2: LINE Notify API Integration */}
-        <div className="mt-4 p-4 rounded-2xl bg-[#06C755]/10 border border-[#06C755]/30">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="w-3.5 h-3.5 rounded-full bg-[#06C755] flex items-center justify-center text-[9px] font-black text-white">L</span>
-              <span className="text-xs font-bold text-white">LINE Notify Token (ส่งข้อความเข้าแอป LINE)</span>
-            </div>
-            <a
-              href="https://notify-bot.line.me/my/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-[#06C755] hover:underline flex items-center gap-1"
-            >
-              <span>ขอ Token ฟรี</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
-
-          <p className="text-[11px] text-slate-400 mb-3">
-            นำ Token จาก LINE Notify มาใส่เพื่อให้ระบบส่งแจ้งเตือนทริป กองทุน 2 บาท และสรุปยอดประจำวันเข้ากลุ่ม LINE อัศวิน
+        <div className="mt-4 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-400/20">
+          <div className="text-xs font-bold text-white">LINE / ภายนอก</div>
+          <p className="text-[11px] text-slate-400 mt-2">
+            Token สำหรับบริการแจ้งเตือนภายนอกถูกเก็บฝั่งเซิร์ฟเวอร์แล้ว เพื่อไม่ให้เปิดเผย credential ในเบราว์เซอร์
           </p>
-
-          <div className="space-y-2">
-            <input
-              type="text"
-              value={lineToken}
-              onChange={(e) => setLineToken(e.target.value)}
-              placeholder="วาง LINE Notify Personal Access Token ที่นี่..."
-              className="w-full bg-black/40 border border-[#06C755]/40 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#06C755] font-mono"
-            />
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleSaveLineToken}
-                className="py-2 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold transition-all active:scale-98"
-              >
-                บันทึก Token
-              </button>
-              <button
-                type="button"
-                onClick={handleTestLineNotify}
-                disabled={lineStatus.loading}
-                className="flex-1 py-2 rounded-xl bg-[#06C755] hover:bg-[#05b34c] disabled:opacity-50 text-slate-950 font-black text-xs transition-all active:scale-98 flex items-center justify-center gap-1.5 shadow-md"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>{lineStatus.loading ? 'กำลังส่ง...' : 'ทดสอบส่งข้อความเข้า LINE ทันที'}</span>
-              </button>
-            </div>
-
-            {lineStatus.message && (
-              <div
-                className={`p-2 rounded-xl text-xs font-mono flex items-center gap-1.5 ${
-                  lineStatus.success
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                }`}
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                <span>{lineStatus.message}</span>
-              </div>
-            )}
+          <div className="mt-2 text-[10px] text-emerald-300">
+            หากตั้งค่า LINE_NOTIFY_TOKEN บนเซิร์ฟเวอร์ ระบบสามารถส่งการแจ้งเตือนอัตโนมัติได้
           </div>
         </div>
 
