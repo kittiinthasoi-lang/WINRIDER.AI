@@ -144,8 +144,9 @@ export async function createLiveOrder(orderInput: {
   estMinutes?: number;
 }): Promise<LiveRideOrder> {
   const now = new Date().toISOString();
-  const orderId = `WIN-${Math.floor(1000 + Math.random() * 9000)}`;
-  const fare = Number(orderInput.fare || 40);
+  const orderId = `WIN-${crypto.randomUUID()}`;
+  const fare = Number(orderInput.fare);
+  if (!Number.isFinite(fare) || fare <= 0) throw new Error('INVALID_REAL_ORDER_FARE');
   const welfareFund2Baht = 2.0;
   const netFare = Math.max(0, fare - welfareFund2Baht);
 
@@ -154,9 +155,9 @@ export async function createLiveOrder(orderInput: {
     serviceId: orderInput.serviceId,
     serviceTitle: orderInput.serviceTitle,
     serviceIconEmoji: orderInput.serviceIconEmoji || '🛵',
-    passengerUserId: orderInput.passengerUserId || 'ANON',
-    passengerName: orderInput.passengerName || 'คุณผู้โดยสาร',
-    passengerPhone: orderInput.passengerPhone || '089-123-4567',
+    passengerUserId: orderInput.passengerUserId,
+    passengerName: orderInput.passengerName,
+    passengerPhone: orderInput.passengerPhone,
     pickupLocation: orderInput.pickupLocation,
     dropoffLocation: orderInput.dropoffLocation,
     distanceKm: orderInput.distanceKm,
@@ -241,34 +242,15 @@ export async function acceptLiveOrder(
       driverUserId: driverInfo.driverUserId,
       driverName: driverInfo.driverName,
       driverLevel: driverInfo.driverLevel,
-      driverPhone: driverInfo.driverPhone || '081-998-3344',
-      driverPlate: driverInfo.driverPlate || '1กข 7789 กทม.',
-      driverAvatarEmoji: driverInfo.driverAvatarEmoji || '🦁',
-      driverVehicle: driverInfo.driverVehicle || 'Honda Wave 125i',
+        driverPhone: driverInfo.driverPhone,
+      driverPlate: driverInfo.driverPlate,
+      driverAvatarEmoji: driverInfo.driverAvatarEmoji,
+      driverVehicle: driverInfo.driverVehicle,
     };
     orders[orderIndex] = targetOrder;
     saveLocalLiveOrders(orders);
   } else {
-    // Fallback order
-    targetOrder = {
-      id: orderId,
-      serviceId: 'knight',
-      serviceTitle: 'WIN KNIGHT',
-      serviceIconEmoji: '🛵',
-      passengerName: 'คุณอารียา สุขสวัสดิ์',
-      passengerPhone: '089-445-1234',
-      pickupLocation: 'ซอยสุขุมวิท 23 (แยก 4)',
-      dropoffLocation: 'BTS อโศก (ทางออก 3)',
-      distanceKm: 2.5,
-      fare: 45,
-      welfareFund2Baht: 2.0,
-      netFare: 43,
-      estMinutes: 7,
-      status: 'accepted',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...driverInfo,
-    };
+    return null;
   }
 
   // Update server & Firestore
@@ -287,8 +269,8 @@ export async function acceptLiveOrder(
       driverUserId: driverInfo.driverUserId || '',
       driverName: driverInfo.driverName,
       driverLevel: driverInfo.driverLevel,
-      driverPhone: driverInfo.driverPhone || '081-998-3344',
-      driverPlate: driverInfo.driverPlate || '1กข 7789 กทม.',
+      driverPhone: driverInfo.driverPhone,
+      driverPlate: driverInfo.driverPlate,
     }).catch((err) => console.warn('Firestore update accept err:', err));
   } catch {}
 
