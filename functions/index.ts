@@ -664,6 +664,54 @@ export const updatePayoutStatus = onCall(async (request) => {
     }
 
     const history = Array.isArray(payout.statusHistory) ? payout.statusHistory : [];
+    const amountSatang = Number(payout.amountSatang || 0);
+    const userId = String(payout.userId || "");
+    if (!Number.isInteger(amountSatang) || amountSatang <= 0 || !userId) {
+      throw new HttpsError("failed-precondition", "ข้อมูล payout ไม่สมบูรณ์");
+    }
+
+    if (nextStatus === "FAILED" || nextStatus === "CANCELLED") {
+      if (!payout.reversalLedgerTransactionId) {
+        const reversalKey = "PAYOUT_REVERSAL_" + payoutId;
+        const walletRef = db.collection("wallets").doc(userId);
+        const idempotencyRef = db.collection("idempotency_keys").doc(reversalKey);
+        const walletSnap = await transaction.get(walletRef);
+        const idempotencySnap = await transaction.get(idempotencyRef);
+        if (!walletSnap.exists) throw new HttpsError("not-found", "ไม่พบกระเป๋าเงินสำหรับคืนยอด payout");
+        if (idempotencySnap.exists) throw new HttpsError("failed-precondition", "พบ reversal เดิมแล้ว");
+
+        const wallet = walletSnap.data() || {};
+        const currentBalance = Number(wallet.balanceSatang || 0);
+        const currentAvailable = Number(wallet.availableSatang ?? currentBalance);
+        const ledgerRef = db.collection("ledger").doc();
+        const legs = [
+          { accountId: "PAYOUT_CLEARING", accountType: "PAYOUT_CLEARING", direction: "DEBIT", amountSatang, descriptionTh: "คืนยอดถอนเงินจาก payout " + payoutId },
+          { accountId: userId, accountType: "KNIGHT_WALLET", direction: "CREDIT", amountSatang, descriptionTh: "คืนเงินกลับกระเป๋าจาก payout " + payoutId }
+        ];
+
+        transaction.update(walletRef, {
+          balanceSatang: currentBalance + amountSatang,
+          availableSatang: currentAvailable + amountSatang,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+        transaction.set(ledgerRef, {
+          transactionId: ledgerRef.id, idempotencyKey: reversalKey, type: "PAYOUT_REVERSAL",
+          referenceId: payoutId, userId, amountSatang,
+          totalDebitSatang: amountSatang, totalCreditSatang: amountSatang, balanced: true, legs,
+          createdAt: FieldValue.serverTimestamp()
+        });
+        transaction.set(idempotencyRef, {
+          idempotencyKey: reversalKey, status: "COMPLETED", type: "PAYOUT_REVERSAL",
+          referenceId: payoutId, ledgerTransactionId: ledgerRef.id, amountSatang,
+          completedAt: FieldValue.serverTimestamp()
+        });
+        transaction.update(payoutRef, {
+          reversalLedgerTransactionId: ledgerRef.id,
+          reversalAt: FieldValue.serverTimestamp()
+        });
+      }
+    }
+
     transaction.update(payoutRef, {
       status: nextStatus,
       statusHistory: [...history, {
@@ -677,7 +725,7 @@ export const updatePayoutStatus = onCall(async (request) => {
       ...(nextStatus === "FAILED" || nextStatus === "CANCELLED" ? { failedAt: FieldValue.serverTimestamp() } : {})
     });
 
-    return { payoutId, current, nextStatus, amountSatang: Number(payout.amountSatang || 0), userId: String(payout.userId || "") };
+    return { payoutId, current, nextStatus, amountSatang, userId, reversalApplied: nextStatus === "FAILED" || nextStatus === "CANCELLED" };
   });
 
   return { success: true, ...result };
