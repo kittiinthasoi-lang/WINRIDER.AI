@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
@@ -21,7 +22,56 @@ const PORT = isDevContainer
   ? (Number(process.env.DEFAULT_APP_PORT) || 3000)
   : (Number(process.env.PORT) || 3000);
 
-app.use(express.json());
+app.use(express.json({ limit: "64kb" }));
+
+// Lightweight per-instance abuse protection for sensitive API mutations.
+// Authentication remains the primary authorization control; this limiter only
+// reduces bursts and accidental/replay traffic. Production deployments should
+// also enforce an edge/API-gateway rate limit across all instances.
+const rateBuckets = new Map<string, { windowStart: number; count: number }>();
+const RATE_WINDOW_MS = 60_000;
+const RATE_LIMITS: Record<string, number> = {
+  "/api/orders": 20,
+  "/api/webhooks/dispatch": 10,
+  "/api/notifications/line": 10,
+  "/api/orders/:id/accept": 10,
+  "/api/orders/:id/step": 30,
+  "/api/orders/:id/location": 120,
+  "/api/routes/compute": 30,
+};
+
+function rateLimitKey(req: express.Request): string {
+  const bearer = String(req.headers.authorization || "");
+  if (bearer.startsWith("Bearer ")) {
+    return "auth:" + crypto.createHash("sha256").update(bearer.slice(7)).digest("hex").slice(0, 24);
+  }
+  return "ip:" + String(req.ip || "unknown");
+}
+
+function rateLimit(maxRequests: number) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const now = Date.now();
+    const key = req.path + ":" + rateLimitKey(req);
+    const bucket = rateBuckets.get(key);
+    if (!bucket || now - bucket.windowStart >= RATE_WINDOW_MS) {
+      rateBuckets.set(key, { windowStart: now, count: 1 });
+      return next();
+    }
+    bucket.count += 1;
+    if (bucket.count > maxRequests) {
+      res.setHeader("Retry-After", "60");
+      return res.status(429).json({ error: "Too many requests" });
+    }
+    next();
+  };
+}
+
+setInterval(() => {
+  const cutoff = Date.now() - RATE_WINDOW_MS * 2;
+  for (const [key, bucket] of rateBuckets) {
+    if (bucket.windowStart < cutoff) rateBuckets.delete(key);
+  }
+}, RATE_WINDOW_MS).unref();
 
 // Lazy initialization of GoogleGenAI
 let aiClient: GoogleGenAI | null = null;
@@ -155,7 +205,7 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 
-app.post("/api/orders", async (req, res) => {
+app.post("/api/orders", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const newOrder = req.body as ServerOrder;
@@ -188,7 +238,7 @@ app.post("/api/orders", async (req, res) => {
   }
 });
 
-app.post("/api/orders/:id/accept", async (req, res) => {
+app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const eligibility = await requireEligibleDriver(user.uid);
@@ -259,7 +309,7 @@ app.post("/api/orders/:id/accept", async (req, res) => {
   }
 });
 
-app.post("/api/orders/:id/step", async (req, res) => {
+app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const { id } = req.params;
@@ -346,7 +396,7 @@ app.post("/api/orders/:id/step", async (req, res) => {
  * Only the authenticated driver assigned to an active ride may publish coordinates.
  * Coordinates are validated server-side and stored separately from the ride state.
  */
-app.post("/api/orders/:id/location", async (req, res) => {
+app.post("/api/orders/:id/location", rateLimit(120), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
 
@@ -480,7 +530,7 @@ function validateWebhookTarget(rawUrl: string): URL {
 }
 
 // Low-Code Webhook Dispatch Proxy (bypasses browser CORS for Make.com / Zapier / Google Sheets)
-app.post("/api/webhooks/dispatch", async (req, res) => {
+app.post("/api/webhooks/dispatch", rateLimit(10), async (req, res) => {
   try {
     const { webhookUrl, payload } = req.body;
     if (!webhookUrl) {
@@ -543,7 +593,7 @@ app.post("/api/webhooks/dispatch", async (req, res) => {
 });
 
 // LINE Notify Proxy Endpoint
-app.post("/api/notifications/line", async (req, res) => {
+app.post("/api/notifications/line", rateLimit(10), async (req, res) => {
   try {
     const token = process.env.LINE_NOTIFY_TOKEN;
     if (!token) {
@@ -683,7 +733,7 @@ Respond concisely in Thai (unless asked otherwise) with clear tactical actions o
 // =========================================================================
 let routesApiRateLimitedUntil = 0;
 
-app.post("/api/routes/compute", async (req, res) => {
+app.post("/api/routes/compute", rateLimit(30), async (req, res) => {
   try {
     const {
       origin,
