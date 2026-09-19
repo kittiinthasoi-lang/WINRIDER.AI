@@ -1,6 +1,6 @@
 import { buildWebhookPayload, dispatchToWebhook, isAutoDispatchEnabled } from './webhookDispatcher';
 import { db } from '../lib/firebase';
-import { doc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 export interface LiveRideOrder {
@@ -186,21 +186,15 @@ export async function createLiveOrder(orderInput: {
   orders.unshift(newOrder);
   saveLocalLiveOrders(orders);
 
-  // Sync to server backend & Firestore Cloud DB
-  try {
-    fetch('/api/orders', {
-      method: 'POST',
-      headers: await getAuthHeaders(),
-      body: JSON.stringify(newOrder),
-    }).catch(() => {});
-  } catch {}
-
-  try {
-    setDoc(doc(db, 'rides', newOrder.id), {
-      ...newOrder,
-      sovereignFundCut: newOrder.welfareFund2Baht,
-    }).catch((err) => console.warn('Firestore setDoc order err:', err));
-  } catch {}
+  // Server API is the single source of truth for ride creation.
+  const createResponse = await fetch('/api/orders', {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(newOrder),
+  });
+  if (!createResponse.ok) {
+    throw new Error(`ORDER_CREATE_FAILED_${createResponse.status}`);
+  }
 
   // Broadcast to other tabs
   broadcastEvent(newOrder, 'created');
@@ -264,26 +258,21 @@ export async function acceptLiveOrder(
     return null;
   }
 
-  // Update server & Firestore
-  try {
-    fetch(`/api/orders/${orderId}/accept`, {
-      method: 'POST',
-      headers: await getAuthHeaders(),
-      body: JSON.stringify(driverInfo),
-    }).catch(() => {});
-  } catch {}
-
-  try {
-    updateDoc(doc(db, 'rides', targetOrder.id), {
-      status: 'accepted',
-      updatedAt: new Date().toISOString(),
-      driverUserId: driverInfo.driverUserId || '',
-      driverName: driverInfo.driverName,
-      driverLevel: driverInfo.driverLevel,
-      driverPhone: driverInfo.driverPhone,
-      driverPlate: driverInfo.driverPlate,
-    }).catch((err) => console.warn('Firestore update accept err:', err));
-  } catch {}
+  // Server API is the single source of truth for acceptance.
+  const acceptResponse = await fetch(`/api/orders/${orderId}/accept`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (!acceptResponse.ok) {
+    throw new Error(`ORDER_ACCEPT_FAILED_${acceptResponse.status}`);
+  }
+  const acceptedServerOrder = await acceptResponse.json();
+  if (acceptedServerOrder?.order) {
+    Object.assign(targetOrder, acceptedServerOrder.order);
+    orders[orderIndex] = targetOrder;
+    saveLocalLiveOrders(orders);
+  }
 
   // Broadcast event
   broadcastEvent(targetOrder, 'accepted');
@@ -368,12 +357,14 @@ export async function advanceLiveOrderStep(
   orders[orderIndex] = updatedOrder;
   saveLocalLiveOrders(orders);
 
-  try {
-    updateDoc(doc(db, 'rides', updatedOrder.id), {
-      status: newStatus,
-      updatedAt: updatedOrder.updatedAt,
-    }).catch((err) => console.warn('Firestore update step err:', err));
-  } catch {}
+  const stepResponse = await fetch(`/api/orders/${orderId}/step`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({ status: newStatus }),
+  });
+  if (!stepResponse.ok) {
+    throw new Error(`ORDER_STEP_FAILED_${stepResponse.status}`);
+  }
 
   broadcastEvent(updatedOrder, 'step_changed');
   return updatedOrder;
@@ -405,15 +396,17 @@ export async function completeLiveOrder(
   orders[orderIndex] = completedOrder;
   saveLocalLiveOrders(orders);
 
-  try {
-    updateDoc(doc(db, 'rides', completedOrder.id), {
+  const completeResponse = await fetch(`/api/orders/${orderId}/step`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({
       status: 'completed',
       tipAmount: completedOrder.tipAmount,
-      ratingGiven: completedOrder.ratingGiven,
-      reviewComment: completedOrder.reviewComment,
-      updatedAt: completedOrder.updatedAt,
-    }).catch((err) => console.warn('Firestore update complete err:', err));
-  } catch {}
+    }),
+  });
+  if (!completeResponse.ok) {
+    throw new Error(`ORDER_COMPLETE_FAILED_${completeResponse.status}`);
+  }
 
   broadcastEvent(completedOrder, 'completed');
 
