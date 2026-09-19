@@ -97,11 +97,14 @@ app.post("/api/orders/:id/accept", (req, res) => {
   }
   order.status = "accepted";
   order.updatedAt = new Date().toISOString();
-  order.driverName = driverInfo.driverName || "พี่สมศักดิ์ ไนท์สายฟ้า";
-  order.driverLevel = driverInfo.driverLevel || 100;
-  order.driverPhone = driverInfo.driverPhone || "081-998-3344";
-  order.driverPlate = driverInfo.driverPlate || "1กข 7789 กทม.";
-  order.driverAvatarEmoji = driverInfo.driverAvatarEmoji || "🦁";
+  if (!driverInfo?.driverName || !driverInfo?.driverPlate) {
+    return res.status(400).json({ error: "Real driver identity is required" });
+  }
+  order.driverName = driverInfo.driverName;
+  order.driverLevel = Number(driverInfo.driverLevel || 1);
+  order.driverPhone = driverInfo.driverPhone;
+  order.driverPlate = driverInfo.driverPlate;
+  order.driverAvatarEmoji = driverInfo.driverAvatarEmoji;
   res.json({ success: true, order });
 });
 
