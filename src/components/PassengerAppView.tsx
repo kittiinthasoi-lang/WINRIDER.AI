@@ -285,6 +285,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         ...prev,
         displayName: currentUserSession.name || prev.displayName,
         avatarEmoji: currentUserSession.avatarEmoji || prev.avatarEmoji,
+        avatarUrl: currentUserSession.avatarUrl || prev.avatarUrl,
         bioStatus: currentUserSession.bio || prev.bioStatus,
       }));
     }
@@ -474,7 +475,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         bioStatus: isDriverCitizen 
           ? 'พลเมือง (พี่วินพักงาน 1 วัน) • เลเวลและสถิติเชื่อมโยงกันสมบูรณ์ 🦥🛵'
           : (currentUserSession.bio || prev.bioStatus),
-        avatarUrl: '/avatars/citizen.jpg'
+        avatarUrl: currentUserSession.avatarUrl || prev.avatarUrl || '/avatars/citizen.jpg',
+        avatarEmoji: currentUserSession.avatarEmoji || prev.avatarEmoji
       }));
     }
   }, [currentUserSession, isDriverCitizen]);

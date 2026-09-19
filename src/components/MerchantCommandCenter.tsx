@@ -13,6 +13,7 @@ import { getMerchantTier, calculateLevelMaxXp, getLevelDifficultyMetrics } from 
 import { playTactileBlip, playRadarScan, playLevelUpFanfare } from '../utils/audio';
 import { getCurrentUserSession } from '../utils/userSession';
 import confetti from 'canvas-confetti';
+import { loadProfileCustomization } from '../services/profileService';
 import { 
   ShoppingBag, 
   Users, 
@@ -239,6 +240,13 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
     themeColor: '#FFD700',
     bannerGlow: 'from-[#0D1E3A] via-[#09152B] to-[#060D1E]'
   });
+
+  React.useEffect(() => {
+    if (!canEdit) return;
+    loadProfileCustomization('merchant').then((saved) => {
+      if (saved) setMerchantProfileData(saved);
+    }).catch((error) => console.warn('Unable to load merchant profile:', error));
+  }, [canEdit]);
 
   const currentMerchantTier = useMemo(() => getMerchantTier(merchantLevel), [merchantLevel]);
   const merchantDifficultyMetrics = useMemo(() => getLevelDifficultyMetrics(merchantLevel), [merchantLevel]);
@@ -1777,7 +1785,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
         isOpen={showProfileCustomizerModal}
         onClose={() => setShowProfileCustomizerModal(false)}
         currentData={merchantProfileData}
-        role="shop"
+        role="merchant"
         onSave={(updated) => setMerchantProfileData(updated)}
         audioEnabled={audioEnabled}
       />

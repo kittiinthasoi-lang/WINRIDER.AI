@@ -57,6 +57,7 @@ import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { getCurrentUserSession } from '../utils/userSession';
 import confetti from 'canvas-confetti';
+import { loadProfileCustomization } from '../services/profileService';
 
 interface PartnerProfileViewProps {
   audioEnabled?: boolean;
@@ -332,6 +333,13 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
       bannerGlow: 'from-purple-900/60 via-[#070D1E] to-[#0A1A3F]'
     }
   });
+
+  useEffect(() => {
+    if (!canEdit) return;
+    loadProfileCustomization('partner').then((saved) => {
+      if (saved) setPartnerCustomizations(prev => ({ ...prev, [selectedPartner.id]: saved }));
+    }).catch((error) => console.warn('Unable to load partner profile:', error));
+  }, [canEdit, selectedPartner.id]);
   
   // 3D Live Customer Radar Simulation
   const [incomingCustomers, setIncomingCustomers] = useState<{ id: string; name: string; riderName: string; etaMin: number; x: number; y: number; vehicle: string }[]>([

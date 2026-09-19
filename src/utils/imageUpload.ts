@@ -68,3 +68,20 @@ export async function uploadKycDocument(uid: string, docType: string, file: File
     });
   }
 }
+
+export async function uploadProfileImage(uid: string, role: string, file: File): Promise<string> {
+  const compressedBlob = await compressImage(file, 800, 0.78);
+  try {
+    const storageRef = ref(storage, `profiles/${uid}/${role}-${Date.now()}.jpg`);
+    await uploadBytes(storageRef, compressedBlob, { contentType: 'image/jpeg' });
+    return await getDownloadURL(storageRef);
+  } catch (error) {
+    console.warn('Profile image upload failed; using compressed inline image:', error);
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('ไม่สามารถอ่านรูปโปรไฟล์ได้'));
+      reader.readAsDataURL(compressedBlob);
+    });
+  }
+}

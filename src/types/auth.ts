@@ -22,6 +22,9 @@ export interface UserDoc {
   xp?: number;
   rating?: number;
   avatarUrl?: string;
+  avatarEmoji?: string;
+  bioStatus?: string;
+  themeColor?: string;
   createdAt: any;
   updatedAt: any;
 }

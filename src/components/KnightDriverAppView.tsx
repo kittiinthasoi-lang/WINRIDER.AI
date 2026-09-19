@@ -16,6 +16,7 @@ import { SovereignQuestCenter } from './SovereignQuestCenter';
 import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { DriverPaymentQrCodeModal } from './DriverPaymentQrCodeModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
+import { loadProfileCustomization } from '../services/profileService';
 import { calculateLevelMaxXp, getLevelDifficultyMetrics } from '../data/tierHierarchyData';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import { 
@@ -190,6 +191,22 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
     themeColor: '#FF6B00',
     bannerGlow: 'from-[#0D1C3D] via-[#09142B] to-[#070D1E]'
   });
+
+  React.useEffect(() => {
+    loadProfileCustomization('driver').then((saved) => {
+      if (saved) {
+        setDriverProfileData(saved);
+      } else if (currentUserSession) {
+        setDriverProfileData(prev => ({
+          ...prev,
+          displayName: currentUserSession.name || prev.displayName,
+          avatarUrl: currentUserSession.avatarUrl || prev.avatarUrl,
+          avatarEmoji: currentUserSession.avatarEmoji || prev.avatarEmoji,
+          bioStatus: currentUserSession.bio || prev.bioStatus,
+        }));
+      }
+    }).catch((error) => console.warn('Unable to load driver profile:', error));
+  }, [currentUserSession?.id]);
 
   const equippedSuit = KNIGHT_ARMOR_SUITS.find(s => s.id === equippedSuitId) || KNIGHT_ARMOR_SUITS[9];
 
