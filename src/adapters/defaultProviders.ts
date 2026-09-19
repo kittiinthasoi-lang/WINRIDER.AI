@@ -89,8 +89,18 @@ export class PromptPayPaymentProvider implements IPaymentProvider {
   }
 
   async verifyPayment(transactionId: string): Promise<PaymentVerificationResult> {
+    // A QR payload alone is not proof of settlement. Until a real bank/payment
+    // provider is configured, fail closed instead of crediting the wallet.
+    if (!transactionId.trim()) {
+      return {
+        success: false,
+        transactionId,
+        amount: 0,
+        timestamp: new Date().toISOString()
+      };
+    }
     return {
-      success: true,
+      success: false,
       transactionId,
       amount: 0,
       timestamp: new Date().toISOString()
