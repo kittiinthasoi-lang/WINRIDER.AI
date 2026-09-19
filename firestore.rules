@@ -134,6 +134,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Driver GPS is backend-ingested only; clients cannot forge or delete location history.
+    match /rides/{rideId}/locations/{locationId} {
+      allow read: if isAdmin() || (
+        signedIn() && (
+          get(/databases/$(database)/documents/rides/$(rideId)).data.passengerUserId == request.auth.uid
+          || get(/databases/$(database)/documents/rides/$(rideId)).data.driverUserId == request.auth.uid
+        )
+      );
+      allow write: if false;
+    }
+
     match /trips/{tripId} {
       allow read: if isAdmin() || (
         signedIn() && (
