@@ -328,19 +328,25 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         setActiveLiveOrder(order);
         if (order.driverName) {
           setCurrentMatchedDriver({
+            id: order.driverUserId || '',
             name: order.driverName,
-            level: order.driverLevel || 100,
+            nameEn: order.driverName,
+            nickname: order.driverName,
+            gender: 'male',
+            level: order.driverLevel || 0,
+            tierName: order.driverLevel ? `Knight Level ${order.driverLevel}` : 'Knight',
             rating: order.driverRating || 0,
-            plate: order.driverPlate || '',
+            totalTrips: 0,
             phone: order.driverPhone || '',
-            vehicle: order.driverVehicle || '',
-            photoUrl: order.driverAvatarEmoji ? undefined : undefined,
-            totalRides: 0,
-            currentLocation: '',
+            avatarEmoji: order.driverAvatarEmoji || '🛵',
+            vehicleModel: order.driverVehicle || 'ยังไม่ระบุรถ',
+            plateNumber: order.driverPlate || '',
+            certifications: [],
+            specialtyTags: [],
+            distanceKm: 0,
             etaMinutes: 0,
-            distanceMeters: 0,
-            specialBadges: [],
-            armorsEquipped: []
+            bio: '',
+            serviceMatchScore: 0
           });
           setRidePhase('picking_up');
           if (audioEnabled) {
@@ -1578,9 +1584,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   selectedDreamRide={selectedDreamRide}
                   pickupLocation="หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)"
                   destinationLocation={selectedDestination || "อาคาร Exchange Tower อโศก"}
-                  driverName={currentMatchedDriver?.name || "กิตติ อินทะสร้อย"}
+                  driverName={currentMatchedDriver?.name || "กำลังรอพี่วิน"}
                   driverLevel={currentMatchedDriver?.level || 0}
-                  driverEmoji={currentMatchedDriver?.avatarEmoji || "🦁"}
+                  driverEmoji={currentMatchedDriver?.avatarEmoji || "🛵"}
                   etaMinutes={ridePhase === 'picking_up' ? pickupEtaMinutes : destEtaMinutes}
                   onEmergencyClick={handleTriggerSos}
                 />
@@ -1591,14 +1597,14 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     <div className="flex items-center gap-3">
                       <NeonProfileAvatar 
                         level={currentMatchedDriver?.level || 0} 
-                        emoji={currentMatchedDriver?.avatarEmoji || "🦁"} 
+                        emoji={currentMatchedDriver?.avatarEmoji || "🛵"} 
                         role="driver" 
                         size="md" 
                       />
                       <div>
                         <div className="flex items-center gap-1.5">
                           <h3 className="text-sm font-bold text-white flex items-center gap-1">
-                            <span>{currentMatchedDriver?.name || "กิตติ อินทะสร้อย"}</span>
+                            <span>{currentMatchedDriver?.name || "กำลังรอพี่วิน"}</span>
                           </h3>
                           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/50 font-black shadow-[0_0_8px_rgba(255,215,0,0.3)]">
                             LV.{currentMatchedDriver?.level || 0} SOVEREIGN 👑
@@ -3558,41 +3564,22 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       />
 
       {/* TRIP SUMMARY & 2-BAHT WELFARE FUND RECEIPT MODAL */}
-      <TripSummaryReceiptModal
-        isOpen={showReceiptModal}
-        onClose={() => setShowReceiptModal(false)}
-        order={activeLiveOrder || {
-          id: 'LIVE-' + Date.now().toString().slice(-4),
-          serviceId: activeServiceId || 'knight',
-          serviceTitle: selectedService ? `WIN ${selectedService.toUpperCase()}` : 'WIN KNIGHT',
-          serviceIconEmoji: selectedDreamRide?.icon || '🛵',
-          passengerName: 'คุณอารียา สุขสวัสดิ์ (Citizen LV.91)',
-          passengerPhone: '089-445-1234',
-          pickupLocation: 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)',
-          dropoffLocation: selectedDestination || 'อาคาร Exchange Tower อโศก',
-          distanceKm: tripDistanceKm,
-          fare: totalCalculatedFare || 45,
-          welfareFund2Baht: 2.0,
-          netFare: (totalCalculatedFare || 45) - 2.0,
-          estMinutes: 6.5,
-          status: 'completed',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          driverName: currentMatchedDriver?.name || 'กำลังรอพี่วิน',
-          driverLevel: currentMatchedDriver?.level || 0,
-          driverPlate: currentMatchedDriver?.plate || '—',
-          driverAvatarEmoji: currentMatchedDriver?.avatarEmoji || '🛵'
-        }}
-        audioEnabled={audioEnabled}
-      />
+      {activeLiveOrder && (
+        <TripSummaryReceiptModal
+          isOpen={showReceiptModal}
+          onClose={() => setShowReceiptModal(false)}
+          order={activeLiveOrder}
+          audioEnabled={audioEnabled}
+        />
+      )}
 
       {/* PROMPTPAY EMVCo PAYMENT MODAL */}
       <PromptPayPaymentModal
         isOpen={showPromptPayModal}
         onClose={() => setShowPromptPayModal(false)}
         orderId={activeLiveOrder?.id || 'RIDE-' + Date.now().toString().slice(-4)}
-        payeeName={currentMatchedDriver?.name || 'พี่กิตติ อินทะสร้อย (อัศวิน)'}
-        promptPayId={activeLiveOrder?.driverPhone?.replace(/[^0-9]/g, '') || '0894451234'}
+        payeeName={currentMatchedDriver?.name || 'ผู้รับเงินที่ระบบกำหนด'}
+        promptPayId={activeLiveOrder?.driverPhone?.replace(/[^0-9]/g, '') || ''}
         amount={activeLiveOrder?.fare || totalCalculatedFare || 45}
         tipAmount={activeLiveOrder?.tipAmount || 0}
         audioEnabled={audioEnabled}
