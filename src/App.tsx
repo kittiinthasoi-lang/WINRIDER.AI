@@ -57,7 +57,7 @@ const CHAPTERS: { id: ChapterId; label: string; icon: React.ReactNode; num: stri
 ];
 
 export default function App() {
-  const { firebaseUser, userData, loading: authLoading, signOut, signInWithDevAccount } = useAuth();
+  const { firebaseUser, userData, loading: authLoading, signOut } = useAuth();
 
   // Mode & Tabs
   const [activeMode, setActiveMode] = useState<AppMode>('passenger');
@@ -71,24 +71,38 @@ export default function App() {
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState<boolean>(false);
   const [customerListedItems, setCustomerListedItems] = useState<MarketItem[]>([]);
   const [driverCitizenPersona, setDriverCitizenPersona] = useState<'driver' | 'customer'>('driver');
+  const [ownerPersona, setOwnerPersona] = useState<'customer' | 'driver' | 'merchant' | 'partner'>('customer');
+
+  // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดหน้าตัวอย่างได้ครบทั้ง 4 บทบาท
+  // โดยยังคงใช้ Firebase UID เดิมเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
+  const isOwnerAdmin = Boolean(
+    firebaseUser && (
+      firebaseUser.email === 'kittiinthasoi@gmail.com' ||
+      firebaseUser.email?.toLowerCase().includes('kittiinthasoi') ||
+      userData?.isAdmin === true ||
+      userData?.adminLevel === 'super'
+    )
+  );
 
   // Convert real Firebase or Dev userData to live UserSession
   const currentUserSession: UserSession | null = useMemo(() => {
     if (!userData || !userData.role) return null;
 
-    const mappedRole = userData.role === 'knight' ? 'driver' 
+    const registeredRole = userData.role === 'knight' ? 'driver' 
       : userData.role === 'citizen' ? 'customer'
       : userData.role === 'merchant' ? 'merchant' 
       : 'partner';
 
-    const roleTitle = userData.role === 'knight' ? 'อัศวินไรเดอร์'
-      : userData.role === 'citizen' ? 'พลเมืองอัศวิน'
-      : userData.role === 'merchant' ? 'ร้านค้าพันธมิตร'
-      : 'องค์กรพาร์ทเนอร์';
+    const mappedRole = isOwnerAdmin ? ownerPersona : registeredRole;
 
-    const avatar = userData.role === 'knight' ? '🏍️'
-      : userData.role === 'citizen' ? '🛡️'
-      : userData.role === 'merchant' ? '🏪'
+    const roleTitle = mappedRole === 'driver' ? 'บัญชีเจ้าของ • อัศวินไรเดอร์'
+      : mappedRole === 'customer' ? 'บัญชีเจ้าของ • พลเมืองอัศวิน'
+      : mappedRole === 'merchant' ? 'บัญชีเจ้าของ • ร้านค้าพันธมิตร'
+      : 'บัญชีเจ้าของ • องค์กรพาร์ทเนอร์';
+
+    const avatar = mappedRole === 'driver' ? '🏍️'
+      : mappedRole === 'customer' ? '🛡️'
+      : mappedRole === 'merchant' ? '🏪'
       : '🏢';
 
     return {
@@ -106,14 +120,9 @@ export default function App() {
       avatarEmoji: userData.avatarUrl || avatar,
       registeredAt: userData.createdAt || new Date().toISOString(),
     };
-  }, [userData, driverCitizenPersona]);
+  }, [userData, driverCitizenPersona, isOwnerAdmin, ownerPersona]);
 
-  const isSuperAdminUser = 
-    firebaseUser?.email === 'kittiinthasoi@gmail.com' || 
-    firebaseUser?.email?.toLowerCase().includes('kittiinthasoi') ||
-    userData?.isAdmin === true ||
-    currentUserSession?.email === 'kittiinthasoi@gmail.com' ||
-    currentUserSession?.role === 'partner';
+  const isSuperAdminUser = isOwnerAdmin;
 
   // Set default active mode according to registered role or super admin
   useEffect(() => {
@@ -151,7 +160,16 @@ export default function App() {
   };
 
   const handleToggleDriverPersona = (targetPersona?: 'driver' | 'customer') => {
-    if (!currentUserSession || userData?.role !== 'knight') return;
+    if (!currentUserSession) return;
+    if (isOwnerAdmin) {
+      const newPersona = targetPersona || (ownerPersona === 'driver' ? 'customer' : 'driver');
+      setOwnerPersona(newPersona);
+      setDriverCitizenPersona(newPersona);
+      setActiveMode(newPersona === 'customer' ? 'passenger' : 'driver');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (userData?.role !== 'knight') return;
     const newPersona = targetPersona || (driverCitizenPersona === 'driver' ? 'customer' : 'driver');
     setDriverCitizenPersona(newPersona);
     if (newPersona === 'customer') {
@@ -163,6 +181,16 @@ export default function App() {
   };
 
   const handleSelectMode = (mode: AppMode) => {
+    if (isOwnerAdmin) {
+      if (mode === 'passenger' || mode === 'market') setOwnerPersona('customer');
+      else if (mode === 'driver') setOwnerPersona('driver');
+      else if (mode === 'merchant') setOwnerPersona('merchant');
+      else if (mode === 'partner' || mode === 'hospital') setOwnerPersona('partner');
+      setActiveMode(mode);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (mode === 'admin') {
       setActiveMode('admin');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -237,7 +265,6 @@ export default function App() {
           currentUserSession={null}
           onSignOut={() => {}}
           onToggleDriverPersona={() => {}}
-          onSelectDevAccount={signInWithDevAccount}
         />
         <main className="flex-1 flex items-center justify-center p-4">
           <AuthModalOrView />
@@ -287,7 +314,6 @@ export default function App() {
           currentUserSession={currentUserSession}
           onSignOut={handleSignOut}
           onToggleDriverPersona={() => {}}
-          onSelectDevAccount={signInWithDevAccount}
         />
         <main className="flex-1">
           <RoleSelectionAndRegistration />
@@ -313,7 +339,6 @@ export default function App() {
           currentUserSession={currentUserSession}
           onSignOut={handleSignOut}
           onToggleDriverPersona={handleToggleDriverPersona}
-          onSelectDevAccount={signInWithDevAccount}
         />
         <main className="flex-1">
           <PendingReviewView />
@@ -340,7 +365,6 @@ export default function App() {
         currentUserSession={currentUserSession}
         onSignOut={handleSignOut}
         onToggleDriverPersona={handleToggleDriverPersona}
-        onSelectDevAccount={signInWithDevAccount}
       />
 
       {/* Main Viewport Content with ProtectedRoute */}

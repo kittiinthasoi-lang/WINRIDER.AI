@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MatchedDriver, DreamRideVehicle, LifestylePlace } from '../types';
-import { KNIGHT_DRIVERS_POOL } from '../data/driversData';
+import { fetchLiveDrivers } from '../services/liveDriversService';
 import { LIFESTYLE_PLACES } from '../data/lifestyleData';
 import { 
   RELIGIOUS_SERVICES_DATA, 
@@ -108,6 +108,9 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   const [selectedDriver, setSelectedDriver] = useState<MatchedDriver | null>(null);
   const [activeLifestyleCategory, setActiveLifestyleCategory] = useState<'all' | 'restaurant' | 'cafe' | 'pub' | 'chill' | 'pet_cafe' | 'temple'>('all');
   const [matchingProgress, setMatchingProgress] = useState(15);
+  const [liveDrivers, setLiveDrivers] = useState<MatchedDriver[]>([]);
+  const [driversLoading, setDriversLoading] = useState(true);
+  const [driversError, setDriversError] = useState<string | null>(null);
   
   // Local gender state for reactive switching
   const [currentGender, setCurrentGender] = useState<'female' | 'male'>(customerGender);
@@ -138,6 +141,18 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   useEffect(() => {
     setCurrentGender(customerGender);
   }, [customerGender]);
+
+  useEffect(() => {
+    let active = true;
+    setDriversLoading(true);
+    fetchLiveDrivers().then((drivers) => {
+      if (active) setLiveDrivers(drivers);
+    }).catch((error) => {
+      console.error('Unable to load live drivers:', error);
+      if (active) { setLiveDrivers([]); setDriversError('ไม่สามารถเชื่อมต่อรายชื่อพี่วินจากระบบจริงได้'); }
+    }).finally(() => { if (active) setDriversLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   // Criteria rules based on service and gender
   const serviceCriteria = useMemo(() => {
@@ -246,7 +261,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
   // Filter available drivers according to service and gender rules, plus Dream Ride vehicle matching
   const candidateDrivers = useMemo(() => {
-    return KNIGHT_DRIVERS_POOL.filter(driver => {
+    return liveDrivers.filter(driver => {
       if (serviceId === 'express') {
         return driver.level >= 10 && driver.hasDeliveryBox;
       }
@@ -280,12 +295,12 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
       const scoreB = b.serviceMatchScore + (matchB.isExact ? 40 : matchB.isBrand ? 20 : 0);
       return scoreB - scoreA;
     });
-  }, [serviceId, currentGender, selectedDreamRide]);
+  }, [liveDrivers, serviceId, currentGender, selectedDreamRide]);
 
   // Alternative drivers (for manual choice / opposite gender / other specialties)
   const allOtherDrivers = useMemo(() => {
-    return KNIGHT_DRIVERS_POOL.filter(d => !candidateDrivers.some(cd => cd.id === d.id));
-  }, [candidateDrivers]);
+    return liveDrivers.filter(d => !candidateDrivers.some(cd => cd.id === d.id));
+  }, [liveDrivers, candidateDrivers]);
 
   // Lifestyle recommendations filtered list
   const filteredLifestylePlaces = useMemo(() => {
@@ -651,6 +666,13 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
                 {/* Recommended Candidate Drivers List */}
                 <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                  {!driversLoading && candidateDrivers.length === 0 && (
+                    <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-center">
+                      <AlertCircle className="w-6 h-6 text-amber-300 mx-auto mb-2" />
+                      <p className="text-sm font-bold text-amber-200">{driversError || 'ขณะนี้ยังไม่มีพี่วินที่ผ่านการอนุมัติและออนไลน์'}</p>
+                      <p className="text-[11px] text-slate-400 mt-1">ระบบไม่แสดงรายชื่อจำลองอีกต่อไป</p>
+                    </div>
+                  )}
                   {candidateDrivers.map((driver) => {
                     const isSelected = selectedDriver?.id === driver.id;
                     const dreamMatch = checkDreamRideMatch(driver.vehicleModel, selectedDreamRide);

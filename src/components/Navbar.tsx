@@ -53,7 +53,6 @@ interface NavbarProps {
   currentUserSession?: UserSession | null;
   onSignOut?: () => void;
   onToggleDriverPersona?: (target: 'driver' | 'customer') => void;
-  onSelectDevAccount?: (acc: UserSession) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -72,7 +71,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUserSession,
   onSignOut,
   onToggleDriverPersona,
-  onSelectDevAccount,
 }) => {
   const [nfcSynced, setNfcSynced] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -727,8 +725,32 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               </div>
 
-              {/* Driver Dual-Role Section */}
-              {isDriver ? (
+              {/* Owner account: four operational personas, one Firebase UID */}
+              {isAdminSession ? (
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/15 to-[#08152B] border border-amber-400/40 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                    <Crown className="w-4 h-4 text-amber-400" />
+                    <span>บัญชีเจ้าของระบบ • เลือกบทบาทตัวอย่าง</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    ทั้ง 4 บทบาทใช้บัญชีและ Firebase UID เดียวกันกับแอดมิน ไม่มีการสร้างผู้ใช้จำลองเพิ่ม
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => { onSelectMode('passenger'); setShowRoleInfoModal(false); }} className="p-2.5 rounded-xl border border-cyan-400/40 bg-cyan-500/15 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-cyan-500/25">
+                      <Smartphone className="w-4 h-4" /> ผู้โดยสาร
+                    </button>
+                    <button type="button" onClick={() => { onSelectMode('driver'); setShowRoleInfoModal(false); }} className="p-2.5 rounded-xl border border-blue-400/40 bg-blue-500/15 text-blue-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-500/25">
+                      <Bike className="w-4 h-4" /> พี่วิน
+                    </button>
+                    <button type="button" onClick={() => { onSelectMode('merchant'); setShowRoleInfoModal(false); }} className="p-2.5 rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-500/25">
+                      <Store className="w-4 h-4" /> ร้านค้า
+                    </button>
+                    <button type="button" onClick={() => { onSelectMode('partner'); setShowRoleInfoModal(false); }} className="p-2.5 rounded-xl border border-pink-400/40 bg-pink-500/15 text-pink-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-pink-500/25">
+                      <Building2 className="w-4 h-4" /> พาร์ทเนอร์
+                    </button>
+                  </div>
+                </div>
+              ) : isDriver ? (
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0D2447] to-[#08152B] border border-cyan-400/40 space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
                     <Crown className="w-4 h-4 text-amber-400" />
