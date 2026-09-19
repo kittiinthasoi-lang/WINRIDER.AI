@@ -254,6 +254,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [tripDistanceKm, setTripDistanceKm] = useState<number>(2.4);
   const [deviceFrameMode, setDeviceFrameMode] = useState(true);
   const [currentMatchedDriver, setCurrentMatchedDriver] = useState<MatchedDriver | null>(null);
+  const [isCreatingRide, setIsCreatingRide] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   // --- Real-Time Active Ride, AI Voice Announcer & Live Dispatch Sync ---
   const [activeLiveOrder, setActiveLiveOrder] = useState<LiveRideOrder | null>(null);
@@ -328,17 +330,17 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           setCurrentMatchedDriver({
             name: order.driverName,
             level: order.driverLevel || 100,
-            rating: 4.98,
-            plate: order.driverPlate || '1กข 7789 กทม.',
-            phone: '081-998-3344',
-            vehicle: order.driverVehicle || 'Honda ADV350 Stealth',
-            photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-            totalRides: 2840,
-            currentLocation: 'ปากซอยสุขุมวิท 23 (ห่าง 200ม.)',
-            etaMinutes: 2.0,
-            distanceMeters: 200,
-            specialBadges: ['⚡ อัศวินตอบสนองไว', '🛡️ กองทุน 2 บาทสมบูรณ์'],
-            armorsEquipped: ['The Guardian Zipper', 'Smart HUD Helmet']
+            rating: order.driverRating || 0,
+            plate: order.driverPlate || '',
+            phone: order.driverPhone || '',
+            vehicle: order.driverVehicle || '',
+            photoUrl: order.driverAvatarEmoji ? undefined : undefined,
+            totalRides: 0,
+            currentLocation: '',
+            etaMinutes: 0,
+            distanceMeters: 0,
+            specialBadges: [],
+            armorsEquipped: []
           });
           setRidePhase('picking_up');
           if (audioEnabled) {
@@ -409,8 +411,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   // AI Voice Announcement Dispatcher
   const speakRideAiAnnouncement = (phaseOverride?: 'picking_up' | 'arrived_pickup' | 'in_transit' | 'arrived_destination') => {
     const targetPhase = phaseOverride || ridePhase;
-    const driverName = currentMatchedDriver?.name || 'กิตติ อินทะสร้อย';
-    const driverLvl = currentMatchedDriver?.level || 100;
+    const driverName = currentMatchedDriver?.name || 'กำลังรอพี่วิน';
+    const driverLvl = currentMatchedDriver?.level || 0;
     const vehicle = selectedDreamRide?.thaiName || 'Honda ADV350 Custom Stealth';
     const pickupLoc = 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)';
     const destLoc = selectedDestination || 'อาคาร Exchange Tower อโศก';
@@ -862,42 +864,44 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   };
 
   const handleConfirmRide = async () => {
-    if (audioEnabled) {
-      playRadarScan();
+    if (!currentUserSession?.id) {
+      setBookingError('กรุณาเข้าสู่ระบบก่อนเรียกรถ เพื่อป้องกันการสร้างออเดอร์โดยไม่มีเจ้าของบัญชี');
+      return;
     }
-    setShowBookingModal(false);
-    setBookingConfirmed(true);
-    confetti({
-      particleCount: 50,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#00D2FF', '#FFD700', '#FFFFFF']
-    });
+    if (!selectedDestination) {
+      setBookingError('กรุณาเลือกปลายทางก่อนยืนยันการเดินทาง');
+      return;
+    }
 
-    // Create live order for cross-tab sync and No-Code webhook dispatch
+    setIsCreatingRide(true);
+    setBookingError(null);
     try {
-      const pName = currentUserSession?.name || passengerProfileData.displayName || 'คุณผู้โดยสาร';
-      const pPhone = currentUserSession?.phone || '089-445-1234';
+      if (audioEnabled) playRadarScan();
+      const pName = currentUserSession.name || passengerProfileData.displayName;
+      const pPhone = currentUserSession.phone || '';
       const liveOrder = await createLiveOrder({
         serviceId: activeServiceId || 'knight',
         serviceTitle: selectedService ? `WIN ${selectedService.toUpperCase()}` : 'WIN KNIGHT',
         serviceIconEmoji: selectedDreamRide?.icon || '🛵',
-        passengerUserId: currentUserSession?.id || 'ANON',
-        passengerName: `${pName} (${currentUserSession?.level ? `LV.${currentUserSession.level}` : 'Citizen'})`,
+        passengerUserId: currentUserSession.id,
+        passengerName: `${pName} (${currentUserSession.level ? `LV.${currentUserSession.level}` : 'Citizen'})`,
         passengerPhone: pPhone,
-        pickupLocation: 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)',
-        dropoffLocation: selectedDestination || 'อาคาร Exchange Tower อโศก',
+        pickupLocation: 'ตำแหน่ง GPS ปัจจุบันของผู้โดยสาร',
+        dropoffLocation: selectedDestination,
         distanceKm: tripDistanceKm,
         fare: totalCalculatedFare || 45
       });
       setActiveLiveOrder(liveOrder);
+      setBookingConfirmed(true);
+      setShowBookingModal(false);
+      setActiveTab('ride');
+      if (audioEnabled) speakThaiText('สร้างออเดอร์สำเร็จ กำลังรอพี่วินที่ผ่านเกณฑ์กดรับงานค่ะ');
     } catch (err) {
       console.error('Failed to create live order:', err);
+      setBookingError('สร้างออเดอร์ไม่สำเร็จ กรุณาตรวจสอบการเข้าสู่ระบบและลองใหม่อีกครั้ง');
+    } finally {
+      setIsCreatingRide(false);
     }
-
-    setTimeout(() => {
-      setActiveTab('ride');
-    }, 600);
   };
 
   const handleTriggerSos = () => {
@@ -906,8 +910,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       speakThaiText("สัญญาณฉุกเฉิน SOS ส่งถึงศูนย์บัญชาการ Cosmo-Ko และอัศวินรอบข้างในรัศมี 1 กิโลเมตรแล้ว");
     }
     setIsSosActive(true);
-    alert("🚨 สัญญาณเตือนภัย SOS ฉุกเฉินถูกส่งไปยังศูนย์บัญชาการ Cosmo-Ko และอัศวินในพื้นที่เรียบร้อย!");
-    confetti({ particleCount: 30, spread: 40, colors: ['#EF4444', '#F59E0B'] });
   };
 
   const handleAddC2c = (e: React.FormEvent) => {
@@ -1564,7 +1566,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   pickupLocation="หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)"
                   destinationLocation={selectedDestination || "อาคาร Exchange Tower อโศก"}
                   driverName={currentMatchedDriver?.name || "กิตติ อินทะสร้อย"}
-                  driverLevel={currentMatchedDriver?.level || 100}
+                  driverLevel={currentMatchedDriver?.level || 0}
                   driverEmoji={currentMatchedDriver?.avatarEmoji || "🦁"}
                   etaMinutes={ridePhase === 'picking_up' ? pickupEtaMinutes : destEtaMinutes}
                   onEmergencyClick={handleTriggerSos}
@@ -1575,7 +1577,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <NeonProfileAvatar 
-                        level={currentMatchedDriver?.level || 100} 
+                        level={currentMatchedDriver?.level || 0} 
                         emoji={currentMatchedDriver?.avatarEmoji || "🦁"} 
                         role="driver" 
                         size="md" 
@@ -1586,7 +1588,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                             <span>{currentMatchedDriver?.name || "กิตติ อินทะสร้อย"}</span>
                           </h3>
                           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/50 font-black shadow-[0_0_8px_rgba(255,215,0,0.3)]">
-                            LV.{currentMatchedDriver?.level || 100} SOVEREIGN 👑
+                            LV.{currentMatchedDriver?.level || 0} SOVEREIGN 👑
                           </span>
                         </div>
                         <p className="text-xs text-cyan-300 font-semibold mt-0.5">
@@ -1702,7 +1704,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     <button
                       onClick={() => {
                         if (audioEnabled) playTactileBlip(800);
-                        alert(`📞 กำลังโทรติดต่อ ${currentMatchedDriver?.name || 'พี่วิน'}...`);
+                        if (currentMatchedDriver?.phone) window.location.href = `tel:${currentMatchedDriver.phone}`;
                       }}
                       className="py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center justify-center gap-1.5"
                     >
@@ -1712,7 +1714,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     <button
                       onClick={() => {
                         if (audioEnabled) playTactileBlip(800);
-                        alert(`💬 เปิดกล่องข้อความสนทนากับ ${currentMatchedDriver?.name || 'พี่วิน'}`);
+                        setShowInRideChatModal(true);
                       }}
                       className="py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center justify-center gap-1.5"
                     >
@@ -2432,11 +2434,11 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   {/* Trip details strip */}
                   <div className="p-2.5 rounded-2xl bg-black/50 border border-white/10 flex items-center justify-between text-xs font-mono">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{currentMatchedDriver?.avatarEmoji || '🦁'}</span>
+                      <span className="text-lg">{currentMatchedDriver?.avatarEmoji || '🛵'}</span>
                       <div>
                         <div className="flex items-center gap-1">
-                          <span className="font-bold text-white text-[11px]">{currentMatchedDriver?.name || 'กิตติ อินทะสร้อย'}</span>
-                          <span className="text-[8px] px-1 rounded bg-amber-400/20 text-amber-300">LV.{currentMatchedDriver?.level || 100}</span>
+                          <span className="font-bold text-white text-[11px]">{currentMatchedDriver?.name || 'กำลังรอพี่วิน'}</span>
+                          <span className="text-[8px] px-1 rounded bg-amber-400/20 text-amber-300">LV.{currentMatchedDriver?.level || 0}</span>
                         </div>
                         <p className="text-[9px] text-slate-400">
                           {selectedDreamRide?.thaiName || 'Honda ADV350'} • ทะเบียน 9กก-9999
@@ -2576,8 +2578,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         <ServicePhotoVerificationModal
           type={photoVerificationType}
           serviceName={selectedService || 'WIN Service'}
-          driverName={currentMatchedDriver?.name || 'กิตติ อินทะสร้อย'}
-          driverLevel={currentMatchedDriver?.level || 100}
+          driverName={currentMatchedDriver?.name || 'กำลังรอพี่วิน'}
+          driverLevel={currentMatchedDriver?.level || 0}
           recipientOrPassengerName={
             photoVerificationType === 'express_delivery'
               ? (preMatchingData?.express?.recipientName || 'คุณสมศรี เจริญสุข')
@@ -3556,10 +3558,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           status: 'completed',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          driverName: currentMatchedDriver?.name || 'พี่กิตติ อินทะสร้อย',
-          driverLevel: currentMatchedDriver?.level || 100,
-          driverPlate: currentMatchedDriver?.plate || '1กข 7789 กทม.',
-          driverAvatarEmoji: currentMatchedDriver?.avatarEmoji || '🦁'
+          driverName: currentMatchedDriver?.name || 'กำลังรอพี่วิน',
+          driverLevel: currentMatchedDriver?.level || 0,
+          driverPlate: currentMatchedDriver?.plate || '—',
+          driverAvatarEmoji: currentMatchedDriver?.avatarEmoji || '🛵'
         }}
         audioEnabled={audioEnabled}
       />
