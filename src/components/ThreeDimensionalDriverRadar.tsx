@@ -90,265 +90,7 @@ interface ThreeDimensionalDriverRadarProps {
   onSelectPing?: (ping: Radar3DPing) => void;
 }
 
-export const SAMPLE_3D_PINGS: Radar3DPing[] = [
-  // 1. CUSTOMERS (ลูกค้า)
-  {
-    id: 'PING-CUST-01',
-    name: 'คุณณิชา รัตนเวช',
-    avatar: '👩‍💼',
-    imageUrl: '/images/person_commuter.jpg',
-    category: 'customer',
-    categoryLabel: '👤 ลูกค้า',
-    service: 'WIN KNIGHT (รับส่งด่วน)',
-    serviceEmoji: '🛵',
-    serviceType: 'knight',
-    fare: 74,
-    distanceMeters: 250,
-    location: 'ไอดีโอ สาทร-วงเวียนใหญ่',
-    x: -36,
-    y: -42,
-    elevation: 36,
-    urgency: 'high',
-    specialNote: 'รอหน้าล็อบบี้ ใส่เสื้อขาว',
-    badge: '📍 ลูกค้าใกล้สุด 250ม. (อันดับ 1)',
-    details: 'เดินทางไปอาคาร Exchange Tower สี่แยกอโศก ต้องการพี่วินขับนุ่มนวล'
-  },
-  {
-    id: 'PING-CUST-02',
-    name: 'คุณลุงฮาซัน & ครอบครัว',
-    avatar: '🧓',
-    imageUrl: '/images/elderly_spirit.jpg',
-    category: 'customer',
-    categoryLabel: '👤 ลูกค้า',
-    service: 'WIN Spirit (ศาสนกิจ)',
-    serviceEmoji: '🕌',
-    serviceType: 'spirit',
-    fare: 99,
-    distanceMeters: 350,
-    location: 'มัสยิดบางหลวง (กุฎีขาว)',
-    x: 48,
-    y: 36,
-    elevation: 32,
-    urgency: 'normal',
-    specialNote: 'พาคุณตาไปละหมาด ขับนุ่มนวล',
-    badge: '🕌 ศาสนกิจผู้สูงอายุ',
-    details: 'ผู้โดยสารสูงอายุ ต้องการการประคองขึ้น-ลง และขับขี่ปลอดภัยเป็นเลิศ'
-  },
-  {
-    id: 'PING-CUST-03',
-    name: 'คุณแพรวา สายมู',
-    avatar: '🧘‍♀️',
-    imageUrl: '/images/mu_buddy.jpg',
-    category: 'customer',
-    categoryLabel: '👤 ลูกค้า',
-    service: 'WIN MU BUDDY',
-    serviceEmoji: '🪷',
-    serviceType: 'mu',
-    fare: 149,
-    distanceMeters: 420,
-    location: 'วัดกัลยาณมิตรวรมหาวิหาร',
-    x: -54,
-    y: 42,
-    elevation: 30,
-    urgency: 'normal',
-    specialNote: 'ขอแวะไหว้พระ 3 วัดริมน้ำ',
-    badge: '🪷 ทริปมงคล 9 วัด (+ทิป ฿50)',
-    details: 'ต้องการพี่วินบัดดี้แนะนำจุดไหว้หลวงพ่อโตซำปอกง และพาไปวัดอรุณ'
-  },
-  {
-    id: 'PING-CUST-04',
-    name: 'คุณหมอทราย & น้องปอม',
-    avatar: '🐶',
-    imageUrl: '/images/pet_care.jpg',
-    category: 'customer',
-    categoryLabel: '👤 ลูกค้า',
-    service: 'WIN-Pet Care (สัตว์เลี้ยง)',
-    serviceEmoji: '🐾',
-    serviceType: 'pet',
-    fare: 134,
-    distanceMeters: 280,
-    location: 'BTS กรุงธนบุรี ทางออก 3',
-    x: 52,
-    y: -18,
-    elevation: 38,
-    urgency: 'urgent',
-    specialNote: 'พาน้องหมาส่งรพ.สัตว์ 24ชม.',
-    badge: '🐾 WIN-Pet Pod มีแอร์',
-    details: 'สัตว์เลี้ยงขนาดเล็ก มีสายรัด Pet Safety Harness บนเบาะหลัง'
-  },
-
-  // 2. SHOPS (ร้านค้า / อาหาร / พัสดุด่วน)
-  {
-    id: 'PING-SHOP-01',
-    name: 'ร้าน Aura Bake เบเกอรี่',
-    avatar: '🧁',
-    imageUrl: '/images/cookie_box.jpg',
-    category: 'shop',
-    categoryLabel: '🏪 ร้านค้า',
-    service: 'WIN Express (พัสดุด่วน)',
-    serviceEmoji: '📦',
-    serviceType: 'express',
-    fare: 84,
-    distanceMeters: 180,
-    location: 'ซอยลาดหญ้า 12',
-    x: 24,
-    y: -56,
-    elevation: 42,
-    urgency: 'high',
-    specialNote: 'กล่องเค้ก 2 ปอนด์ ระวังเอียง (กล่องโปร่งใส)',
-    badge: '📦 ค่ากล่องพัสดุ +฿20',
-    details: 'สินค้าบรรจุในกล่องใสมาตรฐาน มีหูหิ้วกันสั่นสะเทือน ส่งด่วนสยามสแควร์'
-  },
-  {
-    id: 'PING-SHOP-02',
-    name: 'ครัวเจ๊หงส์ ตามสั่งกระทะร้อน',
-    avatar: '🍜',
-    imageUrl: '/images/street_market_food.jpg',
-    category: 'shop',
-    categoryLabel: '🏪 ร้านค้า',
-    service: 'WIN Food Express',
-    serviceEmoji: '🍲',
-    serviceType: 'express',
-    fare: 68,
-    distanceMeters: 310,
-    location: 'ซอยเจริญนคร 14',
-    x: -28,
-    y: 18,
-    elevation: 34,
-    urgency: 'normal',
-    specialNote: 'อาหารปรุงเสร็จ 3 กล่อง พร้อมส่งทันที',
-    badge: '🍲 อาหารร้อน 0% GP พ่อค้าแฮปปี้',
-    details: 'ส่งคอนโดแม่น้ำริเวอร์ไซด์ อาหารใส่กล่องคุมอุณหภูมิเรียบร้อย'
-  },
-  {
-    id: 'PING-SHOP-03',
-    name: 'Café Amazon สาขาเจริญนคร',
-    avatar: '☕',
-    imageUrl: '/images/lifestyle_cafe.jpg',
-    category: 'shop',
-    categoryLabel: '🏪 ร้านค้า',
-    service: 'WIN Beverage Express',
-    serviceEmoji: '🥤',
-    serviceType: 'express',
-    fare: 55,
-    distanceMeters: 160,
-    location: 'ปากซอยเจริญนคร 18',
-    x: 10,
-    y: 44,
-    elevation: 30,
-    urgency: 'normal',
-    specialNote: 'กาแฟ 4 แก้ว พร้อมถุงเก็บความเย็น',
-    badge: '☕ รับเครื่องดื่มด่วน',
-    details: 'แก้วกาแฟใส่ที่ล็อกทรงสูง ไม่หก ไม่ล้ม 100%'
-  },
-  {
-    id: 'PING-SHOP-04',
-    name: 'Kerry Express Hub สาขาคลองสาน',
-    avatar: '📦',
-    imageUrl: '/images/express_parcel.jpg',
-    category: 'shop',
-    categoryLabel: '🏪 ร้านค้า',
-    service: 'WIN Express Hub Drop',
-    serviceEmoji: '🚚',
-    serviceType: 'express',
-    fare: 110,
-    distanceMeters: 450,
-    location: 'ถนนลาดหญ้า ใกล้คลองสาน',
-    x: -62,
-    y: -22,
-    elevation: 35,
-    urgency: 'high',
-    specialNote: 'เอกสารด่วนและพัสดุอีคอมเมิร์ซ 2 ชิ้น',
-    badge: '⚡ ด่วนพิเศษ Express Track',
-    details: 'ส่งเอกสารเซ็นสัญญาเร่งด่วน อาคารสาธรซิตี้ทาวเวอร์'
-  },
-
-  // 3. PARTNERS (พาร์ทเนอร์ / ศูนย์บริการ / จุดสลับแบต / ซุ้มพัก)
-  {
-    id: 'PING-PART-01',
-    name: 'สถานีสลับแบตเตอรี่ WIN EV Swapping Hub #04',
-    avatar: '⚡',
-    imageUrl: '/images/cyber_vehicle.jpg',
-    category: 'partner',
-    categoryLabel: '⚡ พาร์ทเนอร์',
-    service: 'WIN EV Battery Swap',
-    serviceEmoji: '🔋',
-    serviceType: 'knight',
-    fare: 0,
-    distanceMeters: 120,
-    location: 'จุดเชื่อมต่อ BTS กรุงธนบุรี',
-    x: 32,
-    y: 12,
-    elevation: 48,
-    urgency: 'normal',
-    specialNote: 'แบตเตอรี่เต็ม 100% พร้อมใช้งาน 12 ลูก (สลับไวใน 45 วินาที)',
-    badge: '⚡ สลับแบตฟรี สวัสดิการอัศวิน',
-    details: 'พาร์ทเนอร์เครือข่ายพลังงานสะอาด ตู้สลับแบตเตอรี่อัจฉริยะระบบอัตโนมัติ'
-  },
-  {
-    id: 'PING-PART-02',
-    name: 'ศูนย์บริการซ่อมบำรุง Win Pro Service & Garage',
-    avatar: '🛠️',
-    imageUrl: '/images/armor_circuit.jpg',
-    category: 'partner',
-    categoryLabel: '⚡ พาร์ทเนอร์',
-    service: 'Partner Garage & Tire',
-    serviceEmoji: '🔧',
-    serviceType: 'knight',
-    fare: 0,
-    distanceMeters: 290,
-    location: 'ถนนลาดหญ้า ซอย 8',
-    x: -18,
-    y: -65,
-    elevation: 40,
-    urgency: 'normal',
-    specialNote: 'เปลี่ยนถ่ายน้ำมันเครื่อง & ตรวจเช็กผ้าเบรก ลด 25% สมาชิกอัศวิน',
-    badge: '🛡️ กองทุน 2 บาท คุ้มครองค่าซ่อม',
-    details: 'อู่มาตรฐานช่างชำนาญการ ตรวจสภาพฟรี 12 รายการสำหรับพี่วิน'
-  },
-  {
-    id: 'PING-PART-03',
-    name: 'ศูนย์สวัสดิการกองทุน 2 บาท & พักผ่อนอัศวิน',
-    avatar: '🏛️',
-    imageUrl: '/images/cyber_arena.jpg',
-    category: 'partner',
-    categoryLabel: '⚡ พาร์ทเนอร์',
-    service: 'Sovereign Knight Lounge',
-    serviceEmoji: '🛋️',
-    serviceType: 'knight',
-    fare: 0,
-    distanceMeters: 380,
-    location: 'ใกล้ท่าน้ำคลองสาน',
-    x: -42,
-    y: 55,
-    elevation: 44,
-    urgency: 'normal',
-    specialNote: 'น้ำดื่มเย็นฟรี, กาแฟ, จุดชาร์จมือถือ และห้องพักแอร์เย็นฉ่ำ',
-    badge: '👑 สวัสดิการอัศวิน Sovereign',
-    details: 'ที่พักผ่อนระหว่างรอบ พร้อมห้องพยาบาลปฐมพยาบาลเบื้องต้น'
-  },
-  {
-    id: 'PING-PART-04',
-    name: 'ปั๊ม PTT EV Quick Charge Hub',
-    avatar: '⛽',
-    imageUrl: '/images/cyber_vehicle.jpg',
-    category: 'partner',
-    categoryLabel: '⚡ พาร์ทเนอร์',
-    service: 'EV Supercharger DC Fast',
-    serviceEmoji: '🔌',
-    serviceType: 'knight',
-    fare: 0,
-    distanceMeters: 410,
-    location: 'ถนนกรุงธนบุรี มุ่งหน้าสาทร',
-    x: 64,
-    y: 30,
-    elevation: 36,
-    urgency: 'normal',
-    specialNote: 'หัวชาร์จว่าง 4 ช่อง พร้อมร้านสะดวกซื้อ 24 ชม.',
-    badge: '⚡ ชาร์จด่วน 15 นาที',
-    details: 'รองรับการชาร์จมอเตอร์ไซค์ไฟฟ้าและรถยนต์ไฟฟ้าทุกยี่ห้อ'
-  }
-];
+const LIVE_RADAR_PINGS: Radar3DPing[] = [];
 
 export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarProps> = ({
   activeVehicle,
@@ -370,7 +112,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
   const [showGroundShadows, setShowGroundShadows] = useState<boolean>(true);
   const [filterCategory, setFilterCategory] = useState<RadarCategory>('all');
   const [filterService, setFilterService] = useState<'all' | 'knight' | 'express' | 'pet' | 'mu' | 'spirit'>('all');
-  const [selectedPing, setSelectedPing] = useState<Radar3DPing | null>(SAMPLE_3D_PINGS[0]);
+  const [selectedPing, setSelectedPing] = useState<Radar3DPing | null>(LIVE_RADAR_PINGS[0]);
   const [radarSweepAngle, setRadarSweepAngle] = useState<number>(0);
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
 
@@ -530,7 +272,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
     if (onSelectPing) onSelectPing(ping);
   };
 
-  const filteredPings = SAMPLE_3D_PINGS.filter(p => {
+  const filteredPings = LIVE_RADAR_PINGS.filter(p => {
     if (filterCategory !== 'all' && p.category !== filterCategory) return false;
     if (filterService !== 'all' && p.serviceType !== filterService) return false;
     return true;
@@ -1396,7 +1138,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
         onLocateMe={handleLocateMe}
         onStartNavigation={handleStartNavigation}
         onStartArCameraNav={handleStartArCameraNav}
-        availablePings={SAMPLE_3D_PINGS}
+        availablePings={LIVE_RADAR_PINGS}
         selectedPing={selectedPing}
       />
 
