@@ -632,6 +632,57 @@ export const topUpWallet = onCall(async (request) => {
  * - บันทึก Double-Entry Ledger (Debit: User Wallet, Credit: Payout Clearing)
  * - ปรับลด balance หรือล็อคยอดเงินใน Firestore Transaction เดียว
  */
+/**
+ * Advance a payout only through an authenticated backend action.
+ * State transitions are intentionally explicit; there is no client write path.
+ */
+export const updatePayoutStatus = onCall(async (request) => {
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "ต้องเข้าสู่ระบบก่อนอัปเดตสถานะการถอนเงิน");
+
+  const payoutId = String(request.data?.payoutId || "").trim();
+  const nextStatus = String(request.data?.status || "").trim().toUpperCase();
+  const allowed = ["PROCESSING", "COMPLETED", "FAILED", "CANCELLED"];
+  if (!payoutId || !allowed.includes(nextStatus)) {
+    throw new HttpsError("invalid-argument", "payoutId หรือสถานะไม่ถูกต้อง");
+  }
+
+  const payoutRef = db.collection("payout_requests").doc(payoutId);
+  const result = await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(payoutRef);
+    if (!snap.exists) throw new HttpsError("not-found", "ไม่พบรายการถอนเงิน");
+    const payout = snap.data() || {};
+    const current = String(payout.status || "");
+    const transitions: Record<string,string[]> = {
+      PENDING_TRANSFER: ["PROCESSING", "FAILED", "CANCELLED"],
+      PROCESSING: ["COMPLETED", "FAILED"],
+      COMPLETED: [],
+      FAILED: [],
+      CANCELLED: []
+    };
+    if (!transitions[current]?.includes(nextStatus)) {
+      throw new HttpsError("failed-precondition", `ไม่อนุญาตให้เปลี่ยนสถานะจาก ${current} เป็น ${nextStatus}`);
+    }
+
+    const history = Array.isArray(payout.statusHistory) ? payout.statusHistory : [];
+    transaction.update(payoutRef, {
+      status: nextStatus,
+      statusHistory: [...history, {
+        status: nextStatus,
+        at: FieldValue.serverTimestamp(),
+        actorUid: request.auth!.uid,
+        actorType: "backend"
+      }],
+      updatedAt: FieldValue.serverTimestamp(),
+      ...(nextStatus === "COMPLETED" ? { completedAt: FieldValue.serverTimestamp() } : {}),
+      ...(nextStatus === "FAILED" || nextStatus === "CANCELLED" ? { failedAt: FieldValue.serverTimestamp() } : {})
+    });
+
+    return { payoutId, current, nextStatus, amountSatang: Number(payout.amountSatang || 0), userId: String(payout.userId || "") };
+  });
+
+  return { success: true, ...result };
+});
+
 export const requestPayout = onCall(async (request) => {
   if (!request.auth || !request.auth.uid) {
     throw new HttpsError("unauthenticated", "ต้องเข้าสู่ระบบก่อนทำรายการขอถอนเงิน");
@@ -756,7 +807,14 @@ export const requestPayout = onCall(async (request) => {
         accountName
       },
       status: "PENDING_TRANSFER",
-      createdAt: FieldValue.serverTimestamp()
+      statusHistory: [{
+        status: "PENDING_TRANSFER",
+        at: FieldValue.serverTimestamp(),
+        actorUid: uid,
+        actorType: "user"
+      }],
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
     });
 
     // 6. บันทึก Journal Ledger
