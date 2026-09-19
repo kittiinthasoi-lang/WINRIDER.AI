@@ -2609,7 +2609,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                             <div><span className="text-slate-500">ปลายทาง:</span> {item.dropoffLocation}</div>
                             {item.driverName && (
                               <div className="text-emerald-300">
-                                พี่วินผู้ดูแล: {item.driverName} ({item.driverPlate || '1กข 7789 กทม.'})
+                                พี่วินผู้ดูแล: {item.driverName} ({item.driverPlate || 'ไม่ระบุทะเบียน'})
                               </div>
                             )}
                           </div>
