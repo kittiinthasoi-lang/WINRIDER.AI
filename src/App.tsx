@@ -117,7 +117,9 @@ export default function App() {
       level: isOwnerAdmin ? 100 : (userData.level !== undefined ? userData.level : 1),
       xp: userData.xp !== undefined ? userData.xp : 0,
       rating: userData.rating !== undefined ? userData.rating : 5.0,
-      avatarEmoji: userData.avatarUrl || avatar,
+      avatarEmoji: userData.avatarEmoji || avatar,
+      avatarUrl: userData.avatarUrl || undefined,
+      bio: userData.bioStatus || undefined,
       registeredAt: userData.createdAt || new Date().toISOString(),
     };
   }, [userData, driverCitizenPersona, isOwnerAdmin, ownerPersona]);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ShieldAlert, Loader2, KeyRound } from 'lucide-react';
 import { getAdminClaims } from '../../services/adminService';
 import { AdminClaims, AdminLevel } from '../../types/admin';
@@ -17,6 +17,11 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
   const [loading, setLoading] = useState(true);
   const [claims, setClaims] = useState<AdminClaims | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
+  const redirectHomeRef = useRef(onRedirectHome);
+
+  useEffect(() => {
+    redirectHomeRef.current = onRedirectHome;
+  }, [onRedirectHome]);
 
   useEffect(() => {
     let isMounted = true;
@@ -31,7 +36,7 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
           // ถ้าไม่ใช่ admin ให้เด้งกลับหน้าแรกทันที ตามข้อกำหนดข้อ 1
           setAccessDenied(true);
           const timer = setTimeout(() => {
-            if (isMounted) onRedirectHome();
+            if (isMounted) redirectHomeRef.current();
           }, 1200);
           return () => clearTimeout(timer);
         }
@@ -40,7 +45,7 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
         if (requiredLevel === 'super' && result.adminLevel !== 'super') {
           setAccessDenied(true);
           const timer = setTimeout(() => {
-            if (isMounted) onRedirectHome();
+            if (isMounted) redirectHomeRef.current();
           }, 1500);
           return () => clearTimeout(timer);
         }
@@ -50,7 +55,7 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
       } catch (err) {
         console.error('AdminRoute error checking claims:', err);
         setAccessDenied(true);
-        onRedirectHome();
+        redirectHomeRef.current();
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -61,7 +66,7 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [requiredLevel, onRedirectHome]);
+  }, [requiredLevel]);
 
   if (loading) {
     return (

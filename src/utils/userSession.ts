@@ -35,6 +35,7 @@ export interface UserSession {
   xp: number;
   rating: number;
   avatarEmoji: string;
+  avatarUrl?: string;
   registeredAt: string;
   faceImageUrl?: string;
   faceHash?: string;
@@ -651,4 +652,3 @@ export async function resetEntireApplicationState(newSession: UserSession): Prom
     console.error('[UserSession] Full reset error:', err);
   }
 }
-

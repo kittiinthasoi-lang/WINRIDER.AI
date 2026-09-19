@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Camera, 
   Sparkles, 
@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { playTactileBlip, playLevelUpFanfare } from '../utils/audio';
 import confetti from 'canvas-confetti';
+import { auth } from '../firebase';
+import { uploadProfileImage } from '../utils/imageUpload';
+import { loadProfileCustomization, ProfileRole, saveProfileCustomization } from '../services/profileService';
 
 export interface ProfileCustomizationData {
   avatarUrl?: string;
@@ -27,7 +30,7 @@ interface ProfileCustomizerModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentData: ProfileCustomizationData;
-  role: 'customer' | 'driver' | 'merchant' | 'partner';
+  role: ProfileRole;
   onSave: (newData: ProfileCustomizationData) => void;
   audioEnabled?: boolean;
 }
@@ -76,17 +79,38 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
   const [themeColor, setThemeColor] = useState(currentData.themeColor || '#00D2FF');
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(currentData.avatarUrl);
   const [avatarEmoji, setAvatarEmoji] = useState(currentData.avatarEmoji || '🦥');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    loadProfileCustomization(role).then((saved) => {
+      if (!active) return;
+      const data = saved || currentData;
+      setDisplayName(data.displayName);
+      setBioStatus(data.bioStatus || 'พร้อมเดินทางสู่ความสำเร็จ');
+      setThemeColor(data.themeColor || '#00D2FF');
+      setAvatarUrl(data.avatarUrl);
+      setAvatarEmoji(data.avatarEmoji || '🦥');
+      setAvatarFile(null);
+      setSaveError(null);
+    }).catch((error) => console.warn('Unable to load saved profile:', error));
+    return () => { active = false; };
+  }, [isOpen, role, currentData]);
 
   if (!isOpen) return null;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+      const file = e.target.files?.[0];
     if (file) {
       if (file.size > 3 * 1024 * 1024) {
         alert('ขนาดไฟล์ใหญ่เกินไป กรุณาใช้ภาพขนาดไม่เกิน 3MB');
         return;
       }
+      setAvatarFile(file);
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
         const result = uploadEvent.target?.result as string;
@@ -97,18 +121,37 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
     }
   };
 
-  const handleSave = () => {
-    if (audioEnabled) playLevelUpFanfare();
-    confetti({ particleCount: 50, spread: 60, colors: [themeColor, '#FFD700', '#FFFFFF'] });
-    onSave({
-      displayName: displayName.trim() || currentData.displayName,
-      bioStatus: bioStatus.trim(),
-      themeColor,
-      avatarUrl,
-      avatarEmoji,
-      bannerGlow: `0 0 25px ${themeColor}40`
-    });
-    onClose();
+  const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      let persistedAvatarUrl = avatarUrl;
+      if (avatarFile) {
+        const uid = auth.currentUser?.uid;
+        if (!uid) throw new Error('กรุณาเข้าสู่ระบบก่อนบันทึกรูปโปรไฟล์');
+        persistedAvatarUrl = await uploadProfileImage(uid, role, avatarFile);
+      }
+
+      const updated: ProfileCustomizationData = {
+        displayName: displayName.trim() || currentData.displayName,
+        bioStatus: bioStatus.trim(),
+        themeColor,
+        avatarUrl: persistedAvatarUrl,
+        avatarEmoji,
+        bannerGlow: `0 0 25px ${themeColor}40`
+      };
+      await saveProfileCustomization(role, updated);
+      onSave(updated);
+      if (audioEnabled) playLevelUpFanfare();
+      confetti({ particleCount: 50, spread: 60, colors: [themeColor, '#FFD700', '#FFFFFF'] });
+      onClose();
+    } catch (error) {
+      console.error('Profile save failed:', error);
+      setSaveError(error instanceof Error ? error.message : 'บันทึกโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -318,6 +361,7 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-white/10 bg-white/5 flex items-center justify-end gap-2">
+          {saveError && <p className="mr-auto text-[10px] text-red-300 max-w-[220px]">{saveError}</p>}
           <button
             type="button"
             onClick={onClose}
@@ -328,11 +372,12 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
           <button
             type="button"
             onClick={handleSave}
+            disabled={isSaving}
             className="px-5 py-2 rounded-xl text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-lg active:scale-95 transition-all"
             style={{ backgroundColor: themeColor }}
           >
             <Check className="w-4 h-4 text-slate-950" />
-            <span>บันทึกโปรไฟล์</span>
+            <span>{isSaving ? 'กำลังบันทึก...' : 'บันทึกโปรไฟล์'}</span>
           </button>
         </div>
       </div>
