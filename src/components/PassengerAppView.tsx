@@ -3198,8 +3198,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
               {/* Product catalog is populated from real merchant data. */}
 
-              </div>
-
               {/* Item Name */}
               <div>
                 <label className="block text-slate-300 mb-1 font-bold">ชื่อสินค้าที่ต้องการขาย *:</label>
