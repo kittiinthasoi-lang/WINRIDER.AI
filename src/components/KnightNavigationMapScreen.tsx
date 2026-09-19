@@ -133,34 +133,6 @@ export interface KnightNavigationMapScreenProps {
   initialNavMode?: '3d_map' | 'google_maps' | 'live_camera_ar';
 }
 
-// Bangkok Real Locations Pool for Realistic Random Simulation
-const BANGKOK_SIMULATION_HUBS = [
-  { name: 'BTS พร้อมพงษ์ / ซุ้มวินเอ็มควอเทียร์', district: 'สุขุมวิท', lat: 13.7303, lng: 100.5698 },
-  { name: 'สยามพารากอน / จุดรับหน้าโรงแรมสยามเคมปินสกี้', district: 'ปทุมวัน', lat: 13.7460, lng: 100.5347 },
-  { name: 'ซอยทองหล่อ 10 / ร้านข้าวต้มแสงชัย', district: 'วัฒนา', lat: 13.7335, lng: 100.5828 },
-  { name: 'เซ็นทรัลพระราม 9 / อาคาร G Tower', district: 'ห้วยขวาง', lat: 13.7578, lng: 100.5658 },
-  { name: 'ตลาดนัดจตุจักร / ประตู 1 ถนนพหลโยธิน', district: 'จตุจักร', lat: 13.7999, lng: 100.5504 },
-  { name: 'สีลมคอมเพล็กซ์ / ซอยละลายทรัพย์', district: 'บางรัก', lat: 13.7279, lng: 100.5348 },
-  { name: 'ไอคอนสยาม / ท่าเรือเจริญนคร', district: 'คลองสาน', lat: 13.7267, lng: 100.5109 },
-  { name: 'เยาวราช / ซอยแปลงนาม ท่าเตียน', district: 'สัมพันธวงศ์', lat: 13.7412, lng: 100.5085 },
-  { name: 'ซอยอารีย์ (พหลโยธิน 7) / ลา วิลล่า', district: 'พญาไท', lat: 13.7797, lng: 100.5447 },
-  { name: 'เมกาบางนา / จุดนัดพบหน้าอิเกีย', district: 'บางนา', lat: 13.6465, lng: 100.6798 },
-];
-
-const SIM_JOB_TYPES: { type: 'ride' | 'delivery' | 'food' | 'special'; label: string; icon: string; rateMultiplier: number }[] = [
-  { type: 'ride', label: 'WIN Ride (รับส่งผู้โดยสารเร่งด่วน)', icon: '🛵', rateMultiplier: 1.0 },
-  { type: 'delivery', label: 'WIN Express (ส่งเอกสาร/พัสดุไวแสง)', icon: '📦', rateMultiplier: 1.15 },
-  { type: 'food', label: 'WIN Food (ส่งอาหารร้านดังมิชลิน/สตรีทฟู้ด)', icon: '🍜', rateMultiplier: 1.2 },
-  { type: 'special', label: 'WIN Mu Buddy (พาไหว้พระ/มูเตลูเสริมดวง)', icon: '🔮', rateMultiplier: 1.35 },
-];
-
-const SIM_SAMPLE_PHOTOS = [
-  'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1580910051074-3eb694886505?w=600&auto=format&fit=crop&q=80',
-];
-
 export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps> = ({
   activeJob,
   activeVehicle,
@@ -239,13 +211,8 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
     };
   }, [activeRoute]);
 
-  // Overall Trip Simulation Progress (0.0 to 1.0)
-  // 0.0 = At Point A
-  // 0.0 - 0.5 = Traveling from Point A to Point B
-  // 0.5 = At Point B (Pickup)
-  // 0.5 - 1.0 = Traveling from Point B to Point C
-  // 1.0 = At Point C (Arrived & Dropoff)
-  const [tripProgress, setTripProgress] = useState<number>(0.08);
+  // Trip progress reflects the real accepted-order phase; it is advanced by the trip state machine.
+  const [tripProgress, setTripProgress] = useState<number>(activeJob ? 0.08 : 0);
 
   // Camera & Visual HUD Controls: '3d_chase' | '3d_isometric' | '2d_radar' | 'drone' | 'fpv' | 'lidar'
   const [cameraView, setCameraView] = useState<'3d_chase' | '3d_isometric' | '2d_radar' | 'drone' | 'fpv' | 'lidar'>('3d_chase');
@@ -276,7 +243,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   // 3D Density Radar (2.5 km) & Driver QR Code Modals
   const [showRadarModal, setShowRadarModal] = useState<boolean>(false);
   const [showQrPayModal, setShowQrPayModal] = useState<boolean>(false);
-  const [showRandomSimModal, setShowRandomSimModal] = useState<boolean>(false);
   const [showDirectChatModal, setShowDirectChatModal] = useState<boolean>(false);
   const [showRealGpsModal, setShowRealGpsModal] = useState<boolean>(false);
 
@@ -418,96 +384,19 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   const [showCompactNavWidget, setShowCompactNavWidget] = useState<boolean>(false);
   const [weatherCondition, setWeatherCondition] = useState<'clear' | 'rain' | 'heat' | 'storm' | 'traffic_dense'>('clear');
 
-  // Live Telemetry Simulation
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
-  const [speedMultiplier, setSpeedMultiplier] = useState<number>(1);
-  const [currentSpeed, setCurrentSpeed] = useState<number>(42); // km/h
-  const [liveHeading, setLiveHeading] = useState<number>(45); // degrees
-  const [liveLeanAngle, setLiveLeanAngle] = useState<number>(0); // motorbike lean in deg
-  const [voiceInstruction, setVoiceInstruction] = useState<string>('ออกจากซุ้มวิน BTS พร้อมพงษ์ มุ่งหน้าเข้าซอยสุขุมวิท 39');
-  const [trainProgress, setTrainProgress] = useState<number>(0.35); // BTS Skytrain animation
+  // Live telemetry is read from real navigation/GPS; no synthetic motion generator.
+  const [currentSpeed] = useState<number>(0);
+  const [liveHeading] = useState<number>(0);
+  const [liveLeanAngle] = useState<number>(0);
+  const [voiceInstruction, setVoiceInstruction] = useState<string>('รอข้อมูลนำทางจากตำแหน่งจริง');
   const lastSpokenRef = useRef<string>('');
 
   // Recharts Telemetry Data
-  const [telemetryHistory, setTelemetryHistory] = useState<{ time: string; battery: number; earningsPerKm: number; speed: number }[]>([
-    { time: '0m', battery: 94, earningsPerKm: 38, speed: 40 },
-    { time: '1m', battery: 93.8, earningsPerKm: 42, speed: 46 },
-    { time: '2m', battery: 93.2, earningsPerKm: 48, speed: 44 },
-    { time: '3m', battery: 92.5, earningsPerKm: 52, speed: 48 },
-    { time: '4m', battery: 91.9, earningsPerKm: 55, speed: 42 },
-  ]);
+  const telemetryHistory: { time: string; battery: number; earningsPerKm: number; speed: number }[] = [];
 
   // Voice announcement trigger helper (simulated voice removed per user instruction)
   const triggerVoiceGuidance = (_text: string) => {
     // Disabled simulated voice chatter - keep only real navigation
-  };
-
-  // Random realistic Bangkok job generator
-  const generateRandomBangkokJob = () => {
-    const originIdx = Math.floor(Math.random() * BANGKOK_SIMULATION_HUBS.length);
-    let destIdx = Math.floor(Math.random() * BANGKOK_SIMULATION_HUBS.length);
-    if (destIdx === originIdx) destIdx = (originIdx + 1) % BANGKOK_SIMULATION_HUBS.length;
-    
-    const origin = BANGKOK_SIMULATION_HUBS[originIdx];
-    const dest = BANGKOK_SIMULATION_HUBS[destIdx];
-    const jobType = SIM_JOB_TYPES[Math.floor(Math.random() * SIM_JOB_TYPES.length)];
-
-    const distKm = parseFloat((2.0 + Math.random() * 6.5).toFixed(1));
-    const baseFare = 25;
-    const distanceFare = Math.round(distKm * 8.5);
-    const rushHourBonus = Math.random() > 0.4 ? 15 : 0;
-    const totalFare = Math.round((baseFare + distanceFare + rushHourBonus) * jobType.rateMultiplier);
-
-    const customers = [
-      'คุณมัทนา วงศ์สวรรค์ (ลูกค้าประจำ)',
-      'คุณธนภพ (ออฟฟิศ Asoke Tower)',
-      'ร้านก๋วยเตี๋ยวทองหล่อ (พาร์ทเนอร์)',
-      'คุณหมออรสา (รพ.บำรุงราษฎร์)',
-      'คุณนลินดา (นักศึกษานานาชาติ)',
-      'Gourmet Partner สยาม',
-      'คุณเอกภาพ (ส่งเอกสารด่วนคอนโดสุขุมวิท)'
-    ];
-
-    const randomCustomer = customers[Math.floor(Math.random() * customers.length)];
-    const randomWeather: ('clear' | 'rain' | 'heat' | 'storm' | 'traffic_dense')[] = ['clear', 'rain', 'heat', 'storm', 'traffic_dense'];
-    const chosenWeather = randomWeather[Math.floor(Math.random() * randomWeather.length)];
-
-    const newJob: IncomingJobData = {
-      id: `JOB-${Math.floor(1000 + Math.random() * 9000)}`,
-      serviceId: (jobType.type as any) || 'knight',
-      serviceTitle: jobType.label,
-      serviceIconEmoji: jobType.icon,
-      pickupLocation: origin.name,
-      dropoffLocation: dest.name,
-      customerName: randomCustomer,
-      customerAvatarEmoji: '👤',
-      customerPhone: '089-123-4567',
-      customerRating: 4.9,
-      netFare: totalFare,
-      baseFare: baseFare,
-      tips: rushHourBonus,
-      platformFee: 1,
-      estMinutes: Math.round(distKm * 2.8),
-      driverDistanceToPickupKm: 0.3,
-      fairDispatchQueueRank: 1,
-      totalCandidatesInRadius: 4,
-      urgency: 'normal',
-      distanceKm: distKm,
-      xpReward: Math.round(distKm * 40 + 50)
-    };
-
-    setSelectedJob(newJob);
-    setWeatherCondition(chosenWeather);
-    setTripProgress(0.05);
-    setNavPhase('to_pickup');
-    setPaymentStepDone(false);
-    setCapturedProofPhoto(null);
-    setCompletionStep('photo');
-
-    if (audioEnabled) {
-      playLevelUpFanfare();
-      triggerVoiceGuidance(`สุ่มทริปใหม่ ${jobType.label} รับที่ ${origin.name} ไปส่งที่ ${dest.name} ระยะทาง ${distKm} กิโลเมตร ค่าโดยสารคำนวณจริง ฿${totalFare}`);
-    }
   };
 
   // Sync with prop if activeJob changes
@@ -555,106 +444,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   };
 
   const riderState = calculateCurrentPosition(tripProgress);
-
-  // Jump to specific simulation stage
-  const jumpToStage = (stage: 'A' | 'A_TO_B' | 'B' | 'B_TO_C' | 'C') => {
-    if (audioEnabled) playTactileBlip(850);
-    if (stage === 'A') {
-      setTripProgress(0.01);
-      setNavPhase('to_pickup');
-      triggerVoiceGuidance(`จุด A: ซุ้มวินพี่วิน พร้อมสตาร์ทรถไปรับ ${selectedJob.customerName}`);
-    } else if (stage === 'A_TO_B') {
-      setTripProgress(0.25);
-      setNavPhase('to_pickup');
-      triggerVoiceGuidance(`กำลังเดินทางช่วงที่ 1 จากจุด A ไปยังจุด B`);
-    } else if (stage === 'B') {
-      setTripProgress(0.5);
-      setNavPhase('at_pickup');
-      triggerVoiceGuidance(`ถึงจุด B แล้ว ตรวจสอบพัสดุและรับ ${selectedJob.customerName} ขึ้นรถ`);
-    } else if (stage === 'B_TO_C') {
-      setTripProgress(0.75);
-      setNavPhase('to_destination');
-      triggerVoiceGuidance(`กำลังเดินทางช่วงที่ 2 จากจุด B มุ่งหน้าจุด C ปลายทาง`);
-    } else if (stage === 'C') {
-      setTripProgress(1.0);
-      setNavPhase('arrived_destination');
-      triggerVoiceGuidance(`ถึงจุด C ${selectedJob.dropoffLocation} เรียบร้อยแล้ว ค่าโดยสาร ฿${selectedJob.netFare}`);
-    }
-  };
-
-  // Telemetry & Route Progress Loop
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const interval = setInterval(() => {
-      // Move BTS Train independently along Sukhumvit track (from left to right)
-      setTrainProgress(prev => (prev + 0.008) % 1);
-
-      setTripProgress(prev => {
-        const step = 0.0045 * speedMultiplier;
-        const next = prev + step;
-
-        // Auto transition phase based on progress
-        if (next < 0.48) {
-          if (navPhase !== 'to_pickup') setNavPhase('to_pickup');
-        } else if (next >= 0.48 && next <= 0.52) {
-          if (navPhase !== 'at_pickup') {
-            setNavPhase('at_pickup');
-            if (audioEnabled) playTactileBlip(1200);
-            triggerVoiceGuidance(`ถึงจุด B แล้ว! กำลังรับ ${selectedJob.customerName} / พัสดุ`);
-          }
-        } else if (next > 0.52 && next < 0.98) {
-          if (navPhase !== 'to_destination') setNavPhase('to_destination');
-        } else if (next >= 0.98) {
-          if (navPhase !== 'arrived_destination') {
-            setNavPhase('arrived_destination');
-            if (audioEnabled) playLevelUpFanfare();
-            triggerVoiceGuidance(`ถึงจุด C ${selectedJob.dropoffLocation} เรียบร้อยแล้ว`);
-          }
-          return 1.0;
-        }
-
-        // Determine current waypoint and instruction
-        const totalWps = activeRoute.waypoints.length;
-        const currentWpIndex = Math.min(totalWps - 1, Math.floor(next * totalWps));
-        const activeWp = activeRoute.waypoints[currentWpIndex];
-
-        if (activeWp) {
-          if (next < 0.5) {
-            setVoiceInstruction(`[ช่วง A➔B] มุ่งหน้าไปรับที่: ${selectedJob.pickupLocation} (${activeWp.instructionThai})`);
-          } else {
-            setVoiceInstruction(`[ช่วง B➔C] นำทางสู่ปลายทาง: ${selectedJob.dropoffLocation} (${activeWp.instructionThai})`);
-          }
-          setLiveHeading(Math.round(riderState.angle));
-          
-          // Motorbike lean angle based on turns
-          const lean = Math.sin(next * 30) * 14;
-          setLiveLeanAngle(Number(lean.toFixed(1)));
-        }
-
-        // Live speed fluctuation based on road segment
-        const baseSpeed = activeWp?.speedLimitKmH || 40;
-        const speed = Math.round(baseSpeed + Math.sin(next * 24) * 6 + (Math.random() - 0.5) * 3);
-        setCurrentSpeed(speed);
-
-        // Update Recharts telemetry
-        setTelemetryHistory(hist => {
-          const last = hist[hist.length - 1];
-          const newEntry = {
-            time: `${(next * 6).toFixed(1)}m`,
-            battery: Math.max(70, Number((last.battery - 0.03).toFixed(1))),
-            earningsPerKm: Math.round(42 + Math.sin(next * 12) * 14),
-            speed
-          };
-          return [...hist.slice(-8), newEntry];
-        });
-
-        return next;
-      });
-    }, 220);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, speedMultiplier, navPhase, activeRoute, audioEnabled, voiceGuidanceEnabled, riderState.angle, selectedJob]);
 
   const handleAdvancePhase = () => {
     if (navPhase === 'to_pickup') {
@@ -1790,7 +1579,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
       )}
 
       {/* ========================================================================= */}
-      {/* 2. TRIP STEP ADVANCE & SIMULATION SCRUBBER BAR */}
       {/* ========================================================================= */}
       <div className="p-3.5 rounded-3xl bg-gradient-to-r from-[#07132B] via-[#091C3E] to-[#050E24] border-2 border-cyan-400/60 shadow-[0_0_30px_rgba(0,210,255,0.25)] space-y-3">
         {/* Title & Stage Indicators */}
