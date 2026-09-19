@@ -350,14 +350,9 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   };
 
   const handleWithdraw = () => {
-    if (audioEnabled) playTactileBlip(1100);
-    alert(`💸 ดำเนินการโอนเงินสด ฿${balance.toLocaleString()}.00 จากกระเป๋าเงินอัศวินเข้าบัญชีธนาคารกสิกรไทยเรียบร้อย (ค่าธรรมเนียม 0 บาทตามนโยบายอธิปไตย)`);
-    setBalance(0);
-    confetti({
-      particleCount: 50,
-      spread: 70,
-      colors: ['#00D2FF', '#FFD700', '#FFFFFF']
-    });
+    if (audioEnabled) playTactileBlip(500);
+    setSwitchSuccessToast('การถอนเงินต้องผ่านคำขอ Payout ที่ยืนยันโดยระบบการโอนเงินจริง — ยังไม่มีการตัดยอดในหน้านี้');
+    setTimeout(() => setSwitchSuccessToast(null), 4500);
   };
 
   const handleAddVehicle = (e: React.FormEvent) => {
