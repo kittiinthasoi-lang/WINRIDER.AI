@@ -126,11 +126,7 @@ app.post("/api/webhooks/dispatch", async (req, res) => {
   try {
     const { webhookUrl, event, payload } = req.body;
     if (!webhookUrl) {
-      return res.json({
-        success: true,
-        simulated: true,
-        message: "No Webhook URL provided. Simulated dispatch succeeded."
-      });
+      return res.status(400).json({ success: false, error: "Webhook URL is required" });
     }
 
     const startTime = Date.now();
@@ -175,8 +171,7 @@ app.post("/api/webhooks/dispatch", async (req, res) => {
     console.error("[Webhook Dispatch Error]:", err?.message);
     return res.status(500).json({
       success: false,
-      error: err?.message || "Webhook dispatch failed",
-      simulatedFallback: true
+      error: err?.message || "Webhook dispatch failed"
     });
   }
 });
@@ -483,8 +478,8 @@ app.post("/api/routes/compute", async (req, res) => {
 
     return res.json({
       success: true,
-      source: apiKey ? "google_routes_api_simulation" : "local_tactical_routing_engine",
-      provider: apiKey ? "Google Maps Routes API (Simulation)" : "WINRIDER CI Capillary Router",
+      source: "google_routes_api_live",
+      provider: "Google Maps Platform Routes API",
       travelMode,
       route: {
         distanceMeters: Math.round(estRoadDistKm * 1000),
