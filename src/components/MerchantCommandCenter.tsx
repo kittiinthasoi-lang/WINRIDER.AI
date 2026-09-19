@@ -1052,6 +1052,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
 
             {showRadarOverlay && (
               <DensityRadarOverlay
+                targetPerspective="merchant"
                 venueName="ร้านค้าพันธมิตร WIN HQ (Merchant Command Center)"
                 venueIcon="🏬"
                 venueCategory="ศูนย์การค้า & พันธมิตรธุรกิจ"

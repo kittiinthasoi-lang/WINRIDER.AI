@@ -23,7 +23,7 @@ export interface RadarEntity {
 }
 
 interface DensityRadarOverlayProps {
-  targetPerspective?: 'driver' | 'passenger' | 'merchant';
+  targetPerspective?: 'driver' | 'passenger' | 'merchant' | 'partner';
   venueName?: string;
   venueIcon?: string;
   venueCategory?: string;

@@ -1171,6 +1171,7 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
       {activeTab === 'radar3d' && (
         <div className="space-y-4">
           <DensityRadarOverlay
+            targetPerspective="partner"
             venueName={selectedPartner.name}
             venueIcon={selectedPartner.icon}
             venueCategory={selectedPartner.categoryLabel}

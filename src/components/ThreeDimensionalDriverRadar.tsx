@@ -46,7 +46,6 @@ import { Vehicle } from '../types';
 import { playTactileBlip, playRadarScan, playEngineRev, speakThaiText } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 import { GoogleMapsLiveView } from './GoogleMapsLiveView';
-import { CyberGraphic } from './CyberGraphic';
 import { ARLiveCameraNavigation, ARManeuverType } from './ARLiveCameraNavigation';
 import { 
   RadarNavRoute, 
@@ -138,7 +137,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
         const directoryResponse = await fetch('/api/shop/directory', { headers: { Authorization: `Bearer ${token}` } });
         const directoryPayload = await directoryResponse.json() as { profiles?: Array<{ id: string; role: 'merchant' | 'partner'; name: string; address: string; category: string }> };
         const registered = directoryResponse.ok ? (directoryPayload.profiles || []).filter((profile) => profile.address) : [];
-        let sourcePlaces: Array<{ id: string; name: string; category: 'shop' | 'partner'; primaryType: string; address: string; latitude: number; longitude: number; rating: number | null; openNow: boolean | null; distanceMeters: number; source: 'win' | 'google' }> = [];
+        let sourcePlaces: Array<{ id: string; name: string; category: 'shop' | 'partner'; primaryType: string; address: string; latitude: number; longitude: number; rating: number | null; openNow: boolean | null; distanceMeters: number; categoryLabel?: string; source: 'win' | 'google' }> = [];
 
         if (registered.length > 0) {
           const routeResponse = await fetch('/api/places/resolve-routes', {
@@ -156,21 +155,19 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
           });
         }
 
-        if (sourcePlaces.length === 0) {
-          const response = await fetch('/api/radar/nearby-places', {
+        const response = await fetch('/api/radar/nearby-places', {
           method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
           body: JSON.stringify({ latitude: gpsState.latitude, longitude: gpsState.longitude }),
-          });
-          const payload = await response.json() as { places?: Array<Omit<(typeof sourcePlaces)[number], 'source'>>; error?: string };
-          if (!response.ok) throw new Error(payload.error || 'โหลดสถานที่จริงไม่สำเร็จ');
-          sourcePlaces = (payload.places || []).map((place) => ({ ...place, source: 'google' }));
-        }
+        });
+        const payload = await response.json() as { places?: Array<Omit<(typeof sourcePlaces)[number], 'source'>>; error?: string };
+        if (!response.ok) throw new Error(payload.error || 'โหลดสถานที่จริงไม่สำเร็จ');
+        sourcePlaces = [...sourcePlaces, ...(payload.places || []).map((place) => ({ ...place, source: 'google' as const }))];
 
         const next = sourcePlaces.map((place): Radar3DPing => {
           const northKm = (place.latitude - gpsState.latitude) * 111;
           const eastKm = (place.longitude - gpsState.longitude) * 111 * Math.cos(gpsState.latitude * Math.PI / 180);
-          return { id: `google:${place.id}`, name: place.name, avatar: place.category === 'shop' ? '🏪' : '🏢', category: place.category,
-            categoryLabel: place.source === 'win' ? (place.category === 'shop' ? 'ร้านค้าในระบบ WIN' : 'พาร์ทเนอร์ในระบบ WIN') : (place.category === 'shop' ? 'ร้านค้าจาก Google Maps' : 'พาร์ทเนอร์/สถานที่จาก Google Maps'),
+          return { id: `${place.source}:${place.id}`, name: place.name, avatar: '', category: place.category,
+            categoryLabel: place.source === 'win' ? (place.category === 'shop' ? 'ร้านค้าในระบบ WIN' : 'พาร์ทเนอร์ในระบบ WIN') : (place.categoryLabel || (place.category === 'shop' ? 'ร้านค้าจาก Google Maps' : 'สถานที่จาก Google Maps')),
             service: place.primaryType, serviceEmoji: place.category === 'shop' ? '🛍️' : '🤝', serviceType: 'knight', fare: 0,
             distanceMeters: place.distanceMeters, location: place.address, x: Math.max(-100, Math.min(100, eastKm * 20)),
             y: Math.max(-100, Math.min(100, -northKm * 20)), elevation: 10, urgency: 'normal',
@@ -877,8 +874,10 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
                         />
+                      ) : ping.category === 'shop' ? (
+                        <Store className="w-5 h-5" />
                       ) : (
-                        <CyberGraphic emoji={ping.avatar || ping.serviceEmoji} size={32} />
+                        <Building2 className="w-5 h-5" />
                       )}
                     </div>
 
@@ -1106,8 +1105,10 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
+              ) : selectedPing.category === 'shop' ? (
+                <Store className="w-7 h-7 m-auto mt-3 text-amber-300" />
               ) : (
-                <CyberGraphic emoji={selectedPing.avatar || selectedPing.serviceEmoji} size={56} />
+                <Building2 className="w-7 h-7 m-auto mt-3 text-emerald-300" />
               )}
             </div>
             <div>

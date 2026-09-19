@@ -273,8 +273,12 @@ app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]
   }
 });
 
-// Public business fallback for the radar. This never invents riders or customers:
-// when no registered WIN entities are available, only real Google Places are returned.
+const radarPlacesCache = new Map<string, { expiresAt: number; places: any[] }>();
+const RADAR_PLACES_CACHE_MS = 2 * 60 * 1000;
+
+// Real-world radar places shared by customer, knight, merchant and partner views.
+// Searches are split by domain so nearby shops cannot crowd schools, transport
+// or places of worship out of Google's 20-result response window.
 app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-places"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
@@ -285,21 +289,64 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
   }
   const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
   if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY", places: [] });
+  const cacheKey = `${latitude.toFixed(3)}:${longitude.toFixed(3)}`;
+  const cached = radarPlacesCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return res.json({ places: cached.places, source: "Google Places API cache", registeredPeopleSynthesized: false });
+  }
   try {
-    const googleResponse = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.primaryType,places.formattedAddress,places.location,places.rating,places.currentOpeningHours.openNow,places.googleMapsUri" },
-      body: JSON.stringify({
-        includedTypes: ["restaurant", "cafe", "convenience_store", "shopping_mall", "store", "lodging", "hospital", "school", "university", "gym", "tourist_attraction"],
-        maxResultCount: 20, rankPreference: "DISTANCE", languageCode: "th", regionCode: "TH",
-        locationRestriction: { circle: { center: { latitude, longitude }, radius: 5000 } },
-      }),
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!googleResponse.ok) return res.status(502).json({ error: "ดึงร้านค้าและสถานที่จริงจาก Google Places ไม่สำเร็จ", places: [] });
-    const payload = await googleResponse.json() as { places?: any[] };
-    const raw = (payload.places || []).filter((place) => place?.id && place?.location && place?.displayName?.text);
+    const searchGroups = [
+      {
+        key: "shop",
+        label: "ร้านค้าและบริการ",
+        types: ["restaurant", "cafe", "bakery", "convenience_store", "grocery_store", "supermarket", "market", "shopping_mall", "store", "pharmacy", "courier_service", "pet_store"],
+      },
+      {
+        key: "transport",
+        label: "ขนส่งสาธารณะทางบกและทางน้ำ",
+        types: ["bus_station", "bus_stop", "train_station", "light_rail_station", "subway_station", "transit_station", "transit_stop", "taxi_stand", "park_and_ride", "ferry_terminal", "ferry_service", "marina", "airport"],
+      },
+      {
+        key: "faith",
+        label: "ศาสนสถาน",
+        types: ["buddhist_temple", "church", "hindu_temple", "mosque", "shinto_shrine", "synagogue"],
+      },
+      {
+        key: "community",
+        label: "การศึกษา ที่พัก สุขภาพและสถานที่สำคัญ",
+        types: ["preschool", "primary_school", "school", "secondary_school", "university", "library", "lodging", "hotel", "hostel", "guest_house", "resort_hotel", "hospital", "medical_clinic", "police", "fire_station", "community_center", "tourist_attraction", "park", "event_venue", "stadium", "veterinary_care"],
+      },
+    ] as const;
+    const fieldMask = "places.id,places.displayName,places.primaryType,places.formattedAddress,places.location,places.rating,places.currentOpeningHours.openNow,places.googleMapsUri";
+    const groupResults = await Promise.all(searchGroups.map(async (group) => {
+      const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fieldMask },
+        body: JSON.stringify({
+          includedTypes: group.types,
+          maxResultCount: 15,
+          rankPreference: "DISTANCE",
+          languageCode: "th",
+          regionCode: "TH",
+          locationRestriction: { circle: { center: { latitude, longitude }, radius: 5000 } },
+        }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) {
+        console.warn(`[Radar Nearby Places] Google group ${group.key} returned ${response.status}`);
+        return [];
+      }
+      const payload = await response.json() as { places?: any[] };
+      return (payload.places || []).map((place) => ({ ...place, radarGroup: group.key, radarGroupLabel: group.label }));
+    }));
+    const deduplicated = new Map<string, any>();
+    for (const place of groupResults.flat()) {
+      if (place?.id && place?.location && place?.displayName?.text && !deduplicated.has(String(place.id))) {
+        deduplicated.set(String(place.id), place);
+      }
+    }
+    const raw = [...deduplicated.values()];
+    if (!raw.length) return res.status(502).json({ error: "ดึงสถานที่จริงจาก Google Places ไม่สำเร็จ", places: [] });
     let matrix: any[] = [];
     if (raw.length) {
       const routeResponse = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
@@ -312,14 +359,31 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
       if (routeResponse.ok) matrix = await routeResponse.json() as any[];
     }
     const routes = new Map(matrix.filter((route) => route?.condition === "ROUTE_EXISTS").map((route) => [Number(route.destinationIndex), route]));
-    const partnerTypes = new Set(["lodging", "hospital", "school", "university", "gym", "tourist_attraction"]);
+    const toRadians = (degrees: number) => degrees * Math.PI / 180;
+    const straightLineMeters = (destinationLat: number, destinationLng: number) => {
+      const earthRadius = 6_371_000;
+      const deltaLat = toRadians(destinationLat - latitude);
+      const deltaLng = toRadians(destinationLng - longitude);
+      const value = Math.sin(deltaLat / 2) ** 2 + Math.cos(toRadians(latitude)) * Math.cos(toRadians(destinationLat)) * Math.sin(deltaLng / 2) ** 2;
+      return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value)));
+    };
     const places = raw.map((place, index) => {
       const route = routes.get(index) as any;
-      return { id: String(place.id), name: String(place.displayName.text), category: partnerTypes.has(place.primaryType) ? "partner" : "shop",
+      const isShop = place.radarGroup === "shop";
+      return { id: String(place.id), name: String(place.displayName.text), category: isShop ? "shop" : "partner",
+        placeGroup: String(place.radarGroup), categoryLabel: String(place.radarGroupLabel),
         primaryType: String(place.primaryType || "store"), address: String(place.formattedAddress || ""), latitude: Number(place.location.latitude), longitude: Number(place.location.longitude),
         rating: Number.isFinite(place.rating) ? Number(place.rating) : null, openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
-        distanceMeters: route && Number.isFinite(route.distanceMeters) ? Math.round(Number(route.distanceMeters)) : null, googleMapsUri: String(place.googleMapsUri || "") };
-    }).filter((place) => place.distanceMeters !== null).sort((a, b) => Number(a.distanceMeters) - Number(b.distanceMeters));
+        distanceMeters: route && Number.isFinite(route.distanceMeters) ? Math.round(Number(route.distanceMeters)) : straightLineMeters(Number(place.location.latitude), Number(place.location.longitude)),
+        distanceSource: route && Number.isFinite(route.distanceMeters) ? "route" : "straight_line", googleMapsUri: String(place.googleMapsUri || "") };
+    }).sort((a, b) => Number(a.distanceMeters) - Number(b.distanceMeters));
+    radarPlacesCache.set(cacheKey, { expiresAt: Date.now() + RADAR_PLACES_CACHE_MS, places });
+    if (radarPlacesCache.size > 200) {
+      const now = Date.now();
+      for (const [key, value] of radarPlacesCache) {
+        if (value.expiresAt <= now || radarPlacesCache.size > 150) radarPlacesCache.delete(key);
+      }
+    }
     return res.json({ places, source: "Google Places API (New) + Google Routes API", registeredPeopleSynthesized: false });
   } catch (error) {
     console.error("[Radar Nearby Places]", error instanceof Error ? error.message : error);
@@ -743,34 +807,7 @@ async function requireEligibleDriver(uid: string) {
 }
 
 const ordersCollection = ordersDb.collection("rides");
-// Approved, online knights for driver-matching. Reads through the trusted Admin
-// SDK on the server because the client SDK cannot list the whole `users`/`knights`
-// collections directly: firestore.rules only grants read on a document a caller
-// owns (or is admin), and Firestore denies an unfiltered "list" query unless the
-// rule can be proven true for every possible document in the collection.
-app.get("/api/knights/available", rateLimit(30), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return;
-  try {
-    const [usersSnap, knightsSnap] = await Promise.all([
-      ordersDb.collection("users").where("role", "==", "knight").where("status", "==", "active").get(),
-      ordersDb.collection("knights").where("isOnline", "==", true).get(),
-    ]);
-    const knightsById = new Map(knightsSnap.docs.map((doc) => [doc.id, doc.data()]));
-    const knights = usersSnap.docs
-      .map((doc) => ({ uid: doc.id, user: doc.data(), knight: knightsById.get(doc.id) }))
-      .filter(({ knight }) => {
-        const kyc = String((knight as any)?.kycStatus || "").toLowerCase();
-        return knight && ["approved", "verified"].includes(kyc);
-      })
-      .map(({ uid, user: userData, knight }) => ({ uid, user: userData, knight }));
 
-    return res.json({ knights });
-  } catch (error: any) {
-    console.error("[Knights Available GET Error]:", error?.message);
-    return res.status(503).json({ error: "Knight directory unavailable", knights: [] });
-  }
-});
 app.get("/api/orders", async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
