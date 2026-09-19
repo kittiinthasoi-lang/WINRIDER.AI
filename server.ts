@@ -786,6 +786,15 @@ app.post("/api/routes/compute", rateLimit(30), async (req, res) => {
       });
     }
 
+    const originLat = Number(origin.latitude ?? origin.lat);
+    const originLng = Number(origin.longitude ?? origin.lng);
+    const destinationLat = Number(destination.latitude ?? destination.lat);
+    const destinationLng = Number(destination.longitude ?? destination.lng);
+    const validCoord = (lat: number, lng: number) => Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    if (!validCoord(originLat, originLng) || !validCoord(destinationLat, destinationLng)) {
+      return res.status(400).json({ error: "พิกัด origin/destination ไม่ถูกต้อง" });
+    }
+
     const apiKey = process.env.GOOGLE_MAPS_API_KEY || "";
 
     // 1. If live Google Maps API Key is available and not rate-limited, request Google Routes API REST endpoint
@@ -795,7 +804,7 @@ app.post("/api/routes/compute", rateLimit(30), async (req, res) => {
           origin: {
             location: {
               latLng: {
-                latitude: Number(origin.latitude || origin.lat),
+                latitude: originLat,
                 longitude: Number(origin.longitude || origin.lng)
               }
             }
@@ -803,7 +812,7 @@ app.post("/api/routes/compute", rateLimit(30), async (req, res) => {
           destination: {
             location: {
               latLng: {
-                latitude: Number(destination.latitude || destination.lat),
+                latitude: destinationLat,
                 longitude: Number(destination.longitude || destination.lng)
               }
             }
