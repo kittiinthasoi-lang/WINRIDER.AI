@@ -114,8 +114,8 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    // Orders: participants may read. Creation must belong to the authenticated passenger.
-    // State-changing writes are limited to the fields each participant is allowed to change.
+    // Rides are state-controlled by the trusted backend. Clients may read their own ride,
+    // but cannot mutate status, driver assignment, fare, or financial fields directly.
     match /rides/{rideId} {
       allow read: if isAdmin() || (
         signedIn() && (
@@ -130,23 +130,7 @@ service cloud.firestore {
         && request.resource.data.createdAt is string
         && request.resource.data.updatedAt is string;
 
-      allow update: if isAdmin()
-        || (
-          signedIn()
-          && resource.data.passengerUserId == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'updatedAt', 'tipAmount', 'ratingGiven', 'reviewComment'])
-        )
-        || (
-          signedIn()
-          && resource.data.driverUserId == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly([
-              'status', 'updatedAt', 'driverUserId', 'driverName',
-              'driverLevel', 'driverPhone', 'driverPlate', 'driverAvatarEmoji',
-              'driverVehicle', 'driverRating'
-            ])
-        );
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
