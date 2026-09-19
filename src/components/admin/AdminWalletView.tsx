@@ -192,10 +192,10 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-white font-mono">
-                ฿{formatBaht(breakdown.systemSatang)}
+                ฿{formatBaht(breakdown.system)}
               </div>
               <span className="text-[11px] text-slate-400 font-mono block mt-1">
-                ({breakdown.systemSatang.toLocaleString()} สตางค์)
+                ({breakdown.system.toLocaleString()} สตางค์)
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-3 pt-3 border-t border-slate-800">
@@ -213,10 +213,10 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-white font-mono">
-                ฿{formatBaht(breakdown.insuranceSatang)}
+                ฿{formatBaht(breakdown.insurance)}
               </div>
               <span className="text-[11px] text-slate-400 font-mono block mt-1">
-                ({breakdown.insuranceSatang.toLocaleString()} สตางค์)
+                ({breakdown.insurance.toLocaleString()} สตางค์)
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-3 pt-3 border-t border-slate-800">
@@ -234,10 +234,10 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-[#FFC93C] font-mono">
-                ฿{formatBaht(breakdown.pensionSatang)}
+                ฿{formatBaht(breakdown.pension)}
               </div>
               <span className="text-[11px] text-slate-400 font-mono block mt-1">
-                ({breakdown.pensionSatang.toLocaleString()} สตางค์)
+                ({breakdown.pension.toLocaleString()} สตางค์)
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-3 pt-3 border-t border-slate-800">
@@ -255,10 +255,10 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-white font-mono">
-                ฿{formatBaht(breakdown.helmetSatang)}
+                ฿{formatBaht(breakdown.helmet)}
               </div>
               <span className="text-[11px] text-slate-400 font-mono block mt-1">
-                ({breakdown.helmetSatang.toLocaleString()} สตางค์)
+                ({breakdown.helmet.toLocaleString()} สตางค์)
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-3 pt-3 border-t border-slate-800">
@@ -276,10 +276,10 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-white font-mono">
-                ฿{formatBaht(breakdown.equipmentSatang)}
+                ฿{formatBaht(breakdown.equipment)}
               </div>
               <span className="text-[11px] text-slate-400 font-mono block mt-1">
-                ({breakdown.equipmentSatang.toLocaleString()} สตางค์)
+                ({breakdown.equipment.toLocaleString()} สตางค์)
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-3 pt-3 border-t border-slate-800">
@@ -297,11 +297,11 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
               <div className="mt-3">
                 <div className="text-3xl font-black text-emerald-400 font-mono">
                   ฿{formatBaht(
-                    breakdown.systemSatang +
-                    breakdown.insuranceSatang +
-                    breakdown.pensionSatang +
-                    breakdown.helmetSatang +
-                    breakdown.equipmentSatang
+                    breakdown.system +
+                    breakdown.insurance +
+                    breakdown.pension +
+                    breakdown.helmet +
+                    breakdown.equipment
                   )}
                 </div>
               </div>

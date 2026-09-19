@@ -37,9 +37,6 @@ import { Vehicle } from '../types';
 import { ThreeDimensionalDriverRadar, Radar3DPing } from './ThreeDimensionalDriverRadar';
 import { KnightNavigationMapScreen } from './KnightNavigationMapScreen';
 import {
-  generateRealGoogleMapsJob,
-  REAL_BANGKOK_LOCATIONS,
-  RealBangkokLocation,
   getGoogleMapsNavigationUrl
 } from '../data/realBangkokLocations';
 import { useWakeLock } from '../hooks/useWakeLock';
@@ -127,7 +124,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   // Live Order Listener (Real-Time Passenger <-> Driver Cross-Screen Sync)
   useEffect(() => {
     const unsubscribe = subscribeToLiveOrders((order, type) => {
-      if (type === 'created' && order.status === 'pending' && isOnDuty) {
+      if (type === 'created' && order.status === 'pending' && order.passengerUserId && isOnDuty) {
         const incomingJob: IncomingJobData = {
           id: order.id,
           serviceId: (order.serviceId as any) || 'knight',

@@ -35,36 +35,16 @@ import { UserDoc } from '../types/auth';
  */
 export async function getAdminClaims(): Promise<AdminClaims | null> {
   const currentUser = auth.currentUser;
-  
-  // 1. ตรวจสอบสิทธิ์สูงสุด (Super Admin) จากอีเมลเจ้าของระบบ
-  if (currentUser?.email === 'kittiinthasoi@gmail.com' || currentUser?.email?.toLowerCase().includes('kittiinthasoi')) {
-    return {
-      admin: true,
-      adminLevel: 'super'
-    };
-  }
-  
-  // 2. ตรวจสอบจาก Firebase Auth Token Custom Claims
+
+  // Firebase Custom Claims is the single source of truth for admin authorization.
   if (currentUser) {
     try {
-      const tokenResult = await currentUser.getIdTokenResult(false);
+      const tokenResult = await currentUser.getIdTokenResult(true);
       if (tokenResult.claims.admin === true) {
         return {
           admin: true,
           adminLevel: (tokenResult.claims.adminLevel as AdminLevel) || 'support'
         };
-      }
-      
-      // เช็ค Firestore doc users/{uid} สำหรับ fallback role
-      const uSnap = await getDoc(doc(db, 'users', currentUser.uid));
-      if (uSnap.exists()) {
-        const uData = uSnap.data();
-        if (uData.isAdmin === true || uData.role === 'admin' || uData.adminLevel) {
-          return {
-            admin: true,
-            adminLevel: (uData.adminLevel as AdminLevel) || 'super'
-          };
-        }
       }
     } catch (err) {
       console.warn('Error fetching admin token claims:', err);
@@ -617,7 +597,16 @@ export async function getUserFullProfileAndLedger(uid: string) {
  */
 export async function getAllUsers(): Promise<AdminUserSummary[]> {
   const users = await getUsersList('', 'all', 'all');
-  return users as AdminUserSummary[];
+  return users.map((user) => ({
+    ...user,
+    uid: String(user.uid || ''),
+    displayName: String(user.displayName || 'ผู้ใช้งาน'),
+    email: String(user.email || ''),
+    phone: String(user.phone || ''),
+    role: ['knight', 'citizen', 'merchant', 'partner', 'admin'].includes(user.role) ? user.role : 'citizen',
+    status: ['active', 'pending_review', 'suspended'].includes(user.status) ? user.status : 'active',
+    walletBalanceSatang: Number(user.walletBalanceSatang || 0)
+  })) as AdminUserSummary[];
 }
 
 /**
@@ -704,8 +693,8 @@ export async function getActiveFeeRules(): Promise<FeeRule[]> {
           systemSatang: data.systemSatang ?? data.buckets?.system ?? 100,
           insuranceSatang: data.insuranceSatang ?? data.buckets?.insurance ?? 100,
           pensionSatang: data.pensionSatang ?? data.buckets?.pension ?? 0,
-          activeFrom: data.activeFrom || '2026-08-01T00:00:00Z',
-          activeTo: data.activeTo || null,
+          activeFrom: data.activeFrom?.toDate?.()?.toISOString?.() || data.activeFrom || new Date().toISOString(),
+          activeTo: data.activeTo?.toDate?.()?.toISOString?.() || data.activeTo || null,
           supersedesRuleId: data.supersedesRuleId
         });
       }

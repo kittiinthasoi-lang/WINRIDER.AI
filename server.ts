@@ -129,8 +129,9 @@ interface ServerOrder {
 }
 
 function getAdminDb() {
+  const databaseId = process.env.FIRESTORE_DATABASE_ID || "ai-studio-winriderai-96f1b3b6-26ee-4fca-ba51-662b278eea8d";
   if (getApps().length) {
-    return getFirestore(getApps()[0]);
+    return getFirestore(getApps()[0], databaseId);
   }
 
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
@@ -138,19 +139,18 @@ function getAdminDb() {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
   if (projectId && clientEmail && privateKey) {
-    return getFirestore(
-      initializeApp({
+    const adminApp = initializeApp({
         credential: cert({
           projectId,
           clientEmail,
           privateKey: privateKey.replace(/\\n/g, "\n"),
         }),
-      })
-    );
+      });
+    return getFirestore(adminApp, databaseId);
   }
 
   // Cloud Run / Firebase environments can use Application Default Credentials.
-  return getFirestore(initializeApp());
+  return getFirestore(initializeApp(), databaseId);
 }
 
 const ordersDb = getAdminDb();

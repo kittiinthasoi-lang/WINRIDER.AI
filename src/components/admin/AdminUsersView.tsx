@@ -28,6 +28,14 @@ interface AdminUsersViewProps {
   adminLevel: AdminLevel;
 }
 
+function formatLedgerDate(value: unknown): string {
+  const candidate = value as { toDate?: () => Date } | string | number | Date | null | undefined;
+  const date = typeof candidate === 'object' && candidate && 'toDate' in candidate && typeof candidate.toDate === 'function'
+    ? candidate.toDate()
+    : new Date(candidate as string | number | Date);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('th-TH');
+}
+
 export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) => {
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -294,7 +302,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                             ? 'bg-teal-500/15 border-teal-500/40 text-teal-300'
                             : 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
                         }`}>
-                          {u.role.toUpperCase()}
+                          {(u.role || 'citizen').toUpperCase()}
                         </span>
                       </td>
 
@@ -313,7 +321,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                           <span className={`w-1.5 h-1.5 rounded-full ${
                             u.status === 'active' ? 'bg-emerald-400' : u.status === 'pending_review' ? 'bg-amber-400' : 'bg-rose-400'
                           }`} />
-                          {u.status.toUpperCase()}
+                          {(u.status || 'active').toUpperCase()}
                         </span>
                       </td>
 
@@ -464,7 +472,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                     {userLedger.map((tx) => (
                       <tr key={tx.id} className="hover:bg-slate-800/30">
                         <td className="py-2 px-3 text-slate-400 text-[11px] whitespace-nowrap">
-                          {tx.timestamp}
+                          {formatLedgerDate(tx.createdAt)}
                         </td>
                         <td className="py-2 px-3">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -477,15 +485,15 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                           </span>
                         </td>
                         <td className="py-2 px-3 text-slate-300 text-[11px] font-sans truncate max-w-xs">
-                          {tx.description}
+                          {tx.reason || '-'}
                         </td>
                         <td className={`py-2 px-3 text-right font-bold ${
-                          tx.amount >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                          'text-emerald-400'
                         }`}>
-                          {tx.amount >= 0 ? `+฿${tx.amount.toFixed(2)}` : `-฿${Math.abs(tx.amount).toFixed(2)}`}
+                          ฿{(Number(tx.totalCreditSatang || tx.totalDebitSatang || 0) / 100).toFixed(2)}
                         </td>
                         <td className="py-2 px-3 text-right text-slate-300 font-bold">
-                          ฿{tx.balanceAfter.toFixed(2)}
+                          {tx.balanced ? 'สมดุล ✓' : 'ไม่สมดุล'}
                         </td>
                       </tr>
                     ))}

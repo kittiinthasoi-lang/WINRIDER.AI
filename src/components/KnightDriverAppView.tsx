@@ -95,7 +95,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
     setInternalDriverTab(tab);
     if (onSelectDriverTab) onSelectDriverTab(tab);
   };
-  const [isOnDuty, setIsOnDuty] = useState<boolean>(true);
+  const [isOnDuty, setIsOnDuty] = useState<boolean>(false);
   const [deviceFrameMode, setDeviceFrameMode] = useState(true);
   const [balance, setBalance] = useState(125400);
   const [ridesPaid, setRidesPaid] = useState(35);

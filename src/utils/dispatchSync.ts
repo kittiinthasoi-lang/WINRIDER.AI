@@ -48,6 +48,20 @@ const BROADCAST_CHANNEL_NAME = 'winrider_dispatch_sync_channel';
 let broadcastChannel: BroadcastChannel | null = null;
 const listeners: Set<OrderEventCallback> = new Set();
 
+function isValidLiveOrder(value: unknown): value is LiveRideOrder {
+  if (!value || typeof value !== 'object') return false;
+  const order = value as Partial<LiveRideOrder>;
+  return Boolean(
+    order.id &&
+    order.passengerUserId &&
+    order.passengerName &&
+    order.pickupLocation &&
+    order.dropoffLocation &&
+    Number.isFinite(Number(order.fare)) &&
+    ['pending', 'accepted', 'heading_pickup', 'picked_up', 'in_transit', 'completed', 'cancelled'].includes(String(order.status))
+  );
+}
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const user = getAuth().currentUser;
   if (!user) throw new Error('AUTH_REQUIRED');
@@ -64,7 +78,7 @@ function getChannel(): BroadcastChannel | null {
     try {
       broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
       broadcastChannel.onmessage = (e) => {
-        if (e.data && e.data.order && e.data.type) {
+        if (e.data && isValidLiveOrder(e.data.order) && e.data.type) {
           listeners.forEach((cb) => {
             try {
               cb(e.data.order, e.data.type);
@@ -87,7 +101,7 @@ if (typeof window !== 'undefined') {
     if (e.key === 'winrider_last_order_event' && e.newValue) {
       try {
         const data = JSON.parse(e.newValue);
-        if (data && data.order && data.type) {
+        if (data && isValidLiveOrder(data.order) && data.type) {
           listeners.forEach((cb) => cb(data.order, data.type));
         }
       } catch (err) {
@@ -129,7 +143,8 @@ export function getLocalLiveOrders(): LiveRideOrder[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ORDERS);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(isValidLiveOrder) : [];
   } catch {
     return [];
   }
@@ -154,9 +169,9 @@ export async function fetchAvailableOrdersForDriver(): Promise<LiveRideOrder[]> 
       }
     }
   } catch (err) {
-    // If not authenticated or network fails, fallback to local storage
+    console.warn('Unable to load live dispatch orders:', err);
   }
-  return getLocalLiveOrders();
+  return [];
 }
 
 /**
@@ -175,6 +190,7 @@ export async function createLiveOrder(orderInput: {
   fare: number;
   estMinutes?: number;
 }): Promise<LiveRideOrder> {
+  if (!orderInput.passengerUserId) throw new Error('AUTHENTICATED_PASSENGER_REQUIRED');
   const now = new Date().toISOString();
   const orderId = `WIN-${crypto.randomUUID()}`;
   const fare = Number(orderInput.fare);
@@ -256,29 +272,6 @@ export async function acceptLiveOrder(
     driverVehicle?: string;
   }
 ): Promise<LiveRideOrder | null> {
-  const orders = getLocalLiveOrders();
-  const orderIndex = orders.findIndex((o) => o.id === orderId);
-
-  let targetOrder: LiveRideOrder;
-  if (orderIndex >= 0) {
-    targetOrder = {
-      ...orders[orderIndex],
-      status: 'accepted',
-      updatedAt: new Date().toISOString(),
-      driverUserId: driverInfo.driverUserId,
-      driverName: driverInfo.driverName,
-      driverLevel: driverInfo.driverLevel,
-        driverPhone: driverInfo.driverPhone,
-      driverPlate: driverInfo.driverPlate,
-      driverAvatarEmoji: driverInfo.driverAvatarEmoji,
-      driverVehicle: driverInfo.driverVehicle,
-    };
-    orders[orderIndex] = targetOrder;
-    saveLocalLiveOrders(orders);
-  } else {
-    return null;
-  }
-
   // Server API is the single source of truth for acceptance.
   const acceptResponse = await fetch(`/api/orders/${orderId}/accept`, {
     method: 'POST',
@@ -289,11 +282,11 @@ export async function acceptLiveOrder(
     throw new Error(`ORDER_ACCEPT_FAILED_${acceptResponse.status}`);
   }
   const acceptedServerOrder = await acceptResponse.json();
-  if (acceptedServerOrder?.order) {
-    Object.assign(targetOrder, acceptedServerOrder.order);
-    orders[orderIndex] = targetOrder;
-    saveLocalLiveOrders(orders);
-  }
+  if (!isValidLiveOrder(acceptedServerOrder?.order)) return null;
+  const targetOrder = acceptedServerOrder.order as LiveRideOrder;
+  const orders = getLocalLiveOrders().filter((order) => order.id !== targetOrder.id);
+  orders.unshift(targetOrder);
+  saveLocalLiveOrders(orders);
 
   // Broadcast event
   broadcastEvent(targetOrder, 'accepted');
