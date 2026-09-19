@@ -394,11 +394,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   // Recharts Telemetry Data
   const telemetryHistory: { time: string; battery: number; earningsPerKm: number; speed: number }[] = [];
 
-  // Voice announcement trigger helper (simulated voice removed per user instruction)
-  const triggerVoiceGuidance = (_text: string) => {
-    // Disabled simulated voice chatter - keep only real navigation
-  };
-
   // Sync with prop if activeJob changes
   useEffect(() => {
     if (activeJob) {
@@ -1180,7 +1175,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
                 top: `${routeLegs.pointA.y}%`,
                 transform: 'translate(-50%, -50%) translateZ(28px)'
               }}
-              onClick={() => jumpToStage('A')}
             >
               <div className="flex flex-col items-center">
                 <div className="px-2 py-0.5 rounded-lg bg-cyan-500/90 text-slate-950 font-black font-mono text-[9px] border-2 border-white shadow-[0_0_15px_#00D2FF] whitespace-nowrap animate-bounce">
@@ -1199,7 +1193,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
                 top: `${routeLegs.pointB.y}%`,
                 transform: 'translate(-50%, -50%) translateZ(32px)'
               }}
-              onClick={() => jumpToStage('B')}
             >
               <div className="flex flex-col items-center">
                 <div className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black font-mono text-[9px] border-2 border-white shadow-[0_0_20px_#F59E0B] whitespace-nowrap animate-pulse">
@@ -1218,7 +1211,6 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
                 top: `${routeLegs.pointC.y}%`,
                 transform: 'translate(-50%, -50%) translateZ(34px)'
               }}
-              onClick={() => jumpToStage('C')}
             >
               <div className="flex flex-col items-center">
                 <div className="px-2 py-0.5 rounded-lg bg-emerald-400 text-slate-950 font-black font-mono text-[9px] border-2 border-white shadow-[0_0_20px_#10B981] whitespace-nowrap animate-bounce">
@@ -1619,7 +1611,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             <button
               onClick={() => {
                 if (audioEnabled) playTactileBlip(800);
-                setIsPlaying(!isPlaying);
+                undefined;
               }}
               className={`px-3 py-2 rounded-xl font-mono text-xs font-bold border transition-all ${
                 isPlaying 
@@ -1644,7 +1636,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 font-mono text-[10px]">
           {/* Point A */}
           <button
-            onClick={() => jumpToStage('A')}
+            
             className={`p-2 rounded-xl border text-left transition-all ${
               tripProgress <= 0.05
                 ? 'bg-cyan-500 text-slate-950 border-white font-black shadow-[0_0_12px_#00D2FF]'
@@ -1660,7 +1652,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
 
           {/* Leg 1: A -> B */}
           <button
-            onClick={() => jumpToStage('A_TO_B')}
+            
             className={`p-2 rounded-xl border text-left transition-all ${
               tripProgress > 0.05 && tripProgress < 0.48
                 ? 'bg-cyan-500 text-slate-950 border-white font-black shadow-[0_0_12px_#00D2FF]'
@@ -1676,7 +1668,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
 
           {/* Point B: Pickup */}
           <button
-            onClick={() => jumpToStage('B')}
+            
             className={`p-2 rounded-xl border text-left transition-all ${
               tripProgress >= 0.48 && tripProgress <= 0.52
                 ? 'bg-amber-400 text-slate-950 border-white font-black shadow-[0_0_12px_#F59E0B]'
@@ -1692,7 +1684,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
 
           {/* Leg 2: B -> C */}
           <button
-            onClick={() => jumpToStage('B_TO_C')}
+            
             className={`p-2 rounded-xl border text-left transition-all ${
               tripProgress > 0.52 && tripProgress < 0.98
                 ? 'bg-emerald-500 text-slate-950 border-white font-black shadow-[0_0_12px_#10B981]'
@@ -1708,7 +1700,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
 
           {/* Point C: Destination */}
           <button
-            onClick={() => jumpToStage('C')}
+            
             className={`p-2 rounded-xl border text-left transition-all ${
               tripProgress >= 0.98
                 ? 'bg-emerald-400 text-slate-950 border-white font-black shadow-[0_0_12px_#10B981]'
@@ -1960,327 +1952,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
         </div>
       )}
 
-      {/* REAL-LIFE BANGKOK RANDOM SIMULATION MODAL */}
-      {showRandomSimModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="p-6 rounded-3xl bg-[#07132B] border-2 border-amber-400/60 max-w-md w-full space-y-4 shadow-[0_0_50px_rgba(245,158,11,0.4)]">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400 text-amber-300 flex items-center justify-center text-xl">
-                  🎲
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-white">จำลองสถานการณ์จริง (Bangkok Simulation)</h3>
-                  <p className="text-[10px] text-amber-300 font-mono">สุ่มสภาพแวดล้อม, การจราจร, ระยะทาง & ค่าโดยสาร</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowRandomSimModal(false)}
-                className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <p className="text-slate-300">
-                ระบบจะสุ่มพิกัดลูกค้า ร้านค้าพาร์ทเนอร์ จุดรับ-ส่งในกรุงเทพฯ พร้อมคำนวณค่าโดยสารจริงตามระยะทาง + สภาพการจราจร:
-              </p>
-
-              <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1.5 font-mono text-[11px]">
-                <div className="flex justify-between text-slate-400">
-                  <span>พิกัดปัจจุบัน:</span>
-                  <span className="text-cyan-300 font-bold">{selectedJob.pickupLocation.split('/')[0]}</span>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span>ปลายทาง:</span>
-                  <span className="text-emerald-300 font-bold">{selectedJob.dropoffLocation.split('/')[0]}</span>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span>ระยะทางจริง:</span>
-                  <span className="text-white font-bold">{selectedJob.distanceKm} กม.</span>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span>ค่าโดยสารคำนวณจริง:</span>
-                  <span className="text-amber-300 font-black">฿{selectedJob.netFare}.00</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  generateRandomBangkokJob();
-                  setShowRandomSimModal(false);
-                }}
-                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-[0_0_20px_#F59E0B] hover:brightness-110"
-              >
-                <Sparkles className="w-4 h-4 text-slate-950" />
-                <span>🎲 สุ่มสถานการณ์ใหม่ทันที</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MANDATORY PROOF OF DELIVERY & DYNAMIC QR PAYMENT MODAL */}
-      {showDeliveryProofModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-          <div className="p-6 rounded-3xl bg-[#061226] border-2 border-emerald-400/70 max-w-lg w-full space-y-4 shadow-[0_0_60px_rgba(16,185,129,0.4)]">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400 text-emerald-400 flex items-center justify-center">
-                  <ShieldCheck className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-white">ขั้นตอนส่งมอบงาน & รับชำระเงิน</h3>
-                  <p className="text-[10px] text-emerald-300 font-mono">
-                    เงื่อนไขส่งงาน: ถ่ายรูปหลักฐาน ➔ สแกนจ่ายตามระยะทางจริง ➔ ให้ดาว
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowDeliveryProofModal(false)}
-                className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Step 1: Camera Photo Proof */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-white flex items-center gap-1.5">
-                  <Camera className="w-4 h-4 text-cyan-400" />
-                  <span>1. ถ่ายภาพหลักฐานส่งมอบ (Mandatory Photo Verification):</span>
-                </span>
-                <span className="text-[10px] text-cyan-300 font-mono">
-                  {capturedProofPhoto ? '✓ ถ่ายภาพสำเร็จ' : '⚠️ ต้องถ่ายภาพก่อนจบงาน'}
-                </span>
-              </div>
-
-              {/* Viewfinder Preview */}
-              <div className="relative rounded-2xl overflow-hidden border-2 border-dashed border-cyan-400/50 bg-slate-950 h-44 flex flex-col items-center justify-center">
-                {capturedProofPhoto ? (
-                  <div className="relative w-full h-full">
-                    <img
-                      src={capturedProofPhoto}
-                      alt="Delivery Proof"
-                      className="w-full h-full object-cover"
-                    />
-                    {/* Watermark Overlay */}
-                    <div className="absolute bottom-2 left-2 right-2 bg-black/80 backdrop-blur-md p-2 rounded-xl border border-white/20 text-[9px] font-mono text-cyan-300 flex justify-between items-center">
-                      <div>
-                        <p className="text-white font-bold">📍 GPS: 13.7367° N, 100.5750° E ({selectedJob.dropoffLocation.split('/')[0]})</p>
-                        <p className="text-slate-400">รหัสงาน: #{selectedJob.id} • เวลา: {new Date().toLocaleTimeString('th-TH')}</p>
-                      </div>
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center space-y-2 p-4">
-                    <div className="w-12 h-12 rounded-full bg-cyan-500/20 border border-cyan-400 text-cyan-300 mx-auto flex items-center justify-center">
-                      <Camera className="w-6 h-6 animate-pulse" />
-                    </div>
-                    <p className="text-xs text-slate-300 font-medium">กดปุ่มด้านล่างเพื่อจำลองการถ่ายภาพส่งมอบลูกค้าหรือพัสดุ</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Camera Snap Button */}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    playCameraSnap();
-                    setIsCapturingPhoto(true);
-                    setTimeout(() => {
-                      const randomPhoto = SIM_SAMPLE_PHOTOS[Math.floor(Math.random() * SIM_SAMPLE_PHOTOS.length)];
-                      setCapturedProofPhoto(randomPhoto);
-                      setIsCapturingPhoto(false);
-                      if (audioEnabled) speakThaiText('บันทึกภาพถ่ายหลักฐานส่งมอบพร้อมพิกัดดาวเทียมเรียบร้อยแล้วค่ะ', voicePersona, voiceSpeedRate);
-                    }, 400);
-                  }}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-[0_0_15px_#00D2FF]"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>{capturedProofPhoto ? '📸 ถ่ายภาพใหม่' : '📸 กดถ่ายภาพหลักฐาน (GPS Stamp)'}</span>
-                </button>
-              </div>
-
-              {/* Checklist */}
-              <div className="grid grid-cols-3 gap-2 text-[10px] font-mono">
-                <label className="p-2 rounded-xl bg-black/40 border border-white/10 flex items-center gap-1.5 cursor-pointer text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={proofChecklist.helmCheck}
-                    onChange={(e) => setProofChecklist(prev => ({ ...prev, helmCheck: e.target.checked }))}
-                    className="rounded accent-cyan-400"
-                  />
-                  <span>สวมหมวกกันน็อก</span>
-                </label>
-                <label className="p-2 rounded-xl bg-black/40 border border-white/10 flex items-center gap-1.5 cursor-pointer text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={proofChecklist.safeHandover}
-                    onChange={(e) => setProofChecklist(prev => ({ ...prev, safeHandover: e.target.checked }))}
-                    className="rounded accent-emerald-400"
-                  />
-                  <span>ส่งถึงมือผู้รับ</span>
-                </label>
-                <label className="p-2 rounded-xl bg-black/40 border border-white/10 flex items-center gap-1.5 cursor-pointer text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={proofChecklist.packageIntact}
-                    onChange={(e) => setProofChecklist(prev => ({ ...prev, packageIntact: e.target.checked }))}
-                    className="rounded accent-amber-400"
-                  />
-                  <span>สภาพสมบูรณ์</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Step 2: Dynamic QR Payment based on Real Distance */}
-            <div className="space-y-2 pt-2 border-t border-white/10">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-white flex items-center gap-1.5">
-                  <QrCode className="w-4 h-4 text-[#FFD700]" />
-                  <span>2. สแกนจ่ายเงิน PromptPay (คำนวณจริงตามระยะทาง):</span>
-                </span>
-                <span className="text-sm font-black text-amber-300 font-mono">
-                  ฿{selectedJob.netFare}.00
-                </span>
-              </div>
-
-              <div className="p-3 rounded-2xl bg-black/50 border border-amber-400/40 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-white p-1 flex items-center justify-center flex-shrink-0">
-                    <QrCode className="w-10 h-10 text-slate-950" />
-                  </div>
-                  <div className="font-mono text-xs">
-                    <p className="text-white font-bold">พร้อมเพย์อัศวิน: WR-SOV-001</p>
-                    <p className="text-[10px] text-slate-400">ระยะทาง {selectedJob.distanceKm} กม. • ค่าโดยสารสุทธิ ฿{selectedJob.netFare}</p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    playPaymentSuccessChime();
-                    setPaymentStepDone(true);
-                    confetti({
-                      particleCount: 80,
-                      spread: 60,
-                      origin: { y: 0.6 }
-                    });
-                    speakThaiText(`ชำระเงินสำเร็จ ได้รับเงินค่าโดยสาร ${selectedJob.netFare} บาท และทิป ${customerTip} บาทเข้าวอลเล็ตเรียบร้อยค่ะ`, voicePersona, voiceSpeedRate);
-                  }}
-                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-                    paymentStepDone
-                      ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_#10B981]'
-                      : 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-[0_0_15px_#F59E0B] hover:brightness-110'
-                  }`}
-                >
-                  {paymentStepDone ? <Check className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
-                  <span>{paymentStepDone ? 'ชำระเงินสำเร็จแล้ว' : 'จำลองลูกค้าสแกนจ่าย'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Step 3: Customer Rating & Tip */}
-            {paymentStepDone && (
-              <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-400/40 space-y-2 animate-fadeIn">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-white font-bold flex items-center gap-1">
-                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                    <span>3. คะแนนรีวิว & ทิปจากลูกค้า:</span>
-                  </span>
-                  <div className="flex gap-1 text-amber-400">
-                    {[1, 2, 3, 4, 5].map(s => (
-                      <Star key={s} className="w-3.5 h-3.5 fill-amber-400" />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-[10px] text-emerald-300 font-mono">
-                  "พี่วินขับนุ่มมาก ซอกแซกลัดซอยเก่งมาก ถึงที่หมายไวกว่าเวลาประเมิน 4 นาที!" (+ทิปพิเศษ ฿{customerTip})
-                </p>
-              </div>
-            )}
-
-            {/* Complete Button */}
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                disabled={!capturedProofPhoto || !paymentStepDone}
-                onClick={() => {
-                  if (onCompleteTrip) onCompleteTrip(selectedJob);
-                  setShowDeliveryProofModal(false);
-                  if (onClose) onClose();
-                }}
-                className={`w-full py-3 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 ${
-                  capturedProofPhoto && paymentStepDone
-                    ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-green-600 text-slate-950 shadow-[0_0_20px_#10B981] hover:brightness-110 cursor-pointer'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}
-              >
-                <CheckCircle2 className="w-5 h-5" />
-                <span>ยืนยันส่งงานสำเร็จ & รับเงินเข้ากระเป๋า (+{selectedJob.xpReward} XP)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP DETAILS: LANDMARK OR INFRASTRUCTURE CLICK INSPECTOR */}
-      {selectedLandmark && (
-        <div className="p-3 rounded-2xl bg-slate-900 border border-cyan-400 flex items-center justify-between gap-3 text-xs animate-fadeIn">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🏢</span>
-            <div>
-              <h4 className="font-bold text-white">{selectedLandmark.name}</h4>
-              <p className="text-[10px] text-cyan-300 font-mono">ความสูง {selectedLandmark.floors} ชั้น • {selectedLandmark.nameEn}</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setSelectedLandmark(null)}
-            className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 text-[10px]"
-          >
-            ปิด
-          </button>
-        </div>
-      )}
-
-      {selectedInfraPoint && (
-        <div className="p-3 rounded-2xl bg-slate-900 border border-emerald-400 flex items-center justify-between gap-3 text-xs animate-fadeIn">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">⚡</span>
-            <div>
-              <h4 className="font-bold text-white">{selectedInfraPoint.name}</h4>
-              <p className="text-[10px] text-emerald-300 font-mono">{selectedInfraPoint.detail}</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setSelectedInfraPoint(null)}
-            className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 text-[10px]"
-          >
-            ปิด
-          </button>
-        </div>
-      )}
-
-      {/* MODALS */}
-      {showRadarModal && (
-        <DensityRadarOverlay
-          isOpen={showRadarModal}
-          onClose={() => setShowRadarModal(false)}
-          currentDriverLevel={driverLevel}
-          audioEnabled={audioEnabled}
-        />
-      )}
-
-      {showQrPayModal && (
-        <DriverPaymentQrCodeModal
+      <DriverPaymentQrCodeModal
           isOpen={showQrPayModal}
           onClose={() => setShowQrPayModal(false)}
           driverName="กิตติ อินทะสร้อย"
