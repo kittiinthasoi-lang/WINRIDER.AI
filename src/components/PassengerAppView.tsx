@@ -250,7 +250,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [showCustomerRadarModal, setShowCustomerRadarModal] = useState(false);
   const [showFundDetails, setShowFundDetails] = useState(true);
   const [, setBookingConfirmed] = useState(false);
-  const [selectedDestination, setSelectedDestination] = useState<string | null>('อาคาร Exchange Tower อโศก');
+  const [selectedDestination, setSelectedDestination] = useState<string | null>('');
+  const [pickupLocationInput, setPickupLocationInput] = useState<string>('');
   const [tripDistanceKm, setTripDistanceKm] = useState<number>(2.4);
   const [deviceFrameMode, setDeviceFrameMode] = useState(true);
   const [currentMatchedDriver, setCurrentMatchedDriver] = useState<MatchedDriver | null>(null);
@@ -420,8 +421,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     const driverName = currentMatchedDriver?.name || 'กำลังรอพี่วิน';
     const driverLvl = currentMatchedDriver?.level || 0;
     const vehicle = selectedDreamRide?.thaiName || 'Honda ADV350 Custom Stealth';
-    const pickupLoc = 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)';
-    const destLoc = selectedDestination || 'อาคาร Exchange Tower อโศก';
+    const pickupLoc = pickupLocationInput || 'จุดรับของท่าน';
+    const destLoc = selectedDestination || 'จุดหมายปลายทาง';
 
     let textToSpeak = '';
     if (targetPhase === 'picking_up') {
@@ -800,8 +801,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       return;
     }
 
-    // Specialized services pre-matching modal intercept (Express, Mu, Lifestyle, Spirit, Family, Link)
-    if (['express', 'mu', 'lifestyle', 'spirit', 'family', 'link'].includes(svc.id)) {
+    // Specialized services pre-matching modal intercept (Knight, Express, Mu, Lifestyle, Spirit, Family, Link)
+    if (['knight', 'express', 'mu', 'lifestyle', 'spirit', 'family', 'link'].includes(svc.id)) {
       setPreMatchingServiceId(svc.id);
       setShowPreMatchingModal(true);
       if (audioEnabled) {
@@ -823,6 +824,24 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const handlePreMatchingSubmit = (data: SpecializedPreMatchingData, addonFee: number) => {
     setPreMatchingData(data);
     setServiceAddonFee(addonFee);
+    if (data.serviceId === 'knight' && data.knight?.destinationAddress) {
+      setSelectedDestination(data.knight.destinationAddress);
+    } else if (data.serviceId === 'express' && data.express?.destinationAddress) {
+      setSelectedDestination(data.express.destinationAddress);
+    } else if (data.serviceId === 'spirit' && data.spirit?.destinationAddress) {
+      setSelectedDestination(data.spirit.destinationAddress);
+    } else if (data.serviceId === 'family') {
+      if (data.family?.destinationSpecificPoint) {
+        setSelectedDestination(data.family.destinationSpecificPoint);
+      }
+      if (data.family?.pickupSpecificPoint) {
+        setPickupLocationInput(data.family.pickupSpecificPoint);
+      }
+    } else if (data.serviceId === 'pet' && data.pet?.vetClinicDestination) {
+      setSelectedDestination(data.pet.vetClinicDestination);
+    } else if (data.serviceId === 'link' && data.link?.eventOrVenueName) {
+      setSelectedDestination(data.link.eventOrVenueName);
+    }
     setShowPreMatchingModal(false);
     setShowDriverMatchingModal(true);
   };
@@ -840,14 +859,15 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const handleBookWithDreamRide = (ride: DreamRideVehicle) => {
     if (audioEnabled) {
       playTactileBlip(950);
-      speakThaiText(`เตรียมจองทริปด้วย ${ride.thaiName}`);
+      speakThaiText(`เตรียมจองทริปด้วย ${ride.thaiName} กรุณากรอกจุดหมายปลายทางจริง`);
     }
     setSelectedDreamRide(ride);
     setUserExplicitlyChoseVehicle(true);
     setSelectedService(`WIN KNIGHT (${ride.thaiName})`);
     setActiveServiceId('knight');
     setSelectedExperienceMode(ride.experienceModes[0]);
-    setShowDriverMatchingModal(true);
+    setPreMatchingServiceId('knight');
+    setShowPreMatchingModal(true);
   };
 
   const handleConfirmMatch = (driver: MatchedDriver) => {
@@ -874,27 +894,98 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       setBookingError('กรุณาเข้าสู่ระบบก่อนเรียกรถ เพื่อป้องกันการสร้างออเดอร์โดยไม่มีเจ้าของบัญชี');
       return;
     }
-    if (!selectedDestination) {
-      setBookingError('กรุณาเลือกปลายทางก่อนยืนยันการเดินทาง');
+
+    // Determine effective dropoff and pickup (No dummy GPS - uses entered locations)
+    const effectivePickup = (
+      preMatchingData?.family?.pickupSpecificPoint ||
+      pickupLocationInput ||
+      ''
+    ).trim();
+
+    const effectiveDropoff = (
+      selectedDestination ||
+      preMatchingData?.knight?.destinationAddress ||
+      preMatchingData?.express?.destinationAddress ||
+      preMatchingData?.spirit?.destinationAddress ||
+      preMatchingData?.family?.destinationSpecificPoint ||
+      preMatchingData?.pet?.vetClinicDestination ||
+      preMatchingData?.link?.eventOrVenueName ||
+      ''
+    ).trim();
+
+    if (!effectivePickup) {
+      setBookingError('⚠️ กรุณาระบุจุดรับจริงของผู้โดยสาร/ผู้ส่ง (ห้ามเว้นว่าง หรือใช้ค่าจำลอง)');
+      return;
+    }
+
+    if (!effectiveDropoff) {
+      setBookingError('⚠️ กรุณาระบุสถานที่หรือจุดหมายปลายทางจริงก่อนยืนยันสร้างออเดอร์ (ห้ามเว้นว่าง หรือใช้ค่าจำลอง)');
       return;
     }
 
     setIsCreatingRide(true);
     setBookingError(null);
     try {
-      if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        throw new Error('GPS_UNAVAILABLE');
-      }
-      const pickupLocation = await new Promise<string>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => resolve(`GPS ${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`),
-          () => reject(new Error('GPS_PERMISSION_OR_FIX_FAILED')),
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
-        );
-      });
       if (audioEnabled) playRadarScan();
       const pName = currentUserSession.name || passengerProfileData.displayName;
       const pPhone = currentUserSession.phone || '';
+
+      // Extract specific contact & requirements per service
+      let pickupContactName: string | undefined;
+      let pickupContactPhone: string | undefined;
+      let dropoffContactName: string | undefined;
+      let dropoffContactPhone: string | undefined;
+      let specialRequirements: string | undefined;
+
+      if (preMatchingData?.serviceId === 'family' && preMatchingData.family) {
+        pickupContactName = preMatchingData.family.pickupSenderName;
+        pickupContactPhone = preMatchingData.family.pickupSenderPhone;
+        dropoffContactName = preMatchingData.family.dropoffReceiverName;
+        dropoffContactPhone = preMatchingData.family.dropoffReceiverPhone;
+        const passengerTypeLabel = preMatchingData.family.passengerType === 'disabled'
+          ? 'ผู้พิการ'
+          : preMatchingData.family.passengerType === 'elderly'
+          ? 'ผู้สูงอายุ'
+          : 'นักเรียน/เด็ก';
+        specialRequirements = [
+          `ประเภทผู้โดยสาร: ${passengerTypeLabel}`,
+          preMatchingData.family.specialCareRequirements ? `การดูแลพิเศษ: ${preMatchingData.family.specialCareRequirements}` : '',
+          'ต้องการรูปถ่ายยืนยันความปลอดภัยเมื่อถึงที่หมาย'
+        ].filter(Boolean).join(' | ');
+      } else if (preMatchingData?.serviceId === 'express' && preMatchingData.express) {
+        dropoffContactName = preMatchingData.express.recipientName;
+        dropoffContactPhone = preMatchingData.express.recipientPhone;
+        specialRequirements = [
+          `พัสดุ: ${preMatchingData.express.packageType}`,
+          'บรรจุภัณฑ์โปร่งใสผ่านเกณฑ์ความปลอดภัย',
+          preMatchingData.express.requirePhotoProof ? 'ต้องการรูปถ่ายยืนยันจุดส่ง' : ''
+        ].filter(Boolean).join(' | ');
+      } else if (preMatchingData?.serviceId === 'spirit' && preMatchingData.spirit) {
+        specialRequirements = [
+          preMatchingData.spirit.wantStopBuyItems ? `แวะซื้อของไหว้ ณ ${preMatchingData.spirit.stopMarketName}` : '',
+          preMatchingData.spirit.selectedSacredItems?.length ? `รายการของไหว้: ${preMatchingData.spirit.selectedSacredItems.map(i => `${i.name} x${i.count}`).join(', ')}` : ''
+        ].filter(Boolean).join(' | ');
+      } else if (preMatchingData?.serviceId === 'pet' && preMatchingData.pet) {
+        specialRequirements = [
+          `สัตว์เลี้ยง: ${preMatchingData.pet.petType} (${preMatchingData.pet.petWeight})`,
+          `พาหนะใส่: ${preMatchingData.pet.carrierType}`,
+          preMatchingData.pet.specialCareNote ? `หมายเหตุ: ${preMatchingData.pet.specialCareNote}` : ''
+        ].filter(Boolean).join(' | ');
+      } else if (preMatchingData?.serviceId === 'mu' && preMatchingData.mu) {
+        specialRequirements = [
+          preMatchingData.mu.wantBuddy ? `มีบัดดี้ร่วมทาง ${preMatchingData.mu.totalDurationMinutes} นาที` : 'ส่งอย่างเดียว',
+          `วัตถุประสงค์: ${preMatchingData.mu.travelObjective}`,
+          preMatchingData.mu.specificRitualOrTemple ? `พิธี/วัด: ${preMatchingData.mu.specificRitualOrTemple}` : ''
+        ].filter(Boolean).join(' | ');
+      } else if (preMatchingData?.serviceId === 'knight' && preMatchingData.knight) {
+        specialRequirements = [
+          preMatchingData.knight.expressHighway ? 'ขึ้นทางด่วนพิเศษ (+25฿)' : '',
+          preMatchingData.knight.goldHelmetVIP ? 'หมวกกันน็อกทอง VIP' : '',
+          preMatchingData.knight.quietEscortRide ? 'โหมดเงียบสงบ' : '',
+          preMatchingData.knight.specialBrief ? `สัมภาระ: ${preMatchingData.knight.specialBrief}` : ''
+        ].filter(Boolean).join(' | ');
+      }
+
       const liveOrder = await createLiveOrder({
         serviceId: activeServiceId || 'knight',
         serviceTitle: selectedService ? `WIN ${selectedService.toUpperCase()}` : 'WIN KNIGHT',
@@ -902,8 +993,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         passengerUserId: currentUserSession.id,
         passengerName: `${pName} (${currentUserSession.level ? `LV.${currentUserSession.level}` : 'Citizen'})`,
         passengerPhone: pPhone,
-        pickupLocation,
-        dropoffLocation: selectedDestination,
+        pickupLocation: effectivePickup,
+        dropoffLocation: effectiveDropoff,
+        pickupContactName,
+        pickupContactPhone,
+        dropoffContactName,
+        dropoffContactPhone,
+        specialRequirements,
         distanceKm: tripDistanceKm,
         fare: totalCalculatedFare || 45
       });
@@ -912,11 +1008,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       setShowBookingModal(false);
       setActiveTab('ride');
       if (audioEnabled) speakThaiText('สร้างออเดอร์สำเร็จ กำลังรอพี่วินที่ผ่านเกณฑ์กดรับงานค่ะ');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to create live order:', err);
-      const message = err instanceof Error && err.message.startsWith('GPS_')
-        ? 'ไม่สามารถอ่านตำแหน่ง GPS ได้ กรุณาอนุญาต Location แล้วลองใหม่'
-        : 'สร้างออเดอร์ไม่สำเร็จ กรุณาตรวจสอบการเข้าสู่ระบบและลองใหม่อีกครั้ง';
+      const message = err?.message || 'สร้างออเดอร์ไม่สำเร็จ กรุณาตรวจสอบข้อมูลและลองใหม่อีกครั้ง';
       setBookingError(message);
     } finally {
       setIsCreatingRide(false);
@@ -1580,8 +1674,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 {/* 3D Holographic Capillary Map Navigation Component */}
                 <ThreeDimensionalRideMap
                   selectedDreamRide={selectedDreamRide}
-                  pickupLocation="หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)"
-                  destinationLocation={selectedDestination || "อาคาร Exchange Tower อโศก"}
+                  pickupLocation={pickupLocationInput || "จุดรับของผู้โดยสาร"}
+                  destinationLocation={selectedDestination || "จุดหมายปลายทาง"}
                   driverName={currentMatchedDriver?.name || "กำลังรอพี่วิน"}
                   driverLevel={currentMatchedDriver?.level || 0}
                   driverEmoji={currentMatchedDriver?.avatarEmoji || "🛵"}
@@ -2578,12 +2672,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         </div>
       </div>
 
-      {/* Specialized Service Pre-Matching Modal for Express, MU, Lifestyle, Spirit, Family */}
+      {/* Specialized Service Pre-Matching Modal for Knight, Express, MU, Lifestyle, Spirit, Family */}
       {showPreMatchingModal && (
         <SpecializedServicePreMatchingModal
           serviceId={preMatchingServiceId}
           serviceName={services.find(s => s.id === preMatchingServiceId)?.name || 'WIN Service'}
-          destinationLocation={selectedDestination || 'อาคาร Exchange Tower อโศก'}
+          destinationLocation={selectedDestination || ''}
           audioEnabled={audioEnabled}
           onClose={() => setShowPreMatchingModal(false)}
           onSubmit={handlePreMatchingSubmit}
@@ -2599,10 +2693,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           driverLevel={currentMatchedDriver?.level || 0}
           recipientOrPassengerName={
             photoVerificationType === 'express_delivery'
-              ? (preMatchingData?.express?.recipientName || 'คุณสมศรี เจริญสุข')
-              : (preMatchingData?.family?.contactPersonName || 'คุณวราภรณ์ (บุตรสาว)')
+              ? (preMatchingData?.express?.recipientName || 'ผู้รับพัสดุ')
+              : (preMatchingData?.family?.dropoffReceiverName || preMatchingData?.family?.pickupSenderName || 'ผู้รับ')
           }
-          locationName={selectedDestination || 'อาคาร Exchange Tower อโศก'}
+          locationName={selectedDestination || ''}
           audioEnabled={audioEnabled}
           onClose={() => setShowPhotoVerificationModal(false)}
         />
@@ -2613,7 +2707,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         <DriverMatchingModal
           serviceId={activeServiceId}
           serviceName={selectedService || 'WIN KNIGHT'}
-          selectedDestination={selectedDestination || 'อาคาร Exchange Tower อโศก'}
+          selectedDestination={selectedDestination || ''}
           selectedDreamRide={selectedDreamRide}
           totalCalculatedFare={totalCalculatedFare}
           audioEnabled={audioEnabled}
@@ -2729,13 +2823,40 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 </span>
               </div>
               
-              <div className="text-slate-300 flex items-center justify-between">
-                <div>
-                  ปลายทาง: <strong className="text-white">{selectedDestination || 'อาคาร Exchange Tower อโศก'}</strong>
+              {/* Real Pickup Point Input */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-cyan-400 font-bold flex items-center justify-between">
+                  <span>📍 จุดรับจริง (Pickup Location) *</span>
+                  <span className="text-[9px] text-slate-400 font-normal">ระบุสถานที่จริง ไม่ใช้ค่าจำลอง</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={pickupLocationInput}
+                  onChange={(e) => setPickupLocationInput(e.target.value)}
+                  placeholder="กรอกจุดรับจริง เช่น ปากซอยสุขุมวิท 39, ล็อบบี้คอนโด..."
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-cyan-500/30 text-white text-xs focus:outline-none focus:border-cyan-400 placeholder:text-slate-500"
+                />
+              </div>
+
+              {/* Real Destination Input */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-amber-400 font-bold flex items-center gap-1">
+                    <span>🎯 จุดหมายปลายทางจริง (Destination) *</span>
+                  </span>
+                  <span className="text-cyan-400 bg-black/40 px-1.5 py-0.5 rounded border border-white/10">
+                    {tripDistanceKm} กม.
+                  </span>
                 </div>
-                <span className="text-[10px] font-mono text-cyan-400 bg-black/40 px-2 py-0.5 rounded border border-white/10">
-                  {tripDistanceKm} กม.
-                </span>
+                <input
+                  type="text"
+                  required
+                  value={selectedDestination || ''}
+                  onChange={(e) => setSelectedDestination(e.target.value)}
+                  placeholder="กรอกจุดหมายปลายทางจริง เช่น ตึกสิงห์คอมเพล็กซ์, โรงพยาบาลบำรุงราษฎร์..."
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-amber-500/30 text-white text-xs focus:outline-none focus:border-amber-400 placeholder:text-slate-500"
+                />
               </div>
 
               {/* Express Mandatory Box Notice */}
@@ -2766,8 +2887,16 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 <div className="p-2.5 rounded-xl bg-black/50 border border-cyan-500/30 text-[11px] font-mono space-y-1">
                   <div className="text-cyan-300 font-bold flex items-center justify-between">
                     <span>ข้อมูลบริการเฉพาะทาง (Pre-Matching Details):</span>
-                    <span className="text-amber-300">+฿{serviceAddonFee.toFixed(2)}</span>
+                    {serviceAddonFee > 0 && <span className="text-amber-300">+฿{serviceAddonFee.toFixed(2)}</span>}
                   </div>
+                  {activeServiceId === 'knight' && preMatchingData.knight && (
+                    <div className="text-slate-300 text-[10px] space-y-0.5">
+                      <div>จุดหมาย: <strong className="text-amber-300">{preMatchingData.knight.destinationAddress}</strong></div>
+                      {preMatchingData.knight.expressHighway && <div>ทางด่วนพิเศษ: <strong className="text-cyan-300">✓ ขึ้นทางด่วน (+25฿)</strong></div>}
+                      {preMatchingData.knight.goldHelmetVIP && <div>หมวกกันน็อก VIP: <strong className="text-yellow-400">✓ หมวกทอง VIP</strong></div>}
+                      {preMatchingData.knight.quietEscortRide && <div>โหมดเดินทาง: <strong className="text-emerald-400">✓ เงียบสงบ ไม่ชวนคุย</strong></div>}
+                    </div>
+                  )}
                   {activeServiceId === 'mu' && preMatchingData.mu && (
                     <div className="text-slate-300 text-[10px] space-y-0.5">
                       <div>บัดดี้ร่วมทาง: <strong className="text-white">{preMatchingData.mu.wantBuddy ? `ต้องการ (${preMatchingData.mu.totalDurationMinutes} นาที)` : 'ส่งอย่างเดียว'}</strong></div>
@@ -2782,6 +2911,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   )}
                   {activeServiceId === 'spirit' && preMatchingData.spirit && (
                     <div className="text-slate-300 text-[10px] space-y-0.5">
+                      <div>ปลายทางสายมู: <strong className="text-amber-300">{preMatchingData.spirit.destinationAddress}</strong></div>
                       <div>แวะซื้อของไหว้: <strong className="text-white">{preMatchingData.spirit.selectedSacredItems?.length || 0} รายการ</strong></div>
                       <div>จุดแวะ: <strong className="text-rose-300">{preMatchingData.spirit.stopMarketName}</strong></div>
                     </div>
@@ -2791,7 +2921,11 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       <div>ประเภทผู้โดยสาร: <strong className="text-blue-300">
                         {preMatchingData.family.passengerType === 'disabled' ? '♿ ผู้พิการ' : preMatchingData.family.passengerType === 'elderly' ? '👵 ผู้สูงอายุ' : '🎒 นักเรียน/เด็ก'}
                       </strong></div>
-                      <div>ผู้ติดต่อ: <strong className="text-white">{preMatchingData.family.contactPersonName} ({preMatchingData.family.contactPersonPhone})</strong></div>
+                      <div>ผู้ส่ง (จุดรับ): <strong className="text-white">{preMatchingData.family.pickupSenderName} ({preMatchingData.family.pickupSenderPhone})</strong></div>
+                      <div>ผู้รับ (จุดส่ง): <strong className="text-white">{preMatchingData.family.dropoffReceiverName} ({preMatchingData.family.dropoffReceiverPhone})</strong></div>
+                      {preMatchingData.family.specialCareRequirements && (
+                        <div>การดูแลพิเศษ: <span className="text-amber-300">{preMatchingData.family.specialCareRequirements}</span></div>
+                      )}
                       <div>ระบบส่งภาพถ่ายยืนยัน: <span className="text-emerald-400 font-bold">✓ เปิดใช้งาน</span></div>
                     </div>
                   )}
@@ -3513,44 +3647,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         </div>
       )}
 
-      {/* SPECIALIZED SERVICES PRE-MATCHING MODAL (WIN Express, WIN MU BUDDY, etc.) */}
-      {showPreMatchingModal && (
-        <SpecializedServicePreMatchingModal
-          serviceId={preMatchingServiceId}
-          serviceName={selectedService || 'บริการเฉพาะทาง'}
-          destinationLocation={selectedDestination || 'อาคาร Exchange Tower อโศก'}
-          audioEnabled={audioEnabled}
-          onClose={() => setShowPreMatchingModal(false)}
-          onSubmit={(data, calculatedAddonFee) => {
-            setPreMatchingData(data);
-            setServiceAddonFee(calculatedAddonFee);
-            setShowPreMatchingModal(false);
-            if (audioEnabled) {
-              playTactileBlip(1000);
-              speakThaiText(`บันทึกข้อมูลบริการ ${selectedService} เรียบร้อยแล้ว ระบบเริ่มค้นหาพี่วินทันทีค่ะ`);
-            }
-            setShowDriverMatchingModal(true);
-          }}
-        />
-      )}
-
-      {/* SERVICE PHOTO VERIFICATION MODAL (ตรวจรูปส่งพัสดุ / ส่งเด็กถึงที่หมาย) */}
-      {showPhotoVerificationModal && (
-        <ServicePhotoVerificationModal
-          type={photoVerificationType}
-          audioEnabled={audioEnabled}
-          onClose={() => setShowPhotoVerificationModal(false)}
-          onConfirm={(imgUrl) => {
-            setShowPhotoVerificationModal(false);
-            if (audioEnabled) {
-              playTactileBlip(1100);
-              speakThaiText("ยืนยันรูปถ่ายหลักฐานความปลอดภัยสำเร็จ บันทึกเข้าระบบเรียบร้อยแล้วค่ะ");
-            }
-            confetti({ particleCount: 50, spread: 70, colors: ['#00D2FF', '#10B981', '#FFD700'] });
-          }}
-        />
-      )}
-
       {/* Customer Custom QR Code Modal for วันนี้มีของมาขาย (ระบุจำนวนเงินเองได้) */}
       <CustomerPaymentQrCodeModal
         isOpen={showCustomerQrModal}
@@ -3602,7 +3698,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       <RealGpsMapModal
         isOpen={showRealGpsModal}
         onClose={() => setShowRealGpsModal(false)}
-        destinationTitle={selectedDestination || 'อาคาร Exchange Tower อโศก'}
+        destinationTitle={selectedDestination || 'จุดหมายปลายทาง'}
         audioEnabled={audioEnabled}
       />
 

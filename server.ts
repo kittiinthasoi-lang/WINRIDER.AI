@@ -413,6 +413,11 @@ interface ServerOrder {
   passengerPhone: string;
   pickupLocation: string;
   dropoffLocation: string;
+  pickupContactName?: string;
+  pickupContactPhone?: string;
+  dropoffContactName?: string;
+  dropoffContactPhone?: string;
+  specialRequirements?: string;
   distanceKm: number;
   fare: number;
   welfareFund2Baht: number;
