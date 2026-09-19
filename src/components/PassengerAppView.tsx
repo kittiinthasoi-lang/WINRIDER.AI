@@ -327,7 +327,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         if (orders.length > 0) {
           setUserRideHistory(orders);
           const active = orders
-            .filter((order) => !['completed', 'cancelled'].includes(order.status))
             .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
           if (active) {
             setActiveLiveOrder(active);
