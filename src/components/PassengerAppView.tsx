@@ -882,6 +882,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       setBookingError('กรุณาเลือกปลายทางก่อนยืนยันการเดินทาง');
       return;
     }
+    if (!Number.isFinite(tripDistanceKm) || tripDistanceKm <= 0) {
+      setBookingError('ยังไม่มีระยะทางจริงของเส้นทาง กรุณาเลือกปลายทางจากรายการที่คำนวณระยะทางได้ก่อน');
+      return;
+    }
 
     setIsCreatingRide(true);
     setBookingError(null);
