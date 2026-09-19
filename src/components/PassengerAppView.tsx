@@ -313,13 +313,34 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       })
       .catch((err) => console.warn('Firestore orders fetch error:', err));
 
-    // 3. Live subscriptions
+    // 3. Live local subscriptions for same-device UX
     const unsub = subscribeToLiveOrders(() => {
       const updated = getOrdersForPassenger(currentUserSession.id);
       setUserRideHistory(updated);
     });
 
-    return () => unsub();
+    // 4. Cross-device polling from Firestore so a Knight accepting on another device
+    // becomes visible to the passenger without relying on BroadcastChannel/localStorage.
+    const refreshCloudOrders = async () => {
+      try {
+        const orders = await fetchFirestoreOrdersForUser(currentUserSession.id, 'customer');
+        if (orders.length > 0) {
+          setUserRideHistory(orders);
+          const active = orders
+            .filter((order) => !['completed', 'cancelled'].includes(order.status))
+            .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+          if (active) setActiveLiveOrder(active);
+        }
+      } catch (err) {
+        console.warn('Cloud ride refresh failed:', err);
+      }
+    };
+    const refreshTimer = window.setInterval(refreshCloudOrders, 5000);
+
+    return () => {
+      unsub();
+      window.clearInterval(refreshTimer);
+    };
   }, [currentUserSession?.id]);
 
   // Cross-tab Live Dispatch Listener: updates passenger UI when Knight accepts or advances trip
