@@ -78,16 +78,28 @@ interface ServerOrder {
 }
 
 function getAdminDb() {
-  const app = getApps().length
-    ? getApps()[0]
-    : initializeApp({
+  if (getApps().length) {
+    return getFirestore(getApps()[0]);
+  }
+
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (projectId && clientEmail && privateKey) {
+    return getFirestore(
+      initializeApp({
         credential: cert({
-          projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "",
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL || "",
-          privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+          projectId,
+          clientEmail,
+          privateKey: privateKey.replace(/\\n/g, "\n"),
         }),
-      });
-  return getFirestore(app);
+      })
+    );
+  }
+
+  // Cloud Run / Firebase environments can use Application Default Credentials.
+  return getFirestore(initializeApp());
 }
 
 const ordersDb = getAdminDb();
