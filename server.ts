@@ -3,6 +3,8 @@ import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
 dotenv.config();
 
@@ -44,12 +46,13 @@ app.get(["/api/health", "/healthz", "/health"], (_req, res) => {
   res.json({ status: "ok", empire: "WINRIDER.AI", timestamp: new Date().toISOString() });
 });
 
-// In-memory active orders store for cross-device & cross-tab sync
+// Persistent order store: Firestore is the source of truth across instances/restarts.
 interface ServerOrder {
   id: string;
   serviceId: string;
   serviceTitle: string;
   serviceIconEmoji: string;
+  passengerUserId?: string;
   passengerName: string;
   passengerPhone: string;
   pickupLocation: string;
@@ -62,6 +65,7 @@ interface ServerOrder {
   status: string;
   createdAt: string;
   updatedAt: string;
+  driverUserId?: string;
   driverName?: string;
   driverLevel?: number;
   driverPhone?: string;
@@ -69,56 +73,171 @@ interface ServerOrder {
   driverAvatarEmoji?: string;
   driverVehicle?: string;
   tipAmount?: number;
+  ratingGiven?: number;
+  reviewComment?: string;
 }
 
-let activeOrders: ServerOrder[] = [];
+function getAdminDb() {
+  const app = getApps().length
+    ? getApps()[0]
+    : initializeApp({
+        credential: cert({
+          projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "",
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL || "",
+          privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+        }),
+      });
+  return getFirestore(app);
+}
 
-// Orders API
-app.get("/api/orders", (_req, res) => {
-  res.json({ orders: activeOrders });
+const ordersDb = getAdminDb();
+const ordersCollection = ordersDb.collection("rides");
+
+app.get("/api/orders", async (_req, res) => {
+  try {
+    const snapshot = await ordersCollection.orderBy("createdAt", "desc").limit(50).get();
+    const orders = snapshot.docs.map((doc) => doc.data() as ServerOrder);
+    return res.json({ orders });
+  } catch (error: any) {
+    console.error("[Orders GET Error]:", error?.message);
+    return res.status(503).json({ error: "Order store unavailable" });
+  }
 });
 
-app.post("/api/orders", (req, res) => {
+app.post("/api/orders", async (req, res) => {
   const newOrder = req.body as ServerOrder;
-  if (!newOrder || !newOrder.id) {
+  if (!newOrder || !newOrder.id || !newOrder.passengerUserId) {
     return res.status(400).json({ error: "Invalid order data" });
   }
-  activeOrders.unshift(newOrder);
-  if (activeOrders.length > 50) activeOrders.pop();
-  res.json({ success: true, order: newOrder });
+
+  try {
+    const orderRef = ordersCollection.doc(newOrder.id);
+    await ordersDb.runTransaction(async (transaction) => {
+      const existing = await transaction.get(orderRef);
+      if (existing.exists) {
+        throw new Error("ORDER_ALREADY_EXISTS");
+      }
+      transaction.create(orderRef, {
+        ...newOrder,
+        status: "pending",
+        createdAt: newOrder.createdAt || new Date().toISOString(),
+        updatedAt: newOrder.updatedAt || new Date().toISOString(),
+        serverCreatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+    return res.status(201).json({ success: true, order: newOrder });
+  } catch (error: any) {
+    if (error?.message === "ORDER_ALREADY_EXISTS") {
+      return res.status(409).json({ error: "Order already exists" });
+    }
+    console.error("[Orders POST Error]:", error?.message);
+    return res.status(503).json({ error: "Order store unavailable" });
+  }
 });
 
-app.post("/api/orders/:id/accept", (req, res) => {
+app.post("/api/orders/:id/accept", async (req, res) => {
   const { id } = req.params;
   const driverInfo = req.body;
-  const order = activeOrders.find(o => o.id === id);
-  if (!order) {
-    return res.status(404).json({ error: "Order not found" });
-  }
-  order.status = "accepted";
-  order.updatedAt = new Date().toISOString();
-  if (!driverInfo?.driverName || !driverInfo?.driverPlate) {
+
+  if (!driverInfo?.driverUserId || !driverInfo?.driverName || !driverInfo?.driverPlate) {
     return res.status(400).json({ error: "Real driver identity is required" });
   }
-  order.driverName = driverInfo.driverName;
-  order.driverLevel = Number(driverInfo.driverLevel || 1);
-  order.driverPhone = driverInfo.driverPhone;
-  order.driverPlate = driverInfo.driverPlate;
-  order.driverAvatarEmoji = driverInfo.driverAvatarEmoji;
-  res.json({ success: true, order });
+
+  try {
+    const orderRef = ordersCollection.doc(id);
+    let acceptedOrder: ServerOrder | null = null;
+
+    await ordersDb.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(orderRef);
+      if (!snapshot.exists) {
+        throw new Error("ORDER_NOT_FOUND");
+      }
+
+      const order = snapshot.data() as ServerOrder;
+      if (order.status !== "pending") {
+        throw new Error("ORDER_NOT_PENDING");
+      }
+
+      acceptedOrder = {
+        ...order,
+        status: "accepted",
+        updatedAt: new Date().toISOString(),
+        driverUserId: driverInfo.driverUserId,
+        driverName: driverInfo.driverName,
+        driverLevel: Number(driverInfo.driverLevel || 1),
+        driverPhone: driverInfo.driverPhone,
+        driverPlate: driverInfo.driverPlate,
+        driverAvatarEmoji: driverInfo.driverAvatarEmoji,
+        driverVehicle: driverInfo.driverVehicle,
+      };
+
+      transaction.update(orderRef, {
+        status: "accepted",
+        updatedAt: acceptedOrder.updatedAt,
+        driverUserId: acceptedOrder.driverUserId,
+        driverName: acceptedOrder.driverName,
+        driverLevel: acceptedOrder.driverLevel,
+        driverPhone: acceptedOrder.driverPhone || null,
+        driverPlate: acceptedOrder.driverPlate,
+        driverAvatarEmoji: acceptedOrder.driverAvatarEmoji || null,
+        driverVehicle: acceptedOrder.driverVehicle || null,
+      });
+    });
+
+    return res.json({ success: true, order: acceptedOrder });
+  } catch (error: any) {
+    if (error?.message === "ORDER_NOT_FOUND") {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    if (error?.message === "ORDER_NOT_PENDING") {
+      return res.status(409).json({ error: "Order has already been accepted or is no longer pending" });
+    }
+    console.error("[Orders Accept Error]:", error?.message);
+    return res.status(503).json({ error: "Order store unavailable" });
+  }
 });
 
-app.post("/api/orders/:id/step", (req, res) => {
+app.post("/api/orders/:id/step", async (req, res) => {
   const { id } = req.params;
   const { status, tipAmount } = req.body;
-  const order = activeOrders.find(o => o.id === id);
-  if (!order) {
-    return res.status(404).json({ error: "Order not found" });
+
+  if (!status && tipAmount === undefined) {
+    return res.status(400).json({ error: "Order update is required" });
   }
-  if (status) order.status = status;
-  if (tipAmount !== undefined) order.tipAmount = tipAmount;
-  order.updatedAt = new Date().toISOString();
-  res.json({ success: true, order });
+
+  try {
+    const orderRef = ordersCollection.doc(id);
+    let updatedOrder: ServerOrder | null = null;
+
+    await ordersDb.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(orderRef);
+      if (!snapshot.exists) {
+        throw new Error("ORDER_NOT_FOUND");
+      }
+
+      const order = snapshot.data() as ServerOrder;
+      updatedOrder = {
+        ...order,
+        ...(status ? { status } : {}),
+        ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
+        updatedAt: new Date().toISOString(),
+      };
+
+      transaction.update(orderRef, {
+        ...(status ? { status } : {}),
+        ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
+        updatedAt: updatedOrder.updatedAt,
+      });
+    });
+
+    return res.json({ success: true, order: updatedOrder });
+  } catch (error: any) {
+    if (error?.message === "ORDER_NOT_FOUND") {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    console.error("[Orders Step Error]:", error?.message);
+    return res.status(503).json({ error: "Order store unavailable" });
+  }
 });
 
 // Low-Code Webhook Dispatch Proxy (bypasses browser CORS for Make.com / Zapier / Google Sheets)
