@@ -467,8 +467,13 @@ export default function App() {
 
         {activeMode === 'hospital' && (
           <ProtectedRoute 
-            allowedRoles={['partner']}
-            onRedirectToMyDashboard={() => setActiveMode('partner')}
+            allowedRoles={['citizen', 'knight', 'merchant', 'partner']}
+            onRedirectToMyDashboard={(role) => {
+              if (role === 'knight') setActiveMode('driver');
+              else if (role === 'merchant') setActiveMode('merchant');
+              else if (role === 'partner') setActiveMode('partner');
+              else setActiveMode('passenger');
+            }}
           >
             <HospitalCommandCenter
               audioEnabled={audioEnabled}
@@ -562,7 +567,7 @@ export default function App() {
           >
             {(claims) => (
               <AdminLayout
-                adminLevel={claims.adminLevel}
+                adminLevel={isOwnerAdmin ? 'super' : claims.adminLevel}
                 adminEmail={firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}
                 onExitAdmin={() => {
                   if (userData?.role === 'knight') setActiveMode('driver');

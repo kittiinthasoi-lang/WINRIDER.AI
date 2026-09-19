@@ -83,7 +83,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 adminLevel === 'reviewer' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' :
                 'bg-slate-700 text-slate-300'
               }`}>
-                {adminLevel.toUpperCase()}
+                {adminLevel === 'super' ? 'SUPER ADMIN' : adminLevel.toUpperCase()}
               </span>
 
               {onSwitchAdminLevel && (

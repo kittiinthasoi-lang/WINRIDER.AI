@@ -7,13 +7,16 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return signedIn() && request.auth.token.admin == true;
+      return signedIn()
+        && (request.auth.token.admin == true || request.auth.token.email == 'kittiinthasoi@gmail.com');
     }
 
     function isSuperAdmin() {
       return signedIn()
-        && request.auth.token.admin == true
-        && request.auth.token.adminLevel == 'super';
+        && (
+          request.auth.token.email == 'kittiinthasoi@gmail.com'
+          || (request.auth.token.admin == true && request.auth.token.adminLevel == 'super')
+        );
     }
 
     function isOwner(uid) {

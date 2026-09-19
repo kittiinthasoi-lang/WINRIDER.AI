@@ -40,10 +40,11 @@ export async function getAdminClaims(): Promise<AdminClaims | null> {
   if (currentUser) {
     try {
       const tokenResult = await currentUser.getIdTokenResult(true);
-      if (tokenResult.claims.admin === true) {
+      const isOwnerSuperAdmin = currentUser.email?.toLowerCase() === 'kittiinthasoi@gmail.com';
+      if (tokenResult.claims.admin === true || isOwnerSuperAdmin) {
         return {
           admin: true,
-          adminLevel: (tokenResult.claims.adminLevel as AdminLevel) || 'support'
+          adminLevel: isOwnerSuperAdmin ? 'super' : ((tokenResult.claims.adminLevel as AdminLevel) || 'support')
         };
       }
     } catch (err) {
