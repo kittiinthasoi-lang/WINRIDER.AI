@@ -16,10 +16,12 @@ import {
   CreditCard, 
   Building2, 
   Wallet,
+  Landmark,
   Sparkles,
   ExternalLink
 } from 'lucide-react';
 import { auth } from '../firebase';
+import { generateBankAccountQRDataUrl } from '../utils/promptpay';
 import { 
   getPaymentProfile, 
   savePaymentProfile, 
@@ -97,9 +99,25 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
     return () => { isMounted = false; };
   }, [currentUid, defaultName]);
 
-  // Real-time dynamic QR generation when PromptPay ID or test amount changes
+  // Real-time dynamic QR generation when PromptPay ID / bank account or test amount changes
   useEffect(() => {
     const clean = promptPayId.replace(/[^0-9]/g, '');
+
+    if (receiverType === 'bank_account') {
+      if (clean.length >= 10 && clean.length <= 15 && bankName.trim() && accountName.trim()) {
+        generateBankAccountQRDataUrl({
+          bankName: bankName.trim(),
+          accountNumber: clean,
+          accountName: accountName.trim(),
+        })
+          .then(dataUrl => setPreviewQr(dataUrl))
+          .catch(() => {});
+      } else {
+        setPreviewQr('');
+      }
+      return;
+    }
+
     if (clean.length >= 9) {
       generateDynamicPromptPayQR(clean, testAmount > 0 ? testAmount : undefined)
         .then(dataUrl => setPreviewQr(dataUrl))
@@ -107,7 +125,7 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
     } else {
       setPreviewQr('');
     }
-  }, [promptPayId, testAmount]);
+  }, [promptPayId, testAmount, receiverType, bankName, accountName]);
 
   const handleFileUpload = async (file?: File) => {
     if (!file) return;
@@ -135,9 +153,21 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
       return;
     }
     const cleanId = promptPayId.replace(/[^0-9]/g, '');
-    if (!cleanId || cleanId.length < 9) {
-      setErrorMessage('กรุณากรอกหมายเลข PromptPay ให้ถูกต้อง (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)');
-      return;
+
+    if (receiverType === 'bank_account') {
+      if (!cleanId || cleanId.length < 10 || cleanId.length > 15) {
+        setErrorMessage('กรุณากรอกเลขบัญชีธนาคารให้ถูกต้อง (10-15 หลัก)');
+        return;
+      }
+      if (!bankName.trim()) {
+        setErrorMessage('กรุณาระบุชื่อธนาคาร');
+        return;
+      }
+    } else {
+      if (!cleanId || cleanId.length < 9) {
+        setErrorMessage('กรุณากรอกหมายเลข PromptPay ให้ถูกต้อง (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)');
+        return;
+      }
     }
 
     setSaving(true);
@@ -297,6 +327,7 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
               { id: 'national_id' as const, label: 'เลขบัตร ปชช.', sub: '13 หลัก', icon: CreditCard },
               { id: 'merchant_tax_id' as const, label: 'เลขนิติบุคคล/ภาษี', sub: '13 หลัก', icon: Building2 },
               { id: 'e_wallet' as const, label: 'e-Wallet ID', sub: '15 หลัก', icon: Wallet },
+              { id: 'bank_account' as const, label: 'บัญชีธนาคาร', sub: 'เลขบัญชี', icon: Landmark },
             ].map(({ id, label, sub, icon: Icon }) => (
               <button
                 key={id}
@@ -319,12 +350,13 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
           </div>
         </div>
 
-        {/* PromptPay ID Input */}
+        {/* PromptPay ID / Bank Account Number Input */}
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-200 flex items-center justify-between">
-            <span>หมายเลข PromptPay *</span>
+            <span>{receiverType === 'bank_account' ? 'เลขบัญชีธนาคาร *' : 'หมายเลข PromptPay *'}</span>
             <span className="text-[10px] text-cyan-300 font-mono">
-              {receiverType === 'citizen_phone' ? 'ระบุเบอร์โทร เช่น 0812345678' : 'ระบุตัวเลขเท่านั้น'}
+              {receiverType === 'bank_account' ? 'ระบุตัวเลข 10-15 หลัก' :
+               receiverType === 'citizen_phone' ? 'ระบุเบอร์โทร เช่น 0812345678' : 'ระบุตัวเลขเท่านั้น'}
             </span>
           </label>
           <input
@@ -333,6 +365,7 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
             value={promptPayId}
             onChange={(e) => setPromptPayId(e.target.value)}
             placeholder={
+              receiverType === 'bank_account' ? 'เช่น 1234567890' :
               receiverType === 'citizen_phone' ? '08XXXXXXXX' : 
               receiverType === 'national_id' ? '1XXXXXXXXXXXX' : 
               receiverType === 'merchant_tax_id' ? '0XXXXXXXXXXXX' : '15 หลัก e-Wallet'
@@ -341,9 +374,11 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
           />
         </div>
 
-        {/* Bank Name (Optional) */}
+        {/* Bank Name */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-200">ธนาคารเจ้าของบัญชี (ระบุเพื่อความชัดเจน)</label>
+          <label className="text-xs font-bold text-slate-200">
+            {receiverType === 'bank_account' ? 'ธนาคารเจ้าของบัญชี *' : 'ธนาคารเจ้าของบัญชี (ระบุเพื่อความชัดเจน)'}
+          </label>
           <input
             type="text"
             value={bankName}
@@ -355,32 +390,40 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
 
         {/* Real-time EMVCo PromptPay Preview & Bank Slip Upload Box */}
         <div className="grid sm:grid-cols-2 gap-4 pt-2">
-          {/* Box 1: Auto-generated Real EMVCo PromptPay QR */}
+          {/* Box 1: Auto-generated QR (PromptPay EMVCo or Bank Account info) */}
           <div className="p-4 rounded-2xl bg-black/50 border border-white/10 flex flex-col items-center justify-between text-center space-y-3">
             <div className="space-y-1">
               <span className="text-xs font-bold text-cyan-300 flex items-center justify-center gap-1">
                 <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-                <span>QR พร้อมเพย์มาตรฐาน EMVCo</span>
+                <span>{receiverType === 'bank_account' ? 'QR ข้อมูลบัญชีธนาคาร' : 'QR พร้อมเพย์มาตรฐาน EMVCo'}</span>
               </span>
-              <p className="text-[10px] text-slate-400">สร้างแบบเรียลไทม์ตามมาตรฐานธนาคารแห่งประเทศไทย</p>
+              <p className="text-[10px] text-slate-400">
+                {receiverType === 'bank_account'
+                  ? 'สแกนแล้วแสดงชื่อธนาคาร/เลขบัญชี/ชื่อบัญชี (ไม่ใช่ QR โอนเงินอัตโนมัติ)'
+                  : 'สร้างแบบเรียลไทม์ตามมาตรฐานธนาคารแห่งประเทศไทย'}
+              </p>
             </div>
 
             {previewQr ? (
               <div className="p-2.5 rounded-2xl bg-white shadow-xl">
-                <img src={previewQr} alt="QR PromptPay จริง" className="w-40 h-40 object-contain mx-auto" />
+                <img src={previewQr} alt="QR ช่องทางรับเงิน" className="w-40 h-40 object-contain mx-auto" />
                 <div className="text-[9px] text-slate-800 font-mono font-bold mt-1">
-                  THAI QR PAYMENT
+                  {receiverType === 'bank_account' ? 'BANK ACCOUNT INFO' : 'THAI QR PAYMENT'}
                 </div>
               </div>
             ) : (
               <div className="w-40 h-40 rounded-2xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center p-3 text-slate-500 text-xs">
                 <QrCode className="w-8 h-8 mb-2 opacity-40" />
-                <span>กรอกหมายเลขพร้อมเพย์เพื่อสร้าง QR จริง</span>
+                <span>
+                  {receiverType === 'bank_account'
+                    ? 'กรอกชื่อบัญชี ธนาคาร และเลขบัญชีเพื่อสร้าง QR'
+                    : 'กรอกหมายเลขพร้อมเพย์เพื่อสร้าง QR จริง'}
+                </span>
               </div>
             )}
 
-            {/* Test dynamic amount */}
-            {previewQr && (
+            {/* Test dynamic amount (PromptPay only) */}
+            {previewQr && receiverType !== 'bank_account' && (
               <div className="w-full pt-2 border-t border-white/10 space-y-1">
                 <label className="text-[10px] text-slate-400 block">ทดสอบสร้าง QR ระบุยอดเงินจริง:</label>
                 <div className="flex items-center gap-1 justify-center">
@@ -449,7 +492,7 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
             )}
 
             <div className="text-[10px] text-slate-400">
-              {bankSlipQrUrl ? '✓ แนบรูป QR ธนาคารเรียบร้อยแล้ว' : 'หากไม่อัปโหลด ระบบจะใช้ QR พร้อมเพย์มาตรฐาน EMVCo ด้านซ้าย'}
+              {bankSlipQrUrl ? '✓ แนบรูป QR ธนาคารเรียบร้อยแล้ว' : 'หากไม่อัปโหลด ระบบจะใช้ QR ด้านซ้ายที่สร้างอัตโนมัติ'}
             </div>
           </div>
         </div>
