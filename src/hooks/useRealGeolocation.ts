@@ -89,13 +89,29 @@ export function useRealGeolocation(enableHighAccuracy = true) {
   useEffect(() => {
     if (!('geolocation' in navigator)) return;
 
-    let watchId: number | null = null;
+        let watchId: number | null = null;
+    let lastLat: number | null = null;
+    let lastLon: number | null = null;
     try {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
+          const newLat = pos.coords.latitude;
+          const newLon = pos.coords.longitude;
+
+          // ข้ามการอัปเดตถ้าตำแหน่งขยับน้อยกว่า ~8 เมตร (กันสัญญาณ GPS สั่น/noise)
+          if (lastLat !== null && lastLon !== null) {
+            const movedKm = calculateHaversineDistanceKm(lastLat, lastLon, newLat, newLon);
+            if (movedKm < 0.008) {
+              return;
+            }
+          }
+
+          lastLat = newLat;
+          lastLon = newLon;
+
           setPosition({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
+            latitude: newLat,
+            longitude: newLon,
             accuracy: pos.coords.accuracy,
             speed: pos.coords.speed,
             heading: pos.coords.heading,
