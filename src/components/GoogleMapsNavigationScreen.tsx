@@ -33,6 +33,7 @@ import {
 } from '../services/googleRoutesService';
 
 const GOOGLE_MAPS_API_KEY = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
+const GOOGLE_MAPS_MAP_ID = String(import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID');
 
 export type NavigationRole = 'customer' | 'driver';
 export type NavigationPhase = 'approaching' | 'in_transit' | 'completed';
@@ -154,15 +155,12 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
 
   // Real position:
   // If role is driver and device has GPS, use real device GPS.
-  // Otherwise use pickup or origin coordinates.
+  // Never invent a position when GPS is unavailable.
   const driverPos = useMemo(() => {
     if (gpsState.latitude && gpsState.longitude) {
       return { lat: gpsState.latitude, lng: gpsState.longitude };
     }
-    if (phase === 'approaching') {
-      return { lat: pickupCoords.lat + 0.0025, lng: pickupCoords.lng + 0.0020 };
-    }
-    return pickupCoords;
+    return null;
   }, [gpsState.latitude, gpsState.longitude, phase, pickupCoords]);
 
   // Active calculated route
@@ -174,13 +172,20 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
     let isCancelled = false;
 
     async function loadRoute() {
+      const hasDriverPosition = Boolean(driverPos && driverPos.lat && driverPos.lng);
+      const destination = phase === 'approaching' ? pickupCoords : dropoffCoords;
+      if (!hasDriverPosition || !destination.lat || !destination.lng) {
+        setLiveRoute(null);
+        setIsLoadingRoute(false);
+        return;
+      }
       setIsLoadingRoute(true);
       try {
-        let originPt = { latitude: driverPos.lat, longitude: driverPos.lng };
+        let originPt = { latitude: driverPos!.lat, longitude: driverPos!.lng };
         let destPt = { latitude: pickupCoords.lat, longitude: pickupCoords.lng, name: pickupAddress };
 
         if (phase === 'in_transit') {
-          originPt = { latitude: pickupCoords.lat, longitude: pickupCoords.lng };
+          originPt = { latitude: driverPos!.lat, longitude: driverPos!.lng };
           destPt = { latitude: dropoffCoords.lat, longitude: dropoffCoords.lng, name: dropoffAddress };
         }
 
@@ -208,7 +213,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [phase, driverPos.lat, driverPos.lng, pickupCoords.lat, pickupCoords.lng, dropoffCoords.lat, dropoffCoords.lng, pickupAddress, dropoffAddress]);
+  }, [phase, driverPos?.lat, driverPos?.lng, pickupCoords.lat, pickupCoords.lng, dropoffCoords.lat, dropoffCoords.lng, pickupAddress, dropoffAddress]);
 
   // Launch Real Google Maps Turn-by-Turn Navigation on device
   const handleOpenNativeGoogleMaps = () => {
@@ -219,7 +224,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
     // Check if origin is available from real GPS
     const originParam = gpsState.latitude && gpsState.longitude
       ? `&origin=${gpsState.latitude},${gpsState.longitude}`
-      : `&origin=${pickupCoords.lat},${pickupCoords.lng}`;
+      : '';
 
     const url = `https://www.google.com/maps/dir/?api=1${originParam}&destination=${dest.lat},${dest.lng}&destination_place_id=&travelmode=two-wheeler`;
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -306,7 +311,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
           <Map
             defaultCenter={pickupCoords}
             defaultZoom={16}
-            mapId="DEMO_MAP_ID"
+            mapId={GOOGLE_MAPS_MAP_ID}
             mapTypeId={mapType}
             gestureHandling="greedy"
             fullscreenControl={false}
@@ -318,8 +323,8 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
           >
             {/* Real Route Polyline */}
             <MapRouteRenderer
-              path={liveRoute?.polylineCoordinates || [driverPos, pickupCoords, dropoffCoords]}
-              driverPosition={driverPos}
+              path={liveRoute?.polylineCoordinates || []}
+              driverPosition={driverPos || undefined}
               pickupCoords={pickupCoords}
               dropoffCoords={dropoffCoords}
               isFollowDriver={isFollowDriver}
@@ -359,7 +364,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
             </AdvancedMarker>
 
             {/* C. Real Rider/Vehicle Marker */}
-            <AdvancedMarker
+            {driverPos && <AdvancedMarker
               position={driverPos}
               title={`${driverName} - ${driverVehicle}`}
               zIndex={60}
@@ -372,7 +377,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
                   {driverPlate}
                 </div>
               </div>
-            </AdvancedMarker>
+            </AdvancedMarker>}
           </Map>
         </APIProvider>
 

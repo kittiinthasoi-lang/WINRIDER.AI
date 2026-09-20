@@ -5,7 +5,8 @@ import {
   getFeeRules, 
   satangToBaht, 
   bpsToPercent, 
-  FeeRuleItem 
+  FeeRuleItem,
+  INITIAL_FEE_RULES
 } from '../../services/feeRulesService';
 import { 
   subscribeFoundingKnightCounter,
@@ -44,7 +45,8 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
 
   // State
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
-  const [feeRules, setFeeRules] = useState<FeeRuleItem[]>([]);
+  // Registration must remain usable without spending Firestore reads just to render the form.
+  const [feeRules, setFeeRules] = useState<FeeRuleItem[]>(INITIAL_FEE_RULES);
   const [foundingCounter, setFoundingCounter] = useState<{ count: number; limit: number; remaining: number }>({
     count: 0,
     limit: 1000,
@@ -95,14 +97,17 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
   const licenseInputRef = useRef<HTMLInputElement>(null);
   const vehicleInputRef = useRef<HTMLInputElement>(null);
 
-  // Load fee rules and subscribe to founding counter
+  // Load remote pricing only after a role is selected. The founding counter is
+  // observed only while the Knight form is open, rather than on every onboarding visit.
   useEffect(() => {
+    if (!selectedRole) return;
     getFeeRules().then(setFeeRules);
+    if (selectedRole !== 'knight') return;
     const unsubCounter = subscribeFoundingKnightCounter((data) => {
       setFoundingCounter(data);
     });
     return () => unsubCounter();
-  }, []);
+  }, [selectedRole]);
 
   // Rules from DB
   const knightStandardRule = feeRules.find(r => r.payerRole === 'knight' && r.tier === 'standard') || feeRules.find(r => r.payerRole === 'knight');
@@ -266,7 +271,12 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
       if (onCompleted) onCompleted();
     } catch (err: any) {
       console.error('Registration failed:', err);
-      setFormError(err.message || 'เกิดข้อผิดพลาดในการลงทะเบียน กรุณาลองใหม่อีกครั้ง');
+      const message = String(err?.message || '');
+      setFormError(
+        message.includes('Quota limit exceeded') || message.includes('resource-exhausted')
+          ? 'ฐานข้อมูล Firestore ใช้โควต้าอ่านรายวันครบแล้ว การสมัครยังไม่ถูกบันทึก กรุณารอรอบโควต้าใหม่หรือให้ผู้ดูแลเปิดฐานข้อมูลแบบชำระตามการใช้งาน'
+          : message || 'เกิดข้อผิดพลาดในการลงทะเบียน กรุณาลองใหม่อีกครั้ง'
+      );
     } finally {
       setIsSubmitting(false);
       setUploadProgressText('');

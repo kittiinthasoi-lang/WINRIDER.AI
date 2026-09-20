@@ -2,6 +2,7 @@
 // Internal Usage Attribution: gmp_mcp_codeassist_v1_aistudio
 
 import { ARManeuverType } from '../components/ARLiveCameraNavigation';
+import { auth } from '../firebase';
 
 export interface RouteCoordinate {
   lat: number;
@@ -36,7 +37,7 @@ export interface LiveRouteStep {
 
 export interface ComputedLiveRoute {
   success: boolean;
-  source: 'google_routes_api_live' | 'google_routes_api_simulation' | 'local_tactical_routing_engine';
+  source: 'google_routes_api_live' | 'unavailable';
   provider: string;
   totalDistanceMeters: number;
   totalDurationSeconds: number;
@@ -219,10 +220,13 @@ export async function computeLiveRoute(params: {
 }): Promise<ComputedLiveRoute> {
   let json: any = null;
   try {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error('Authentication required for live routing');
     const response = await fetch('/api/routes/compute', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
         origin: params.origin,
@@ -315,70 +319,18 @@ export async function computeLiveRoute(params: {
     };
   }
 
-  // Fallback Tactical Route Calculation
-  const oLat = params.origin.latitude;
-  const oLng = params.origin.longitude;
-  const dLat = params.destination.latitude;
-  const dLng = params.destination.longitude;
-  const distDeg = Math.sqrt(Math.pow(dLat - oLat, 2) + Math.pow(dLng - oLng, 2));
-  const estKm = Math.max(0.8, Number((distDeg * 111 * 1.3).toFixed(1)));
-  const estMinutes = Math.max(3, Math.round((estKm / 28) * 60));
-  const estSec = estMinutes * 60;
-  const destName = params.destination.name || 'ปลายทาง';
-
-  const fallbackSteps: LiveRouteStep[] = [
-    {
-      stepIndex: 0,
-      instructions: `มุ่งหน้าไปตามซอยเพื่อออกสู่ถนนสายหลัก ไปยัง ${destName}`,
-      maneuver: 'straight',
-      rawManeuver: 'STRAIGHT',
-      distanceMeters: Math.round(estKm * 300),
-      durationSeconds: Math.round(estSec * 0.3),
-      startLocation: { lat: oLat, lng: oLng },
-      endLocation: { lat: oLat + (dLat - oLat) * 0.3, lng: oLng + (dLng - oLng) * 0.3 }
-    },
-    {
-      stepIndex: 1,
-      instructions: `เลี้ยวซ้ายเข้าสู่ถนนมุ่งหน้า ${destName} (ช่องทางมอเตอร์ไซค์)`,
-      maneuver: 'turn_left',
-      rawManeuver: 'TURN_LEFT',
-      distanceMeters: Math.round(estKm * 400),
-      durationSeconds: Math.round(estSec * 0.4),
-      startLocation: { lat: oLat + (dLat - oLat) * 0.3, lng: oLng + (dLng - oLng) * 0.3 },
-      endLocation: { lat: oLat + (dLat - oLat) * 0.7, lng: oLng + (dLng - oLng) * 0.7 }
-    },
-    {
-      stepIndex: 2,
-      instructions: `เลี้ยวขวาเข้าสู่จุดหมาย ${destName} (ถึงปลายทาง)`,
-      maneuver: 'turn_right',
-      rawManeuver: 'TURN_RIGHT',
-      distanceMeters: Math.round(estKm * 300),
-      durationSeconds: Math.round(estSec * 0.3),
-      startLocation: { lat: oLat + (dLat - oLat) * 0.7, lng: oLng + (dLng - oLng) * 0.7 },
-      endLocation: { lat: dLat, lng: dLng }
-    }
-  ];
-
-  const fallbackPolyline = [
-    { lat: oLat, lng: oLng },
-    { lat: oLat + (dLat - oLat) * 0.25, lng: oLng + (dLng - oLng) * 0.2 },
-    { lat: oLat + (dLat - oLat) * 0.55, lng: oLng + (dLng - oLng) * 0.6 },
-    { lat: oLat + (dLat - oLat) * 0.85, lng: oLng + (dLng - oLng) * 0.82 },
-    { lat: dLat, lng: dLng }
-  ];
-
   return {
-    success: true,
-    source: 'local_tactical_routing_engine',
-    provider: 'WINRIDER Capillary Router',
-    totalDistanceMeters: Math.round(estKm * 1000),
-    totalDurationSeconds: estSec,
-    totalDistanceKm: `${estKm} กม.`,
-    totalDurationMinutes: estMinutes,
-    formattedEta: `${estMinutes} นาที`,
-    routeDescription: `เส้นทางมอเตอร์ไซค์เลี่ยงรถติด มุ่งหน้า ${destName}`,
-    steps: fallbackSteps,
-    polylineCoordinates: fallbackPolyline,
+    success: false,
+    source: 'unavailable',
+    provider: 'Google Maps Platform Routes API',
+    totalDistanceMeters: 0,
+    totalDurationSeconds: 0,
+    totalDistanceKm: '',
+    totalDurationMinutes: 0,
+    formattedEta: '',
+    routeDescription: 'ไม่สามารถโหลดเส้นทางจริงได้ กรุณาตรวจสอบ API และการเชื่อมต่อ',
+    steps: [],
+    polylineCoordinates: [],
     timestamp: new Date().toISOString()
   };
 }

@@ -105,7 +105,6 @@ import { useRealtimeGps } from './GpsRealTimeTracker';
 import { chatWithPassengerOnLine } from '../utils/lineIntegration';
 import {
   computeLiveRoute,
-  POPULAR_BANGKOK_DESTINATIONS,
   ComputedLiveRoute,
   LiveRouteStep,
   RouteDestination
@@ -269,7 +268,10 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   const { gpsState } = useRealtimeGps(true);
 
   // Google Maps Routes API (New) Live Integration State
-  const [selectedDestination, setSelectedDestination] = useState<RouteDestination>(POPULAR_BANGKOK_DESTINATIONS[0]);
+  const [selectedDestination, setSelectedDestination] = useState<RouteDestination>({
+    id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0,
+    address: '', landmark: '', estimatedFare: 0
+  });
   const [liveRoute, setLiveRoute] = useState<ComputedLiveRoute | null>(null);
   const [isComputingRoute, setIsComputingRoute] = useState<boolean>(false);
   const [currentRouteStepIndex, setCurrentRouteStepIndex] = useState<number>(0);
@@ -327,17 +329,22 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   // Handle Google Maps Routes API Calculation
   const handleCalculateRoute = async (targetDest?: RouteDestination) => {
     const dest = targetDest || selectedDestination;
+    if (!gpsState.isRealGps || !gpsState.latitude || !gpsState.longitude || !dest.lat || !dest.lng) {
+      setLiveRoute(null);
+      setVoiceInstruction('รอตำแหน่ง GPS และปลายทางจริงจากงานที่รับ');
+      return;
+    }
     setIsComputingRoute(true);
     try {
-      const origLat = gpsState.latitude || 13.7563;
-      const origLng = gpsState.longitude || 100.5018;
+      const origLat = gpsState.latitude;
+      const origLng = gpsState.longitude;
       const res = await computeLiveRoute({
         origin: { latitude: origLat, longitude: origLng },
         destination: { latitude: dest.lat, longitude: dest.lng, name: dest.name, address: dest.address },
         travelMode: routeTravelMode,
         routingPreference: 'TRAFFIC_AWARE'
       });
-      setLiveRoute(res);
+      setLiveRoute(res.success ? res : null);
       setCurrentRouteStepIndex(0);
 
       // Sync first step with AR overlay and voice
@@ -373,10 +380,26 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
     }
   };
 
-  // Calculate route on initial mount
+  // Route destination comes only from the accepted live job.
   useEffect(() => {
-    handleCalculateRoute(selectedDestination);
-  }, []);
+    if (!activeJob?.dropoffCoord) {
+      setLiveRoute(null);
+      return;
+    }
+    const destination: RouteDestination = {
+      id: activeJob.id,
+      name: activeJob.dropoffLocation || activeJob.dropoffAddressTh || 'ปลายทางจากงาน',
+      nameEn: '',
+      category: activeJob.serviceId,
+      lat: activeJob.dropoffCoord.lat,
+      lng: activeJob.dropoffCoord.lng,
+      address: activeJob.dropoffAddressTh || activeJob.dropoffLocation || '',
+      landmark: '',
+      estimatedFare: activeJob.netFare || activeJob.baseFare || 0
+    };
+    setSelectedDestination(destination);
+    if (gpsState.isRealGps) handleCalculateRoute(destination);
+  }, [activeJob?.id, gpsState.isRealGps]);
 
   // Holo Overlay & Weather
   const [showRoutesOverlay, setShowRoutesOverlay] = useState<boolean>(false);
@@ -704,25 +727,9 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
               </button>
             </div>
 
-            {/* Quick Destination Select Dropdown */}
-            <select
-              value={selectedDestination.id}
-              onChange={(e) => {
-                const found = POPULAR_BANGKOK_DESTINATIONS.find(d => d.id === e.target.value);
-                if (found) {
-                  if (audioEnabled) playTactileBlip(850);
-                  setSelectedDestination(found);
-                  handleCalculateRoute(found);
-                }
-              }}
-              className="bg-black/80 text-white text-xs border border-cyan-400/50 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-cyan-300 max-w-[220px]"
-            >
-              {POPULAR_BANGKOK_DESTINATIONS.map(d => (
-                <option key={d.id} value={d.id} className="bg-slate-900 text-white">
-                  🏁 {d.name}
-                </option>
-              ))}
-            </select>
+            <div className="bg-black/80 text-white text-xs border border-cyan-400/50 rounded-xl px-2.5 py-1.5 max-w-[260px] truncate">
+              🏁 {selectedDestination.name || 'รอปลายทางจากงานที่รับ'}
+            </div>
 
             {/* Calculate Button */}
             <button
@@ -832,25 +839,19 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
         </div>
       ) : navDisplayMode === 'google_maps' ? (
         <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">
-          <GoogleMapsNavigationScreen
+          {activeJob?.pickupCoord && activeJob?.dropoffCoord ? <GoogleMapsNavigationScreen
             role="driver"
             initialPhase={driverLegPhase === 'to_pickup' ? 'approaching' : 'in_transit'}
             driverName={activeVehicle?.name || 'พี่วินอัศวิน'}
             driverAvatar={activeVehicle?.imageEmoji || '🛵'}
             driverPlate={(activeVehicle as any)?.plateNumber || ''}
             driverVehicle={activeVehicle?.model || ''}
-            passengerName={selectedJob?.customerName || 'คุณผู้โดยสาร'}
+            passengerName={selectedJob?.customerName || ''}
             pickupAddress={activeJob?.pickupLocation || ''}
-            pickupCoords={{
-              lat: (activeJob as any)?.pickupCoords?.lat || gpsState.latitude || 0,
-              lng: (activeJob as any)?.pickupCoords?.lng || gpsState.longitude || 0
-            }}
-            dropoffAddress={selectedDestination.name || activeJob?.dropoffLocation || ''}
-            dropoffCoords={{
-              lat: selectedDestination.lat || 13.7462,
-              lng: selectedDestination.lng || 100.5348
-            }}
-            fareBaht={activeJob?.fare || 65}
+            pickupCoords={activeJob.pickupCoord}
+            dropoffAddress={activeJob?.dropoffLocation || ''}
+            dropoffCoords={activeJob.dropoffCoord}
+            fareBaht={activeJob.netFare || activeJob.baseFare || 0}
             audioEnabled={audioEnabled}
             onArrivedAtPickup={() => {
               if (audioEnabled) playTactileBlip(950);
@@ -864,7 +865,11 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             }}
             onClose={onClose}
             onOpenChat={() => setShowDirectChatModal(true)}
-          />
+          /> : (
+            <div className="min-h-[420px] flex items-center justify-center p-8 text-center text-sm text-slate-300 bg-slate-950">
+              ยังไม่มีงานจริงที่มีพิกัดจุดรับและปลายทาง จึงไม่แสดงเส้นทางจำลอง
+            </div>
+          )}
         </div>
       ) : navDisplayMode === 'mapbox' ? (
         <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">
