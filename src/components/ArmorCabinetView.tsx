@@ -153,20 +153,6 @@ export const ArmorCabinetView: React.FC<ArmorCabinetViewProps> = ({
               <span>🛡️ คลังเกราะ 10 ยศ</span>
             </button>
 
-            <button
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(950);
-                setActiveCabinetSection('lab');
-              }}
-              className={`flex-1 md:flex-initial px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                activeCabinetSection === 'lab'
-                  ? 'bg-gradient-to-r from-[#FFD700] to-amber-500 text-slate-950 shadow-[0_0_12px_rgba(255,215,0,0.4)] font-black'
-                  : 'text-[#FFD700] hover:text-yellow-200 hover:bg-white/5'
-              }`}
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span>🧪 ARMOR LAB</span>
-            </button>
           </div>
         </div>
       </div>

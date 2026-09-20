@@ -238,10 +238,10 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
         throw new Error('เบราว์เซอร์ไม่รองรับการเข้าถึงกล้อง');
       }
     } catch (err: any) {
-      console.warn('Camera access unavailable, activating realistic simulation feed:', err);
+      console.warn('Camera access unavailable:', err);
       setCameraActive(false);
-      setUseSimulationFeed(true);
-      setCameraError('ไม่พบกล้องสด หรือยังไม่ได้รับสิทธิ์ — ระบบสลับเข้าโหมดภาพเสมือนถนนจริง (Street POV Simulator) อัตโนมัติ');
+      setUseSimulationFeed(false);
+      setCameraError('ไม่พบกล้องสดหรือยังไม่ได้รับสิทธิ์ กรุณาอนุญาตกล้องเพื่อใช้ AR Navigation');
     }
   };
 
@@ -547,8 +547,8 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
           )}
         </div>
 
-        {/* 2. REALISTIC FALLBACK POV VIDEO / SIMULATION STREET FEED (shown if camera is off or denied) */}
-        {(!cameraActive || useSimulationFeed) && (
+        {/* Synthetic street feeds are disabled; AR requires the real camera. */}
+        {useSimulationFeed && (
           <div className={`absolute inset-0 w-full h-full z-0 overflow-hidden ${getFilterStyle()}`}>
             <div className="absolute inset-0 bg-gradient-to-b from-[#06142E] via-[#0B254E] to-[#040A18]" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(0,210,255,0.25)_0,transparent_70%)]" />
@@ -912,35 +912,10 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
       {/* ========================================================================= */}
       <div className="p-3 bg-[#061226] border-t border-cyan-500/40 space-y-2.5 font-mono">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          {/* Distance Proximity Slider & Auto-drive simulation */}
+          {/* Live route distance */}
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(850);
-                setIsApproachingAuto(prev => !prev);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                isApproachingAuto
-                  ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-[0_0_12px_#F59E0B] animate-pulse'
-                  : 'bg-black/60 text-cyan-300 border-cyan-400/50 hover:bg-cyan-950/40'
-              }`}
-            >
-              {isApproachingAuto ? <Pause className="w-3.5 h-3.5 fill-slate-950" /> : <Play className="w-3.5 h-3.5 fill-cyan-400" />}
-              <span>{isApproachingAuto ? 'หยุดจำลองเข้าใกล้' : 'จำลองขี่เข้าใกล้จุดเลี้ยว'}</span>
-            </button>
-
             <div className="flex items-center gap-2 flex-1 sm:w-48 text-[11px]">
               <span className="text-slate-400 whitespace-nowrap">ระยะ:</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={arDistanceM}
-                onChange={(e) => setArDistanceM(Number(e.target.value))}
-                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#00D2FF]"
-              />
               <span className="text-[#00D2FF] font-black w-10 text-right">{arDistanceM}ม.</span>
             </div>
           </div>
@@ -1090,4 +1065,3 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
     </div>
   );
 };
-

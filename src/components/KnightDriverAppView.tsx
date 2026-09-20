@@ -215,106 +215,17 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   const [showSwitchVehicleModal, setShowSwitchVehicleModal] = useState<boolean>(false);
   const [switchSuccessToast, setSwitchSuccessToast] = useState<string | null>(null);
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>([
-    {
-      id: 'wave-110i',
-      brand: 'HONDA',
-      modelName: 'Wave 110i (PGM-FI)',
-      name: 'Honda Wave 110i (PGM-FI)',
-      type: '1. Legendary Daily Commuter',
-      category: 'commuter',
-      displacement: '109.5 cc',
-      plateNumber: '1กข 8899 กทม.',
-      registrationNumber: 'DLT-TH-88291',
-      insuranceStatus: 'พ.ร.บ. & ประกันคุ้มครองผู้โดยสาร (Active)',
-      status: 'READY',
-      isPrimary: true,
-      mileage: '70,240 km',
-      fuel: 100,
-      oil: 92,
-      batteryHealth: 96,
-      fuelEconomy: '60.0 กม./ลิตร',
-      image: waveBikeImg,
-      iconEmoji: '🛵',
-      dailyRidesDone: 14,
-      accent: 'border-cyan-500/40 bg-cyan-950/20',
-      description: 'รถคู่ใจมหาชน ประหยัดน้ำมัน 60 กม./ลิตร ซอกแซกตรอกแคบได้ทุกเส้นเลือดฝอย คล่องตัวสูงสุด'
-    },
-    {
-      id: 'pcx-160',
-      brand: 'HONDA',
-      modelName: 'PCX 160 ABS (Smart Key)',
-      name: 'Honda PCX 160 ABS (Smart Key)',
-      type: '2. Premium Urban Cruiser',
-      category: 'scooter',
-      displacement: '156.9 cc (eSP+)',
-      plateNumber: '3ษล 4455 กทม.',
-      registrationNumber: 'DLT-TH-94112',
-      insuranceStatus: 'พ.ร.บ. & ประกันภัยชั้น 1 คุ้มครองผู้โดยสาร (Active)',
-      status: 'READY',
-      isPrimary: false,
-      mileage: '24,180 km',
-      fuel: 88,
-      oil: 94,
-      batteryHealth: 98,
-      fuelEconomy: '45.0 กม./ลิตร',
-      image: pcxBikeImg,
-      iconEmoji: '✨',
-      dailyRidesDone: 7,
-      accent: 'border-blue-500/40 bg-blue-950/20',
-      description: 'สกู๊ตเตอร์พรีเมียม ขี่นุ่ม เงียบ เบาะกว้าง มีช่องชาร์จ Type-C ผู้โดยสารนั่งสบาย เดินทางสะดวก'
-    },
-    {
-      id: 'africa-twin',
-      brand: 'HONDA',
-      modelName: 'Africa Twin (CRF1100L)',
-      name: 'Honda Africa Twin (CRF1100L)',
-      type: '3. Adventure Long-Distance Beast',
-      category: 'touring',
-      displacement: '1,084 cc (DCT Dual Clutch)',
-      plateNumber: '5ขพ 7711 กทม.',
-      registrationNumber: 'DLT-TH-11002',
-      insuranceStatus: 'พ.ร.บ. & ประกันภัยชั้น 1 + วงเงินพิเศษ (Active)',
-      status: 'READY',
-      isPrimary: false,
-      mileage: 'Dakar Spec • 18,400 km',
-      fuel: 98,
-      oil: 85,
-      batteryHealth: 100,
-      fuelEconomy: '20.5 กม./ลิตร',
-      image: adventureBikeImg,
-      iconEmoji: '🏜️',
-      dailyRidesDone: 2,
-      accent: 'border-[#FFD700]/50 bg-amber-950/20',
-      description: 'ยานรบทางไกล ข้ามจังหวัด ลุยน้ำท่วมลึก 40 ซม. พร้อมระบบกันสะเทือนไฟฟ้า Showa EERA'
-    },
-    {
-      id: 'deco-ev-4000',
-      brand: 'DECO',
-      modelName: 'Super EV 4000W (Clean Knight)',
-      name: 'Deco Super EV 4000W (Clean Knight)',
-      type: '4. Clean Energy Eco-EV',
-      category: 'ev',
-      displacement: 'มอเตอร์ไฟฟ้า 4,000 Watt',
-      plateNumber: '9ฉค 3344 กทม. (ป้ายเขียว)',
-      registrationNumber: 'DLT-EV-04021',
-      insuranceStatus: 'พ.ร.บ. & ประกันแบตเตอรี่และผู้โดยสาร (Active)',
-      status: 'READY',
-      isPrimary: false,
-      mileage: '8,520 km',
-      fuel: 95,
-      oil: 100,
-      batteryHealth: 99,
-      fuelEconomy: '0.12 บาท/กม. (สลับแบตที่ Win Hub ฟรี)',
-      image: evBikeImg,
-      iconEmoji: '⚡',
-      dailyRidesDone: 8,
-      accent: 'border-emerald-500/40 bg-emerald-950/20',
-      description: 'รถพลังงานสะอาด 100% ไร้ควัน ไร้เสียง ต้นทุนต่อกม. ต่ำสุด สลับแบตเตอรี่ได้ที่ WIN HUB ทั่วกรุง'
-    }
-  ]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
-  const activeVehicle = vehicles.find(v => v.id === activeVehicleId) || vehicles[0];
+  const emptyVehicle: Vehicle = {
+    id: 'unregistered', brand: '', modelName: 'ยังไม่มีรถที่ลงทะเบียน', name: 'ยังไม่มีรถที่ลงทะเบียน',
+    type: '', category: 'commuter', displacement: '', plateNumber: '', registrationNumber: '',
+    insuranceStatus: 'ยังไม่ได้ตรวจสอบ', status: 'MAINTENANCE', isPrimary: false, mileage: '', fuel: 0,
+    oil: 0, batteryHealth: 0, fuelEconomy: '', image: '', iconEmoji: '🛵', dailyRidesDone: 0,
+    accent: 'border-slate-500/40 bg-slate-950/20', description: 'เพิ่มรถและส่งเอกสารให้ผ่านการอนุมัติก่อนเปิดรับงาน',
+  };
+
+  const activeVehicle = vehicles.find(v => v.id === activeVehicleId) || vehicles[0] || emptyVehicle;
 
   const [showAddRideModal, setShowAddRideModal] = useState(false);
   const [newRideName, setNewRideName] = useState('');
@@ -371,8 +282,8 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
       type: `${vehicles.length + 1}. ${newRideType}`,
       category: newRideCategory,
       displacement: newRideDisplacement || '150 cc',
-      plateNumber: newRidePlate || '7กข 1122 กทม.',
-      registrationNumber: `DLT-TH-${Math.floor(10000 + Math.random() * 90000)}`,
+      plateNumber: newRidePlate,
+      registrationNumber: `REG-${Date.now()}`,
       insuranceStatus: 'พ.ร.บ. & ประกันภัยชั้น 1 คุ้มครองผู้โดยสาร (Active)',
       status: 'READY',
       isPrimary: newRideSetAsActive,
@@ -836,8 +747,6 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               { id: 'quests' as const, label: '🎯 ภารกิจ XP', icon: <Target className="w-4 h-4 mx-auto text-[#FFD700]" />, isHot: true },
               { id: 'garage' as const, label: 'อู่รถ (GARAGE)', icon: <Wrench className="w-4 h-4 mx-auto" /> },
               { id: 'cabinet' as const, label: 'ตู้ชุดเกราะ', icon: <Shirt className="w-4 h-4 mx-auto" /> },
-              { id: 'calculator' as const, label: '2฿ ENGINE', icon: <Calculator className="w-4 h-4 mx-auto" /> },
-              { id: 'installment' as const, label: '4฿ GEAR PAY', icon: <Zap className="w-4 h-4 mx-auto" /> },
               { id: 'wallet' as const, label: 'กระเป๋าเงิน', icon: <Coins className="w-4 h-4 mx-auto" /> },
             ].map((tab) => (
               <button
@@ -1207,16 +1116,6 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               </div>
             )}
 
-            {/* 2. 2-BAHT EMPIRE CALCULATOR TAB */}
-            {activeDriverTab === 'calculator' && (
-              <TwoBahtEmpireCalculator audioEnabled={audioEnabled} />
-            )}
-
-            {/* 3. 4-BAHT ARMOR INSTALLMENT TAB */}
-            {activeDriverTab === 'installment' && (
-              <ArmorInstallmentFourBahtModel audioEnabled={audioEnabled} />
-            )}
-
             {/* 6. WALLET & EQUIPMENT TAB (Matches IMG_6075 + Upgraded Armor/Helmet Cards) */}
             {activeDriverTab === 'wallet' && (
               <div className="space-y-4">
@@ -1312,101 +1211,17 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
 
                     <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1">
                       <div className="text-[10px] text-slate-400">กองทุนสวัสดิการ & เงินออม:</div>
-                      <div className="text-sm font-bold text-cyan-300">฿14,250</div>
+                      <div className="text-sm font-bold text-cyan-300">ยังไม่มีข้อมูลจริง</div>
                       <div className="text-[9px] text-slate-400">สะสมจากทริปอัศวิน</div>
                     </div>
 
                     <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1">
                       <div className="text-[10px] text-slate-400">วงเงินซ่อมบำรุงล่วงหน้า:</div>
-                      <div className="text-sm font-bold text-amber-300">฿8,000</div>
+                      <div className="text-sm font-bold text-amber-300">ยังไม่มีข้อมูลจริง</div>
                       <div className="text-[9px] text-slate-400">เปลี่ยนยาง/น้ำมันเครื่องที่ศูนย์</div>
                     </div>
                   </div>
 
-                  {/* Interactive Micro-Credit Actions */}
-                  <div className="pt-2 border-t border-white/10 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-slate-300 font-bold">สิทธิประโยชน์และภารกิจเครดิต:</span>
-                      <span className="text-[10px] text-cyan-300">กดรับสิทธิ์ได้ทันที</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => handleDrawEmergencyCredit(5000)}
-                        className="p-3 rounded-2xl bg-gradient-to-r from-emerald-950/70 to-cyan-950/70 hover:from-emerald-900/90 hover:to-cyan-900/90 border border-emerald-500/50 hover:border-emerald-400 text-left transition-all flex items-center justify-between group"
-                      >
-                        <div>
-                          <div className="font-bold text-emerald-300 flex items-center gap-1.5">
-                            <Banknote className="w-4 h-4" />
-                            <span>เบิกสินเชื่อฉุกเฉิน ฿5,000</span>
-                          </div>
-                          <div className="text-[10px] text-slate-300">ดอกเบี้ย 0% เข้ากระเป๋าทันที</div>
-                        </div>
-                        <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-emerald-500 text-slate-950">
-                          กดเบิก
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleBoostDriverCredit(10, "ผ่อนชุดเกราะตรงรอบเวลา")}
-                        className="p-3 rounded-2xl bg-gradient-to-r from-amber-950/70 to-yellow-950/70 hover:from-amber-900/90 hover:to-yellow-900/90 border border-amber-500/50 hover:border-amber-400 text-left transition-all flex items-center justify-between group"
-                      >
-                        <div>
-                          <div className="font-bold text-amber-300 flex items-center gap-1.5">
-                            <Zap className="w-4 h-4" />
-                            <span>จำลองผ่อนเกราะตรงเวลา</span>
-                          </div>
-                          <div className="text-[10px] text-slate-300">สร้างประวัติเครดิตชั้น 1</div>
-                        </div>
-                        <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-[#FFD700] text-slate-950">
-                          +10 แต้ม
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Financial Action Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <button
-                    onClick={() => {
-                      if (audioEnabled) playTactileBlip(900);
-                      setActiveDriverTab('calculator');
-                    }}
-                    className="p-3.5 rounded-2xl bg-gradient-to-br from-[#0C1E3C] to-[#081326] border border-[#FFD700]/40 hover:border-[#FFD700] text-left transition-all space-y-1 shadow-md group"
-                  >
-                    <div className="flex items-center justify-between text-xs font-bold text-[#FFD700]">
-                      <span className="flex items-center gap-1.5 font-mono">
-                        <Calculator className="w-4 h-4" />
-                        เครื่องคำนวณ "2 บาทครองเมือง"
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-[#FFD700] group-hover:translate-x-1 transition-transform" />
-                    </div>
-                    <p className="text-[10px] text-slate-300">
-                      เปรียบเทียบเงินเก็บเพิ่มขึ้นต่อเดือน/ปี ระหว่าง Flat Fee 2฿ VS หัก GP 25%
-                    </p>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      if (audioEnabled) playTactileBlip(900);
-                      setActiveDriverTab('installment');
-                    }}
-                    className="p-3.5 rounded-2xl bg-gradient-to-br from-[#0A2238] to-[#061524] border border-cyan-400/40 hover:border-cyan-400 text-left transition-all space-y-1 shadow-md group"
-                  >
-                    <div className="flex items-center justify-between text-xs font-bold text-cyan-300">
-                      <span className="flex items-center gap-1.5 font-mono">
-                        <Zap className="w-4 h-4" />
-                        โมเดลผ่อนเกราะ 4฿ (20 รอบ)
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-cyan-300 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                    <p className="text-[10px] text-slate-300">
-                      หัก 4฿ เฉพาะ 20 รอบแรก/วัน (รอบที่ 21+ ฟรี!) ผ่อนครบ 45 วันรับกรรมสิทธิ์ 100%
-                    </p>
-                  </button>
                 </div>
 
                 {/* EQUIPMENT STATUS GRID (Including Armor Shirt & Helmet) */}
@@ -1514,21 +1329,21 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                   <div className="space-y-1.5 text-[11px] font-mono">
                     <div className="flex items-center justify-between text-slate-400">
                       <span>Platform Flat Fee (1฿ ต่อเที่ยว x 75 เที่ยว)</span>
-                      <span className="text-rose-400 font-bold">-฿75.00</span>
+                      <span className="text-slate-400 font-bold">ยังไม่มีข้อมูล</span>
                     </div>
                     <div className="flex items-center justify-between text-slate-400">
                       <span>Armor Installment (ผ่อนชุดเกราะ)</span>
-                      <span className="text-rose-400 font-bold">-฿150.00</span>
+                      <span className="text-slate-400 font-bold">ยังไม่มีข้อมูล</span>
                     </div>
                     <div className="flex items-center justify-between text-slate-400">
                       <span>Welfare & Retirement Fund (สวัสดิการเกษียณ)</span>
-                      <span className="text-rose-400 font-bold">-฿40.00</span>
+                      <span className="text-slate-400 font-bold">ยังไม่มีข้อมูล</span>
                     </div>
                   </div>
 
                   <div className="pt-2 border-t border-white/10 flex items-center justify-between font-bold text-emerald-400">
                     <span>รายได้สุทธิวันนี้ (Net Day Payout):</span>
-                    <span>+฿3,585.00</span>
+                    <span>ยังไม่มีข้อมูลธุรกรรมจริง</span>
                   </div>
                 </div>
               </div>
@@ -1787,7 +1602,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               </div>
               <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20">
                 <span className="text-[10px] text-cyan-400 block font-bold">เล่มทะเบียนยานพาหนะ:</span>
-                <span className="text-slate-300 font-semibold text-[11px]">{selectedInspectVehicle.registrationNumber || 'DLT-TH-88291'}</span>
+                <span className="text-slate-300 font-semibold text-[11px]">{selectedInspectVehicle.registrationNumber || 'ยังไม่มีเลขทะเบียนระบบ'}</span>
               </div>
               <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20">
                 <span className="text-[10px] text-cyan-400 block font-bold">อัตราสิ้นเปลือง / เชื้อเพลิง:</span>
@@ -2115,14 +1930,6 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
         initialRole={tiersModalInitialRole}
         currentLevel={driverLevel}
         audioEnabled={audioEnabled}
-        onApplySimulatedLevel={(role, lvl) => {
-          if (role === 'knight') {
-            setDriverLevel(lvl);
-            const req = calculateLevelMaxXp(lvl, 'knight');
-            setDriverNextXp(req);
-            setDriverXp(Math.round(req * 0.85));
-          }
-        }}
       />
 
       {/* 3D DENSITY RADAR OVERLAY MODAL (2.5 KM) FOR DRIVER */}
@@ -2148,7 +1955,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
           driverCode="WIN-BKK-LV100"
           fareAmount={50}
           tipAmount={10}
-          promptPayNumber="081-998-7766"
+          promptPayNumber=""
           audioEnabled={audioEnabled}
           onPaymentSuccess={(amt) => {
             setBalance(prev => prev + amt);

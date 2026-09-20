@@ -602,12 +602,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   }, [baseFare, distanceFare, expressBoxFee, selectedDreamRide.priceAddon, amenitiesSummary.totalPrice, serviceAddonFee]);
 
   // C2C Marketplace state
-  const [c2cItems, setC2cItems] = useState([
-    { id: '1', name: 'น้ำพริกกรอบสูตรเด็ดคุณแม่ (Crispy Chili Snack)', price: 150, rating: 4.9, sales: 84, tag: 'Homemade Food', icon: '🌶️', imageUrl: '/images/street_market_food.jpg' },
-    { id: '2', name: 'Sony WH-1000XM5 Wireless Headphones (สภาพ 99%)', price: 8500, rating: 5.0, sales: 1, tag: 'Electronics', icon: '🎧', imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80' },
-    { id: '3', name: 'ผ้าไหมมัดหมี่สุรินทร์แท้ ทอมือ (Royal Silk Scarf)', price: 500, rating: 4.8, sales: 12, tag: 'Handcraft', icon: '🧣', imageUrl: 'https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?auto=format&fit=crop&w=600&q=80' },
-    { id: '4', name: 'คุกกี้เนยสดดาร์กช็อกโกแลตโฮมเมด', price: 85, rating: 5.0, sales: 42, tag: 'Bakery', icon: '🍪', imageUrl: '/images/cookie_box.jpg' },
-  ]);
+  const [c2cItems, setC2cItems] = useState<Array<{ id: string; name: string; price: number; rating: number; sales: number; tag: string; icon: string; imageUrl?: string; condition?: string; description?: string; aiVerified?: boolean }>>([]);
   const [showAddC2cModal, setShowAddC2cModal] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
@@ -616,7 +611,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [newItemDescription, setNewItemDescription] = useState('');
   const [newItemIcon, setNewItemIcon] = useState('📦');
   const [passengerAiVerified, setPassengerAiVerified] = useState<AIVerificationResult | null>(null);
-  const [earnings, setEarnings] = useState(12750);
+  const [earnings, setEarnings] = useState(0);
 
   // 8 Pillars Core Services Array with Neon Contrast Color IDs & Outer Glowing Icons
   const services = [
@@ -2583,7 +2578,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                             <div><span className="text-slate-500">ปลายทาง:</span> {item.dropoffLocation}</div>
                             {item.driverName && (
                               <div className="text-emerald-300">
-                                พี่วินผู้ดูแล: {item.driverName} ({item.driverPlate || '1กข 7789 กทม.'})
+                                พี่วินผู้ดูแล: {item.driverName}{item.driverPlate ? ` (${item.driverPlate})` : ''}
                               </div>
                             )}
                           </div>
@@ -2627,7 +2622,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           driverLevel={currentMatchedDriver?.level || 0}
           recipientOrPassengerName={
             photoVerificationType === 'express_delivery'
-              ? (preMatchingData?.express?.recipientName || 'คุณสมศรี เจริญสุข')
+              ? (preMatchingData?.express?.recipientName || 'ผู้รับพัสดุ')
               : (preMatchingData?.family?.dropoffContactName || preMatchingData?.family?.pickupContactName || 'ผู้รับมอบที่ปลายทาง')
           }
           locationName={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
@@ -2806,7 +2801,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   )}
                   {activeServiceId === 'lifestyle' && preMatchingData.lifestyle && (
                     <div className="text-slate-300 text-[10px] space-y-0.5">
-                      <div>บริการถ่ายภาพ: <strong className="text-white">{preMatchingData.lifestyle.wantPhotoService ? 'ต้องการ (10 นาที)' : 'เที่ยวอย่างเดียว'}</strong></div>
+                      <div>บริการถ่ายภาพ: <strong className="text-white">{preMatchingData.lifestyle.wantPhotoService ? 'ต้องการ (10 นาที)' : 'ส่งอย่างเดียว'}</strong></div>
                       <div>ธีมภาพถ่าย: <strong className="text-purple-300">{preMatchingData.lifestyle.photoTheme}</strong></div>
                     </div>
                   )}

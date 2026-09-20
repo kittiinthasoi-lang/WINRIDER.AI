@@ -117,32 +117,6 @@ export const WinScanAndPayModal: React.FC<WinScanAndPayModalProps> = ({
         {/* Content Modes */}
         {!paymentSuccess ? (
           <>
-            {/* Tab switch */}
-            <div className="flex rounded-xl bg-black/40 p-1 border border-white/10 text-xs">
-              <button
-                onClick={() => setActiveTab('qr')}
-                className={`flex-1 py-1.5 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'qr'
-                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(0,210,255,0.4)]'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <QrCode className="w-3.5 h-3.5" />
-                <span>QR Code รับเงิน</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('simulate')}
-                className={`flex-1 py-1.5 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'simulate'
-                    ? 'bg-amber-400 text-slate-950 shadow-[0_0_10px_rgba(255,215,0,0.4)]'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Wallet className="w-3.5 h-3.5" />
-                <span>จำลองการจ่ายเงิน</span>
-              </button>
-            </div>
-
             {activeTab === 'qr' ? (
               <div className="space-y-4 text-center">
                 {/* Holographic QR Code Box */}

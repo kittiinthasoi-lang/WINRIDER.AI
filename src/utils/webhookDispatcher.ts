@@ -247,7 +247,7 @@ export function buildWebhookPayload(params: {
     orderId: params.orderId,
     passengerUserId: params.passengerUserId,
     passengerName: params.passengerName,
-    passengerPhone: params.passengerPhone || '089-123-4567',
+    passengerPhone: params.passengerPhone || '',
     serviceTitle: params.serviceTitle,
     pickupLocation: params.pickupLocation,
     dropoffLocation: params.dropoffLocation,
@@ -280,27 +280,13 @@ export async function dispatchToWebhook(payload: WebhookDispatchEvent): Promise<
   const url = getSavedWebhookUrl();
   const startTime = Date.now();
 
-  // If no URL is configured, record simulated success
+  // Never report a synthetic success when no real endpoint is configured.
   if (!url) {
-    const latencyMs = 85;
-    const logEntry: WebhookLogEntry = {
-      id: `LOG-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      event: payload.event,
-      url: '(จำลองในระบบ / ยังไม่ได้ระบุ Webhook URL)',
-      status: 'simulated',
-      httpCode: 200,
-      latencyMs,
-      payload,
-      responsePreview: '{"status":"simulated_ok","message":"บันทึกข้อมูลจำลองเรียบร้อย พร้อมเชื่อมต่อ Webhook จริง"}'
-    };
-    addDispatchLog(logEntry);
     return {
-      success: true,
-      status: 'simulated',
-      httpCode: 200,
-      latencyMs,
-      message: 'จำลองการส่งข้อมูลเรียบร้อย (ยังไม่ได้ตั้งค่า Webhook URL)'
+      success: false,
+      status: 'error',
+      latencyMs: Date.now() - startTime,
+      message: 'ยังไม่ได้ตั้งค่า Webhook URL จึงไม่มีการส่งข้อมูล'
     };
   }
 

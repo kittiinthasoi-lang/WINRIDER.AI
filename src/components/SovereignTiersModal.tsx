@@ -217,7 +217,7 @@ export const SovereignTiersModal: React.FC<SovereignTiersModalProps> = ({
               <div>
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-[#FFD700]" />
-                  <span>ทดสอบเลื่อนระดับเลเวลจำลอง (Level Simulator):</span>
+                  <span>ดูเกณฑ์ระดับเลเวล:</span>
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono">
                   {sliderLevel >= 91 ? '🌌 ระดับอภิมหาเทพเจ้า (Godlike Tier 10)' : sliderLevel >= 61 ? '⚔️ ระดับสูงผู้พิชิต/จักรพรรดิ (Tier 7-9)' : '🛡️ ระดับปฏิบัติการ (Tier 1-6)'}
@@ -585,13 +585,6 @@ export const SovereignTiersModal: React.FC<SovereignTiersModalProps> = ({
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleApplyLevelToApp(activeRoleTab, sliderLevel)}
-                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:brightness-110 text-slate-950 font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all self-start sm:self-auto"
-                  >
-                    <span>จำลองตั้งค่า LV.{sliderLevel}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
                 </div>
               </div>
 

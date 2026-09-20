@@ -71,8 +71,8 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
         throw new Error('อุปกรณ์ไม่รองรับการเปิดกล้องเว็บแคมโดยตรง');
       }
     } catch (err: any) {
-      console.warn('Camera access error, fallback to simulated AI scanner:', err);
-      setCameraError('ไม่สามารถเข้าถึงกล้องได้ (เปิดโหมดจำลอง AI Biometric Sensor อัตโนมัติ)');
+      console.warn('Camera access error:', err);
+      setCameraError('ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตกล้องเพื่อยืนยันตัวตน');
       setCameraActive(false);
     }
   };
@@ -214,7 +214,7 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
         {/* Hidden Canvas for capture */}
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* Video feed or simulated avatar */}
+        {/* Real camera feed only; biometric verification never uses a stand-in image. */}
         {cameraActive ? (
           <video
             ref={videoRef}
@@ -225,12 +225,7 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
           />
         ) : (
           <div className="relative w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#0A1633] to-black">
-            <img
-              src={capturedPhoto || (role === 'driver' ? '/avatars/knight.jpg' : role === 'customer' ? '/avatars/citizen.jpg' : role === 'merchant' ? '/avatars/merchant.jpg' : '/avatars/partner.jpg')}
-              alt="Biometric Target"
-              className="w-48 h-48 rounded-full object-cover border-2 border-white/20 shadow-xl opacity-80"
-              referrerPolicy="no-referrer"
-            />
+            <p className="max-w-xs text-center text-sm text-slate-300">เปิดกล้องจริงเพื่อเริ่มยืนยันใบหน้า</p>
             {cameraError && (
               <div className="absolute bottom-3 left-3 right-3 px-3 py-1.5 rounded-xl bg-black/80 backdrop-blur-md border border-amber-500/40 text-[10px] text-amber-300 font-mono text-center flex items-center justify-center gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />

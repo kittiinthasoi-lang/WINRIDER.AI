@@ -837,15 +837,15 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             initialPhase={driverLegPhase === 'to_pickup' ? 'approaching' : 'in_transit'}
             driverName={activeVehicle?.name || 'พี่วินอัศวิน'}
             driverAvatar={activeVehicle?.imageEmoji || '🛵'}
-            driverPlate="1กข 7789 กทม."
-            driverVehicle={activeVehicle?.model || 'Honda Forza 350'}
+            driverPlate={(activeVehicle as any)?.plateNumber || ''}
+            driverVehicle={activeVehicle?.model || ''}
             passengerName={selectedJob?.customerName || 'คุณผู้โดยสาร'}
-            pickupAddress={activeJob?.pickupLocation || 'สุขุมวิท 39 หน้า BTS พร้อมพงษ์'}
+            pickupAddress={activeJob?.pickupLocation || ''}
             pickupCoords={{
-              lat: (activeJob as any)?.pickupCoords?.lat || gpsState.latitude || 13.7314,
-              lng: (activeJob as any)?.pickupCoords?.lng || gpsState.longitude || 100.5700
+              lat: (activeJob as any)?.pickupCoords?.lat || gpsState.latitude || 0,
+              lng: (activeJob as any)?.pickupCoords?.lng || gpsState.longitude || 0
             }}
-            dropoffAddress={selectedDestination.name || activeJob?.dropoffLocation || 'สยามพารากอน - สยามสแควร์วัน'}
+            dropoffAddress={selectedDestination.name || activeJob?.dropoffLocation || ''}
             dropoffCoords={{
               lat: selectedDestination.lat || 13.7462,
               lng: selectedDestination.lng || 100.5348

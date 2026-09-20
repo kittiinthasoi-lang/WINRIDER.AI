@@ -293,7 +293,7 @@ export const NoCodeWebhookBridgeModal: React.FC<NoCodeWebhookBridgeModalProps> =
                   ) : (
                     <>
                       <Send className="w-4 h-4 text-slate-950" />
-                      <span>🚀 ทดสอบยิง Webhook จำลอง (1-Click Test Dispatch)</span>
+                      <span>🚀 ทดสอบส่ง Webhook จริง</span>
                     </>
                   )}
                 </button>
@@ -309,7 +309,7 @@ export const NoCodeWebhookBridgeModal: React.FC<NoCodeWebhookBridgeModalProps> =
                     <div className="flex items-center justify-between font-bold">
                       <span className="flex items-center gap-1.5">
                         {testResult.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                        {testResult.status === 'simulated' ? 'สถานะ: จำลองสำเร็จ (Offline Sandbox)' : 'สถานะ: ส่งสำเร็จ 200 OK'}
+                        {testResult.success ? 'สถานะ: ส่งสำเร็จ' : 'สถานะ: ส่งไม่สำเร็จ'}
                       </span>
                       {testResult.latencyMs && <span>{testResult.latencyMs} ms</span>}
                     </div>

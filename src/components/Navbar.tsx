@@ -727,15 +727,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               </div>
 
-              {/* Owner account: four operational personas, one Firebase UID */}
+              {/* Owner account: four operational personas plus Super Admin, one Firebase UID */}
               {isAdminSession ? (
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/15 to-[#08152B] border border-amber-400/40 space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
                     <Crown className="w-4 h-4 text-amber-400" />
-                    <span>บัญชีเจ้าของระบบ • เลือกบทบาทตัวอย่าง</span>
+                    <span>บัญชีเจ้าของระบบ • เลือกดูทั้ง 5 บทบาท</span>
                   </div>
                   <p className="text-[11px] text-slate-300 leading-relaxed">
-                    ทั้ง 4 บทบาทใช้บัญชีและ Firebase UID เดียวกันกับแอดมิน ไม่มีการสร้างผู้ใช้จำลองเพิ่ม
+                    ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Super Admin ใช้บัญชีและ Firebase UID เดียวกัน ไม่มีการสร้างผู้ใช้จำลองเพิ่ม
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     <button type="button" onClick={() => { onSelectOwnerPersona?.('customer'); setShowRoleInfoModal(false); }} className="p-2.5 rounded-xl border border-cyan-400/40 bg-cyan-500/15 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-cyan-500/25">
@@ -749,6 +749,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                     <button type="button" onClick={() => { onSelectOwnerPersona?.('partner'); setShowRoleInfoModal(false); }} className="p-2.5 rounded-xl border border-pink-400/40 bg-pink-500/15 text-pink-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-pink-500/25">
                       <Building2 className="w-4 h-4" /> พาร์ทเนอร์
+                    </button>
+                    <button type="button" onClick={() => { onSelectMode('admin'); setShowRoleInfoModal(false); }} className="col-span-2 p-2.5 rounded-xl border border-amber-400/50 bg-amber-500/20 text-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/30">
+                      <Crown className="w-4 h-4" /> Super Admin
                     </button>
                   </div>
                 </div>

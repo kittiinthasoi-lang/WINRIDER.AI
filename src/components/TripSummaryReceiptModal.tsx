@@ -138,13 +138,13 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
             </div>
             <div>
               <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                <span>{order.driverName || 'พี่สมศักดิ์ ไนท์สายฟ้า'}</span>
+                <span>{order.driverName || 'ยังไม่มีพี่วินรับงาน'}</span>
                 <span className="px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-mono text-[9px] font-bold">
-                  Lvl {order.driverLevel || 100}
+                  {order.driverLevel ? `Lvl ${order.driverLevel}` : 'ยังไม่มีข้อมูลระดับ'}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-mono">
-                ทะเบียน: {order.driverPlate || '1กข 7789 กทม.'} • {order.serviceTitle}
+                ทะเบียน: {order.driverPlate || 'ยังไม่มีข้อมูล'} • {order.serviceTitle}
               </p>
             </div>
           </div>

@@ -399,8 +399,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
           </div>
         </div>
 
-        {/* ACTION BUTTONS: COPY / SIMULATE PAYMENT */}
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 font-mono text-xs">
+        <div className="grid grid-cols-1 gap-2 pt-2 border-t border-white/10 font-mono text-xs">
           <button
             onClick={handleCopy}
             className="py-2.5 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 flex items-center justify-center gap-1.5 transition-colors"
@@ -409,13 +408,6 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
             <span>{copied ? 'คัดลอกแล้ว!' : 'คัดลอกเลขบัญชี'}</span>
           </button>
 
-          <button
-            onClick={handleSimulatePayment}
-            className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-[#FFD700] via-amber-400 to-orange-400 hover:brightness-110 text-slate-950 font-black shadow-[0_0_15px_rgba(255,215,0,0.4)] flex items-center justify-center gap-1.5 transition-all"
-          >
-            <Coins className="w-4 h-4" />
-            <span>จำลองรับเงิน ฿{customAmount > 0 ? customAmount : 150}</span>
-          </button>
         </div>
 
         <div className="space-y-1.5 pt-1">

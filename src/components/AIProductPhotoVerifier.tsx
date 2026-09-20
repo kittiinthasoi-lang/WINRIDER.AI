@@ -47,7 +47,7 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
   initialItemName = '',
   initialCategory = ''
 }) => {
-  const [photoSource, setPhotoSource] = useState<'camera' | 'upload' | 'sample'>('sample');
+  const [photoSource, setPhotoSource] = useState<'camera' | 'upload' | 'sample'>('upload');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedEmoji, setSelectedEmoji] = useState<string>('📦');
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -57,63 +57,7 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pre-configured realistic product samples with real photographic imagery
-  const SAMPLE_ITEMS = [
-    {
-      id: 'samp-1',
-      name: 'กล้องฟิล์ม Olympus Trip 35 วินเทจ',
-      category: 'ของมือสอง & อุปกรณ์ไอที',
-      icon: '📷',
-      cond: 'มือสอง สภาพ 98%',
-      img: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80',
-      priceMin: 2800,
-      priceMax: 3500,
-      tags: ['กล้องฟิล์ม', 'วินเทจ', 'ของแท้ 100%']
-    },
-    {
-      id: 'samp-2',
-      name: 'ต่างหูเงินแท้ 925 ชุบทองคำขาว ไข่มุกน้ำจืด',
-      category: 'เครื่องประดับ & จิวเวลรี่',
-      icon: '💍',
-      cond: 'งานแฮนด์เมดแท้',
-      img: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600&auto=format&fit=crop&q=80',
-      priceMin: 450,
-      priceMax: 790,
-      tags: ['เงินแท้ 925', 'ไข่มุกแท้', 'งานฝีมือ']
-    },
-    {
-      id: 'samp-3',
-      name: 'คุกกี้เนยสดแท้ฝรั่งเศส & ดาร์กช็อกโกแลตชิป',
-      category: 'ขนม & เบเกอรี่โฮมเมด',
-      icon: '🍪',
-      cond: 'ปรุงสดใหม่เช้านี้',
-      img: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=600&auto=format&fit=crop&q=80',
-      priceMin: 65,
-      priceMax: 120,
-      tags: ['เนยสดแท้', 'โฮมเมด', 'ไร้สารกันเสีย']
-    },
-    {
-      id: 'samp-4',
-      name: 'ชุดยาดูแลสุขภาพฉุกเฉิน & ยาสามัญประจำบ้าน',
-      category: 'ยารักษาโรค & ยาสามัญประจำบ้าน',
-      icon: '💊',
-      cond: 'ยาแผนปัจจุบันมี อย.',
-      img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80',
-      priceMin: 140,
-      priceMax: 220,
-      tags: ['ยาสามัญประจำบ้าน', 'มี อย.', 'ส่งด่วนทันที']
-    },
-    {
-      id: 'samp-5',
-      name: 'ผักสลัดไฮโดรโปนิกส์อินทรีย์รวม 5 ชนิด',
-      category: 'ผัก & ผลไม้สด',
-      icon: '🥗',
-      cond: 'เก็บสดจากแปลงเช้านี้',
-      img: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop&q=80',
-      priceMin: 70,
-      priceMax: 110,
-      tags: ['ออร์แกนิก', 'ผักสดปลอดสาร', 'ไฮโดรโปนิกส์']
-    }
-  ];
+  const SAMPLE_ITEMS: Array<{ id: string; name: string; category: string; icon: string; cond: string; img: string; priceMin: number; priceMax: number; tags: string[] }> = [];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

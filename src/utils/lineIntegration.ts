@@ -74,7 +74,7 @@ export async function authenticateOrRegisterWithLine(params: {
     pictureUrl: params.avatarUrl || 'https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg',
     statusMessage: 'ใช้งานผ่าน WINRIDER.AI Sovereign Platform',
     lineId: params.lineId?.trim() || cleanLineId,
-    phone: params.phone?.trim() || '089-123-4567',
+    phone: params.phone?.trim() || '',
     role: params.role,
     plateNumber: params.plateNumber,
     connectedAt: new Date().toISOString()
@@ -85,10 +85,10 @@ export async function authenticateOrRegisterWithLine(params: {
   const newSession: UserSession = {
     id: sovereignId,
     name: lineProfile.displayName,
-    phone: lineProfile.phone || '089-123-4567',
+    phone: lineProfile.phone || '',
     role: params.role,
     roleTitleTh: getRoleTitleTh(params.role),
-    plateNumber: params.plateNumber || (params.role === 'driver' ? '1กข 8899 กทม.' : undefined),
+    plateNumber: params.plateNumber || undefined,
     level: 1,
     xp: 150,
     rating: 5.0,

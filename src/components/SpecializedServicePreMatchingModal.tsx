@@ -130,45 +130,45 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
 }) => {
   // 0. KNIGHT STATE
   const [knightExpressHighway, setKnightExpressHighway] = useState(false);
-  const [knightGoldHelmetVIP, setKnightGoldHelmetVIP] = useState(true);
+  const [knightGoldHelmetVIP, setKnightGoldHelmetVIP] = useState(false);
   const [knightQuietRide, setKnightQuietRide] = useState(false);
-  const [knightLuggageBrief, setKnightLuggageBrief] = useState('มีกระเป๋าเป้ 1 ใบ');
+  const [knightLuggageBrief, setKnightLuggageBrief] = useState('');
 
   // 1. EXPRESS STATE
-  const [expressRecipientName, setExpressRecipientName] = useState('คุณสมศรี เจริญสุข');
-  const [expressRecipientPhone, setExpressRecipientPhone] = useState('089-123-4567');
+  const [expressRecipientName, setExpressRecipientName] = useState('');
+  const [expressRecipientPhone, setExpressRecipientPhone] = useState('');
   const [expressDestination, setExpressDestination] = useState(destinationLocation);
-  const [expressPackageType, setExpressPackageType] = useState('เอกสาร & แฟ้มสัญญาสำคัญ');
-  const [expressTransparentAgreed, setExpressTransparentAgreed] = useState(true);
-  const [expressRequirePhotoProof, setExpressRequirePhotoProof] = useState(true);
+  const [expressPackageType, setExpressPackageType] = useState('');
+  const [expressTransparentAgreed, setExpressTransparentAgreed] = useState(false);
+  const [expressRequirePhotoProof, setExpressRequirePhotoProof] = useState(false);
 
   // 1.5 PET CARE STATE
   const [petType, setPetType] = useState<'dog' | 'cat' | 'exotic'>('cat');
   const [petWeight, setPetWeight] = useState<'<5kg' | '5-10kg' | '10-15kg'>('<5kg');
   const [petCarrierType, setPetCarrierType] = useState<'carrier' | 'leash' | 'lap'>('carrier');
-  const [petComfortKit, setPetComfortKit] = useState(true);
+  const [petComfortKit, setPetComfortKit] = useState(false);
   const [petVetDestination, setPetVetDestination] = useState(destinationLocation);
   const [petSpecialInstructions, setPetSpecialInstructions] = useState('');
 
   // 2. MU BUDDY STATE
-  const [muWantBuddy, setMuWantBuddy] = useState(true);
+  const [muWantBuddy, setMuWantBuddy] = useState(false);
   const [muExtraTime, setMuExtraTime] = useState<number>(0); // 0, 15, 30, 45, 60
-  const [muTravelObjective, setMuTravelObjective] = useState('⛩️ ไหว้พระ 9 วัด เสริมสิริมงคล');
-  const [muSpecificRitual, setMuSpecificRitual] = useState('ขอพรเรื่องความรัก & ความสำเร็จในหน้าที่การงาน');
+  const [muTravelObjective, setMuTravelObjective] = useState('');
+  const [muSpecificRitual, setMuSpecificRitual] = useState('');
 
   // 3. LIFESTYLE STATE
-  const [lifestyleWantPhoto, setLifestyleWantPhoto] = useState(true);
-  const [lifestyleTheme, setLifestyleTheme] = useState('📸 ถ่ายรูปคาเฟ่ชิคๆ & มินิมอล (Cafe Hopping)');
-  const [lifestyleCameraAngle, setLifestyleCameraAngle] = useState('มุมมองกว้าง Ultra-Wide ถ่ายคู่กับรถและบรรยากาศ');
-  const [lifestyleNote, setLifestyleNote] = useState('ช่วยถ่ายรูปสวยๆ ลง IG Story / TikTok');
+  const [lifestyleWantPhoto, setLifestyleWantPhoto] = useState(false);
+  const [lifestyleTheme, setLifestyleTheme] = useState('');
+  const [lifestyleCameraAngle, setLifestyleCameraAngle] = useState('');
+  const [lifestyleNote, setLifestyleNote] = useState('');
 
   // 4. SPIRIT STATE
-  const [spiritWantStop, setSpiritWantStop] = useState(true);
-  const [spiritMarketName, setSpiritMarketName] = useState('แผงพวงมาลัยและดอกไม้สดหน้าวัด');
+  const [spiritWantStop, setSpiritWantStop] = useState(false);
+  const [spiritMarketName, setSpiritMarketName] = useState('');
   const [spiritItems, setSpiritItems] = useState([
-    { id: '1', name: 'พวงมาลัยดาวเรืองสด 2 ชาย', price: 30, count: 2, icon: '🌸' },
-    { id: '2', name: 'ชุดธูป เทียน ทองคำเปลว & ไม้ขีด', price: 20, count: 1, icon: '🕯️' },
-    { id: '3', name: 'ดอกบัวหลวงสดพับกลีบ (กำละ 3 ดอก)', price: 35, count: 1, icon: '🪷' },
+    { id: '1', name: 'พวงมาลัยดาวเรืองสด 2 ชาย', price: 30, count: 0, icon: '🌸' },
+    { id: '2', name: 'ชุดธูป เทียน ทองคำเปลว & ไม้ขีด', price: 20, count: 0, icon: '🕯️' },
+    { id: '3', name: 'ดอกบัวหลวงสดพับกลีบ (กำละ 3 ดอก)', price: 35, count: 0, icon: '🪷' },
     { id: '4', name: 'ไข่ต้มแก้บน (10 ฟอง พร้อมน้ำปลา)', price: 80, count: 0, icon: '🥚' },
     { id: '5', name: 'ผลไม้มงคล 5 อย่าง (ส้ม, แอปเปิ้ล, กล้วย)', price: 150, count: 0, icon: '🍎' },
     { id: '6', name: 'ชุดสังฆทานยา & น้ำดื่มขวดแก้ว', price: 120, count: 0, icon: '🧴' },
@@ -1086,7 +1086,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      เที่ยวอย่างเดียว
+                      ส่งอย่างเดียว
                     </button>
                   </div>
                 </div>
@@ -1200,7 +1200,7 @@ export const SpecializedServicePreMatchingModal: React.FC<SpecializedServicePreM
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      ตรงไปจุดหมาย
+                      ส่งอย่างเดียว
                     </button>
                   </div>
                 </div>

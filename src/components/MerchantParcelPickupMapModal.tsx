@@ -142,7 +142,7 @@ export const MerchantParcelPickupMapModal: React.FC<MerchantParcelPickupMapModal
   const [elevation3D, setElevation3D] = useState<number>(40); // 0m to 150m (3D Floating Height / Altitude)
   const [pitch3D, setPitch3D] = useState<number>(48); // 20 to 75 deg
   const [scannedParcels, setScannedParcels] = useState<string[]>([]);
-  const [isSimulatingLiveMove, setIsSimulatingLiveMove] = useState<boolean>(true);
+  const [isSimulatingLiveMove] = useState<boolean>(false);
   const [callToast, setCallToast] = useState<string | null>(null);
 
   const selectedParcel = parcels.find(p => p.id === selectedParcelId) || parcels[0];
@@ -473,18 +473,10 @@ export const MerchantParcelPickupMapModal: React.FC<MerchantParcelPickupMapModal
               </div>
             </div>
 
-            {/* Quick Actions & Live Simulator Controls */}
+            {/* Courier tracking uses real GPS only. */}
             <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-[#09152E] border border-white/10 text-xs font-mono">
               <div className="flex items-center gap-2">
-                <span className="text-slate-400">แบบจำลองสด:</span>
-                <button
-                  onClick={() => setIsSimulatingLiveMove(!isSimulatingLiveMove)}
-                  className={`px-3 py-1 rounded-xl border font-bold transition-all ${
-                    isSimulatingLiveMove ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' : 'bg-slate-800 text-slate-400 border-white/10'
-                  }`}
-                >
-                  {isSimulatingLiveMove ? '⏸️ หยุดเคลื่อนที่' : '▶️ เล่นต่อ'}
-                </button>
+                <span className="text-slate-400">รอพิกัด GPS จริงจากพี่วิน</span>
               </div>
 
               <button

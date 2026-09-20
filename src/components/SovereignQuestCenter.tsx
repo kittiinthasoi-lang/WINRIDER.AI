@@ -357,17 +357,6 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
     setTimeout(() => setClaimedToast(null), 4000);
   };
 
-  const handleSimulateProgress = (questId: string) => {
-    if (audioEnabled) playTactileBlip(950);
-    setQuests(prev => prev.map(q => {
-      if (q.id === questId && q.progress < q.totalRequired) {
-        const nextProg = Math.min(q.totalRequired, q.progress + 1);
-        return { ...q, progress: nextProg };
-      }
-      return q;
-    }));
-  };
-
   return (
     <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-[#0B1733] via-[#081226] to-[#040914] border-2 border-[#FFD700]/50 shadow-[0_0_35px_rgba(255,215,0,0.2)] space-y-4 font-mono">
       {/* Header Toast */}
@@ -536,17 +525,6 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2 justify-end">
-                  {!isComplete && !quest.isClaimed && (
-                    <button
-                      type="button"
-                      onClick={() => handleSimulateProgress(quest.id)}
-                      className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-[10px] font-mono transition-all"
-                      title="กดเพื่อจำลองทำภารกิจเพิ่ม 1 สเต็ป"
-                    >
-                      + ทำภารกิจ (+1)
-                    </button>
-                  )}
-
                   {quest.isClaimed ? (
                     <span className="px-3 py-1.5 rounded-xl bg-white/10 text-slate-400 text-xs font-bold flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />

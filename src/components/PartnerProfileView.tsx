@@ -67,223 +67,35 @@ interface PartnerProfileViewProps {
   canEdit?: boolean;
 }
 
-export const SAMPLE_PARTNERS: PartnerProfile[] = [
-  {
-    id: 'partner-bar-01',
-    name: 'THE KNIGHT ROOFTOP & SPEAKEASY BAR',
-    category: 'pub_bar',
-    categoryLabel: 'ผับ & บาร์ / ไนต์ไลฟ์',
-    icon: '🍸',
-    coverGradient: 'from-purple-900/60 via-[#070D1E] to-[#0A1A3F]',
-    rating: 4.95,
-    reviewCount: 380,
-    level: 63,
-    tierName: 'พาร์ทเนอร์ระดับผู้พิชิต (Conqueror Partner LV.63) ⚔️',
-    xp: 36500,
-    nextXp: 45000,
-    address: 'ชั้น 42 อาคาร Exchange Tower อโศกมนตรี',
-    distanceKm: 0.8,
-    estimatedWinFare: 35,
-    phone: '02-888-9999',
-    openHours: '17:00 - 02:00 น. (เปิดบริการอยู่ขณะนี้ 🟢)',
-    todayCustomersArrivingViaWin: 42,
-    activeWinDriversInZone: 18,
-    description: 'บาร์รูฟท็อปวิวพาโนรามา 360 องศาใจกลางอโศก ค็อกเทลสูตรพิเศษ พร้อมดนตรีสดแจ๊ส & อะคูสติกทุกค่ำคืน เดินทางสะดวกด้วยพี่วินจอดเทียบถึงหน้าลิฟต์',
-    amenities: ['วิวระฟ้า 360°', 'ดนตรีสดทุกวัน', 'บริการจอดเทียบพี่วิน VIP', 'บาร์เทนเดอร์ระดับรางวัล'],
-    parkingInfo: {
-      motorcycleSpots: 60,
-      carSpots: 250,
-      winDropoffLane: 'จุดจอดเทียบด่วนพี่วิน VIP หน้าประตูอาคาร Exchange Tower เชื่อมลิฟต์ชั้น G ตรงสู่ชั้น 42 ไม่เปียกฝน',
-      parkingFeePolicy: 'จอดรถยนต์ฟรี 4 ชม. เมื่อมียอดใช้จ่าย 800 บาทขึ้นไป / มอเตอร์ไซค์และผู้โดยสารพี่วินจอดฟรีตลอดการใช้บริการ',
-      valetService: true,
-      evCharging: true
-    },
-    eventsToday: [
-      {
-        id: 'ev-1',
-        title: 'Live Acoustic Session: วง The Blue Velvet',
-        time: '20:30 - 22:30 น.',
-        description: 'บทเพลงแจ๊สคลาสสิกและป๊อปอะคูสติกฟังสบาย',
-        highlight: 'ศิลปินดังรับเชิญ: แป้งโกะ & คชา',
-        artistOrChef: 'The Blue Velvet Band',
-        tag: 'ดนตรีสดคืนนี้'
-      },
-      {
-        id: 'ev-2',
-        title: 'Midnight DJ Electro-Swing Set',
-        time: '23:00 - 01:30 น.',
-        description: 'ปาร์ตี้บีทสนุกยามดึกกับดีเจชื่อดัง',
-        highlight: 'Special Guest: DJ COSMO',
-        artistOrChef: 'DJ COSMO',
-        tag: 'ปาร์ตี้ดึก'
-      }
-    ],
-    promotionsToday: [
-      {
-        id: 'promo-1',
-        title: 'Happy Hour 1 แถม 1 Signature Cocktail',
-        discount: 'Buy 1 Get 1',
-        condition: 'เมื่อเดินทางมาด้วยพี่วิน WINRIDER ก่อน 20:00 น.',
-        validUntil: '20:00 น.',
-        badge: 'WIN Special Deal'
-      },
-      {
-        id: 'promo-2',
-        title: 'เปิดเซ็ตไวน์พรีเมียม รับส่วนลด 20%',
-        discount: 'ลด 20%',
-        condition: 'แสดงบัตร Citizen หรือ Knight Badge ในแอป',
-        validUntil: 'สิ้นสุดคืนนี้',
-        badge: 'VIP Perk'
-      },
-      {
-        id: 'promo-2b',
-        title: 'ส่วนลดค่าอาหาร 15% ทุกบิล',
-        discount: 'ลด 15%',
-        condition: 'แสดงหน้าจอแอป WINRIDER ก่อนชำระเงิน',
-        validUntil: 'ตลอดทั้งเดือน',
-        badge: 'Member Exclusive'
-      }
-    ],
-    specialHighlights: [
-      'เมนูค็อกเทลแนะนำ: "Sovereign Gold Lion 🦁" รสสัมผัสซิตรัสผสมทองคำเปลว 24K',
-      'จุดรอรถพี่วินในร่ม VIP ชั้น B1 พร้อมหน้าจอเรดาร์แสดงสถานะการเดินทาง',
-      'สิทธิประโยชน์สะสมแต้ม WIN Token คืนเงิน 5% ทุกบิล'
-    ],
-    walletQrAddress: 'WIN-PARTNER-ROOFTOP-7721'
-  },
-  {
-    id: 'partner-hotel-02',
-    name: 'GRAND SOVEREIGN SUITE & RESIDENCE',
-    category: 'hotel',
-    categoryLabel: 'โรงแรม & ที่พักหรู',
-    icon: '🏨',
-    coverGradient: 'from-amber-900/40 via-[#070D1E] to-[#0A1A3F]',
-    rating: 4.92,
-    reviewCount: 520,
-    level: 82,
-    tierName: 'โรงแรมระดับเพชรจักรพรรดิ (Diamond Hotel Partner) 💎',
-    xp: 62000,
-    nextXp: 70000,
-    address: 'สุขุมวิท 24 แขวงคลองตัน เขตคลองเตย กทม.',
-    distanceKm: 0.5,
-    estimatedWinFare: 25,
-    phone: '02-777-5555',
-    openHours: 'เปิดบริการ 24 ชั่วโมง (Check-in ตลอด 24 ชม.)',
-    todayCustomersArrivingViaWin: 68,
-    activeWinDriversInZone: 24,
-    description: 'โรงแรมระดับ 5 ดาวดีไซน์โมเดิร์นลักชัวรี พร้อมสระว่ายน้ำอินฟินิตี้พูล สปาสมุนไพรไทย และบริการรับส่งสนามบินด้วยเครือข่ายอัศวินมอเตอร์ไซค์ระดับพรีเมียม',
-    amenities: ['สระว่ายน้ำ Infinity Pool', 'สปาพรีเมียม 24 ชม.', 'บริการพี่วิน Shuttle จุดต่อ BTS', 'อาหารเช้านานาชาติ'],
-    parkingInfo: {
-      motorcycleSpots: 80,
-      carSpots: 400,
-      winDropoffLane: 'เลนเทียบรถในร่ม Grand Porte-Cochère หน้าล็อบบี้ มีเจ้าหน้าที่รักษาความปลอดภัยดูแลตลอด 24 ชม.',
-      parkingFeePolicy: 'จอดรถยนต์ฟรีตลอดการเข้าพัก / ลูกค้ารับประทานอาหารจอดฟรี 6 ชม. / มอเตอร์ไซค์มีช่องจอด VIP กว้างพิเศษ',
-      valetService: true,
-      evCharging: true
-    },
-    eventsToday: [
-      {
-        id: 'ev-3',
-        title: 'Sunset Wine Tasting & Jazz By The Pool',
-        time: '17:30 - 19:30 น.',
-        description: 'ชิมไวน์รสเลิศริมสระว่ายน้ำวิวพระอาทิตย์ตกดิน',
-        highlight: 'Sommelier แนะนำไวน์ 6 ชนิด',
-        artistOrChef: 'Chef Pierre & Sommelier Somchai',
-        tag: 'อีเวนต์วันนี้'
-      }
-    ],
-    promotionsToday: [
-      {
-        id: 'promo-3',
-        title: 'Staycation Suite Room Upgrade ฟรี!',
-        discount: 'Free Upgrade',
-        condition: 'เมื่อจองตรงและเช็คอินผ่านแอป WINRIDER',
-        validUntil: '31 ธ.ค. 2026',
-        badge: 'Exclusive'
-      },
-      {
-        id: 'promo-4',
-        title: 'แพ็กเกจสปาอโรม่า 90 นาที ลด 35%',
-        discount: 'ลด 35%',
-        condition: 'สำหรับผู้โดยสารที่นั่งพี่วินมาใช้บริการ',
-        validUntil: '22:00 น.',
-        badge: 'Spa Deal'
-      }
-    ],
-    specialHighlights: [
-      'จุดรับส่งเฉพาะผู้โดยสาร WINRIDER พร้อมเลานจ์พักคอยเครื่องดื่มฟรี',
-      'บริการ Fast Track Check-in สำหรับสมาชิกระดับอัศวิน',
-      'เชื่อมต่อสถานี BTS พร้อมพงษ์เพียง 2 นาทีด้วย Dream Ride'
-    ],
-    walletQrAddress: 'WIN-PARTNER-HOTEL-5582'
-  },
-  {
-    id: 'partner-buffet-03',
-    name: 'WAGYU & SEAFOOD IMPERIAL BUFFET',
-    category: 'buffet',
-    categoryLabel: 'ร้านบุฟเฟต์ & อาหารนานาชาติ',
-    icon: '🥩',
-    coverGradient: 'from-red-950/60 via-[#070D1E] to-[#0A1A3F]',
-    rating: 4.97,
-    reviewCount: 890,
-    level: 90,
-    tierName: 'ภัตตาคารบุฟเฟต์ระดับมาสเตอร์การันตี 🌟',
-    xp: 82000,
-    nextXp: 90000,
-    address: 'ซอยทองหล่อ 10 อาคาร The Grand Terrace',
-    distanceKm: 1.4,
-    estimatedWinFare: 45,
-    phone: '02-999-1234',
-    openHours: '11:00 - 23:00 น. (เปิดบริการอยู่ขณะนี้ 🟢)',
-    todayCustomersArrivingViaWin: 95,
-    activeWinDriversInZone: 31,
-    description: 'บุฟเฟต์เนื้อวากิว A5 นำเข้าจากญี่ปุ่น กุ้งแม่น้ำอยุธยาเผาผ่าหัวมันเยิ้ม ซาชิมิฮามาจิ & แซลมอนนอร์เวย์ไม่อั้น บริการรวดเร็วทันใจ',
-    amenities: ['วากิว A5 ไม่อั้น', 'กุ้งแม่น้ำเผามันเยิ้ม', 'ฮาเก้นดาสไม่อั้น', 'ที่นั่ง VIP 150 ที่'],
-    parkingInfo: {
-      motorcycleSpots: 40,
-      carSpots: 150,
-      winDropoffLane: 'จุดจอดเทียบด่วนพี่วิน บริเวณทางลาดเข้า The Grand Terrace ชั้น 1 หน้าร้านสะดวกสบาย',
-      parkingFeePolicy: 'จอดรถยนต์ฟรี 3 ชม. เมื่อประทับตราใบเสร็จบุฟเฟต์ / มอเตอร์ไซค์และผู้โดยสารพี่วินจอดฟรี 5 ชม.',
-      valetService: true,
-      evCharging: false
-    },
-    eventsToday: [
-      {
-        id: 'ev-4',
-        title: 'โชว์แล่ปลามากุโร่ยักษ์สดๆ โดยเชฟญี่ปุ่น',
-        time: '18:00 น. & 20:00 น.',
-        description: 'ตื่นตากับการแล่ปลาบลูฟินทูน่า 100 กก. พร้อมเสิร์ฟโอโทโร่สดทันที',
-        highlight: 'Chef Kenji จากโตเกียว',
-        artistOrChef: 'Master Chef Kenji',
-        tag: 'ไฮไลต์วันนี้'
-      }
-    ],
-    promotionsToday: [
-      {
-        id: 'promo-5',
-        title: 'มา 4 จ่าย 3 แพ็กเกจ Ultimate Wagyu A5',
-        discount: 'มา 4 จ่าย 3',
-        condition: 'เรียกรถพี่วินมาทั้งกลุ่ม รับสิทธิ์ทันที',
-        validUntil: '22:30 น.',
-        badge: 'Hot Group Deal'
-      },
-      {
-        id: 'promo-6',
-        title: 'ฟรี! ซุปเห็ดทรัฟเฟิลดำ & ฟัวกราส์ย่าง 1 จาน',
-        discount: 'Free Special Dish',
-        condition: 'เมื่อแสดงโค้ด WIN-BUFFET ในแอป',
-        validUntil: 'สิ้นสุดวันนี้',
-        badge: 'Bonus Dish'
-      }
-    ],
-    specialHighlights: [
-      'วัตถุดิบนำเข้าสดใหม่วันต่อวัน มาตรฐานสุขอนามัย SHA Extra Plus',
-      'พี่วินจัดส่งเซ็ตเดลิเวอรีกล่องเก็บความร้อนพิเศษคงความฉ่ำ 100%',
-      'สะสมแต้มแลกบัตรรับประทานอาหารฟรีทุก 10 ครั้ง'
-    ],
-    walletQrAddress: 'WIN-PARTNER-BUFFET-3391'
-  }
-];
+const EMPTY_PARTNER_PROFILE: PartnerProfile = {
+  id: 'current-partner',
+  name: 'ยังไม่ได้ตั้งชื่อพาร์ทเนอร์',
+  category: 'wellness',
+  categoryLabel: 'พาร์ทเนอร์ในระบบ WINRIDER.AI',
+  icon: '🤝',
+  coverGradient: 'from-slate-900 via-[#070D1E] to-[#0A1A3F]',
+  rating: 0,
+  reviewCount: 0,
+  level: 1,
+  tierName: 'พาร์ทเนอร์ใหม่',
+  xp: 0,
+  nextXp: 100,
+  address: '',
+  distanceKm: 0,
+  estimatedWinFare: 0,
+  phone: '',
+  openHours: 'ยังไม่ได้ระบุเวลาทำการ',
+  todayCustomersArrivingViaWin: 0,
+  activeWinDriversInZone: 0,
+  description: 'กรุณาเพิ่มข้อมูลบริการของพาร์ทเนอร์',
+  amenities: [],
+  eventsToday: [],
+  promotionsToday: [],
+  specialHighlights: [],
+  walletQrAddress: '',
+};
+
+export const SAMPLE_PARTNERS: PartnerProfile[] = [EMPTY_PARTNER_PROFILE];
 
 export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   audioEnabled = true,
@@ -341,32 +153,13 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
     }).catch((error) => console.warn('Unable to load partner profile:', error));
   }, [canEdit, selectedPartner.id]);
   
-  // 3D Live Customer Radar Simulation
-  const [incomingCustomers, setIncomingCustomers] = useState<{ id: string; name: string; riderName: string; etaMin: number; x: number; y: number; vehicle: string }[]>([
-    { id: 'c1', name: 'คุณนภัสสร (โต๊ะจอง 4 ท่าน)', riderName: 'พี่วินสมชาย (XMAX 300)', etaMin: 3, x: 30, y: 40, vehicle: '🏍️' },
-    { id: 'c2', name: 'คุณธนภัทร & เพื่อน', riderName: 'พี่วินวิชัย (Forza 350)', etaMin: 6, x: 65, y: 25, vehicle: '🏍️' },
-    { id: 'c3', name: 'Mr. David (Tourist VIP)', riderName: 'พี่วินประเสริฐ (CB650R)', etaMin: 9, x: 75, y: 70, vehicle: '🏍️' },
-    { id: 'c4', name: 'คุณกิตติ (Diamond Member)', riderName: 'พี่วินธีรพงษ์ (Vespa GTS)', etaMin: 12, x: 20, y: 80, vehicle: '🏍️' }
-  ]);
+  const [incomingCustomers] = useState<{ id: string; name: string; riderName: string; etaMin: number; x: number; y: number; vehicle: string }[]>([]);
 
   // Combined promotions list (sample + owner created)
   const currentPromotions = useMemo(() => {
     const extra = ownerPromotions[selectedPartner.id] || [];
     return [...extra, ...selectedPartner.promotionsToday];
   }, [selectedPartner, ownerPromotions]);
-
-  // Periodic simulated radar movement
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIncomingCustomers(prev => prev.map(c => ({
-        ...c,
-        etaMin: Math.max(1, c.etaMin - 0.2),
-        x: c.x + (50 - c.x) * 0.05,
-        y: c.y + (50 - c.y) * 0.05
-      })));
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleSelectPartner = (p: PartnerProfile) => {
     if (audioEnabled) playTactileBlip(800);

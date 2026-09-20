@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { playRadarScan, playTactileBlip } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
+import { RADAR_PLACE_GROUPS, RadarPlaceGroup, selectRadarPlaces } from '../utils/radarPlaces';
 
 const GOOGLE_MAPS_API_KEY = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
 
@@ -37,6 +38,7 @@ export interface MapRadarEntity {
   etaMin: number;
   specialBadge?: string;
   categoryLabel?: string;
+  placeGroup?: Exclude<RadarPlaceGroup, 'all'>;
   phone?: string;
   pickupNote?: string;
 }
@@ -96,7 +98,7 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
 }) => {
   const { gpsState } = useRealtimeGps(true);
   const [selectedRadius, setSelectedRadius] = useState(radiusKm);
-  const [filterType, setFilterType] = useState<'all' | 'merchants' | 'partners'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<RadarPlaceGroup>('all');
   const [selectedEntity, setSelectedEntity] = useState<MapRadarEntity | null>(null);
   const [mapType, setMapType] = useState<'roadmap' | 'hybrid'>('roadmap');
   const [mapZoom, setMapZoom] = useState(16);
@@ -151,6 +153,7 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
           etaMin: Math.max(1, Math.ceil(place.distanceMeters / 350)),
           specialBadge: 'GOOGLE MAPS',
           categoryLabel: place.categoryLabel || (place.category === 'shop' ? 'ร้านค้าจาก Google Maps' : 'สถานที่และพาร์ทเนอร์จาก Google Maps'),
+          placeGroup: (place.placeGroup || 'community') as Exclude<RadarPlaceGroup, 'all'>,
         }));
 
         const directoryResponse = await fetch('/api/shop/directory', {
@@ -196,6 +199,7 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
               etaMin: route.etaMinutes || 0,
               specialBadge: 'WIN VERIFIED',
               categoryLabel: profile.category || profile.role,
+              placeGroup: 'shop',
             }];
           });
         }
@@ -215,12 +219,14 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
     return () => { cancelled = true; };
   }, [gpsState.isRealGps, userLat, userLng]);
 
-  const filteredEntities = useMemo(() => entities.filter((entity) => {
-    if (entity.distanceMeters > selectedRadius * 1000) return false;
-    if (filterType === 'merchants') return entity.type === 'merchant';
-    if (filterType === 'partners') return entity.type === 'transit_hub';
-    return true;
-  }), [entities, filterType, selectedRadius]);
+  const entitiesInRadius = useMemo(
+    () => entities.filter((entity) => entity.distanceMeters <= selectedRadius * 1000),
+    [entities, selectedRadius],
+  );
+  const filteredEntities = useMemo(
+    () => selectRadarPlaces(entitiesInRadius, selectedCategory),
+    [entitiesInRadius, selectedCategory],
+  );
 
   const perspectiveLabel = targetPerspective === 'driver' ? 'เรดาร์พี่วิน' : 'เรดาร์ลูกค้า';
   const canShowMap = Boolean(GOOGLE_MAPS_API_KEY && gpsState.isRealGps);
@@ -269,19 +275,19 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
 
       <div className="flex items-center justify-between gap-2 overflow-x-auto border-b border-white/10 bg-[#081226] px-4 py-2">
         <div className="flex gap-1.5">
-          {([
-            ['all', 'ทั้งหมด', entities.length],
-            ['merchants', 'ร้านค้า', entities.filter((entity) => entity.type === 'merchant').length],
-            ['partners', 'สถานที่ & พาร์ทเนอร์', entities.filter((entity) => entity.type === 'transit_hub').length],
-          ] as const).map(([id, label, count]) => (
-            <button key={id} type="button" onClick={() => setFilterType(id)}
-              className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1 text-[11px] font-bold ${filterType === id ? 'bg-cyan-400 text-slate-950' : 'border border-white/10 bg-black/40 text-slate-300'}`}>
-              {id === 'merchants' ? <Store className="h-3.5 w-3.5" /> : id === 'partners' ? <Building2 className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
+          {RADAR_PLACE_GROUPS.map(({ id, label, emoji }) => {
+            const count = id === 'all'
+              ? Math.min(20, entitiesInRadius.length)
+              : Math.min(20, entitiesInRadius.filter((entity) => entity.placeGroup === id).length);
+            return (
+            <button key={id} type="button" onClick={() => { setSelectedCategory(id); setSelectedEntity(null); }}
+              className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1 text-[11px] font-bold ${selectedCategory === id ? 'bg-cyan-400 text-slate-950' : 'border border-white/10 bg-black/40 text-slate-300'}`}>
+              <span>{emoji}</span>
               {label} <span className="rounded-full bg-black/20 px-1.5 text-[9px]">{count}</span>
             </button>
-          ))}
+          )})}
         </div>
-        <span className="whitespace-nowrap text-[10px] font-bold text-cyan-300">พบ {filteredEntities.length} จุด</span>
+        <span className="whitespace-nowrap text-[10px] font-bold text-cyan-300">แสดง {filteredEntities.length}/20 จุด</span>
       </div>
 
       <div className="relative w-full" style={{ height }}>

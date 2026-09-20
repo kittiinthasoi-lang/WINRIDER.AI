@@ -90,8 +90,8 @@ function RidePolylineRenderer({
  */
 export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = ({
   selectedDreamRide,
-  pickupLocation = 'จุดรับผู้โดยสาร',
-  destinationLocation = 'จุดหมายปลายทาง',
+  pickupLocation = 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)',
+  destinationLocation = 'อาคาร Exchange Tower อโศก',
   driverName = 'กิตติ อินทะสร้อย',
   driverLevel = 100,
   driverEmoji = '🦁',
@@ -105,28 +105,23 @@ export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = (
 
   // Default coordinates around Bangkok Sukhumvit / Phrom Phong
   const pickupCoords = useMemo(() => ({
-    lat: gpsState.latitude || 13.7314,
-    lng: gpsState.longitude || 100.5700
+    lat: gpsState.latitude || 0,
+    lng: gpsState.longitude || 0
   }), [gpsState.latitude, gpsState.longitude]);
 
   const dropoffCoords = useMemo(() => ({
-    lat: 13.7356,
-    lng: 100.5612
+    lat: 0,
+    lng: 0
   }), []);
 
   // Assigned driver coordinates
   const driverCoords = useMemo(() => ({
-    lat: pickupCoords.lat + 0.0022,
-    lng: pickupCoords.lng + 0.0018
+    lat: pickupCoords.lat,
+    lng: pickupCoords.lng
   }), [pickupCoords]);
 
   // Real nearby riders, merchants, and hubs within the radius
-  const nearbyRadiusEntities = useMemo(() => [
-    { id: 'r-1', type: 'rider', name: 'พี่วินสมชาย (LV.38)', lat: pickupCoords.lat + 0.0015, lng: pickupCoords.lng - 0.0020, emoji: '🛵', label: 'ใกล้ 250 ม.' },
-    { id: 'r-2', type: 'rider', name: 'พี่วินเอกชัย (LV.72)', lat: pickupCoords.lat - 0.0018, lng: pickupCoords.lng + 0.0025, emoji: '🏍️', label: 'ใกล้ 320 ม.' },
-    { id: 'm-1', type: 'merchant', name: 'ร้านป้าสมร ตามสั่ง', lat: pickupCoords.lat + 0.0028, lng: pickupCoords.lng + 0.0005, emoji: '🍲', label: 'Street Food' },
-    { id: 't-1', type: 'transit_hub', name: 'BTS พร้อมพงษ์', lat: pickupCoords.lat - 0.0010, lng: pickupCoords.lng - 0.0012, emoji: '🚊', label: 'SkyTrain' },
-  ], [pickupCoords]);
+  const nearbyRadiusEntities = useMemo<Array<{ id: string; type: string; name: string; lat: number; lng: number; emoji: string; label: string }>>(() => [], []);
 
   // Calculated route
   const [routeData, setRouteData] = useState<ComputedLiveRoute | null>(null);

@@ -80,121 +80,10 @@ interface StoreVoucher {
   validUntil: string;
 }
 
-const INITIAL_STORE_PRODUCTS: StoreCatalogProduct[] = [
-  {
-    id: 'prod-1',
-    title: 'นาฬิกาสำริดลิมิเต็ดอิดิชั่น Imperial Bronze Watch',
-    category: 'หัตถศิลป์พรีเมียม',
-    price: 4500,
-    originalPrice: 6200,
-    discountBadge: 'ลด 27%',
-    imageIcon: '⌚',
-    description: 'งานฝีมือหล่อสำริดแท้ลายกนกโบราณ ผลิตจำกัดเพียง 99 เรือน พร้อมกล่องไม้สักแท้',
-    stock: 5,
-    soldCount: 18,
-    isFlashSale: true,
-    aiVerified: true
-  },
-  {
-    id: 'prod-2',
-    title: 'เมล็ดกาแฟดริปพิเศษ Single Origin คั่วเข้ม (500g)',
-    category: 'กาแฟและอาหารเลิศรส',
-    price: 390,
-    originalPrice: 550,
-    discountBadge: 'ลด 29%',
-    imageIcon: '☕',
-    description: 'กาแฟอาราบิกา 100% จากยอดดอยช้าง ปลูกแบบอินทรีย์ กลิ่นหอมช็อกโกแลตและคาราเมล',
-    stock: 24,
-    soldCount: 42,
-    isFlashSale: true,
-    aiVerified: true
-  },
-  {
-    id: 'prod-3',
-    title: 'ชาอู่หลงยอดดอยคัดพิเศษเกรดจักรพรรดิ (กล่อง 20 ซอง)',
-    category: 'กาแฟและอาหารเลิศรส',
-    price: 280,
-    originalPrice: 380,
-    discountBadge: 'ลด 26%',
-    imageIcon: '🍵',
-    description: 'ใบชาคัดมือยอดแรกของฤดูใบไม้ผลิ รสชาติชุ่มคอ หอมละมุนดั่งหมอกยามเช้า',
-    stock: 35,
-    soldCount: 88,
-    aiVerified: true
-  },
-  {
-    id: 'prod-4',
-    title: 'เซ็ตขนมทองเอก & เสน่ห์จันทน์หัตถศิลป์ (12 ชิ้น)',
-    category: 'ของฝากและขนมไทย',
-    price: 190,
-    originalPrice: 250,
-    discountBadge: 'ลด 24%',
-    imageIcon: '🍯',
-    description: 'ขนมมงคลโบราณสูตรชาววัง ปิดทองคำเปลวบริสุทธิ์ 24K บรรจุกล่องกระจกใสสวยหรู',
-    stock: 15,
-    soldCount: 120,
-    aiVerified: true
-  },
-  {
-    id: 'prod-5',
-    title: 'น้ำผึ้งป่าเดือนห้าอินทรีย์แท้ 100% ขวดแก้ววินเทจ (750ml)',
-    category: 'สินค้าเกษตรอินทรีย์',
-    price: 320,
-    originalPrice: 450,
-    discountBadge: 'ลด 28%',
-    imageIcon: '🐝',
-    description: 'น้ำผึ้งแท้จากป่าต้นน้ำธรรมชาติ อุดมไปด้วยสารต้านอนุมูลอิสระ หวานหอมกลมกล่อม',
-    stock: 28,
-    soldCount: 95,
-    aiVerified: true
-  },
-  {
-    id: 'prod-6',
-    title: 'เสื้อคลุมผ้าไหมมัดหมี่ย้อมครามธรรมชาติ Cyber-Silk',
-    category: 'เสื้อผ้าและแฟชั่น',
-    price: 1890,
-    originalPrice: 2600,
-    discountBadge: 'ลด 27%',
-    imageIcon: '👘',
-    description: 'การผสมผสานผ้าไหมมัดหมี่ดั้งเดิมกับดีไซน์นีออนไซเบอร์ร่วมสมัย ใส่ได้ทุกโอกาส',
-    stock: 8,
-    soldCount: 23,
-    aiVerified: true
-  }
-];
+const INITIAL_STORE_PRODUCTS: StoreCatalogProduct[] = [];
 
-const STORE_VOUCHERS: StoreVoucher[] = [
-  {
-    id: 'vouch-1',
-    code: 'WINZEN50',
-    title: 'ส่วนลด ฿50 เมื่อช้อปครบ ฿300',
-    discountText: 'ลด ฿50',
-    minSpend: 300,
-    discountValue: 50,
-    isPercent: false,
-    validUntil: 'วันนี้ 23:59'
-  },
-  {
-    id: 'vouch-2',
-    code: 'WINRIDEFREE',
-    title: 'ส่งด่วนฟรี 3 กม. แรกผ่านพี่วิน (ประหยัด ฿30)',
-    discountText: 'ฟรีค่าส่ง',
-    minSpend: 200,
-    discountValue: 30,
-    isPercent: false,
-    validUntil: 'ตลอดทั้งสัปดาห์'
-  },
-  {
-    id: 'vouch-3',
-    code: 'SOVEREIGN15',
-    title: 'ลด 15% สำหรับสมาชิกระดับอัศวิน/พลเมือง',
-    discountText: 'ลด 15%',
-    minSpend: 500,
-    discountValue: 15,
-    isPercent: true,
-    validUntil: 'ตลอดทั้งเดือน'
-  }
-];
+// Promotions must be created by the merchant account; no seeded vouchers are shown.
+const STORE_VOUCHERS: StoreVoucher[] = [];
 
 interface MerchantCommandCenterProps {
   audioEnabled: boolean;
@@ -277,56 +166,27 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   const [newProdPrice, setNewProdPrice] = useState<string>('');
   const [newProdOrigPrice, setNewProdOrigPrice] = useState<string>('');
   const [newProdCategory, setNewProdCategory] = useState<string>('ของฝากและขนมไทย');
-  const [newProdStock, setNewProdStock] = useState<string>('20');
+  const [newProdStock, setNewProdStock] = useState<string>('');
   const [newProdDesc, setNewProdDesc] = useState<string>('');
   const [newProdIsFlash, setNewProdIsFlash] = useState<boolean>(false);
   const [newProdAiVerified, setNewProdAiVerified] = useState<AIVerificationResult | null>(null);
 
-  const [flashSales, setFlashSales] = useState<FlashSaleItem[]>([
-    {
-      id: '1',
-      title: 'นาฬิกาสำริดลิมิเต็ดอิดิชั่น Imperial Bronze Watch',
-      price: 4500,
-      originalPrice: 6200,
-      timeLeft: '02:14:38',
-      salesCount: 18,
-      category: 'หัตถศิลป์พรีเมียม',
-      imageIcon: '⌚'
-    },
-    {
-      id: '2',
-      title: 'เมล็ดกาแฟดริปพิเศษ Single Origin คั่วเข้ม (500g)',
-      price: 390,
-      originalPrice: 550,
-      timeLeft: '04:50:12',
-      salesCount: 42,
-      category: 'กาแฟและอาหารเลิศรส',
-      imageIcon: '☕'
-    }
-  ]);
-
-  const [deliveries, setDeliveries] = useState([
-    { id: '#8812', item: 'ชุดกาน้ำชาเซรามิก', destination: 'ถ.เจริญนคร ฝั่งธนบุรี', eta: '12 นาที', status: 'กำลังจัดส่ง', knight: 'อัศวิน-019 (Vespa)' },
-    { id: '#8813', item: 'กล่องของขวัญน้ำผึ้งป่าเดือนห้า', destination: 'ย่านสาทร CBD', eta: '25 นาที', status: 'รับของแล้ว', knight: 'อัศวิน-088 (Wave 110i)' }
-  ]);
-
-  const [incomingCustomers, setIncomingCustomers] = useState([
-    { name: 'คุณศิรินทิพย์', status: 'สมาชิกระดับ VIP', eta: '5 นาที', rideType: 'WIN KNIGHT' },
-    { name: 'คุณธนกฤต', status: 'ลูกค้าประจำ', eta: 'กำลังเดินทางมา', rideType: 'WIN Lifestyle' }
-  ]);
+  const [flashSales, setFlashSales] = useState<FlashSaleItem[]>([]);
+  const [deliveries, setDeliveries] = useState<Array<{ id: string; item: string; destination: string; eta: string; status: string; knight: string }>>([]);
+  const [incomingCustomers] = useState<Array<{ name: string; status: string; eta: string; rideType: string }>>([]);
 
   const [showRadarOverlay, setShowRadarOverlay] = useState<boolean>(true);
 
   // Store metadata
   const storeInfo = {
-    name: merchantProfileData.displayName || 'ร้านออร่าเซนโก้ (Aura Zenco)',
-    address: 'อาคาร Interchange 21 อโศก สุขุมวิท กรุงเทพฯ',
-    distanceKm: 1.2,
-    estimatedWinFare: 25,
-    openHours: '08:00 - 22:00 น. (เปิดบริการอยู่ขณะนี้ 🟢)',
-    phone: '02-123-4567',
-    rating: 4.98,
-    reviewsCount: 1240
+    name: merchantProfileData.displayName || 'ยังไม่ได้ตั้งชื่อร้านค้า',
+    address: '',
+    distanceKm: 0,
+    estimatedWinFare: 0,
+    openHours: 'ยังไม่ได้ระบุเวลาทำการ',
+    phone: '',
+    rating: 0,
+    reviewsCount: 0
   };
 
   const handleGainMerchantCredit = (points: number, reason: string) => {
@@ -373,10 +233,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
 
   const handleBulkPickup = () => {
     if (audioEnabled) playRadarScan();
-    setShowPickupMapModal(true);
-    setKnightsAvailable(prev => Math.max(prev - 3, 5));
-    handleGainMerchantXp(120, "เรียกอัศวิน Knight Bulk Pickup สำเร็จ (เปิดเรดาร์แผนที่)");
-    confetti({ particleCount: 35, spread: 60, colors: ['#00D2FF', '#FFD700'] });
+    alert('ยังไม่มีออเดอร์จริงสำหรับเรียกพี่วินรับพัสดุ');
   };
 
   const handleTogglePerspective = (mode: 'owner' | 'customer') => {
@@ -1109,7 +966,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
                     <button
                       onClick={() => {
                         if (audioEnabled) playRadarScan();
-                        setShowPickupMapModal(true);
+                        alert('การติดตามจะแสดงเมื่อมีพี่วินรับออเดอร์จริง');
                       }}
                       className="text-[10px] text-cyan-300 hover:text-white font-mono underline flex items-center gap-1"
                     >
@@ -1124,7 +981,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
                         key={idx} 
                         onClick={() => {
                           if (audioEnabled) playTactileBlip(800);
-                          setShowPickupMapModal(true);
+                          alert('การติดตามจะแสดงเมื่อมีพี่วินรับออเดอร์จริง');
                         }}
                         className="p-3 rounded-xl bg-black/30 hover:bg-cyan-950/40 border border-white/5 hover:border-cyan-500/40 space-y-1 transition-all cursor-pointer"
                       >
@@ -1751,25 +1608,17 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
         initialRole={tiersModalInitialRole}
         currentLevel={merchantLevel}
         audioEnabled={audioEnabled}
-        onApplySimulatedLevel={(role, lvl) => {
-          if (role === 'merchant') {
-            setMerchantLevel(lvl);
-            const req = calculateLevelMaxXp(lvl, 'merchant');
-            setMerchantNextXp(req);
-            setMerchantXp(Math.round(req * 0.5));
-          }
-        }}
       />
 
       {/* WIN SCAN & PAY QR GENERATOR MODAL */}
       <WinScanAndPayModal
         isOpen={showScanAndPayModal}
         onClose={() => setShowScanAndPayModal(false)}
-        entityName="ร้านออร่าเซนโก้ (Aura Zenco)"
+        entityName={storeInfo.name}
         entityType="merchant"
-        entityCategoryLabel="ร้านค้าพันธมิตร (เจริญรัถ-คลองสาน)"
-        defaultAmount={250}
-        qrWalletAddress="WIN-MCH-ZENCO-9988-2104"
+        entityCategoryLabel="ร้านค้าในระบบ WINRIDER.AI"
+        defaultAmount={0}
+        qrWalletAddress=""
         audioEnabled={audioEnabled}
       />
 

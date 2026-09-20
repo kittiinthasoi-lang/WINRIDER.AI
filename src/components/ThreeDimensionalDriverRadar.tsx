@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getAuth } from 'firebase/auth';
 import { 
   Radio, 
@@ -55,6 +55,7 @@ import {
   generateRouteToPing 
 } from '../data/radarNavigationData';
 import { RadarRoutePlannerModal } from './RadarRoutePlannerModal';
+import { RADAR_PLACE_GROUPS, RadarPlaceGroup, selectRadarPlaces } from '../utils/radarPlaces';
 
 export type RadarCategory = 'all' | 'customer' | 'shop' | 'partner' | 'driver';
 
@@ -65,6 +66,7 @@ export interface Radar3DPing {
   imageUrl?: string;
   category: 'customer' | 'shop' | 'partner' | 'driver';
   categoryLabel: string;
+  placeGroup: Exclude<RadarPlaceGroup, 'all'>;
   service: string;
   serviceEmoji: string;
   serviceType: 'knight' | 'express' | 'pet' | 'mu' | 'spirit';
@@ -108,7 +110,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
   const [showCapillaryPaths, setShowCapillaryPaths] = useState<boolean>(true);
   const [showLaserBeacons, setShowLaserBeacons] = useState<boolean>(true);
   const [showGroundShadows, setShowGroundShadows] = useState<boolean>(true);
-  const [filterCategory, setFilterCategory] = useState<RadarCategory>('all');
+  const [filterCategory, setFilterCategory] = useState<RadarPlaceGroup>('all');
   const [filterService, setFilterService] = useState<'all' | 'knight' | 'express' | 'pet' | 'mu' | 'spirit'>('all');
   const [radarPings, setRadarPings] = useState<Radar3DPing[]>([]);
   const [selectedPing, setSelectedPing] = useState<Radar3DPing | null>(null);
@@ -137,7 +139,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
         const directoryResponse = await fetch('/api/shop/directory', { headers: { Authorization: `Bearer ${token}` } });
         const directoryPayload = await directoryResponse.json() as { profiles?: Array<{ id: string; role: 'merchant' | 'partner'; name: string; address: string; category: string }> };
         const registered = directoryResponse.ok ? (directoryPayload.profiles || []).filter((profile) => profile.address) : [];
-        let sourcePlaces: Array<{ id: string; name: string; category: 'shop' | 'partner'; primaryType: string; address: string; latitude: number; longitude: number; rating: number | null; openNow: boolean | null; distanceMeters: number; categoryLabel?: string; source: 'win' | 'google' }> = [];
+        let sourcePlaces: Array<{ id: string; name: string; category: 'shop' | 'partner'; primaryType: string; address: string; latitude: number; longitude: number; rating: number | null; openNow: boolean | null; distanceMeters: number; placeGroup?: Exclude<RadarPlaceGroup, 'all'>; categoryLabel?: string; source: 'win' | 'google' }> = [];
 
         if (registered.length > 0) {
           const routeResponse = await fetch('/api/places/resolve-routes', {
@@ -151,7 +153,8 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
             const profile = byId.get(route.key); if (!profile) return [];
             return [{ id: profile.id, name: profile.name, category: profile.role === 'merchant' ? 'shop' as const : 'partner' as const,
               primaryType: profile.category || profile.role, address: route.address || profile.address, latitude: route.latitude, longitude: route.longitude,
-              rating: null, openNow: null, distanceMeters: Math.round(route.distanceKm * 1000), source: 'win' as const }];
+              rating: null, openNow: null, distanceMeters: Math.round(route.distanceKm * 1000),
+              placeGroup: profile.role === 'merchant' ? 'shop' as const : 'community' as const, source: 'win' as const }];
           });
         }
 
@@ -168,6 +171,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
           const eastKm = (place.longitude - gpsState.longitude) * 111 * Math.cos(gpsState.latitude * Math.PI / 180);
           return { id: `${place.source}:${place.id}`, name: place.name, avatar: '', category: place.category,
             categoryLabel: place.source === 'win' ? (place.category === 'shop' ? 'ร้านค้าในระบบ WIN' : 'พาร์ทเนอร์ในระบบ WIN') : (place.categoryLabel || (place.category === 'shop' ? 'ร้านค้าจาก Google Maps' : 'สถานที่จาก Google Maps')),
+            placeGroup: place.placeGroup || (place.category === 'shop' ? 'shop' : 'community'),
             service: place.primaryType, serviceEmoji: place.category === 'shop' ? '🛍️' : '🤝', serviceType: 'knight', fare: 0,
             distanceMeters: place.distanceMeters, location: place.address, x: Math.max(-100, Math.min(100, eastKm * 20)),
             y: Math.max(-100, Math.min(100, -northKm * 20)), elevation: 10, urgency: 'normal',
@@ -334,11 +338,14 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
     if (onSelectPing) onSelectPing(ping);
   };
 
-  const filteredPings = radarPings.filter(p => {
-    if (filterCategory !== 'all' && p.category !== filterCategory) return false;
-    if (filterService !== 'all' && p.serviceType !== filterService) return false;
-    return true;
-  });
+  const serviceFilteredPings = useMemo(
+    () => radarPings.filter((ping) => filterService === 'all' || ping.serviceType === filterService),
+    [radarPings, filterService],
+  );
+  const filteredPings = useMemo(
+    () => selectRadarPlaces(serviceFilteredPings, filterCategory),
+    [serviceFilteredPings, filterCategory],
+  );
 
   return (
     <div className="space-y-3 font-mono">
@@ -504,19 +511,6 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
               >
                 <Volume2 className="w-4 h-4" />
               </button>
-
-              {/* Manual Advance / Next Step Button */}
-              {activeStepIndex < activeNavRoute.steps.length - 1 && (
-                <button
-                  type="button"
-                  onClick={advanceToNextStep}
-                  className="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1"
-                  title="จำลองเข้าใกล้จุดเลี้ยว (< 20 ม.) และเปลี่ยนก้าวถัดไป"
-                >
-                  <span>ก้าวถัดไป</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              )}
 
               {/* Live Camera AR Switcher Button */}
               <button
@@ -1057,19 +1051,18 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
       </div>
       )}
 
-      {/* CATEGORY FILTER TABS: ลูกค้า • ร้านค้า • พาร์ทเนอร์ • ทั้งหมด */}
+      {/* Google Places category filters; every selected category and the balanced default are capped at 20. */}
       <div className="p-2 rounded-2xl bg-[#061126] border border-cyan-500/30 flex items-center justify-between gap-2 overflow-x-auto text-xs">
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <span className="text-[11px] text-slate-300 font-bold flex items-center gap-1 pl-1">
             <Eye className="w-3.5 h-3.5 text-cyan-400" />
             <span>โหมดเรดาร์:</span>
           </span>
-          {[
-            { id: 'all' as const, label: `🌐 แสดงทั้งหมด (${radarPings.length})`, icon: Eye },
-            { id: 'customer' as const, label: `👤 ลูกค้าในระบบ (${radarPings.filter((p) => p.category === 'customer').length})`, icon: Users },
-            { id: 'shop' as const, label: `🏪 ร้านค้า (${radarPings.filter((p) => p.category === 'shop').length})`, icon: Store },
-            { id: 'partner' as const, label: `⚡ พาร์ทเนอร์ (${radarPings.filter((p) => p.category === 'partner').length})`, icon: BatteryCharging }
-          ].map(cat => (
+          {RADAR_PLACE_GROUPS.map((cat) => {
+            const count = cat.id === 'all'
+              ? Math.min(20, serviceFilteredPings.length)
+              : Math.min(20, serviceFilteredPings.filter((ping) => ping.placeGroup === cat.id).length);
+            return (
             <button
               key={cat.id}
               type="button"
@@ -1083,10 +1076,11 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
                   : 'bg-black/50 text-slate-300 border border-white/10 hover:text-white hover:border-cyan-500/40'
               }`}
             >
-              <span>{cat.label}</span>
+              <span>{cat.emoji} {cat.label} ({count})</span>
             </button>
-          ))}
+          )})}
         </div>
+        <span className="whitespace-nowrap text-[10px] font-bold text-cyan-300">แสดง {filteredPings.length}/20 จุด</span>
       </div>
 
       {placesLoading && <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-2 text-[10px] text-cyan-200">กำลังค้นหาร้านค้าและพาร์ทเนอร์จริงจาก Google Maps…</div>}

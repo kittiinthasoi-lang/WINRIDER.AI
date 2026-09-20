@@ -292,7 +292,15 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
   const cacheKey = `${latitude.toFixed(3)}:${longitude.toFixed(3)}`;
   const cached = radarPlacesCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    return res.json({ places: cached.places, source: "Google Places API cache", registeredPeopleSynthesized: false });
+    const categoryLabels: Record<string, string> = { shop: "ร้านค้าและบริการ", transport: "ขนส่งสาธารณะทางบกและทางน้ำ", faith: "ศาสนสถาน", community: "การศึกษา ที่พัก สุขภาพและสถานที่สำคัญ" };
+    return res.json({
+      places: cached.places,
+      categories: Object.entries(categoryLabels).map(([key, label]) => ({ key, label, count: cached.places.filter((place) => place.placeGroup === key).length })),
+      perCategoryLimit: 20,
+      defaultLimit: 20,
+      source: "Google Places API cache",
+      registeredPeopleSynthesized: false,
+    });
   }
   try {
     const searchGroups = [
@@ -324,7 +332,7 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
         headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fieldMask },
         body: JSON.stringify({
           includedTypes: group.types,
-          maxResultCount: 15,
+          maxResultCount: 20,
           rankPreference: "DISTANCE",
           languageCode: "th",
           regionCode: "TH",
@@ -384,7 +392,14 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
         if (value.expiresAt <= now || radarPlacesCache.size > 150) radarPlacesCache.delete(key);
       }
     }
-    return res.json({ places, source: "Google Places API (New) + Google Routes API", registeredPeopleSynthesized: false });
+    return res.json({
+      places,
+      categories: searchGroups.map((group) => ({ key: group.key, label: group.label, count: places.filter((place) => place.placeGroup === group.key).length })),
+      perCategoryLimit: 20,
+      defaultLimit: 20,
+      source: "Google Places API (New) + Google Routes API",
+      registeredPeopleSynthesized: false,
+    });
   } catch (error) {
     console.error("[Radar Nearby Places]", error instanceof Error ? error.message : error);
     return res.status(502).json({ error: "เชื่อมต่อข้อมูล Google Maps สำหรับเรดาร์ไม่ได้", places: [] });

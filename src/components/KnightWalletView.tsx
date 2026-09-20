@@ -319,12 +319,9 @@ export const KnightWalletView: React.FC<KnightWalletViewProps> = () => {
               รองรับทุก Mobile Banking ของทุกธนาคารในประเทศไทย
             </p>
 
-            <button
-              onClick={handleSimulatePaymentSuccess}
-              className="w-full py-2.5 px-4 rounded-xl bg-[#00D4FF] text-[#0A1633] font-bold text-xs hover:bg-[#38E1FF] transition shadow-[0_0_15px_rgba(0,212,255,0.4)]"
-            >
-              จำลองการโอนสำเร็จ (ยืนยันเติมเงิน)
-            </button>
+            <div className="w-full rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-2.5 text-xs font-bold text-amber-200">
+              รอการยืนยันธุรกรรมจริงจากผู้ให้บริการชำระเงิน
+            </div>
           </div>
         </div>
       )}

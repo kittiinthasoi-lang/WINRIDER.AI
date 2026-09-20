@@ -73,7 +73,8 @@ export default function App() {
   const [driverCitizenPersona, setDriverCitizenPersona] = useState<'driver' | 'customer'>('driver');
   const [ownerPersona, setOwnerPersona] = useState<'customer' | 'driver' | 'merchant' | 'partner'>('driver');
 
-  // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดหน้าตัวอย่างได้ครบทั้ง 4 บทบาท
+  // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดได้ครบทั้ง 5 บทบาท
+  // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Super Admin)
   // โดยยังคงใช้ Firebase UID เดิมเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
   const isOwnerAdmin = Boolean(
     firebaseUser && (
@@ -241,6 +242,21 @@ export default function App() {
       persona
     );
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleExitAdmin = () => {
+    if (isOwnerAdmin) {
+      setActiveMode(
+        ownerPersona === 'customer' ? 'passenger' :
+        ownerPersona === 'driver' ? 'driver' :
+        ownerPersona
+      );
+      return;
+    }
+    if (userData?.role === 'knight') setActiveMode('driver');
+    else if (userData?.role === 'merchant') setActiveMode('merchant');
+    else if (userData?.role === 'partner') setActiveMode('partner');
+    else setActiveMode('passenger');
   };
 
   const handleSignOut = async () => {
@@ -558,23 +574,13 @@ export default function App() {
 
         {activeMode === 'admin' && (
           <AdminRoute
-            onRedirectHome={() => {
-              if (userData?.role === 'knight') setActiveMode('driver');
-              else if (userData?.role === 'merchant') setActiveMode('merchant');
-              else if (userData?.role === 'partner') setActiveMode('partner');
-              else setActiveMode('passenger');
-            }}
+            onRedirectHome={handleExitAdmin}
           >
             {(claims) => (
               <AdminLayout
                 adminLevel={isOwnerAdmin ? 'super' : claims.adminLevel}
                 adminEmail={firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}
-                onExitAdmin={() => {
-                  if (userData?.role === 'knight') setActiveMode('driver');
-                  else if (userData?.role === 'merchant') setActiveMode('merchant');
-                  else if (userData?.role === 'partner') setActiveMode('partner');
-                  else setActiveMode('passenger');
-                }}
+                onExitAdmin={handleExitAdmin}
               />
             )}
           </AdminRoute>

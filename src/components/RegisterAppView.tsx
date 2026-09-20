@@ -77,91 +77,36 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
   // 1. Driver Form State (Knight)
   const [driverForm, setDriverForm] = useState({
     title: 'นาย',
-    fullName: 'สมชาย รักเกียรติ',
-    idCard: '1-1002-39482-91-0',
-    dob: '1988-05-14',
-    bloodType: 'O',
-    phone: '089-123-4567',
-    emergencyContact: 'สมศรี รักเกียรติ (ภรรยา)',
-    emergencyPhone: '081-998-8776',
-    email: 'somchai.knight@winrider.ai',
-    winStation: 'วินทองหล่อ ซอย 10 (สุขุมวิท 55)',
-    vestNumber: '28',
-    district: 'วัฒนา, กรุงเทพมหานคร',
-    publicLicenseNo: 'บข-884912 กทม.',
-    bikeModel: 'Honda Wave 125i (2024)',
-    licensePlate: '1กข-9922 กทม.',
-    taxExpiryDate: '2027-03-31',
-    helmetSize: 'L (59-60cm)',
-    suitSize: 'XL (อก 44")',
+    fullName: '', idCard: '', dob: '', bloodType: '', phone: '', emergencyContact: '', emergencyPhone: '', email: '',
+    winStation: '', vestNumber: '', district: '', publicLicenseNo: '', bikeModel: '', licensePlate: '', taxExpiryDate: '', helmetSize: '', suitSize: '',
     specialSkills: {
-      petCare: true,
-      muBuddy: true,
-      expressParcel: true,
+      petCare: false,
+      muBuddy: false,
+      expressParcel: false,
       familySchool: false,
-      spiritElderly: true,
+      spiritElderly: false,
       femaleFriendly: false,
     },
-    bankName: 'ธนาคารกสิกรไทย',
-    promptPayId: '0891234567',
-    installmentSelected: true, // ผ่อน 80฿/วัน
-    acceptWelfareFund: true, // กองทุน 2฿
+    bankName: '', promptPayId: '', installmentSelected: false, acceptWelfareFund: false,
   });
 
   // 2. Customer Form State (Citizen Passenger)
   const [customerForm, setCustomerForm] = useState({
-    fullName: 'คุณ จิตใจ สล็อต',
-    nickname: 'แอนนา',
-    phone: '081-445-5667',
-    email: 'anna.slot@winrider.ai',
-    homeAddress: 'คอนโด มาร์ค สุขุมวิท 39 แขวงคลองตันเหนือ',
-    district: 'วัฒนา, กรุงเทพมหานคร',
-    frequentDestinations: 'BTS พร้อมพงษ์, เอ็มควอเทียร์, ตึกเอ็มไพร์สาทร',
-    emergencyContact: 'คุณแม่ มณีวรรณ',
-    emergencyPhone: '089-776-5432',
-    emergencyRelation: 'มารดา',
-    medicalOrAllergies: 'ไม่มีโรคประจำตัว (ไม่มีประวัติแพ้ขนสัตว์)',
-    preferredPayment: 'QR PromptPay / Wallet 2฿',
-    riderPreference: 'คนขับขับขี่นุ่มนวล พร้อมบริการหมวกอนามัย',
-    needHygieneCap: true,
-    applyRideLater: true, // วงเงิน ฿1,500 ดอกเบี้ย 0%
-    joinC2CMarket: true,
+    fullName: '', nickname: '', phone: '', email: '', homeAddress: '', district: '', frequentDestinations: '',
+    emergencyContact: '', emergencyPhone: '', emergencyRelation: '', medicalOrAllergies: '', preferredPayment: '', riderPreference: '',
+    needHygieneCap: false, applyRideLater: false, joinC2CMarket: false,
   });
 
   // 3. Merchant Form State (Commercial Partner)
   const [merchantForm, setMerchantForm] = useState({
-    shopName: 'ก๋วยเตี๋ยวเรืออยุธยา สูตรโบราณ (สาขาทองหล่อ)',
-    category: 'ร้านอาหาร & เครื่องดื่ม',
-    subCategory: 'ก๋วยเตี๋ยวเรือ & สตรีทฟู้ดต้นตำรับ',
-    ownerName: 'ธนวัฒน์ ศรีประเสริฐ',
-    phone: '095-887-2211',
-    email: 'boatnoodle.thonglor@gmail.com',
-    address: '24/5 ซอยสุขุมวิท 55 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ 10110',
-    district: 'วัฒนา, กรุงเทพมหานคร',
-    taxId: '0-1055-62044-88-1',
-    bankName: 'ธนาคารไทยพาณิชย์',
-    bankAccountNumber: '408-982144-2',
-    openHours: '09:00 - 22:00 น.',
-    needFastDispatch: true, // Standby 3 นาที
-    requestWorkingCapital: true, // สินเชื่อ 0% กองทุน 2฿
-    discountForRiders: 'ลดทันที 10% สำหรับพี่วินและลูกค้าที่ปักหมุดมา',
+    shopName: '', category: '', subCategory: '', ownerName: '', phone: '', email: '', address: '', district: '', taxId: '',
+    bankName: '', bankAccountNumber: '', openHours: '', needFastDispatch: false, requestWorkingCapital: false, discountForRiders: '',
   });
 
   // 4. Partner Form State (Ecosystem Partner & Venues)
   const [partnerForm, setPartnerForm] = useState({
-    companyName: 'โรงแรม แกรนด์ พาราดิโซ แอนด์ รูฟท็อป สกายบาร์',
-    partnerCategory: 'โรงแรม & รูฟท็อปบาร์ (Hotel & Premium Lifestyle)',
-    contactPerson: 'วิศรุต อภิวัฒนานันท์',
-    contactPosition: 'ผู้อำนวยการฝ่ายปฏิบัติการ (Operations Director)',
-    email: 'partnerships@grandparadiso.co.th',
-    phone: '02-712-9900',
-    venueAddress: '88 ถนนสุขุมวิท ซอย 24 แขวงคลองตัน เขตคลองเตย กรุงเทพมหานคร 10110',
-    businessRegistrationNo: '0-1055-58019-33-4',
-    carParkingCapacity: '120 คัน (Valet Parking มีระบบบัตรจอดรถ)',
-    bikeParkingCapacity: '40 คัน (จุดจอดเฉพาะพี่วิน WIN-Station ฟรี)',
-    operatingHours: 'เปิดบริการ 24 ชั่วโมง (รูฟท็อป 17:00 - 02:00 น.)',
-    partnerPerks: 'จอดรถฟรี 2 ชม. + คูปองส่วนลดเครื่องดื่ม 15% สำหรับผู้โดยสาร WINRIDER',
-    sponsorWinHubStation: true,
+    companyName: '', partnerCategory: '', contactPerson: '', contactPosition: '', email: '', phone: '', venueAddress: '',
+    businessRegistrationNo: '', carParkingCapacity: '', bikeParkingCapacity: '', operatingHours: '', partnerPerks: '', sponsorWinHubStation: false,
   });
 
   const handleRoleChange = (role: RoleType) => {

@@ -226,29 +226,12 @@ export const CustomerVoiceCommandModal: React.FC<CustomerVoiceCommandModalProps>
         if (audioEnabled) playTactileBlip(1200);
         recognitionRef.current.start();
         return;
-      } catch {
-        // Fall back to simulation
+      } catch (error) {
+        console.warn('Unable to start speech recognition:', error);
       }
     }
-
-    // Simulation fallback if browser mic permission denied or running in sandbox
-    setIsListening(true);
-    setSpokenText('กำลังฟังเสียงคำสั่งของคุณ...');
-    if (audioEnabled) playTactileBlip(1200);
-
-    setTimeout(() => {
-      const sampleQueries = [
-        'เรียกวินไป BTS บางหว้า',
-        'เปิดหน้ารถในฝัน',
-        'ดูเรดาร์ติดตามพี่วิน (3D)',
-        'เปิดตลาด WIN SHOP',
-        'ดูโปรไฟล์และวงเงินเครดิต'
-      ];
-      const randomQuery = sampleQueries[Math.floor(Math.random() * sampleQueries.length)];
-      setSpokenText(randomQuery);
-      setIsListening(false);
-      processVoiceQuery(randomQuery);
-    }, 2200);
+    setIsListening(false);
+    setSpokenText('ไม่สามารถเปิดไมโครโฟนได้ กรุณาอนุญาตสิทธิ์แล้วลองอีกครั้ง');
   };
 
   return (
