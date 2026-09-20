@@ -779,6 +779,7 @@ function getAdminDb() {
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET;
 
   if (projectId && clientEmail && privateKey) {
     const adminApp = initializeApp({
@@ -787,12 +788,13 @@ function getAdminDb() {
           clientEmail,
           privateKey: privateKey.replace(/\\n/g, "\n"),
         }),
+        ...(storageBucket ? { storageBucket } : {}),
       });
     return getFirestore(adminApp, databaseId);
   }
 
   // Cloud Run / Firebase environments can use Application Default Credentials.
-  return getFirestore(initializeApp(), databaseId);
+  return getFirestore(initializeApp(storageBucket ? { storageBucket } : undefined), databaseId);
 }
 
 const ordersDb = getAdminDb();
@@ -898,10 +900,20 @@ app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
       tx.create(submissionRef, { userId: user.uid, userEmail: user.email || null, amountSatang, reference, refHash, imageHash,
         extracted, aiModel: result.model, status: "WAITING_ADMIN", createdAt: FieldValue.serverTimestamp() });
     });
+    const ext = image.mimeType.split('/')[1].replace('jpeg', 'jpg');
+    const proofStoragePath = `topup-proofs/${user.uid}/${submissionRef.id}.${ext}`;
     try {
-      const ext = image.mimeType.split('/')[1].replace('jpeg', 'jpg');
-      await getStorage().bucket().file(`topup-proofs/${user.uid}/${submissionRef.id}.${ext}`).save(image.buffer, { contentType: image.mimeType, resumable: false });
-    } catch (storageError: any) { console.error("Top-up proof storage error", storageError?.message); }
+      await getStorage().bucket().file(proofStoragePath).save(image.buffer, {
+        contentType: image.mimeType,
+        resumable: false,
+        metadata: { cacheControl: "private, no-store" },
+      });
+      await submissionRef.update({ proofStoragePath, proofMimeType: image.mimeType });
+    } catch (storageError: any) {
+      console.error("Top-up proof storage error", storageError?.message);
+      await Promise.allSettled([submissionRef.delete(), ordersDb.collection("topup_references").doc(refHash).delete()]);
+      return res.status(503).json({ error: "จัดเก็บภาพสลิปแบบส่วนตัวไม่สำเร็จ กรุณาตรวจ FIREBASE_STORAGE_BUCKET แล้วส่งใหม่" });
+    }
     return res.status(202).json({ status: "WAITING_ADMIN", submissionId: submissionRef.id, message: "อ่านสลิปผ่านแล้ว กำลังรอ Super Admin ยืนยันยอด" });
   } catch (error: any) {
     if (error?.message === "DUPLICATE_SLIP") return res.status(409).json({ error: "เลขอ้างอิงสลิปนี้ถูกส่งแล้ว" });
@@ -916,6 +928,29 @@ app.get("/api/admin/topup-submissions", rateLimit(20), async (req, res) => {
   if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
   const snap = await ordersDb.collection("topup_submissions").where("status", "==", "WAITING_ADMIN").limit(50).get();
   return res.json({ submissions: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) });
+});
+
+app.get("/api/admin/topup-proof/:id", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
+  const submissionId = String(req.params.id || "");
+  if (!/^[A-Za-z0-9_-]{10,80}$/.test(submissionId)) return res.status(400).json({ error: "Invalid submission" });
+  try {
+    const snap = await ordersDb.collection("topup_submissions").doc(submissionId).get();
+    if (!snap.exists) return res.status(404).json({ error: "ไม่พบรายการสลิป" });
+    const data = snap.data() || {};
+    const proofStoragePath = String(data.proofStoragePath || "");
+    if (!proofStoragePath.startsWith(`topup-proofs/${data.userId}/`)) return res.status(404).json({ error: "รายการเดิมไม่มีภาพสลิปที่จัดเก็บไว้" });
+    const [buffer] = await getStorage().bucket().file(proofStoragePath).download();
+    res.setHeader("Content-Type", String(data.proofMimeType || "image/jpeg"));
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    res.setHeader("Content-Disposition", `inline; filename="topup-${submissionId}"`);
+    return res.send(buffer);
+  } catch (error: any) {
+    console.error("Top-up proof read error", error?.message);
+    return res.status(503).json({ error: "โหลดภาพสลิปไม่สำเร็จ" });
+  }
 });
 
 app.post("/api/admin/topup-review", rateLimit(20), async (req, res) => {
