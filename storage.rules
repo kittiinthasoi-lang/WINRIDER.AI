@@ -7,37 +7,19 @@ service firebase.storage {
 
     function isAdmin() {
       return signedIn()
-        && (
-          request.auth.token.admin == true
-          || request.auth.token.email == 'kittiinthasoi@gmail.com'
-        );
+        && (request.auth.token.admin == true || request.auth.token.email == 'kittiinthasoi@gmail.com');
     }
 
-    function isOwner(uid) {
-      return signedIn() && request.auth.uid == uid;
-    }
-
-    // Payment QR codes uploaded by drivers, merchants, partners, and citizens
-    match /payment_qr/{uid}/{fileName} {
-      allow read: if signedIn();
-      allow write: if isOwner(uid)
+    match /payment-qr/{uid}/{fileName} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if signedIn()
+        && request.auth.uid == uid
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(uid) || isAdmin();
     }
 
-    // Top-up payment proofs (driver/passenger upload proof of payment)
-    match /topup_proofs/{uid}/{fileName} {
-      allow read: if isOwner(uid) || isAdmin();
-      allow write: if isOwner(uid)
-        && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
-      allow delete: if isOwner(uid) || isAdmin();
-    }
-
-    // Fallback: Super Admin can access all files
     match /{allPaths=**} {
-      allow read, write: if isAdmin();
+      allow read, write: if false;
     }
   }
 }

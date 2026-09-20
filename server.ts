@@ -779,15 +779,7 @@ function getAdminDb() {
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-  let defaultStorageBucket = "decoded-robot-6lkcn.firebasestorage.app";
-  try {
-    const configPath = path.resolve(process.cwd(), "firebase-applet-config.json");
-    if (fs.existsSync(configPath)) {
-      const cfg = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      if (cfg.storageBucket) defaultStorageBucket = cfg.storageBucket;
-    }
-  } catch (e) {}
-  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET;
 
   if (projectId && clientEmail && privateKey) {
     const adminApp = initializeApp({
@@ -817,500 +809,110 @@ function isSuperAdminToken(user: any) {
 }
 
 function decodeImageDataUrl(value: unknown) {
-  const match = String(value || "").match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  const match = String(value || "").match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
   if (!match) return null;
-  const mimeType = match[1] === "image/jpg" ? "image/jpeg" : match[1];
   const buffer = Buffer.from(match[2], "base64");
   if (buffer.length < 100 || buffer.length > 4 * 1024 * 1024) return null;
-  return { mimeType, buffer };
+  return { mimeType: match[1], buffer };
 }
 
-// โมเดลกลุ่ม Free Tier ของ Google AI Studio (ลำดับ fallback อัตโนมัติ)
-const aiModels = [
-  "gemini-3.6-flash",
-  "gemini-3.1-flash-lite",
-  "gemini-3.8-flash",
+const aiModels = Array.from(new Set([
+  String(process.env.GEMINI_MODEL || "").trim(),
   "gemini-flash-latest",
-];
-
-function classifyGeminiError(error: any): { errorCode: string; message: string } {
-  if (!process.env.GEMINI_API_KEY) {
-    return {
-      errorCode: "MISSING_API_KEY",
-      message: "ยังไม่ได้ตั้งค่า GEMINI_API_KEY ในระบบ (คีย์ไม่ครบ)"
-    };
-  }
-  const str = String(error?.message || error?.statusText || error || "").toLowerCase();
-  const status = Number(error?.status || error?.statusCode || 0);
-
-  if (status === 400 || str.includes("api_key_invalid") || str.includes("api key not valid") || str.includes("invalid api key") || str.includes("permission_denied")) {
-    return {
-      errorCode: "INVALID_API_KEY",
-      message: "API Key ไม่ถูกต้อง หรือไม่มีสิทธิ์เข้าถึง (คีย์ผิด)"
-    };
-  }
-
-  if (status === 429 || str.includes("resource_exhausted") || str.includes("quota") || str.includes("rate limit")) {
-    return {
-      errorCode: "QUOTA_EXCEEDED",
-      message: "โควต้าการใช้งาน Gemini API เต็มแล้ว (Quota Exceeded / 429)"
-    };
-  }
-
-  if (status === 503 || status === 500 || str.includes("unavailable") || str.includes("overloaded") || str.includes("not found")) {
-    return {
-      errorCode: "MODEL_UNAVAILABLE",
-      message: "โมเดล AI ขัดข้องชั่วคราวหรือไม่พร้อมให้บริการ (Model Unavailable)"
-    };
-  }
-
-  if (str.includes("timeout") || str.includes("deadline") || str.includes("timed out") || str.includes("etimedout")) {
-    return {
-      errorCode: "TIMEOUT",
-      message: "การตอบกลับจาก AI หมดเวลาเกิน 30 วินาที"
-    };
-  }
-
-  return {
-    errorCode: "MODEL_UNAVAILABLE",
-    message: "WIN-AI ยังไม่พร้อมใช้งานในขณะนี้ กรุณาลองใหม่อีกครั้ง"
-  };
-}
-
-function generateLocalTacticalFallback(mode: string, message: string, _imageProvided: boolean): string {
-  if (mode === 'motorcycle_mechanic') {
-    const lower = message.toLowerCase();
-    let urgency = "🟡 ปานกลาง (ควรนำรถเข้าตรวจเช็กภายใน 1-3 วัน ไม่ควรใช้เดินทางไกล)";
-    let causes = "1. ระบบไฟ/แบตเตอรี่เสื่อมหรือขั้วหลวม\n2. ระบบส่งกำลัง/โซ่-สายพานหย่อนหรือสึกหรอตามระยะ\n3. ระบบจุดระเบิด (หัวเทียน) หรือกรองอากาศอุดตัน";
-    let check = "• ตรวจดูระดับน้ำมันเครื่องผ่านตาแมวหรือก้านวัด (ขณะดับเครื่องบนขาตั้งคู่)\n• บิดกุญแจ ON แล้วกดแตร/เปิดไฟเลี้ยวเพื่อเช็กกำลังไฟแบตเตอรี่\n• สังเกตรอยหยดของเหลวใต้ท้องรถ";
-    let forbidden = "• ห้ามกดสตาร์ตแช่ยาวเกิน 5 วินาที\n• ห้ามฝืนขี่ต่อหากมีกลิ่นไหม้หรือมีไฟเตือนเครื่องยนต์ติดค้าง\n• ห้ามใช้น้ำราดชิ้นส่วนเครื่องยนต์หรือจานเบรกขณะร้อนจัด";
-    let cost = "• ค่าตรวจเช็ก/ค่าแรงเบื้องต้น: 50 - 150 บาท\n• ค่าอะไหล่สิ้นเปลืองทั่วไป: 120 - 450 บาท (ขึ้นอยู่กับรุ่นและยี่ห้อ)";
-
-    if (lower.includes("เบรก") || lower.includes("เบรค")) {
-      urgency = "🔴 สูงมาก (ห้ามขับขี่เด็ดขาด เสี่ยงเกิดอุบัติเหตุร้ายแรง)";
-      causes = "1. ผ้าเบรกหมดหรือสึกหรอจนถึงเนื้อเหล็กจานเบรก\n2. น้ำมันเบรกรั่วซึมหรือมีฟองอากาศในสายน้ำมัน\n3. จานเบรกคด สึกเป็นร่อง หรือมีคราบน้ำมันเกาะ";
-      check = "• ก้มดูความหนาของผ้าเบรก (ไม่ควรบางกว่า 2 มม.)\n• เช็กระดับน้ำมันเบรกในกระปุกปั๊มบน/ล่าง\n• บีบก้านเบรกดูว่ามีอาการจมลึกหรือวูบหรือไม่";
-      forbidden = "• ห้ามฝืนขับขี่บนท้องถนนโดยเด็ดขาด\n• ห้ามฉีดสเปรย์หล่อลื่นหรือน้ำมันลงบนจานเบรกหรือผ้าเบรกเด็ดขาด";
-      cost = "• ผ้าเบรกแท้/เทียบ: 120 - 350 บาท\n• ค่าแรงเปลี่ยนและไล่น้ำมันเบรก: 80 - 150 บาท";
-    } else if (lower.includes("สตาร์ต") || lower.includes("สตาร์ท") || lower.includes("แชะ") || lower.includes("แบต")) {
-      urgency = "🟡 ปานกลาง (รถสตาร์ตไม่ติด แต่ปลอดภัยหากจอดในที่ปลอดภัย)";
-      causes = "1. แบตเตอรี่เสื่อมสภาพหรือไฟหมด (อายุเกิน 1.5 - 2 ปี)\n2. สวิตช์ขาตั้งข้างสกปรก หรือเซนเซอร์ตัดสตาร์ตทำงานค้าง\n3. ไดสตาร์ทหรือรีเลย์สตาร์ทขัดข้อง / หัวเทียนบอด";
-      check = "• บิดกุญแจ ON แล้วกดแตร หากเสียงแตรเบามากหรือเงียบ แสดงว่าแบตหมด\n• เตะขาตั้งข้างขึ้นลง 2-3 ครั้ง และกำเบรกให้แน่นขณะกดปุ่มสตาร์ต";
-      forbidden = "• ห้ามกดปุ่มสตาร์ตแช่ยาวเกิน 5 วินาทีติดต่อกัน (อาจทำให้ไดสตาร์ตไหม้)\n• ห้ามเข็นกระตุกแรงๆ ในรถเกียร์ออโตเมติก (CVT)";
-      cost = "• ชาร์จแบตเตอรี่: 30 - 50 บาท\n• เปลี่ยนแบตเตอรี่ใหม่: 450 - 750 บาท\n• เปลี่ยนหัวเทียน: 90 - 180 บาท";
-    } else if (lower.includes("ควัน") || lower.includes("น้ำมันเครื่อง") || lower.includes("ร้อน")) {
-      urgency = "🔴 สูงมาก (เสี่ยงลูกสูบติด แหวนหัก หรือเครื่องยนต์น็อก)";
-      causes = "1. น้ำมันเครื่องแห้งหรือต่ำกว่าเกณฑ์ขั้นต่ำมาก\n2. ซีลยางตีนวาล์วหรือแหวนลูกสูบสึกหรอ ทำให้น้ำมันเครื่องเล็ดลอดเข้าห้องเผาไหม้\n3. ระบบระบายความร้อนบกพร่อง (พัดลมไม่หมุน หรือน้ำยาหล่อเย็นแห้ง)";
-      check = "• ดึงก้านวัดน้ำมันเครื่องออกมาเช็กระดับทันที (ขณะดับเครื่อง)\n• เช็กใต้ท้องรถว่ามีคราบน้ำมันเครื่องหยดนองหรือไม่";
-      forbidden = "• ห้ามฝืนสตาร์ตหรือเร่งเครื่องยนต์เด็ดขาด\n• ห้ามเปิดฝาหม้อน้ำขณะเครื่องยนต์ยังร้อนอยู่เด็ดขาด";
-      cost = "• เติม/เปลี่ยนถ่ายน้ำมันเครื่อง: 120 - 250 บาท\n• ซ่อมชุดแหวนลูกสูบ/วาล์ว: 1,200 - 2,800 บาท";
-    }
-
-    return `1. 🚨 ระดับความเร่งด่วน:
-${urgency}
-
-2. 🔍 สาเหตุที่เป็นไปได้:
-${causes}
-
-3. 🛠️ วิธีตรวจสอบเบื้องต้นอย่างปลอดภัย:
-${check}
-
-4. ⚠️ สิ่งที่ห้ามทำเด็ดขาด:
-${forbidden}
-
-5. 💵 ประมาณการค่าใช้จ่ายและค่าอะไหล่:
-${cost}
-
-*(หมายเหตุ: ตอบโดยระบบฐานข้อมูลช่างเบื้องต้นของ WINRIDER ออฟไลน์)*`;
-  } else {
-    return `1. 💰 การคำนวณต้นทุนและตั้งราคา (Pricing & Margin):
-• ต้นทุนวัตถุดิบหลัก (COGS): แนะนำให้อยู่ที่ประมาณ 35% - 45% ของราคาขาย
-• ค่าบรรจุภัณฑ์และขนส่ง: ประมาณ 10% - 15%
-• เป้าหมายกำไรสุทธิ: ควรอยู่ที่ 35% - 50%
-• สูตรคิดราคาขายแนะนำ = ต้นทุนรวม ÷ (1 - %กำไรที่ต้องการ) เช่น ต้นทุน 35 บาท ต้องการกำไร 40% ควรตั้งขายที่ 58 - 60 บาท
-
-2. 📢 แนวทางการเขียนประกาศและแคปชั่น (Copywriting):
-• Hook ดึงดูด: ชี้จุดเด่นชัดเจน เช่น สดใหม่ กรอบนาน หรือสภาพ 95% พร้อมส่ง
-• รายละเอียดสินค้า: ระบุขนาด ปริมาณ สภาพ หรือวันผลิต
-• Call to Action: กระตุ้นการตัดสินใจ พร้อมข้อมูลจัดส่งด่วนผ่าน WINRIDER
-
-3. 🍳 สูตรอาหารและเทคนิคการผลิต (กรณีอาหาร):
-• ชั่งตวงวัตถุดิบเป็นกรัมเพื่อคุมต้นทุนต่อจานให้แม่นยำ
-• เตรียมวัตถุดิบล่วงหน้าแบบ Portion เพื่อส่งได้ไวและไม่สูญเสียวัตถุดิบ
-
-4. 💡 คำแนะนำการตลาด:
-• ตรวจสอบราคาเฉลี่ยของร้านในพื้นที่รัศมี 3 กิโลเมตร
-• รูปภาพสินค้าควรชัดเจน ใช้แสงธรรมชาติเพื่อเพิ่มความน่าสนใจ`;
-  }
-}
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+].filter(Boolean)));
 
 async function generateWithGemini(contents: any, config: any) {
   const ai = getAiClient();
-  if (!ai) {
-    const err: any = new Error("MISSING_API_KEY");
-    err.code = "MISSING_API_KEY";
-    throw err;
-  }
+  if (!ai) throw new Error("GEMINI_NOT_CONFIGURED");
   let lastError: any;
   for (const model of aiModels) {
     try {
-      const response = await ai.models.generateContent({ model, contents, config });
-      if (response && response.text) return { text: response.text, model };
-    } catch (error: any) {
-      lastError = error;
-      console.warn(`Gemini model ${model} unavailable, trying next fallback...`, error?.message || error);
-    }
+      const response = await Promise.race([
+        ai.models.generateContent({ model, contents, config }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("GEMINI_TIMEOUT")), 25_000)),
+      ]);
+      if (response.text) return { text: response.text, model };
+    } catch (error) { lastError = error; }
   }
-  throw lastError || new Error("ALL_MODELS_FAILED");
+  throw lastError || new Error("GEMINI_UNAVAILABLE");
 }
 
-app.post("/api/ai/personal-assistant", rateLimit(20), async (req, res) => {
+function geminiErrorResponse(error: any) {
+  const detail = String(error?.message || error || "");
+  const status = Number(error?.status || error?.code || 0);
+  if (detail.includes("GEMINI_NOT_CONFIGURED")) return { status: 503, code: "AI_NOT_CONFIGURED", error: "ยังไม่ได้ตั้งค่า GEMINI_API_KEY ในระบบ Deploy" };
+  if (status === 429 || /quota|rate.?limit|resource_exhausted/i.test(detail)) return { status: 429, code: "AI_QUOTA_EXCEEDED", error: "โควต้า Gemini เต็มชั่วคราว กรุณารอสักครู่หรือตรวจ Spend cap/Billing" };
+  if (status === 401 || status === 403 || /api.?key|permission|unauthenticated/i.test(detail)) return { status: 503, code: "AI_KEY_INVALID", error: "Gemini API Key ใช้ไม่ได้หรือยังไม่ได้เปิดสิทธิ์ Gemini API" };
+  if (/timeout/i.test(detail)) return { status: 504, code: "AI_TIMEOUT", error: "WIN-AI ใช้เวลาตอบนานเกินไป กรุณาลองใหม่" };
+  return { status: 503, code: "AI_PROVIDER_UNAVAILABLE", error: "WIN-AI เชื่อมต่อ Gemini ไม่สำเร็จ กรุณาลองใหม่ภายหลัง" };
+}
+
+app.get("/api/ai/status", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  return res.json({ configured: Boolean(process.env.GEMINI_API_KEY), models: aiModels, vision: true, maxImageMb: 4 });
+});
+
+app.post("/api/ai/personal-assistant", rateLimit(10), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const mode = String(req.body?.mode || "");
-  if (!['motorcycle_mechanic', 'personal_commerce'].includes(mode)) {
-    return res.status(400).json({ error: "โหมด WIN-AI ไม่ถูกต้อง", errorCode: "INVALID_MODE" });
-  }
-
+  if (!['motorcycle_mechanic', 'personal_commerce'].includes(mode)) return res.status(400).json({ error: "โหมด WIN-AI ไม่ถูกต้อง" });
   const message = String(req.body?.message || "").trim().slice(0, 4000);
+  const history = Array.isArray(req.body?.history) ? req.body.history.slice(-8).flatMap((item: any) => {
+    const role = item?.role === "assistant" ? "model" : item?.role === "user" ? "user" : null;
+    const text = String(item?.text || "").trim().slice(0, 3000);
+    return role && text ? [{ role, parts: [{ text }] }] : [];
+  }) : [];
   const image = req.body?.imageDataUrl ? decodeImageDataUrl(req.body.imageDataUrl) : null;
-  if (!message && !image) {
-    return res.status(400).json({ error: "กรุณาส่งคำถามหรือรูปภาพ", errorCode: "EMPTY_REQUEST" });
-  }
-  if (req.body?.imageDataUrl && !image) {
-    return res.status(400).json({
-      error: "รูปภาพต้องเป็นไฟล์ JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB",
-      errorCode: "INVALID_IMAGE"
-    });
-  }
-
+  if (!message && !image) return res.status(400).json({ error: "กรุณาส่งคำถามหรือรูปภาพ" });
+  if (req.body?.imageDataUrl && !image) return res.status(400).json({ error: "รูปต้องเป็น JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB" });
   const systemInstruction = mode === 'motorcycle_mechanic'
-    ? `คุณคือ "WIN-AI ช่างส่วนตัว" ผู้เชี่ยวชาญด้านรถจักรยานยนต์และระบบเครื่องยนต์ 2 ล้อประจำแพลตฟอร์ม WINRIDER
-หน้าที่ของคุณคือให้คำแนะนำที่เป็นมืออาชีพ ชัดเจน เข้าใจง่าย และคำนึงถึงความปลอดภัยของผู้ขับขี่เป็นอันดับหนึ่ง
-
-เมื่อผู้ใช้ส่งอาการ ปัญหา หรือรูปภาพชิ้นส่วนรถ ให้ตอบกลับโดยจัดโครงสร้างเนื้อหาตาม 5 หัวข้อนี้อย่างเคร่งครัด:
-
-1. 🚨 ระดับความเร่งด่วน:
-(ระบุให้ชัดเจนด้วยอิโมจิ เช่น 🟢 ต่ำ / 🟡 ปานกลาง / 🔴 สูงมาก พร้อมคำอธิบายสั้นๆ ว่าขับต่อได้หรือไม่)
-
-2. 🔍 สาเหตุที่เป็นไปได้:
-(แจกแจง 2-4 สาเหตุหลักที่พบบ่อย เรียงจากโอกาสเกิดมากที่สุดไปน้อย)
-
-3. 🛠️ วิธีตรวจสอบเบื้องต้นอย่างปลอดภัย:
-(ระบุขั้นตอนที่ผู้ขับขี่ตรวจสอบได้เองด้วยตาเปล่าอย่างปลอดภัย เช่น การตรวจระดับน้ำมันเครื่อง, เช็กระยะฟรีเบรก, ตรวจดูรอยหยดใต้ท้องรถ)
-
-4. ⚠️ สิ่งที่ห้ามทำเด็ดขาด:
-(เตือนข้อห้ามเพื่อความปลอดภัย เช่น ห้ามสตาร์ตแช่เกิน 5 วินาที, ห้ามใช้น้ำราดจานเบรกร้อน, ห้ามฝืนขี่ต่อ)
-
-5. 💵 ประมาณการค่าใช้จ่ายและค่าอะไหล่:
-(ประเมินช่วงราคาค่าอะไหล่แท้/เทียบ และค่าแรงช่างในไทย พร้อมระบุว่าเป็นราคาประมาณการ)
-
-ข้อปฏิบัติความปลอดภัยขั้นวิกฤต:
-- หากพบอาการเกี่ยวกับระบบเบรก, ยางบวมหรือปริแตก, น้ำมันเชื้อเพลิงรั่ว, ระบบไฟลัดวงจร, มีกลิ่นไหม้ หรือเครื่องร้อนจัด ให้แจ้งเตือนตัวหนาว่า "อันตรายระดับสูง: ให้หยุดใช้รถทันทีและติดต่อช่าง"
-- ห้ามฟันธง 100% จากรูปถ่ายอย่างเดียว ต้องแนะนำให้นำรถเข้าตรวจเช็กกับช่างผู้ชำนาญ
-- หากข้อมูลไม่พอ ให้ถามยี่ห้อ รุ่น และปีรถเพิ่มเติมอย่างสุภาพ`
-    : `คุณคือ "WIN-AI ผู้ช่วยส่วนตัว" ที่ปรึกษาการค้าขาย การตั้งราคา คำนวณต้นทุน/กำไร การเขียนประกาศ และสูตรอาหารสำหรับพ่อค้าแม่ค้าและผู้ใช้ WINRIDER
-
-จัดโครงสร้างคำตอบให้กระชับ ชัดเจน และนำไปใช้ได้ทันที ครอบคลุม:
-
-1. 💰 การคำนวณต้นทุนและตั้งราคา (Pricing & Margin):
-- จำแนกต้นทุนวัตถุดิบ (COGS), ค่าบรรจุภัณฑ์/กล่อง, ค่าขนส่งหรือ GP (ถ้ามี)
-- แสดงสูตรคำนวณ: กำไรสุทธิ = ราคาขาย - ต้นทุนรวม และคิดเป็น % Margin
-- แนะนำช่วงราคาขายที่เหมาะสม (คุ้มทุน, แนะนำ, พรีเมียม)
-
-2. 📢 การเขียนประกาศและแคปชั่นขาย (Copywriting):
-- พาดหัวดึงดูดสายตา (Hook)
-- ชี้จุดเด่น ประโยชน์ และความคุ้มค่า
-- Call to Action พร้อมแฮชแท็กที่ตรงกลุ่มเป้าหมาย
-
-3. 🍳 สูตรอาหารและเทคนิคการทำ (Recipes & Cooking):
-- รายการวัตถุดิบพร้อมสัดส่วนที่ชัดเจน และระบุจำนวนเสิร์ฟ
-- ขั้นตอนการทำอย่างละเอียดพร้อมเคล็ดลับ (Pro-tips)
-- ประมาณการต้นทุนวัตถุดิบต่อจาน/กล่อง
-
-4. 💡 คำแนะนำการตลาดและข้อควรระวัง:
-- ระบุเสมอว่าราคาและตัวเลขเป็นค่าประมาณการจากเกณฑ์ทั่วไป แนะนำให้คิดต้นทุนจริงจากแหล่งซื้อประจำ
-- ถามรายละเอียดเพิ่มเติมอย่างสุภาพเมื่อข้อมูลไม่พอ`;
-
-  // Build context history (up to last 8 messages)
-  const rawHistory = Array.isArray(req.body?.history) ? req.body.history : [];
-  const last8 = rawHistory.slice(-8);
-  const contents: Array<{ role: string; parts: any[] }> = [];
-
-  for (const item of last8) {
-    const role = (item.role === 'assistant' || item.role === 'model') ? 'model' : 'user';
-    const text = String(item.text || item.content || '').trim();
-    if (!text) continue;
-
-    if (contents.length > 0 && contents[contents.length - 1].role === role) {
-      contents[contents.length - 1].parts[0].text += `\n${text}`;
-    } else {
-      if (contents.length === 0 && role === 'model') continue;
-      contents.push({ role, parts: [{ text }] });
-    }
-  }
-
-  const currentParts: any[] = [{ text: message || "โปรดวิเคราะห์รูปนี้ตามบทบาทของคุณ" }];
-  if (image) {
-    currentParts.push({ inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") } });
-  }
-
-  if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
-    contents.push({ role: 'model', parts: [{ text: 'รับทราบข้อมูล' }] });
-  }
-  contents.push({ role: 'user', parts: currentParts });
-
+    ? `คุณคือ “WIN-AI ช่างส่วนตัว” ผู้ช่วยภาษาไทยที่เชี่ยวชาญรถจักรยานยนต์ ตอบกระชับและลงมือทำตามลำดับ:
+1) สรุปอาการและระดับความเร่งด่วน 2) สาเหตุที่เป็นไปได้เรียงตามโอกาส 3) วิธีตรวจเบื้องต้นที่ปลอดภัย 4) สิ่งที่ห้ามทำ 5) ข้อมูลที่ต้องถามเพิ่ม 6) ช่วงค่าใช้จ่ายโดยระบุว่าเป็นค่าประมาณ
+ห้ามแต่งข้อมูลรุ่นรถหรือยืนยันการวินิจฉัยจากรูปอย่างเดียว ถ้าเกี่ยวกับเบรก ยาง น้ำมันรั่ว กลิ่นไหม้ ไฟฟ้าลัดวงจร พวงมาลัย/ล้อ หรือเครื่องร้อน ให้ขึ้นต้นว่า “หยุดใช้รถทันที” และแนะนำช่างที่มีคุณสมบัติ ห้ามแนะนำการดัดแปลงผิดกฎหมายหรือเสี่ยงอันตราย`
+    : `คุณคือ “WIN-AI ผู้ช่วยส่วนตัว” ภาษาไทยสำหรับผู้ใช้ WINRIDER.AI ช่วยประเมินราคาสินค้า คำนวณต้นทุน/กำไร เปรียบเทียบตัวเลือก เขียนประกาศ และให้สูตรอาหาร
+ตอบเป็นหัวข้อที่นำไปใช้ได้จริง ระบุสมมติฐาน ตัวเลขคำนวณ ช่วงราคาต่ำ-กลาง-สูง และคำถามที่ยังขาด ห้ามอ้างว่าเป็นราคาตลาดปัจจุบันหากไม่มีข้อมูลสด ห้ามแต่งแหล่งอ้างอิง สำหรับอาหารให้เตือนสารก่อภูมิแพ้ การเก็บรักษา และสุขอนามัยเมื่อเกี่ยวข้อง`;
+  const parts: any[] = [{ text: message || "โปรดวิเคราะห์รูปนี้ตามบทบาทของคุณ" }];
+  if (image) parts.push({ inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") } });
   try {
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("REQUEST_TIMEOUT_30S")), 30000);
+    const result = await generateWithGemini([...history, { role: "user", parts }], {
+      systemInstruction,
+      temperature: mode === 'motorcycle_mechanic' ? 0.2 : 0.35,
+      maxOutputTokens: 1400,
     });
-
-    const result = await Promise.race([
-      generateWithGemini(contents, { systemInstruction, temperature: 0.3 }),
-      timeoutPromise
-    ]) as { text: string; model: string };
-
-    return res.json({
-      reply: result.text,
-      source: result.model,
-      mode,
-      timestamp: new Date().toISOString()
-    });
+    return res.json({ reply: result.text, source: result.model });
   } catch (error: any) {
-    console.error("WIN-AI generation error:", error?.message || error);
-    const classified = classifyGeminiError(error);
-    const fallbackText = generateLocalTacticalFallback(mode, message, Boolean(image));
-
-    return res.status(classified.errorCode === "TIMEOUT" ? 504 : 503).json({
-      error: classified.message,
-      errorCode: classified.errorCode,
-      detail: String(error?.message || error),
-      modelsAttempted: aiModels,
-      fallbackReply: fallbackText,
-      canRetry: true
-    });
-  }
-});
-
-app.get("/api/ai/status", async (_req, res) => {
-  const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
-  const key = process.env.GEMINI_API_KEY || "";
-  const maskedKey = hasKey
-    ? `${key.slice(0, 6)}...${key.slice(-4)}`
-    : "ยังไม่ได้ตั้งค่า";
-
-  return res.json({
-    status: hasKey ? "ok" : "warning",
-    geminiConfigured: hasKey,
-    apiKeyStatus: hasKey ? "configured" : "missing",
-    keyMasked: maskedKey,
-    activeModels: aiModels,
-    currentPrimaryModel: aiModels[0],
-    supportedModes: [
-      {
-        id: "motorcycle_mechanic",
-        name: "WIN-AI ช่างส่วนตัว",
-        description: "วินิจฉัยอาการรถ 5 หัวข้อ (ระดับความเร่งด่วน, สาเหตุ, วิธีตรวจ, สิ่งที่ห้ามทำ, ค่าใช้จ่าย)",
-        urgencyLevels: ["🟢 ต่ำ", "🟡 ปานกลาง", "🔴 สูงมาก"]
-      },
-      {
-        id: "personal_commerce",
-        name: "WIN-AI ผู้ช่วยส่วนตัว",
-        description: "ช่วยตั้งราคา คำนวณต้นทุน/กำไร (Margin), เขียนประกาศแคปชั่น และสูตรอาหาร",
-        categories: ["ตั้งราคา & คำนวณกำไร", "เขียนแคปชั่นขาย", "สูตรอาหารคำนวณขนาดเสิร์ฟ"]
-      }
-    ],
-    maxContextTurns: 8,
-    timeoutSeconds: 30,
-    supportedFormats: ["JPG", "PNG", "WEBP"],
-    maxFileSizeMB: 4,
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.post("/api/ai/test-ping", rateLimit(10), async (_req, res) => {
-  const startTime = Date.now();
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(503).json({
-      success: false,
-      errorCode: "MISSING_API_KEY",
-      error: "ยังไม่ได้ตั้งค่า GEMINI_API_KEY ในระบบ (คีย์ไม่ครบ)",
-      latencyMs: Date.now() - startTime
-    });
-  }
-
-  const ai = getAiClient();
-  if (!ai) {
-    return res.status(503).json({
-      success: false,
-      errorCode: "MISSING_API_KEY",
-      error: "ไม่สามารถเริ่มต้นไคลเอนต์ Gemini ได้",
-      latencyMs: Date.now() - startTime
-    });
-  }
-
-  try {
-    const testResult = await Promise.race([
-      ai.models.generateContent({
-        model: aiModels[0],
-        contents: [{ role: "user", parts: [{ text: "ตอบคำว่า PONG สั้นๆ เพียงคำเดียว" }] }],
-        config: { maxOutputTokens: 10, temperature: 0.1 }
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 10000))
-    ]) as any;
-
-    const latencyMs = Date.now() - startTime;
-    return res.json({
-      success: true,
-      model: aiModels[0],
-      reply: testResult?.text?.trim() || "PONG",
-      latencyMs,
-      message: `เชื่อมต่อโมเดล ${aiModels[0]} สำเร็จ ความเร็ว ${latencyMs} ms`,
-      timestamp: new Date().toISOString()
-    });
-  } catch (err: any) {
-    const latencyMs = Date.now() - startTime;
-    const classified = classifyGeminiError(err);
-    return res.status(503).json({
-      success: false,
-      errorCode: classified.errorCode,
-      error: classified.message,
-      detail: String(err?.message || err),
-      latencyMs
-    });
+    console.error("WIN-AI error", error?.message);
+    const mapped = geminiErrorResponse(error);
+    return res.status(mapped.status).json({ error: mapped.error, code: mapped.code });
   }
 });
 
 app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim();
-  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim();
-  return res.json({ configured: true, promptPayId, accountName });
-});
-
-app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return;
-  try {
-    const walletSnap = await ordersDb.collection("wallets").doc(user.uid).get();
-    const walletData = walletSnap.data() || {};
-    const balanceSatang = typeof walletData.balanceSatang === "number" ? walletData.balanceSatang : 0;
-    
-    let submissions: any[] = [];
-    let withdrawals: any[] = [];
-    try {
-      const [topupSnap, withdrawSnap] = await Promise.all([
-        ordersDb.collection("topup_submissions").where("userId", "==", user.uid).limit(10).get(),
-        ordersDb.collection("withdrawal_requests").where("userId", "==", user.uid).limit(10).get()
-      ]);
-      submissions = topupSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      withdrawals = withdrawSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch {
-      // index or fetch fallback
-    }
-
-    const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim();
-    const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim();
-
-    return res.json({
-      userId: user.uid,
-      balanceSatang,
-      balance: balanceSatang / 100,
-      systemPromptPay: {
-        configured: true,
-        promptPayId,
-        accountName
-      },
-      submissions,
-      withdrawals
-    });
-  } catch (err: any) {
-    console.error("wallet me error:", err);
-    return res.json({
-      userId: user.uid,
-      balanceSatang: 0,
-      balance: 0.0,
-      systemPromptPay: {
-        configured: true,
-        promptPayId: String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim(),
-        accountName: String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim()
-      },
-      submissions: [],
-      withdrawals: []
-    });
-  }
-});
-
-app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return;
-  const amount = Number(req.body?.amount);
-  const amountSatang = Math.round(amount * 100);
-  const promptPayOrAccount = String(req.body?.promptPayOrAccount || "").trim();
-  const accountName = String(req.body?.accountName || "").trim();
-  const bankName = String(req.body?.bankName || "PromptPay").trim();
-
-  if (!Number.isSafeInteger(amountSatang) || amountSatang < 2000) {
-    return res.status(400).json({ error: "ยอดถอนขั้นต่ำคือ 20.00 บาท" });
-  }
-  if (!promptPayOrAccount) {
-    return res.status(400).json({ error: "กรุณาระบุหมายเลข PromptPay หรือเลขบัญชีธนาคารปลายทาง" });
-  }
-
-  try {
-    const walletRef = ordersDb.collection("wallets").doc(user.uid);
-    let updatedBalanceSatang = 0;
-
-    await ordersDb.runTransaction(async (tx) => {
-      const snap = await tx.get(walletRef);
-      const currentSatang = snap.exists ? Number(snap.data()?.balanceSatang || 0) : 0;
-      if (currentSatang < amountSatang) {
-        throw new Error("INSUFFICIENT_BALANCE");
-      }
-      updatedBalanceSatang = currentSatang - amountSatang;
-      tx.set(walletRef, {
-        userId: user.uid,
-        balanceSatang: updatedBalanceSatang,
-        updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      const withdrawRef = ordersDb.collection("withdrawal_requests").doc();
-      tx.create(withdrawRef, {
-        userId: user.uid,
-        userEmail: user.email || null,
-        amountSatang,
-        amountBaht: amountSatang / 100,
-        promptPayOrAccount,
-        accountName,
-        bankName,
-        status: "WAITING_ADMIN",
-        createdAt: FieldValue.serverTimestamp()
-      });
-
-      const ledgerRef = ordersDb.collection("ledger_entries").doc();
-      tx.create(ledgerRef, {
-        userId: user.uid,
-        amountSatang: -amountSatang,
-        type: "WITHDRAWAL_REQUEST",
-        promptPayOrAccount,
-        accountName,
-        createdAt: FieldValue.serverTimestamp()
-      });
-    });
-
-    return res.json({
-      status: "SUCCESS",
-      newBalance: updatedBalanceSatang / 100,
-      message: `ส่งคำขอถอนเงิน ฿${(amountSatang / 100).toFixed(2)} เรียบร้อยแล้ว ยอดเงินถูกตัดจาก WIN Wallet`
-    });
-  } catch (err: any) {
-    if (err?.message === "INSUFFICIENT_BALANCE") {
-      return res.status(400).json({ error: "ยอดเงินคงเหลือใน WIN Wallet ไม่เพียงพอสำหรับยอดที่ต้องการถอน (ยอดเงินปัจจุบันคือ ฿0.00)" });
-    }
-    console.error("withdrawal error:", err);
-    return res.status(500).json({ error: "เกิดข้อผิดพลาดในการทำรายการถอนเงิน กรุณาลองใหม่อีกครั้ง" });
-  }
+  const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "").replace(/\D/g, "");
+  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
+  const validPromptPay = [10, 13, 15].includes(promptPayId.length) && promptPayId !== "0899999999";
+  const validAccountName = accountName.length >= 3 && !/SYSTEM\s*WALLET/i.test(accountName);
+  const promptPayMasked = validPromptPay
+    ? `${promptPayId.slice(0, 3)}-XXX-${promptPayId.slice(-4)}`
+    : "";
+  return res.json({
+    configured: validPromptPay && validAccountName,
+    promptPayId: validPromptPay ? promptPayId : "",
+    promptPayMasked,
+    accountName: validAccountName ? accountName : "",
+    source: "server_environment",
+    error: !validPromptPay
+      ? "ADMIN_PROMPTPAY_ID ไม่ถูกต้องหรือยังเป็นค่าจำลอง"
+      : !validAccountName
+        ? "ADMIN_BANK_ACCOUNT_NAME ต้องเป็นชื่อบัญชีธนาคารจริง ไม่ใช่ชื่อระบบ"
+        : undefined,
+  });
 });
 
 app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
@@ -1319,7 +921,10 @@ app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
   const amountSatang = Math.round(Number(req.body?.amount) * 100);
   const image = decodeImageDataUrl(req.body?.imageDataUrl);
   const expectedName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
-  if (!expectedName || !process.env.ADMIN_PROMPTPAY_ID) return res.status(503).json({ error: "ผู้ดูแลยังไม่ได้ตั้งค่าบัญชีรับเงิน" });
+  const adminPromptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "").replace(/\D/g, "");
+  if (!expectedName || ![10, 13, 15].includes(adminPromptPayId.length) || adminPromptPayId === "0899999999") {
+    return res.status(503).json({ error: "บัญชีรับเงินจริงของผู้ดูแลยังไม่ถูกต้องหรือยังเป็นค่าจำลอง" });
+  }
   if (!Number.isSafeInteger(amountSatang) || amountSatang < 100 || amountSatang > 10_000_000) return res.status(400).json({ error: "ยอดเติมเงินไม่ถูกต้อง" });
   if (!image) return res.status(400).json({ error: "สลิปต้องเป็น JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB" });
   try {
