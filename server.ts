@@ -1232,7 +1232,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
   const allowedServices = new Set(["knight", "express", "mu", "spirit", "family", "pet", "link", "lifestyle", "food", "backhaul"]);
   const distanceKm = Number(input.distanceKm);
   const requestedFare = Number(input.fare);
-  if (!allowedServices.has(String(input.serviceId)) || !validCoordinates(input.pickupCoord)
+  if (!allowedServices.has(String(input.serviceId)) || !validCoordinates(input.pickupCoord) || !validCoordinates(input.dropoffCoord)
     || typeof input.dropoffLocation !== "string" || input.dropoffLocation.trim().length < 3
     || !Number.isFinite(distanceKm) || distanceKm < 0 || distanceKm > 500
     || !Number.isFinite(requestedFare) || requestedFare < 10 || requestedFare > 100_000) {
@@ -1241,8 +1241,29 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
 
   try {
     const existingRideSnap = await ordersCollection.where("passengerUserId", "==", user.uid).limit(20).get();
-    const hasActiveRide = existingRideSnap.docs.some((doc) => !["completed", "cancelled"].includes(String(doc.data().status)));
-    if (hasActiveRide) return res.status(409).json({ error: "Passenger already has an active ride" });
+    const pendingExpiry = Date.now() - 15 * 60 * 1000;
+    const stalePending = existingRideSnap.docs.filter((doc) => {
+      const data = doc.data();
+      return data.status === "pending" && Date.parse(String(data.createdAt || "")) < pendingExpiry;
+    });
+    if (stalePending.length) {
+      const batch = ordersDb.batch();
+      stalePending.forEach((doc) => batch.update(doc.ref, {
+        status: "cancelled",
+        cancellationReason: "dispatch_timeout_no_driver",
+        updatedAt: new Date().toISOString(),
+      }));
+      await batch.commit();
+    }
+    const activeRideDoc = existingRideSnap.docs.find((doc) => {
+      if (stalePending.some((stale) => stale.id === doc.id)) return false;
+      return !["completed", "cancelled"].includes(String(doc.data().status));
+    });
+    if (activeRideDoc) return res.status(409).json({
+      error: "คุณมีออเดอร์ที่กำลังดำเนินการอยู่ กรุณากลับไปดูหรือยกเลิกออเดอร์เดิมก่อน",
+      code: "ACTIVE_ORDER_EXISTS",
+      activeOrderId: activeRideDoc.id,
+    });
     const passengerSnap = await ordersDb.collection("users").doc(user.uid).get();
     const passenger = passengerSnap.data() || {};
     const now = new Date();
@@ -1295,13 +1316,13 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       });
     });
     if (firstDriverId) await ordersDb.collection("knights").doc(firstDriverId).set({ lastDispatchOfferAt: now.toISOString() }, { merge: true });
-    return res.status(201).json({ success: true, order: newOrder, dispatch: { matched: Boolean(firstDriverId), mode: newOrder.dispatchMode } });
+    return res.status(201).json({ success: true, order: newOrder, dispatch: { matched: Boolean(firstDriverId), mode: newOrder.dispatchMode, waitingForDriver: !firstDriverId } });
   } catch (error: any) {
     if (error?.message === "ORDER_ALREADY_EXISTS") {
       return res.status(409).json({ error: "Order already exists" });
     }
     console.error("[Orders POST Error]:", error?.message);
-    return res.status(503).json({ error: "Order store unavailable" });
+    return res.status(503).json({ error: "ฐานข้อมูลออเดอร์ยังไม่พร้อมใช้งาน", code: "ORDER_STORE_UNAVAILABLE" });
   }
 });
 

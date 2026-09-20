@@ -211,7 +211,10 @@ export async function createLiveOrder(orderInput: {
   customerGender?: 'female' | 'male';
   preferredDriverId?: string;
 }): Promise<LiveRideOrder> {
-  if (!orderInput.passengerUserId) throw new Error('AUTHENTICATED_PASSENGER_REQUIRED');
+  // The verified Firebase UID is the only valid owner identifier. A profile or
+  // legacy local session ID must never be used as the ride owner.
+  const authenticatedUid = getAuth().currentUser?.uid;
+  if (!authenticatedUid) throw new Error('AUTHENTICATED_PASSENGER_REQUIRED');
   const now = new Date().toISOString();
   const orderId = `WIN-${crypto.randomUUID()}`;
   const fare = Number(orderInput.fare);
@@ -224,7 +227,7 @@ export async function createLiveOrder(orderInput: {
     serviceId: orderInput.serviceId,
     serviceTitle: orderInput.serviceTitle,
     serviceIconEmoji: orderInput.serviceIconEmoji || '🛵',
-    passengerUserId: orderInput.passengerUserId,
+    passengerUserId: authenticatedUid,
     passengerName: orderInput.passengerName,
     passengerPhone: orderInput.passengerPhone,
     pickupLocation: orderInput.pickupLocation,
@@ -250,7 +253,9 @@ export async function createLiveOrder(orderInput: {
     body: JSON.stringify(newOrder),
   });
   if (!createResponse.ok) {
-    throw new Error(`ORDER_CREATE_FAILED_${createResponse.status}`);
+    const failure = await createResponse.json().catch(() => ({})) as { error?: string; code?: string; activeOrderId?: string };
+    const reason = failure.code || failure.error || `HTTP_${createResponse.status}`;
+    throw new Error(`ORDER_CREATE_FAILED:${reason}${failure.activeOrderId ? `:${failure.activeOrderId}` : ''}`);
   }
   const createdServerOrder = await createResponse.json();
   const persistedOrder = (createdServerOrder?.order || newOrder) as LiveRideOrder;

@@ -966,6 +966,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         serviceId: activeServiceId || 'knight',
         serviceTitle: selectedService ? `WIN ${selectedService.toUpperCase()}` : 'WIN KNIGHT',
         serviceIconEmoji: selectedDreamRide?.icon || '🛵',
+        // createLiveOrder binds ownership to the verified Firebase UID.
+        // This profile ID is informational only and is never trusted by the server.
         passengerUserId: currentUserSession.id,
         passengerName: `${pName} (${currentUserSession.level ? `LV.${currentUserSession.level}` : 'Citizen'})`,
         passengerPhone: pPhone,
@@ -986,9 +988,20 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       if (audioEnabled) speakThaiText('สร้างออเดอร์สำเร็จ กำลังรอพี่วินที่ผ่านเกณฑ์กดรับงานค่ะ');
     } catch (err) {
       console.error('Failed to create live order:', err);
-      const message = err instanceof Error && err.message.startsWith('GPS_')
+      const reason = err instanceof Error ? err.message : '';
+      const message = reason.startsWith('GPS_')
         ? 'ไม่สามารถอ่านตำแหน่ง GPS ได้ กรุณาอนุญาต Location แล้วลองใหม่'
-        : 'สร้างออเดอร์ไม่สำเร็จ กรุณาตรวจสอบการเข้าสู่ระบบและลองใหม่อีกครั้ง';
+        : reason === 'DESTINATION_NOT_RESOLVED'
+          ? 'ค้นหาปลายทางหรือคำนวณเส้นทางจริงไม่ได้ โปรดตรวจ GOOGLE_MAPS_API_KEY และเปิด Places API (New) กับ Routes API'
+          : reason === 'PICKUP_LOCATION_NOT_RESOLVED'
+            ? 'ค้นหาจุดรับจริงไม่ได้ กรุณาระบุชื่อสถานที่และพื้นที่ให้ชัดเจน'
+            : reason.includes('ACTIVE_ORDER_EXISTS')
+              ? 'บัญชีนี้มีออเดอร์ที่กำลังดำเนินการอยู่ กรุณาไปหน้าเดินทางเพื่อดูหรือยกเลิกออเดอร์เดิมก่อน'
+              : reason.includes('AUTHENTICATED_PASSENGER_REQUIRED') || reason.includes('AUTH_REQUIRED')
+                ? 'เซสชันเข้าสู่ระบบหมดอายุ กรุณาออกจากระบบแล้วเข้าสู่ระบบใหม่'
+                : reason.includes('ORDER_STORE_UNAVAILABLE')
+                  ? 'เชื่อมต่อฐานข้อมูลออเดอร์ไม่ได้ กรุณาตรวจ Firebase Admin และ FIRESTORE_DATABASE_ID ในระบบ Deploy'
+                  : `สร้างออเดอร์ไม่สำเร็จ${reason ? ` (${reason.replace('ORDER_CREATE_FAILED:', '')})` : ''}`;
       setBookingError(message);
     } finally {
       setIsCreatingRide(false);
