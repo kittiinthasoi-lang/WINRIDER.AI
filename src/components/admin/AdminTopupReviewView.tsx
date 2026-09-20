@@ -46,7 +46,20 @@ export const AdminTopupReviewView: React.FC = () => {
     if (!response.ok) setError(data.error || 'ดำเนินการไม่สำเร็จ'); else load();
   };
   return <div className="space-y-4">
-    <div className="flex items-center justify-between"><div><h2 className="text-xl font-black text-white">ตรวจสลิปเติมเงิน</h2><p className="text-xs text-amber-200">เทียบภาพสลิปกับข้อมูล AI และตรวจเงินเข้าบัญชีธนาคารก่อนอนุมัติ</p></div><button onClick={load} className="rounded-xl border border-cyan-400/40 p-2 text-cyan-300"><RefreshCw className="h-4 w-4" /></button></div>
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <img 
+          src="/images/cookie_box.jpg" 
+          alt="ตรวจสลิปเติมเงิน" 
+          className="w-10 h-10 rounded-2xl object-cover ring-1 ring-emerald-400/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]" 
+        />
+        <div>
+          <h2 className="text-xl font-black text-white">ตรวจสลิปเติมเงิน</h2>
+          <p className="text-xs text-amber-200">เทียบภาพสลิปกับข้อมูล AI และตรวจเงินเข้าบัญชีธนาคารก่อนอนุมัติ</p>
+        </div>
+      </div>
+      <button onClick={load} className="rounded-xl border border-cyan-400/40 p-2 text-cyan-300"><RefreshCw className="h-4 w-4" /></button>
+    </div>
     {error && <p className="rounded-xl bg-red-500/10 p-3 text-red-300">{error}</p>}
     {loading ? <Loader2 className="mx-auto animate-spin" /> : items.length === 0 ? <p className="rounded-2xl bg-white/5 p-6 text-center text-slate-400">ไม่มีสลิปรอตรวจ</p> : items.map((item) => <article key={item.id} className="grid gap-4 rounded-2xl border border-white/10 bg-[#0A1633] p-4 lg:grid-cols-[minmax(260px,0.8fr)_1fr]">
       <SlipImage submissionId={item.id} hasProof={Boolean(item.proofStoragePath)} />

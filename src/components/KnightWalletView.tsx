@@ -87,8 +87,8 @@ export const KnightWalletView: React.FC<KnightWalletViewProps> = () => {
         <div className="absolute top-0 right-0 w-44 h-44 bg-[#FFC93C]/10 rounded-full blur-2xl pointer-events-none" />
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-gray-300 flex items-center gap-1.5">
-            <Wallet className="w-4 h-4 text-[#00D4FF]" />
-            ยอดเงินกระเป๋าอัศวิน (พร้อมถอน)
+            <Wallet className="w-4 h-4 text-[#FFD700]" />
+            ยอดเงินใน WIN Wallet (พร้อมถอน)
           </span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30 font-mono font-medium">
             REAL-TIME LEDGER
@@ -105,7 +105,12 @@ export const KnightWalletView: React.FC<KnightWalletViewProps> = () => {
 
       </div>
 
-      <WalletTopUpPanel />
+      <WalletTopUpPanel
+        role="knight"
+        userId="knight-sovereign-01"
+        userName="กิตติ อินทะสร้อย"
+        onBalanceUpdate={(b) => setWallet((prev) => ({ ...prev, balance: b }))}
+      />
 
       {/* Equipment Installment Progress Bar */}
       <div className="p-4 rounded-2xl bg-[#0A1633] border border-[#00D4FF]/25 shadow-md">

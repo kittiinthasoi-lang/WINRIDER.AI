@@ -11,7 +11,7 @@ const firebaseConfig = {
   apiKey: metaEnv.VITE_FIREBASE_API_KEY || fallbackConfig.apiKey,
   authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || fallbackConfig.authDomain,
   projectId: metaEnv.VITE_FIREBASE_PROJECT_ID || fallbackConfig.projectId,
-  storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || fallbackConfig.storageBucket,
+  storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || fallbackConfig.storageBucket || 'decoded-robot-6lkcn.firebasestorage.app',
   messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || fallbackConfig.messagingSenderId,
   appId: metaEnv.VITE_FIREBASE_APP_ID || fallbackConfig.appId,
 };

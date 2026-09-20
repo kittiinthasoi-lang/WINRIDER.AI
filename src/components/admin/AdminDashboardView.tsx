@@ -136,9 +136,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         <div className="bg-[#0A1633] p-5 rounded-2xl border border-slate-800 hover:border-[#00D4FF]/40 transition-all group relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">ผู้สมัครใหม่วันนี้</span>
-            <div className="p-2 rounded-xl bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/20">
-              <Users className="w-5 h-5" />
-            </div>
+            <img 
+              src="/images/avatar_citizen.jpg" 
+              alt="ผู้สมัครใหม่" 
+              className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#00D4FF]/40 shadow-sm" 
+            />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-white font-mono">{metrics.newUsersToday.toLocaleString()}</span>
@@ -173,13 +175,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               {metrics.pendingKycCount > 0 && <span className="w-2 h-2 rounded-full bg-[#FFC93C] animate-ping" />}
               {metrics.pendingKycCount > 0 ? 'รอตรวจสอบ KYC ด่วน' : 'สถานะคิวตรวจสอบ KYC'}
             </span>
-            <div className={`p-2 rounded-xl border ${
-              metrics.pendingKycCount > 0 
-                ? 'bg-[#FFC93C]/20 text-[#FFC93C] border-[#FFC93C]/40 animate-pulse' 
-                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-            }`}>
-              <FileCheck2 className="w-5 h-5" />
-            </div>
+            <img 
+              src="/images/avatar_knight.jpg" 
+              alt="KYC Verification" 
+              className={`w-8 h-8 rounded-xl object-cover shadow-sm ring-1 ${
+                metrics.pendingKycCount > 0 ? 'ring-[#FFC93C] animate-pulse' : 'ring-emerald-400/40'
+              }`} 
+            />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className={`text-4xl font-black font-mono ${
@@ -201,9 +203,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         <div className="bg-[#0A1633] p-5 rounded-2xl border border-slate-800 hover:border-emerald-500/40 transition-all group">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">อัศวินออนไลน์สแตนด์บาย</span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <Bike className="w-5 h-5" />
-            </div>
+            <img 
+              src="/images/knight_ride.jpg" 
+              alt="Knights Online" 
+              className="w-8 h-8 rounded-xl object-cover ring-1 ring-emerald-400/50 shadow-sm" 
+            />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-emerald-400 font-mono">{metrics.knightsOnline}</span>
@@ -223,9 +227,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         <div className="bg-[#0A1633] p-5 rounded-2xl border border-slate-800 hover:border-[#00D4FF]/40 transition-all group">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">ทริปสำเร็จวันนี้</span>
-            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-              <CheckCircle className="w-5 h-5" />
-            </div>
+            <img 
+              src="/images/transit_train.jpg" 
+              alt="Trips Completed" 
+              className="w-8 h-8 rounded-xl object-cover ring-1 ring-cyan-400/50 shadow-sm" 
+            />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-white font-mono">{metrics.tripsCompletedToday}</span>
@@ -241,9 +247,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         <div className="bg-[#0A1633] p-5 rounded-2xl border border-slate-800 hover:border-indigo-500/40 transition-all group">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">รายได้เข้าถังระบบวันนี้</span>
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              <Coins className="w-5 h-5" />
-            </div>
+            <img 
+              src="/images/cyber_coins.jpg" 
+              alt="System Revenue" 
+              className="w-8 h-8 rounded-xl object-cover ring-1 ring-indigo-400/50 shadow-sm" 
+            />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-black text-white font-mono">
@@ -262,9 +270,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         <div className="bg-[#0A1633] p-5 rounded-2xl border border-[#FFC93C]/30 hover:border-[#FFC93C]/60 transition-all group">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">สิทธิ์ Founding Knight คงเหลือ</span>
-            <div className="p-2 rounded-xl bg-[#FFC93C]/10 text-[#FFC93C] border border-[#FFC93C]/20">
-              <Crown className="w-5 h-5" />
-            </div>
+            <img 
+              src="/images/armor_goldentree.jpg" 
+              alt="Founding Knight Quota" 
+              className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#FFC93C]/60 shadow-sm" 
+            />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-[#FFC93C] font-mono">
@@ -285,9 +295,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           onClick={() => onNavigateTab('kyc')}
           className="p-4 rounded-xl bg-[#0A1633] border border-slate-800 hover:border-[#00D4FF] text-left transition-all group cursor-pointer"
         >
-          <div className="w-10 h-10 rounded-xl bg-[#00D4FF]/10 text-[#00D4FF] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <FileCheck2 className="w-5 h-5" />
-          </div>
+          <img 
+            src="/images/avatar_driver_male.jpg" 
+            alt="1. ตรวจสอบเอกสาร KYC" 
+            className="w-10 h-10 rounded-xl object-cover mb-3 ring-1 ring-[#00D4FF]/40 shadow-sm group-hover:scale-110 transition-transform" 
+          />
           <h2 className="text-sm font-bold text-white group-hover:text-[#00D4FF] transition-colors">
             1. ตรวจสอบเอกสาร KYC
           </h2>
@@ -300,9 +312,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           onClick={() => onNavigateTab('users')}
           className="p-4 rounded-xl bg-[#0A1633] border border-slate-800 hover:border-[#00D4FF] text-left transition-all group cursor-pointer"
         >
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <Users className="w-5 h-5" />
-          </div>
+          <img 
+            src="/images/avatar_passenger_female.jpg" 
+            alt="2. จัดการผู้ใช้งานทุกบทบาท" 
+            className="w-10 h-10 rounded-xl object-cover mb-3 ring-1 ring-purple-400/40 shadow-sm group-hover:scale-110 transition-transform" 
+          />
           <h2 className="text-sm font-bold text-white group-hover:text-purple-400 transition-colors">
             2. จัดการผู้ใช้งานทุกบทบาท
           </h2>
@@ -315,9 +329,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           onClick={() => onNavigateTab('wallet')}
           className="p-4 rounded-xl bg-[#0A1633] border border-slate-800 hover:border-[#00D4FF] text-left transition-all group cursor-pointer"
         >
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <Coins className="w-5 h-5" />
-          </div>
+          <img 
+            src="/images/cyber_coins.jpg" 
+            alt="3. ตรวจกองทุน 5 ถัง & Ledger" 
+            className="w-10 h-10 rounded-xl object-cover mb-3 ring-1 ring-emerald-400/40 shadow-sm group-hover:scale-110 transition-transform" 
+          />
           <h2 className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">
             3. ตรวจกองทุน 5 ถัง & Ledger
           </h2>
@@ -330,9 +346,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           onClick={() => onNavigateTab('fees')}
           className="p-4 rounded-xl bg-[#0A1633] border border-slate-800 hover:border-[#00D4FF] text-left transition-all group cursor-pointer"
         >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <Layers className="w-5 h-5" />
-          </div>
+          <img 
+            src="/images/armor_circuit.jpg" 
+            alt="4. กฎค่าธรรมเนียมบันไดอัศวิน" 
+            className="w-10 h-10 rounded-xl object-cover mb-3 ring-1 ring-amber-400/40 shadow-sm group-hover:scale-110 transition-transform" 
+          />
           <h2 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
             4. กฎค่าธรรมเนียมบันไดอัศวิน
           </h2>

@@ -182,6 +182,23 @@ service cloud.firestore {
         || (signedIn() && resource.data.userId == request.auth.uid);
     }
 
+    // Payment Profiles: Real PromptPay and Bank QR receiver configuration
+    // - Users can read their own profile, or verified profiles can be read by clients for peer payment.
+    // - Users can create/update only their own profile, but status MUST be 'pending_review' (preventing self-approval).
+    // - Only Admin can approve ('verified'), reject/return ('needs_correction'), or suspend ('suspended').
+    match /payment_profiles/{uid} {
+      allow read: if isOwner(uid) || isAdmin() || resource.data.status == 'verified';
+      allow create: if (isOwner(uid) && request.resource.data.status == 'pending_review' && request.resource.data.userId == request.auth.uid)
+        || isAdmin();
+      allow update: if isAdmin()
+        || (
+          isOwner(uid)
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.status == 'pending_review'
+        );
+      allow delete: if isAdmin();
+    }
+
     // Connection-test collection is disabled in production.
     match /_connection_test/{docId} {
       allow read, write: if false;

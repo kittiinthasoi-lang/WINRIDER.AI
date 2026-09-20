@@ -150,6 +150,28 @@
         "legs": { "type": "array" }
       },
       "required": ["transactionId", "idempotencyKey", "type", "totalDebitSatang", "totalCreditSatang", "balanced"]
+    },
+    "PaymentProfile": {
+      "title": "PaymentProfile",
+      "description": "Verified peer-to-peer PromptPay receiver profile and bank QR verification",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "role": { "type": "string", "enum": ["knight", "citizen", "merchant", "partner"] },
+        "accountName": { "type": "string" },
+        "receiverType": { "type": "string", "enum": ["citizen_phone", "national_id", "merchant_tax_id", "e_wallet"] },
+        "promptPayId": { "type": "string" },
+        "bankName": { "type": "string" },
+        "qrCodeDataUrl": { "type": "string" },
+        "bankSlipQrUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending_review", "verified", "needs_correction", "suspended"] },
+        "reviewNotes": { "type": "string" },
+        "reviewedBy": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "role", "accountName", "receiverType", "promptPayId", "status"]
     }
   },
   "firestore": {
@@ -172,6 +194,10 @@
     "partners/{uid}": {
       "schema": "Partner",
       "description": "Institutional partner organization data"
+    },
+    "payment_profiles/{uid}": {
+      "schema": "PaymentProfile",
+      "description": "User verified real PromptPay payment receiver profile and bank QR"
     },
     "wallets/{uid}": {
       "schema": "Wallet",

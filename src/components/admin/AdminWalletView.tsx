@@ -186,9 +186,11 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
           <div className="bg-[#0A1633] p-5 rounded-2xl border border-[#00D4FF]/40 hover:border-[#00D4FF] transition-all relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-[#00D4FF]">1. ถังค่าระบบ (System)</span>
-              <div className="p-2 rounded-xl bg-[#00D4FF]/15 text-[#00D4FF]">
-                <Coins className="w-5 h-5" />
-              </div>
+              <img 
+                src="/images/cyber_coins.jpg" 
+                alt="System Bucket" 
+                className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#00D4FF]/40 shadow-sm" 
+              />
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-white font-mono">
@@ -207,9 +209,11 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
           <div className="bg-[#0A1633] p-5 rounded-2xl border border-emerald-500/40 hover:border-emerald-500 transition-all relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-emerald-400">2. ถังคุ้มครองอุบัติเหตุ (Insurance)</span>
-              <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
-                <Shield className="w-5 h-5" />
-              </div>
+              <img 
+                src="/images/ambulance_vehicle.jpg" 
+                alt="Insurance Bucket" 
+                className="w-8 h-8 rounded-xl object-cover ring-1 ring-emerald-500/40 shadow-sm" 
+              />
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-white font-mono">
@@ -228,9 +232,11 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
           <div className="bg-[#0A1633] p-5 rounded-2xl border border-[#FFC93C]/40 hover:border-[#FFC93C] transition-all relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-[#FFC93C]">3. ถังบำนาญอัศวิน (Pension)</span>
-              <div className="p-2 rounded-xl bg-[#FFC93C]/15 text-[#FFC93C]">
-                <HeartHandshake className="w-5 h-5" />
-              </div>
+              <img 
+                src="/images/armor_goldentree.jpg" 
+                alt="Pension Bucket" 
+                className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#FFC93C]/50 shadow-sm" 
+              />
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-[#FFC93C] font-mono">
@@ -249,9 +255,11 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
           <div className="bg-[#0A1633] p-5 rounded-2xl border border-indigo-500/40 hover:border-indigo-500 transition-all relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-indigo-300">4. ถังมัดจำหมวกนิรภัย (Helmet)</span>
-              <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400">
-                <HardHat className="w-5 h-5" />
-              </div>
+              <img 
+                src="/images/cyber_armor.jpg" 
+                alt="Helmet Bucket" 
+                className="w-8 h-8 rounded-xl object-cover ring-1 ring-indigo-400/50 shadow-sm" 
+              />
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-white font-mono">
@@ -270,9 +278,11 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
           <div className="bg-[#0A1633] p-5 rounded-2xl border border-purple-500/40 hover:border-purple-500 transition-all relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-purple-300">5. ถังอุปกรณ์ & เสื้อเกราะ (Equipment)</span>
-              <div className="p-2 rounded-xl bg-purple-500/15 text-purple-400">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
+              <img 
+                src="/images/shop_armor_kneeguards.jpg" 
+                alt="Equipment Bucket" 
+                className="w-8 h-8 rounded-xl object-cover ring-1 ring-purple-400/50 shadow-sm" 
+              />
             </div>
             <div className="mt-3">
               <div className="text-3xl font-black text-white font-mono">

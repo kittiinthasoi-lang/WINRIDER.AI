@@ -45,22 +45,22 @@ export class LedgerEngine {
   constructor(initialWallet?: Partial<KnightWalletState>) {
     this.wallet = {
       uid: initialWallet?.uid || 'KNT-SOVEREIGN-01',
-      balance: initialWallet?.balance ?? 1250.0,
+      balance: initialWallet?.balance ?? 0.0,
       pending: initialWallet?.pending ?? 0.0,
       locked: initialWallet?.locked ?? 0.0,
       buckets: {
-        system: initialWallet?.buckets?.system ?? 340.0,
-        insurance: initialWallet?.buckets?.insurance ?? 170.0,
-        pension: initialWallet?.buckets?.pension ?? 170.0,
-        helmet: initialWallet?.buckets?.helmet ?? 500.0,
-        equipment: initialWallet?.buckets?.equipment ?? 1420.0
+        system: initialWallet?.buckets?.system ?? 0.0,
+        insurance: initialWallet?.buckets?.insurance ?? 0.0,
+        pension: initialWallet?.buckets?.pension ?? 0.0,
+        helmet: initialWallet?.buckets?.helmet ?? 0.0,
+        equipment: initialWallet?.buckets?.equipment ?? 0.0
       },
       equipmentInstallment: {
         totalGoal: 3600,
-        paidAmount: initialWallet?.equipmentInstallment?.paidAmount ?? 1420,
-        todayDeductionsCount: initialWallet?.equipmentInstallment?.todayDeductionsCount ?? 7,
+        paidAmount: initialWallet?.equipmentInstallment?.paidAmount ?? 0,
+        todayDeductionsCount: initialWallet?.equipmentInstallment?.todayDeductionsCount ?? 0,
         dailyLimit: 20,
-        isCompleted: (initialWallet?.equipmentInstallment?.paidAmount ?? 1420) >= 3600
+        isCompleted: (initialWallet?.equipmentInstallment?.paidAmount ?? 0) >= 3600
       }
     };
 

@@ -94,21 +94,28 @@ export const AdminFeeRulesView: React.FC<AdminFeeRulesViewProps> = ({ adminLevel
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0A1633] p-5 rounded-2xl border border-[#00D4FF]/20 shadow-xl">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold">
-              FEE RULES MATRIX
-            </span>
-            <span className="text-xs text-slate-400 font-mono">
-              IMMUTABLE SUPERSEDE PATTERN
-            </span>
+        <div className="flex items-center gap-3">
+          <img 
+            src="/images/armor_circuit.jpg" 
+            alt="Fee Rules" 
+            className="w-11 h-11 rounded-2xl object-cover ring-1 ring-amber-400/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]" 
+          />
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold">
+                FEE RULES MATRIX
+              </span>
+              <span className="text-xs text-slate-400 font-mono">
+                IMMUTABLE SUPERSEDE PATTERN
+              </span>
+            </div>
+            <h1 className="text-2xl font-black text-white tracking-wide">
+              กฎค่าธรรมเนียมบันไดอัศวิน & GP
+            </h1>
+            <p className="text-xs text-slate-300 mt-1">
+              อัตราค่าธรรมเนียมยุติธรรม 2 บาท (ระบบ 1 บ. + กองทุนคุ้มครอง 1 บ.) และบันไดกิโลเมตร
+            </p>
           </div>
-          <h1 className="text-2xl font-black text-white tracking-wide">
-            กฎค่าธรรมเนียมบันไดอัศวิน & GP
-          </h1>
-          <p className="text-xs text-slate-300 mt-1">
-            อัตราค่าธรรมเนียมยุติธรรม 2 บาท (ระบบ 1 บ. + กองทุนคุ้มครอง 1 บ.) และบันไดกิโลเมตร
-          </p>
         </div>
 
         <button

@@ -61,21 +61,28 @@ export const AdminAuditLogsView: React.FC<AdminAuditLogsViewProps> = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0A1633] p-5 rounded-2xl border border-[#00D4FF]/20 shadow-xl">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-bold">
-              IMMUTABLE AUDIT TRAIL
-            </span>
-            <span className="text-xs text-slate-400 font-mono">
-              บันทึกการกระทำทั้งหมด: <strong className="text-white">{logs.length}</strong> รายการ
-            </span>
+        <div className="flex items-center gap-3">
+          <img 
+            src="/images/armor_lightning.jpg" 
+            alt="Audit Logs" 
+            className="w-11 h-11 rounded-2xl object-cover ring-1 ring-purple-400/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]" 
+          />
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-bold">
+                IMMUTABLE AUDIT TRAIL
+              </span>
+              <span className="text-xs text-slate-400 font-mono">
+                บันทึกการกระทำทั้งหมด: <strong className="text-white">{logs.length}</strong> รายการ
+              </span>
+            </div>
+            <h1 className="text-2xl font-black text-white tracking-wide">
+              บันทึกการทำงานของผู้ดูแล (Audit Logs)
+            </h1>
+            <p className="text-xs text-slate-300 mt-1">
+              เรียงลำดับใหม่สุดก่อน ทุกการอนุมัติ, ปฏิเสธ, ระงับบัญชี, และปรับยอดเงิน จะถูกบันทึกถาวร
+            </p>
           </div>
-          <h1 className="text-2xl font-black text-white tracking-wide">
-            บันทึกการทำงานของผู้ดูแล (Audit Logs)
-          </h1>
-          <p className="text-xs text-slate-300 mt-1">
-            เรียงลำดับใหม่สุดก่อน ทุกการอนุมัติ, ปฏิเสธ, ระงับบัญชี, และปรับยอดเงิน จะถูกบันทึกถาวร
-          </p>
         </div>
 
         <button

@@ -463,6 +463,8 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
       </section>
 
       {canEdit && perspective === 'owner' && <ProfileQuickActions
+        role="partner"
+        userName={selectedPartner.name}
         audioEnabled={audioEnabled}
         questEmptyText="ภารกิจ XP ของพาร์ทเนอร์จะแสดงเมื่อมีภารกิจจริงจากระบบ"
       />}
@@ -1246,11 +1248,11 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
       <WinScanAndPayModal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
+        entityId={selectedPartner.id}
         entityName={selectedPartner.name}
         entityType="partner"
         entityCategoryLabel={selectedPartner.categoryLabel}
         defaultAmount={250}
-        qrWalletAddress={selectedPartner.walletQrAddress}
         audioEnabled={audioEnabled}
       />
 

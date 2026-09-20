@@ -887,6 +887,8 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
           </div>
 
           <ProfileQuickActions
+            role="merchant"
+            userName={storeInfo.name}
             audioEnabled={audioEnabled}
             questContent={<SovereignQuestCenter
               initialRole="merchant"
@@ -1615,11 +1617,11 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
       <WinScanAndPayModal
         isOpen={showScanAndPayModal}
         onClose={() => setShowScanAndPayModal(false)}
+        entityId="merchant_main"
         entityName={storeInfo.name}
         entityType="merchant"
         entityCategoryLabel="ร้านค้าในระบบ WINRIDER.AI"
         defaultAmount={0}
-        qrWalletAddress=""
         audioEnabled={audioEnabled}
       />
 

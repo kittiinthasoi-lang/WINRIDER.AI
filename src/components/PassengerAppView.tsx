@@ -2312,6 +2312,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 </div>
 
                 <ProfileQuickActions
+                  role="citizen"
+                  userName={passengerProfileData.displayName}
                   audioEnabled={audioEnabled}
                   questContent={<SovereignQuestCenter
                     initialRole="citizen"
@@ -2343,35 +2345,18 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   </div>
 
                   <div className="space-y-2 pt-1">
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        id="btn-customer-sell-today"
-                        onClick={() => {
-                          if (audioEnabled) playTactileBlip(1000);
-                          setShowAddC2cModal(true);
-                        }}
-                        className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-[#FFD700] via-amber-400 to-orange-400 hover:brightness-110 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>+ ลงขายของวันนี้</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="btn-customer-qr-code"
-                        onClick={() => {
-                          if (audioEnabled) playTactileBlip(950);
-                          setCustomerQrAmount(150);
-                          setCustomerQrTitle('สินค้าจาก วันนี้มีของมาขาย');
-                          setShowCustomerQrModal(true);
-                        }}
-                        className="py-2.5 px-3 rounded-2xl bg-amber-400/20 hover:bg-amber-400/30 border-2 border-[#FFD700] text-amber-300 hover:text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
-                      >
-                        <QrCode className="w-4 h-4 text-[#FFD700]" />
-                        <span>📱 QR Code รับเงิน (ระบุยอดเอง)</span>
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      id="btn-customer-sell-today"
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(1000);
+                        setShowAddC2cModal(true);
+                      }}
+                      className="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-[#FFD700] via-amber-400 to-orange-400 hover:brightness-110 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>+ ลงขายของวันนี้</span>
+                    </button>
 
                     <button
                       type="button"

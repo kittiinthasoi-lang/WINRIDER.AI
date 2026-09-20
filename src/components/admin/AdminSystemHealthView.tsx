@@ -33,7 +33,18 @@ export const AdminSystemHealthView: React.FC = () => {
   useEffect(() => { load(); }, []);
 
   return <div className="space-y-6">
-    <header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 text-xl font-black text-white"><HeartPulse className="h-6 w-6 text-cyan-300" />System Health</h2><p className="text-xs text-slate-400">ตรวจบริการจริงและหลักฐาน Order Flow โดยไม่สร้างข้อมูลจำลอง</p></div><button onClick={load} disabled={loading} className="flex items-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-xs font-bold text-cyan-200 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />ตรวจใหม่</button></header>
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <img src="/images/cyber_vehicle.jpg" alt="System Health" className="w-10 h-10 rounded-2xl object-cover ring-1 ring-cyan-400/50 shadow-sm" />
+        <div>
+          <h2 className="text-xl font-black text-white">System Health Telemetry</h2>
+          <p className="text-xs text-slate-400">ตรวจบริการจริงและหลักฐาน Order Flow โดยไม่สร้างข้อมูลจำลอง</p>
+        </div>
+      </div>
+      <button onClick={load} disabled={loading} className="flex items-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-xs font-bold text-cyan-200 disabled:opacity-50">
+        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />ตรวจใหม่
+      </button>
+    </header>
     {error && <p className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</p>}
     {loading && !data ? <Loader2 className="mx-auto h-8 w-8 animate-spin text-cyan-300" /> : data && <>
       <div className="grid grid-cols-3 gap-3"><div className="rounded-2xl bg-emerald-500/10 p-4 text-center text-emerald-300"><strong className="block text-2xl">{data.summary.ok}</strong><span className="text-xs">พร้อม</span></div><div className="rounded-2xl bg-amber-500/10 p-4 text-center text-amber-300"><strong className="block text-2xl">{data.summary.warning}</strong><span className="text-xs">ต้องตรวจ</span></div><div className="rounded-2xl bg-red-500/10 p-4 text-center text-red-300"><strong className="block text-2xl">{data.summary.error}</strong><span className="text-xs">ไม่พร้อม</span></div></div>

@@ -275,8 +275,17 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                     >
                       <td className="py-3.5 px-4 font-sans">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-300 text-xs">
-                            {u.displayName?.substring(0, 1) || 'U'}
+                          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            <img 
+                              src={
+                                u.role === 'knight' ? '/images/avatar_knight.jpg' : 
+                                u.role === 'merchant' ? '/images/avatar_merchant.jpg' : 
+                                u.role === 'partner' ? '/images/avatar_partner.jpg' : 
+                                '/images/avatar_citizen.jpg'
+                              } 
+                              alt={u.displayName}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                           <div>
                             <div className="font-bold text-white flex items-center gap-1.5">
@@ -354,8 +363,17 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
         <div className="bg-[#0A1633] rounded-2xl border border-[#00D4FF]/30 p-6 shadow-2xl space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-[#00D4FF]/40 flex items-center justify-center font-bold text-lg text-white">
-                {selectedUser.displayName?.substring(0, 1)}
+              <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-[#00D4FF]/40 overflow-hidden flex-shrink-0">
+                <img 
+                  src={
+                    selectedUser.role === 'knight' ? '/images/avatar_knight.jpg' : 
+                    selectedUser.role === 'merchant' ? '/images/avatar_merchant.jpg' : 
+                    selectedUser.role === 'partner' ? '/images/avatar_partner.jpg' : 
+                    '/images/avatar_citizen.jpg'
+                  } 
+                  alt={selectedUser.displayName}
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">

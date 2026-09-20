@@ -779,7 +779,15 @@ function getAdminDb() {
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET;
+  let defaultStorageBucket = "decoded-robot-6lkcn.firebasestorage.app";
+  try {
+    const configPath = path.resolve(process.cwd(), "firebase-applet-config.json");
+    if (fs.existsSync(configPath)) {
+      const cfg = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      if (cfg.storageBucket) defaultStorageBucket = cfg.storageBucket;
+    }
+  } catch (e) {}
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
 
   if (projectId && clientEmail && privateKey) {
     const adminApp = initializeApp({
@@ -1176,9 +1184,133 @@ app.post("/api/ai/test-ping", rateLimit(10), async (_req, res) => {
 app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "").trim();
-  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
-  return res.json({ configured: Boolean(promptPayId && accountName), promptPayId, accountName });
+  const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim();
+  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim();
+  return res.json({ configured: true, promptPayId, accountName });
+});
+
+app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const walletSnap = await ordersDb.collection("wallets").doc(user.uid).get();
+    const walletData = walletSnap.data() || {};
+    const balanceSatang = typeof walletData.balanceSatang === "number" ? walletData.balanceSatang : 0;
+    
+    let submissions: any[] = [];
+    let withdrawals: any[] = [];
+    try {
+      const [topupSnap, withdrawSnap] = await Promise.all([
+        ordersDb.collection("topup_submissions").where("userId", "==", user.uid).limit(10).get(),
+        ordersDb.collection("withdrawal_requests").where("userId", "==", user.uid).limit(10).get()
+      ]);
+      submissions = topupSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      withdrawals = withdrawSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch {
+      // index or fetch fallback
+    }
+
+    const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim();
+    const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim();
+
+    return res.json({
+      userId: user.uid,
+      balanceSatang,
+      balance: balanceSatang / 100,
+      systemPromptPay: {
+        configured: true,
+        promptPayId,
+        accountName
+      },
+      submissions,
+      withdrawals
+    });
+  } catch (err: any) {
+    console.error("wallet me error:", err);
+    return res.json({
+      userId: user.uid,
+      balanceSatang: 0,
+      balance: 0.0,
+      systemPromptPay: {
+        configured: true,
+        promptPayId: String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim(),
+        accountName: String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim()
+      },
+      submissions: [],
+      withdrawals: []
+    });
+  }
+});
+
+app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const amount = Number(req.body?.amount);
+  const amountSatang = Math.round(amount * 100);
+  const promptPayOrAccount = String(req.body?.promptPayOrAccount || "").trim();
+  const accountName = String(req.body?.accountName || "").trim();
+  const bankName = String(req.body?.bankName || "PromptPay").trim();
+
+  if (!Number.isSafeInteger(amountSatang) || amountSatang < 2000) {
+    return res.status(400).json({ error: "ยอดถอนขั้นต่ำคือ 20.00 บาท" });
+  }
+  if (!promptPayOrAccount) {
+    return res.status(400).json({ error: "กรุณาระบุหมายเลข PromptPay หรือเลขบัญชีธนาคารปลายทาง" });
+  }
+
+  try {
+    const walletRef = ordersDb.collection("wallets").doc(user.uid);
+    let updatedBalanceSatang = 0;
+
+    await ordersDb.runTransaction(async (tx) => {
+      const snap = await tx.get(walletRef);
+      const currentSatang = snap.exists ? Number(snap.data()?.balanceSatang || 0) : 0;
+      if (currentSatang < amountSatang) {
+        throw new Error("INSUFFICIENT_BALANCE");
+      }
+      updatedBalanceSatang = currentSatang - amountSatang;
+      tx.set(walletRef, {
+        userId: user.uid,
+        balanceSatang: updatedBalanceSatang,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      const withdrawRef = ordersDb.collection("withdrawal_requests").doc();
+      tx.create(withdrawRef, {
+        userId: user.uid,
+        userEmail: user.email || null,
+        amountSatang,
+        amountBaht: amountSatang / 100,
+        promptPayOrAccount,
+        accountName,
+        bankName,
+        status: "WAITING_ADMIN",
+        createdAt: FieldValue.serverTimestamp()
+      });
+
+      const ledgerRef = ordersDb.collection("ledger_entries").doc();
+      tx.create(ledgerRef, {
+        userId: user.uid,
+        amountSatang: -amountSatang,
+        type: "WITHDRAWAL_REQUEST",
+        promptPayOrAccount,
+        accountName,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    });
+
+    return res.json({
+      status: "SUCCESS",
+      newBalance: updatedBalanceSatang / 100,
+      message: `ส่งคำขอถอนเงิน ฿${(amountSatang / 100).toFixed(2)} เรียบร้อยแล้ว ยอดเงินถูกตัดจาก WIN Wallet`
+    });
+  } catch (err: any) {
+    if (err?.message === "INSUFFICIENT_BALANCE") {
+      return res.status(400).json({ error: "ยอดเงินคงเหลือใน WIN Wallet ไม่เพียงพอสำหรับยอดที่ต้องการถอน (ยอดเงินปัจจุบันคือ ฿0.00)" });
+    }
+    console.error("withdrawal error:", err);
+    return res.status(500).json({ error: "เกิดข้อผิดพลาดในการทำรายการถอนเงิน กรุณาลองใหม่อีกครั้ง" });
+  }
 });
 
 app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
