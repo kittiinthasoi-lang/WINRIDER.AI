@@ -816,7 +816,13 @@ function decodeImageDataUrl(value: unknown) {
   return { mimeType: match[1], buffer };
 }
 
-const aiModels = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+// โมเดลกลุ่ม Free Tier ของ Google AI Studio (ไม่มีค่าใช้จ่ายตามโควตาฟรี)
+const aiModels = [
+  "gemini-3.1-flash-lite",
+  "gemini-flash-latest",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
+];
 
 async function generateWithGemini(contents: any, config: any) {
   const ai = getAiClient();
