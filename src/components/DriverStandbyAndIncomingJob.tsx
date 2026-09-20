@@ -199,7 +199,13 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
         });
         if (!cancelled) setDispatchError('');
       } catch (error) {
-        if (!cancelled) setDispatchError(isOnDuty ? 'ส่งสถานะออนไลน์หรือ GPS ไปยัง Dispatch ไม่สำเร็จ' : 'เปลี่ยนสถานะออฟไลน์ไม่สำเร็จ');
+        const reason = error instanceof Error ? error.message : '';
+        const message = reason.includes('401') ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'
+          : reason.includes('403') ? 'บัญชีพี่วินยังไม่ได้รับสิทธิ์รับงานหรือ KYC ยังไม่ผ่าน'
+          : reason.includes('Real GPS') || reason.includes('400') ? 'ยังไม่ได้รับตำแหน่ง GPS จริง กรุณาเปิด Location และอนุญาตตำแหน่งแม่นยำ'
+          : reason.includes('503') ? 'เซิร์ฟเวอร์ Dispatch หรือ Firebase Admin ยังเชื่อมต่อไม่ได้'
+          : isOnDuty ? 'ส่งสถานะออนไลน์ไปยัง Dispatch ไม่สำเร็จ กรุณาลองใหม่' : 'เปลี่ยนสถานะออฟไลน์ไม่สำเร็จ';
+        if (!cancelled) setDispatchError(message);
       }
     };
     void publish();

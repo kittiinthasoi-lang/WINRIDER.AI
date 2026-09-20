@@ -428,7 +428,10 @@ export async function updateDriverPresence(input: {
   const response = await fetch('/api/knights/presence', {
     method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify(input),
   });
-  if (!response.ok) throw new Error(`DRIVER_PRESENCE_FAILED_${response.status}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({})) as { error?: string };
+    throw new Error(`DRIVER_PRESENCE_FAILED_${response.status}:${payload.error || 'Unknown error'}`);
+  }
 }
 
 export async function fetchMyOrders(): Promise<LiveRideOrder[]> {

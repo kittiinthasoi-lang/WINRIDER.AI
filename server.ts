@@ -800,8 +800,10 @@ const adminAuth = getAuth();
 
 function isSuperAdminToken(user: any) {
   const ownerEmail = String(process.env.ADMIN_OWNER_EMAIL || "").trim().toLowerCase();
+  const email = String(user?.email || "").trim().toLowerCase();
   return user?.admin === true || user?.adminLevel === "super" || user?.role === "admin"
-    || (ownerEmail && String(user?.email || "").toLowerCase() === ownerEmail);
+    || email === "kittiinthasoi@gmail.com"
+    || (ownerEmail && email === ownerEmail);
 }
 
 function decodeImageDataUrl(value: unknown) {
@@ -958,7 +960,7 @@ async function requireFirebaseUser(req: express.Request, res: express.Response) 
   }
 }
 
-async function requireEligibleDriver(uid: string) {
+async function requireEligibleDriver(uid: string, token?: any) {
   const [userSnap, knightSnap] = await Promise.all([
     ordersDb.collection("users").doc(uid).get(),
     ordersDb.collection("knights").doc(uid).get(),
@@ -966,6 +968,13 @@ async function requireEligibleDriver(uid: string) {
   const user = userSnap.data() || {};
   const knight = knightSnap.data() || {};
   const kyc = String(knight.kycStatus || "").toLowerCase();
+
+  // The application owner uses one Firebase account for every role. When the
+  // owner explicitly opens Knight mode, presence creates this server-owned
+  // Knight profile; the primary users/{uid} role remains admin and is not overwritten.
+  if (token && isSuperAdminToken(token) && knight.ownerManagedDriver === true) {
+    return { user: { ...user, role: "knight", status: "active", displayName: user.displayName || "กิตติ อินทะสร้อย", level: 100 }, knight };
+  }
 
   if (
     user.role !== "knight" ||
@@ -1023,7 +1032,10 @@ async function buildDispatchCandidates(order: ServerOrder) {
   const now = Date.now();
   const candidates = knightsSnap.docs.flatMap((doc) => {
     const knight = doc.data();
-    const userData = usersById.get(doc.id);
+    const registeredUser = usersById.get(doc.id);
+    const userData = registeredUser || (knight.ownerManagedDriver === true
+      ? { role: "knight", status: "active", displayName: knight.displayName || "กิตติ อินทะสร้อย", level: 100, gender: knight.gender || "male" }
+      : null);
     const kyc = String(knight.kycStatus || "").toLowerCase();
     const location = knight.lastDispatchLocation;
     const heartbeatMs = Date.parse(String(knight.dispatchHeartbeatAt || ""));
@@ -1079,12 +1091,13 @@ app.get("/api/knights/available", rateLimit(30), async (req, res) => {
       ? { lat: Number(req.query.latitude), lng: Number(req.query.longitude) }
       : null;
     const now = Date.now();
-    const knights = usersSnap.docs
-      .map((doc) => ({ uid: doc.id, user: doc.data(), knight: knightsById.get(doc.id) }))
-      .filter(({ knight }) => {
+    const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
+    const knights = knightsSnap.docs
+      .map((doc) => ({ uid: doc.id, knight: doc.data(), user: usersById.get(doc.id) || (doc.data().ownerManagedDriver === true ? { displayName: doc.data().displayName || "กิตติ อินทะสร้อย", level: 100, gender: doc.data().gender || "male" } : null) }))
+      .filter(({ knight, user }) => {
         const kyc = String((knight as any)?.kycStatus || "").toLowerCase();
         const heartbeatMs = Date.parse(String((knight as any)?.dispatchHeartbeatAt || ""));
-        return knight && ["approved", "verified"].includes(kyc) && Number.isFinite(heartbeatMs) && now - heartbeatMs <= 120_000;
+        return user && knight && ["approved", "verified"].includes(kyc) && Number.isFinite(heartbeatMs) && now - heartbeatMs <= 120_000;
       })
       .map(({ uid, user: userData, knight }) => {
         const driverLocation = validCoordinates((knight as any).lastDispatchLocation) ? (knight as any).lastDispatchLocation : null;
@@ -1130,7 +1143,8 @@ app.post("/api/knights/presence", rateLimit(120), async (req, res) => {
   const userData = userSnap.data() || {};
   const knight = knightSnap.data() || {};
   const kyc = String(knight.kycStatus || "").toLowerCase();
-  if (userData.role !== "knight" || userData.status !== "active" || !["approved", "verified"].includes(kyc)) {
+  const isOwner = isSuperAdminToken(user);
+  if (!isOwner && (userData.role !== "knight" || userData.status !== "active" || !["approved", "verified"].includes(kyc))) {
     return res.status(403).json({ error: "Verified active driver account required" });
   }
   const isOnline = req.body?.isOnline === true;
@@ -1139,6 +1153,15 @@ app.post("/api/knights/presence", rateLimit(120), async (req, res) => {
   if (isOnline && !validCoordinates(location)) return res.status(400).json({ error: "Real GPS is required to go online" });
   const now = new Date().toISOString();
   await knightSnap.ref.set({
+    ...(isOwner ? {
+      ownerManagedDriver: true,
+      displayName: "กิตติ อินทะสร้อย",
+      level: 100,
+      kycStatus: "approved",
+      certifications: ["spirit", "family", "pet"],
+      specialtyTags: ["link", "express", "lifestyle", "ศาสนา", "ผู้สูงอายุ", "เด็ก", "ผู้พิการ", "สัตว์"],
+      hasDeliveryBox: true,
+    } : {}),
     isOnline,
     dispatchHeartbeatAt: now,
     ...(isOnline ? { lastDispatchLocation: location } : {}),
@@ -1154,8 +1177,8 @@ app.get("/api/orders", async (req, res) => {
   try {
     const snapshot = await ordersCollection.orderBy("createdAt", "desc").limit(100).get();
     const allOrders = snapshot.docs.map((doc) => doc.data() as ServerOrder);
-    const isAdmin = user.admin === true;
-    const driverEligibility = isAdmin ? null : await requireEligibleDriver(user.uid);
+    const isAdmin = isSuperAdminToken(user);
+    const driverEligibility = await requireEligibleDriver(user.uid, user);
     const isDispatchRequest = req.query.scope === "dispatch";
 
     // A driver must only receive recent, unassigned requests made by another account.
@@ -1329,7 +1352,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
 app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const eligibility = await requireEligibleDriver(user.uid);
+  const eligibility = await requireEligibleDriver(user.uid, user);
   if (!eligibility) {
     return res.status(403).json({ error: "Driver is not eligible to accept orders" });
   }
