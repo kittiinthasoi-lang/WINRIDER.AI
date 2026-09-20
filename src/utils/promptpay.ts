@@ -104,3 +104,28 @@ export async function generatePromptPayQRDataUrl(target: string, amount?: number
     },
   });
 }
+
+/**
+ * Generates a QR that simply encodes bank account info as readable text.
+ * Scanning shows the info (not an auto-payment QR like PromptPay).
+ */
+export async function generateBankAccountQRDataUrl(params: {
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+}): Promise<string> {
+  const { bankName, accountNumber, accountName } = params;
+  const cleanAccount = accountNumber.replace(/[^0-9-]/g, '');
+
+  const text = `ธนาคาร: ${bankName}\nเลขบัญชี: ${cleanAccount}\nชื่อบัญชี: ${accountName}`;
+
+  return await QRCode.toDataURL(text, {
+    errorCorrectionLevel: 'M',
+    margin: 2,
+    width: 380,
+    color: {
+      dark: '#002D62',
+      light: '#FFFFFF',
+    },
+  });
+}
