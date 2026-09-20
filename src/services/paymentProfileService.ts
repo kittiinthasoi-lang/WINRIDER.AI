@@ -10,9 +10,9 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth } from '../firebase';
-import { generatePromptPayQRDataUrl } from '../utils/promptpay';
+import { generatePromptPayQRDataUrl, generateBankAccountQRDataUrl } from '../utils/promptpay';
 
-export type PaymentReceiverType = 'citizen_phone' | 'national_id' | 'merchant_tax_id' | 'e_wallet';
+export type PaymentReceiverType = 'citizen_phone' | 'national_id' | 'merchant_tax_id' | 'e_wallet' | 'bank_account';
 export type PaymentProfileStatus = 'pending_review' | 'verified' | 'needs_correction' | 'suspended';
 
 export interface PaymentProfile {
@@ -92,13 +92,29 @@ export async function savePaymentProfile(params: {
   if (!accountName.trim()) {
     throw new Error('กรุณากรอกชื่อบัญชี / ชื่อผู้รับเงิน');
   }
-  const cleanPromptPay = promptPayId.replace(/[^0-9]/g, '');
-  if (!cleanPromptPay || cleanPromptPay.length < 9) {
-    throw new Error('กรุณากรอกหมายเลข PromptPay ให้ถูกต้อง (เบอร์โทร 10 หลัก หรือเลขบัตร/นิติบุคคล 13 หลัก)');
+    const cleanPromptPay = promptPayId.replace(/[^0-9]/g, '');
+
+  if (receiverType === 'bank_account') {
+    if (!cleanPromptPay || cleanPromptPay.length < 10 || cleanPromptPay.length > 15) {
+      throw new Error('กรุณากรอกเลขบัญชีธนาคารให้ถูกต้อง (10-15 หลัก)');
+    }
+    if (!bankName?.trim()) {
+      throw new Error('กรุณาระบุชื่อธนาคาร');
+    }
+  } else {
+    if (!cleanPromptPay || cleanPromptPay.length < 9) {
+      throw new Error('กรุณากรอกหมายเลข PromptPay ให้ถูกต้อง (เบอร์โทร 10 หลัก หรือเลขบัตร/นิติบุคคล 13 หลัก)');
+    }
   }
 
-  // สร้าง QR PromptPay จริงจากข้อมูลที่กรอกโดยใช้มาตรฐาน EMVCo
-  const realQrDataUrl = await generatePromptPayQRDataUrl(cleanPromptPay);
+    // สร้าง QR: PromptPay (EMVCo) หรือ ข้อมูลบัญชีธนาคาร แล้วแต่ receiverType
+  const realQrDataUrl = receiverType === 'bank_account'
+    ? await generateBankAccountQRDataUrl({
+        bankName: bankName!.trim(),
+        accountNumber: cleanPromptPay,
+        accountName: accountName.trim(),
+      })
+    : await generatePromptPayQRDataUrl(cleanPromptPay);
 
   const now = new Date().toISOString();
   const existing = await getPaymentProfile(userId);
