@@ -953,6 +953,105 @@ app.get("/api/admin/topup-proof/:id", rateLimit(30), async (req, res) => {
   }
 });
 
+app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
+
+  type HealthStatus = "ok" | "warning" | "error";
+  const checks: Array<{ id: string; name: string; status: HealthStatus; detail: string }> = [
+    { id: "server", name: "Application Server", status: "ok", detail: "API ตอบสนองและยืนยัน Super Admin สำเร็จ" },
+    { id: "firebase_auth", name: "Firebase Authentication", status: "ok", detail: "ตรวจสอบ Firebase ID token สำเร็จ" },
+  ];
+  const add = (id: string, name: string, status: HealthStatus, detail: string) => checks.push({ id, name, status, detail });
+
+  try {
+    await ordersDb.collection("users").limit(1).get();
+    add("firestore", "Firestore", "ok", `เชื่อมฐานข้อมูล ${process.env.FIRESTORE_DATABASE_ID || "configured database"} สำเร็จ`);
+  } catch (error: any) {
+    add("firestore", "Firestore", "error", `อ่านฐานข้อมูลไม่ได้: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`);
+  }
+
+  try {
+    const [metadata] = await getStorage().bucket().getMetadata();
+    add("storage", "Firebase Storage", "ok", `เชื่อม bucket ${metadata.name || "สำเร็จ"}`);
+  } catch (error: any) {
+    add("storage", "Firebase Storage", "error", `ตรวจ bucket ไม่สำเร็จ: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`);
+  }
+
+  const googleServer = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  add("google_maps_server", "Google Places & Routes", googleServer ? "ok" : "error", googleServer ? "พบคีย์ฝั่งเซิร์ฟเวอร์ (การเรียกจริงจะตรวจสิทธิ์ API อีกครั้ง)" : "ไม่พบ GOOGLE_MAPS_API_KEY");
+  add("google_maps_browser", "Google Maps หน้าเว็บ", process.env.VITE_GOOGLE_MAPS_API_KEY ? "ok" : "warning", process.env.VITE_GOOGLE_MAPS_API_KEY ? "พบคีย์สำหรับ build หน้าเว็บ" : "เซิร์ฟเวอร์ไม่พบ VITE_GOOGLE_MAPS_API_KEY โปรดตรวจ Build Environment");
+  add("gemini", "Gemini API", process.env.GEMINI_API_KEY ? "ok" : "warning", process.env.GEMINI_API_KEY ? "พบคีย์ WIN-AI และตรวจสลิป" : "WIN-AI จะไม่ทำงานจนกว่าจะตั้ง GEMINI_API_KEY");
+  add("predicthq", "PredictHQ Events", process.env.PREDICTHQ_ACCESS_TOKEN ? "ok" : "warning", process.env.PREDICTHQ_ACCESS_TOKEN ? "พบ access token" : "อีเวนต์จริงยังไม่พร้อม");
+  const promptPayReady = Boolean(process.env.ADMIN_PROMPTPAY_ID && process.env.ADMIN_BANK_ACCOUNT_NAME && process.env.ADMIN_OWNER_EMAIL);
+  add("promptpay", "PromptPay Admin", promptPayReady ? "ok" : "error", promptPayReady ? "ตั้งค่าผู้รับเงินและเจ้าของระบบครบ" : "ข้อมูล PromptPay/ชื่อบัญชี/อีเมลเจ้าของยังไม่ครบ");
+
+  let onlineKnights = 0;
+  let pendingOrders = 0;
+  try {
+    const [knights, pending] = await Promise.all([
+      ordersDb.collection("knights").where("isOnline", "==", true).get(),
+      ordersCollection.where("status", "==", "pending").limit(100).get(),
+    ]);
+    const now = Date.now();
+    onlineKnights = knights.docs.filter((doc) => {
+      const heartbeat = Date.parse(String(doc.data().dispatchHeartbeatAt || ""));
+      return Number.isFinite(heartbeat) && now - heartbeat <= 120_000 && validCoordinates(doc.data().lastDispatchLocation);
+    }).length;
+    pendingOrders = pending.size;
+    add("dispatch", "Dispatch Engine", "ok", `ออนไลน์ด้วย GPS จริง ${onlineKnights} คน • ออเดอร์รอจับคู่ ${pendingOrders} รายการ`);
+  } catch (error: any) {
+    add("dispatch", "Dispatch Engine", "error", `อ่านสถานะ Dispatch ไม่ได้: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`);
+  }
+
+  let recentOrders: any[] = [];
+  try {
+    const snapshot = await ordersCollection.orderBy("createdAt", "desc").limit(20).get();
+    const rank: Record<string, number> = { pending: 0, accepted: 1, heading_pickup: 2, picked_up: 3, in_transit: 4, completed: 5 };
+    recentOrders = snapshot.docs.map((doc) => {
+      const order = doc.data() as ServerOrder;
+      const currentRank = rank[order.status] ?? -1;
+      const cancelled = order.status === "cancelled";
+      const issues = [
+        !order.passengerUserId && "ไม่มีเจ้าของออเดอร์",
+        !validCoordinates(order.pickupCoord) && "พิกัดจุดรับไม่ถูกต้อง",
+        !validCoordinates(order.dropoffCoord) && "พิกัดปลายทางไม่ถูกต้อง",
+        !Number.isFinite(Number(order.fare)) && "ค่าโดยสารไม่ถูกต้อง",
+        currentRank >= 1 && !order.driverUserId && "ไม่มีพี่วินหลังรับงาน",
+      ].filter(Boolean);
+      return {
+        id: doc.id, serviceTitle: order.serviceTitle, status: order.status,
+        passengerName: order.passengerName, driverName: order.driverName || null,
+        createdAt: order.createdAt, updatedAt: order.updatedAt, issues,
+        stages: {
+          created: true,
+          offered: Boolean(order.offeredDriverId || order.driverUserId || currentRank >= 1),
+          accepted: currentRank >= 1,
+          headingPickup: currentRank >= 2,
+          pickedUp: currentRank >= 3,
+          inTransit: currentRank >= 4,
+          completed: currentRank >= 5,
+          cancelled,
+        },
+      };
+    });
+  } catch (error: any) {
+    add("order_audit", "Order Flow Audit", "error", `อ่านออเดอร์ล่าสุดไม่ได้: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`);
+  }
+  if (!checks.some((item) => item.id === "order_audit")) {
+    const completed = recentOrders.filter((order) => order.status === "completed" && order.issues.length === 0).length;
+    add("order_audit", "Order Flow Audit", completed > 0 ? "ok" : "warning", recentOrders.length ? `พบออเดอร์จริง ${recentOrders.length} รายการ • จบครบวงจร ${completed} รายการ` : "ยังไม่มีออเดอร์จริงสำหรับยืนยันครบวงจร");
+  }
+
+  const summary = {
+    ok: checks.filter((item) => item.status === "ok").length,
+    warning: checks.filter((item) => item.status === "warning").length,
+    error: checks.filter((item) => item.status === "error").length,
+  };
+  return res.json({ status: summary.error ? "action_required" : summary.warning ? "degraded" : "operational", summary, checks, dispatch: { onlineKnights, pendingOrders }, recentOrders, checkedAt: new Date().toISOString() });
+});
+
 app.post("/api/admin/topup-review", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
