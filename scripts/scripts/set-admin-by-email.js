@@ -30,7 +30,11 @@ async function main() {
     const user = await getAuth().getUserByEmail(targetEmail);
     console.log(`พบผู้ใช้: ${user.email} (UID: ${user.uid})`);
 
-    await getAuth().setCustomUserClaims(user.uid, { admin: true });
+    await getAuth().setCustomUserClaims(user.uid, {
+      ...(user.customClaims || {}),
+      admin: true,
+      adminLevel: "super"
+    });
     console.log(`✅ ตั้งค่า admin: true ให้ ${targetEmail} เรียบร้อยแล้ว`);
     console.log("ℹ️  ให้ logout แล้ว login ใหม่ในเว็บแอป เพื่อให้สิทธิ์มีผล");
 

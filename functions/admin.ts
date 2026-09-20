@@ -34,7 +34,9 @@ function verifyAdminAuth(request: any, requiredLevel?: AdminLevel): { adminUid: 
 
   const token = request.auth.token;
   const adminEmail = String(token?.email || '').toLowerCase();
-  const isOwnerSuperAdmin = adminEmail === "kittiinthasoi@gmail.com";
+  const isOwnerSuperAdmin =
+    adminEmail === "kittiinthasoi@gmail.com" &&
+    token?.email_verified === true;
   if (!token || (token.admin !== true && !isOwnerSuperAdmin)) {
     throw new HttpsError("permission-denied", "ไม่อนุญาต: บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบ (Admin Claim missing)");
   }

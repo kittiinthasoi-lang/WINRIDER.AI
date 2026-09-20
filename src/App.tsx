@@ -87,6 +87,36 @@ export default function App() {
 
   // Convert real Firebase or Dev userData to live UserSession
   const currentUserSession: UserSession | null = useMemo(() => {
+    if (isOwnerAdmin && firebaseUser) {
+      const mappedRole = ownerPersona;
+      const roleTitle = mappedRole === 'driver' ? 'บัญชีเจ้าของ • อัศวินไรเดอร์'
+        : mappedRole === 'customer' ? 'บัญชีเจ้าของ • พลเมืองอัศวิน'
+        : mappedRole === 'merchant' ? 'บัญชีเจ้าของ • ร้านค้าพันธมิตร'
+        : 'บัญชีเจ้าของ • องค์กรพาร์ทเนอร์';
+      const avatar = mappedRole === 'driver' ? '🏍️'
+        : mappedRole === 'customer' ? '🛡️'
+        : mappedRole === 'merchant' ? '🏪'
+        : '🏢';
+
+      return {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || 'kittiinthasoi@gmail.com',
+        name: 'กิตติ อินทะสร้อย',
+        phone: userData?.phone || '',
+        role: mappedRole,
+        primaryRole: mappedRole,
+        activePersona: mappedRole === 'driver' ? driverCitizenPersona : 'customer',
+        roleTitleTh: roleTitle,
+        level: 100,
+        xp: userData?.xp ?? 0,
+        rating: userData?.rating ?? 5,
+        avatarEmoji: userData?.avatarEmoji || avatar,
+        avatarUrl: userData?.avatarUrl || firebaseUser.photoURL || undefined,
+        bio: userData?.bioStatus || undefined,
+        registeredAt: userData?.createdAt || firebaseUser.metadata.creationTime || new Date().toISOString(),
+      };
+    }
+
     if (!userData || !userData.role) return null;
 
     const registeredRole = userData.role === 'knight' ? 'driver' 
@@ -123,16 +153,17 @@ export default function App() {
       bio: userData.bioStatus || undefined,
       registeredAt: userData.createdAt || new Date().toISOString(),
     };
-  }, [userData, driverCitizenPersona, isOwnerAdmin, ownerPersona]);
+  }, [firebaseUser, userData, driverCitizenPersona, isOwnerAdmin, ownerPersona]);
 
   const isSuperAdminUser = isOwnerAdmin;
 
   // Set default active mode according to registered role or super admin
   useEffect(() => {
-    if (firebaseUser?.email === 'kittiinthasoi@gmail.com' || firebaseUser?.email?.toLowerCase().includes('kittiinthasoi') || userData?.isAdmin) {
+    if (isOwnerAdmin) {
       setOwnerPersona('driver');
       setDriverCitizenPersona('driver');
-      setActiveMode('driver');
+      // บัญชีเจ้าของเข้าศูนย์ควบคุมโดยตรง ไม่ต้องสร้างทะเบียนผู้ใช้งานใหม่
+      setActiveMode('admin');
       return;
     }
     if (userData?.role) {
@@ -141,7 +172,7 @@ export default function App() {
       else if (userData.role === 'merchant') setActiveMode('merchant');
       else if (userData.role === 'partner') setActiveMode('partner');
     }
-  }, [userData?.role, userData?.uid, firebaseUser?.email, userData?.isAdmin]);
+  }, [userData?.role, userData?.uid, firebaseUser?.email, userData?.isAdmin, isOwnerAdmin]);
 
   const handleAddCustomerItem = (item: MarketItem) => {
     setCustomerListedItems(prev => [item, ...prev]);
@@ -304,7 +335,7 @@ export default function App() {
   }
 
   // 3. Logged in, but hasn't selected role yet -> Show 4-card role selection & registration
-  if ((!userData || !userData.role) && activeMode !== 'admin') {
+  if ((!userData || !userData.role) && !isOwnerAdmin && activeMode !== 'admin') {
     return (
       <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans flex flex-col">
         {/* Super Admin Floating / Header Bar */}

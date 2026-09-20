@@ -36,19 +36,20 @@ export const ProtectedRoute: React.FC<Props> = ({
     return <AuthModalOrView />;
   }
 
+  const isOwnerAdmin =
+    firebaseUser.email === 'kittiinthasoi@gmail.com' ||
+    firebaseUser.email?.toLowerCase().includes('kittiinthasoi') ||
+    userData?.isAdmin === true ||
+    userData?.adminLevel === 'super';
+
+  // เจ้าของระบบใช้ Firebase UID เดียวเพื่อควบคุมแอปและเปิดทุกบทบาท
+  // ไม่บังคับให้มี users/{uid} หรือสมัครบทบาทใหม่ จึงไม่ติดโควต้าลงทะเบียน
+  if (isOwnerAdmin) return <>{children}</>;
+
   // 2. Signed in, but no user document in users/{uid} yet -> Show Role Selection & Registration
   if (!userData || !userData.role) {
     return <RoleSelectionAndRegistration />;
   }
-
-  const isOwnerAdmin =
-    firebaseUser.email === 'kittiinthasoi@gmail.com' ||
-    firebaseUser.email?.toLowerCase().includes('kittiinthasoi') ||
-    userData.isAdmin === true ||
-    userData.adminLevel === 'super';
-
-  // เจ้าของระบบใช้ UID เดียวเพื่อเปิดหน้าตัวอย่างทุกบทบาท
-  if (isOwnerAdmin) return <>{children}</>;
 
   // 3. Status is pending_review (and not citizen) -> Show Pending Review
   if (userData.status === 'pending_review' && userData.role !== 'citizen') {
