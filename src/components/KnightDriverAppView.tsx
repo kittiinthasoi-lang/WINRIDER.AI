@@ -17,6 +17,8 @@ import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { DriverPaymentQrCodeModal } from './DriverPaymentQrCodeModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { loadProfileCustomization } from '../services/profileService';
+import { WalletTopUpPanel } from './WalletTopUpPanel';
+import { WinAiAssistantPanel } from './WinAiAssistantPanel';
 import { calculateLevelMaxXp, getLevelDifficultyMetrics } from '../data/tierHierarchyData';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import { 
@@ -70,7 +72,7 @@ const pcxBikeImg = '/images/garage_pcx.jpg';
 const adventureBikeImg = '/images/garage_adventure.jpg';
 const evBikeImg = '/images/garage_ev.jpg';
 
-export type DriverTabType = 'profile' | 'garage' | 'cabinet' | 'armor' | 'armorLab' | 'calculator' | 'installment' | 'wallet' | 'jobs' | 'quests' | 'navigation';
+export type DriverTabType = 'profile' | 'garage' | 'cabinet' | 'armor' | 'armorLab' | 'calculator' | 'installment' | 'wallet' | 'mechanic' | 'jobs' | 'quests' | 'navigation';
 
 interface KnightDriverAppViewProps {
   audioEnabled: boolean;
@@ -748,6 +750,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               { id: 'garage' as const, label: 'อู่รถ (GARAGE)', icon: <Wrench className="w-4 h-4 mx-auto" /> },
               { id: 'cabinet' as const, label: 'ตู้ชุดเกราะ', icon: <Shirt className="w-4 h-4 mx-auto" /> },
               { id: 'wallet' as const, label: 'กระเป๋าเงิน', icon: <Coins className="w-4 h-4 mx-auto" /> },
+              { id: 'mechanic' as const, label: 'WIN-AI ช่างส่วนตัว', icon: <Wrench className="w-4 h-4 mx-auto text-cyan-300" /> },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1119,6 +1122,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
             {/* 6. WALLET & EQUIPMENT TAB (Matches IMG_6075 + Upgraded Armor/Helmet Cards) */}
             {activeDriverTab === 'wallet' && (
               <div className="space-y-4">
+                <WalletTopUpPanel />
                 {/* Credit Toast Notification */}
                 {creditToast && (
                   <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-bold text-xs text-center shadow-xl border border-white/30 animate-bounce">
@@ -1349,6 +1353,8 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               </div>
             )}
 
+            {activeDriverTab === 'mechanic' && <WinAiAssistantPanel mode="motorcycle_mechanic" />}
+
             {/* 4. LIVE JOBS & DISPATCH TAB (STANDBY RADAR & FAIR PROXIMITY DISPATCH) */}
             {activeDriverTab === 'jobs' && (
               <div className="space-y-4">
@@ -1380,17 +1386,6 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                     งานรับส่งจะปรากฏเมื่อมีออเดอร์จริงและคุณเปิดสถานะปฏิบัติงาน ระบบจะไม่สร้างงาน รายได้ หรือ XP จำลองบนหน้านี้
                   </p>
                 </div>
-              </div>
-            )}
-
-            {activeDriverTab === 'navigation' && (
-              <div className="space-y-4">
-                <KnightNavigationMapScreen
-                  activeVehicle={activeVehicle}
-                  driverLevel={driverLevel}
-                  audioEnabled={audioEnabled}
-                  isEmbedded={true}
-                />
               </div>
             )}
 

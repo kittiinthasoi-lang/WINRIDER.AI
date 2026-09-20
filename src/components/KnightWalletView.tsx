@@ -6,15 +6,13 @@ import {
   HardHat, 
   Wrench, 
   ArrowUpRight, 
-  QrCode, 
   Clock, 
   CheckCircle2, 
   ChevronRight,
   TrendingUp,
-  X
 } from 'lucide-react';
 import { globalLedgerEngine, KnightWalletState, LedgerEntry } from '../core/ledger';
-import { defaultPaymentProvider } from '../adapters/defaultProviders';
+import { WalletTopUpPanel } from './WalletTopUpPanel';
 
 interface KnightWalletViewProps {
   onBack?: () => void;
@@ -23,10 +21,6 @@ interface KnightWalletViewProps {
 export const KnightWalletView: React.FC<KnightWalletViewProps> = () => {
   const [wallet, setWallet] = useState<KnightWalletState>(globalLedgerEngine.getWallet());
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>(globalLedgerEngine.getLedgerEntries());
-  const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [topupAmount, setTopupAmount] = useState<number>(200);
-  const [isProcessing, setIsProcessing] = useState(false);
 
   const bucketsInfo = [
     {
@@ -81,31 +75,6 @@ export const KnightWalletView: React.FC<KnightWalletViewProps> = () => {
     }
   ];
 
-  const handleOpenPromptPay = async (amt: number) => {
-    setTopupAmount(amt);
-    setIsProcessing(true);
-    try {
-      const qrRes = await defaultPaymentProvider.generatePromptPayQR({
-        targetPhoneOrId: '0812345678',
-        amount: amt,
-        referenceId: `TOPUP-${Date.now()}`
-      });
-      setQrDataUrl(qrRes.qrDataUrl || '');
-      setQrModalOpen(true);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleSimulatePaymentSuccess = () => {
-    globalLedgerEngine.topupViaPromptPay(topupAmount);
-    setWallet(globalLedgerEngine.getWallet());
-    setLedgerEntries(globalLedgerEngine.getLedgerEntries());
-    setQrModalOpen(false);
-  };
-
   const installmentPercent = Math.min(
     100, 
     Math.round((wallet.equipmentInstallment.paidAmount / wallet.equipmentInstallment.totalGoal) * 100)
@@ -134,30 +103,9 @@ export const KnightWalletView: React.FC<KnightWalletViewProps> = () => {
           <span className="text-xs text-gray-400">บาท</span>
         </div>
 
-        {/* Top-up Buttons */}
-        <div className="flex items-center gap-2 pt-2 border-t border-white/10 mt-3">
-          <button
-            onClick={() => handleOpenPromptPay(200)}
-            disabled={isProcessing}
-            className="flex-1 py-2 px-3 rounded-xl bg-[#00D4FF] text-[#0A1633] text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-[#38E1FF] transition active:scale-98 shadow-[0_0_15px_rgba(0,212,255,0.3)]"
-          >
-            <QrCode className="w-4 h-4" />
-            <span>เติมเงิน PromptPay</span>
-          </button>
-          <button
-            onClick={() => handleOpenPromptPay(500)}
-            className="py-2 px-3 rounded-xl bg-white/5 border border-white/15 text-xs text-gray-200 hover:bg-white/10 transition"
-          >
-            +500฿
-          </button>
-          <button
-            onClick={() => handleOpenPromptPay(1000)}
-            className="py-2 px-3 rounded-xl bg-white/5 border border-white/15 text-xs text-gray-200 hover:bg-white/10 transition"
-          >
-            +1,000฿
-          </button>
-        </div>
       </div>
+
+      <WalletTopUpPanel />
 
       {/* Equipment Installment Progress Bar */}
       <div className="p-4 rounded-2xl bg-[#0A1633] border border-[#00D4FF]/25 shadow-md">
@@ -282,49 +230,6 @@ export const KnightWalletView: React.FC<KnightWalletViewProps> = () => {
         </div>
       </div>
 
-      {/* PromptPay QR Modal */}
-      {qrModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-[#0A1633] border border-[#00D4FF]/40 rounded-2xl p-5 text-center shadow-[0_0_35px_rgba(0,212,255,0.3)]">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
-              <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                <QrCode className="w-4 h-4 text-[#00D4FF]" />
-                สแกนชำระผ่าน PromptPay QR
-              </span>
-              <button
-                onClick={() => setQrModalOpen(false)}
-                className="p-1 rounded-full text-gray-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-gray-300 mb-2">ยอดเติมเงินเข้ากระเป๋าอัศวิน</p>
-            <div className="text-2xl font-black text-[#FFC93C] mb-3">
-              ฿{topupAmount.toFixed(2)} บาท
-            </div>
-
-            {/* QR Code */}
-            <div className="p-3 bg-white rounded-xl inline-block shadow-inner mb-3">
-              {qrDataUrl ? (
-                <img src={qrDataUrl} alt="PromptPay QR" className="w-48 h-48 mx-auto" />
-              ) : (
-                <div className="w-48 h-48 flex items-center justify-center text-gray-400 text-xs">
-                  กำลังสร้าง QR Code...
-                </div>
-              )}
-            </div>
-
-            <p className="text-[10px] text-gray-400 mb-4">
-              รองรับทุก Mobile Banking ของทุกธนาคารในประเทศไทย
-            </p>
-
-            <div className="w-full rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-2.5 text-xs font-bold text-amber-200">
-              รอการยืนยันธุรกรรมจริงจากผู้ให้บริการชำระเงิน
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

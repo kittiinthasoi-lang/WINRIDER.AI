@@ -23,6 +23,7 @@ import { AdminUsersView } from './AdminUsersView';
 import { AdminWalletView } from './AdminWalletView';
 import { AdminFeeRulesView } from './AdminFeeRulesView';
 import { AdminAuditLogsView } from './AdminAuditLogsView';
+import { AdminTopupReviewView } from './AdminTopupReviewView';
 
 interface AdminLayoutProps {
   adminLevel: AdminLevel;
@@ -37,13 +38,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onExitAdmin,
   onSwitchAdminLevel
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'kyc' | 'users' | 'wallet' | 'fees' | 'audit'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'kyc' | 'users' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
 
-  const tabs: { id: 'dashboard' | 'kyc' | 'users' | 'wallet' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
+  const tabs: { id: 'dashboard' | 'kyc' | 'users' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'dashboard', label: 'ภาพรวมระบบ', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'kyc', label: 'ตรวจเอกสาร KYC', icon: <FileCheck2 className="w-4 h-4" />, badge: '5 รอตรวจ' },
     { id: 'users', label: 'จัดการผู้ใช้งาน', icon: <Users className="w-4 h-4" /> },
     { id: 'wallet', label: 'กองทุน 5 ถัง & Ledger', icon: <Coins className="w-4 h-4" /> },
+    { id: 'topups', label: 'อนุมัติสลิปเติมเงิน', icon: <BadgeAlert className="w-4 h-4" /> },
     { id: 'fees', label: 'กฎค่าธรรมเนียม & GP', icon: <Layers className="w-4 h-4" /> },
     { id: 'audit', label: 'บันทึก Audit Logs', icon: <FileText className="w-4 h-4" /> },
   ];
@@ -157,6 +159,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {activeTab === 'wallet' && (
           <AdminWalletView adminLevel={adminLevel} />
         )}
+        {activeTab === 'topups' && <AdminTopupReviewView />}
         {activeTab === 'fees' && (
           <AdminFeeRulesView adminLevel={adminLevel} />
         )}

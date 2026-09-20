@@ -117,6 +117,17 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    // Top-up proofs and reference locks are server controlled. Users can read
+    // only their own submission status; only admins can inspect the queue.
+    match /topup_submissions/{submissionId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /topup_references/{referenceHash} {
+      allow read, write: if false;
+    }
+
     // Rides are state-controlled by the trusted backend. Clients may read their own ride,
     // but cannot mutate status, driver assignment, fare, or financial fields directly.
     match /rides/{rideId} {

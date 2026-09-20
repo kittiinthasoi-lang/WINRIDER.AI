@@ -7,6 +7,7 @@ import { GoogleGenAI } from "@google/genai";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import { getStorage } from "firebase-admin/storage";
 
 dotenv.config();
 
@@ -22,7 +23,7 @@ const PORT = isDevContainer
   ? (Number(process.env.DEFAULT_APP_PORT) || 3000)
   : (Number(process.env.PORT) || 3000);
 
-app.use(express.json({ limit: "64kb" }));
+app.use(express.json({ limit: "6mb" }));
 
 // Lightweight per-instance abuse protection for sensitive API mutations.
 // Authentication remains the primary authorization control; this limiter only
@@ -796,6 +797,152 @@ function getAdminDb() {
 
 const ordersDb = getAdminDb();
 const adminAuth = getAuth();
+
+function isSuperAdminToken(user: any) {
+  const ownerEmail = String(process.env.ADMIN_OWNER_EMAIL || "").trim().toLowerCase();
+  return user?.admin === true || user?.adminLevel === "super" || user?.role === "admin"
+    || (ownerEmail && String(user?.email || "").toLowerCase() === ownerEmail);
+}
+
+function decodeImageDataUrl(value: unknown) {
+  const match = String(value || "").match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return null;
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length < 100 || buffer.length > 4 * 1024 * 1024) return null;
+  return { mimeType: match[1], buffer };
+}
+
+const aiModels = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+
+async function generateWithGemini(contents: any, config: any) {
+  const ai = getAiClient();
+  if (!ai) throw new Error("GEMINI_NOT_CONFIGURED");
+  let lastError: any;
+  for (const model of aiModels) {
+    try {
+      const response = await ai.models.generateContent({ model, contents, config });
+      if (response.text) return { text: response.text, model };
+    } catch (error) { lastError = error; }
+  }
+  throw lastError || new Error("GEMINI_UNAVAILABLE");
+}
+
+app.post("/api/ai/personal-assistant", rateLimit(10), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const mode = String(req.body?.mode || "");
+  if (!['motorcycle_mechanic', 'personal_commerce'].includes(mode)) return res.status(400).json({ error: "โหมด WIN-AI ไม่ถูกต้อง" });
+  const message = String(req.body?.message || "").trim().slice(0, 4000);
+  const image = req.body?.imageDataUrl ? decodeImageDataUrl(req.body.imageDataUrl) : null;
+  if (!message && !image) return res.status(400).json({ error: "กรุณาส่งคำถามหรือรูปภาพ" });
+  if (req.body?.imageDataUrl && !image) return res.status(400).json({ error: "รูปต้องเป็น JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB" });
+  const systemInstruction = mode === 'motorcycle_mechanic'
+    ? "คุณคือ WIN-AI ช่างส่วนตัว ผู้ช่วยภาษาไทยด้านรถจักรยานยนต์ ถามยี่ห้อ รุ่น ปี และอาการเมื่อข้อมูลไม่พอ ให้ขั้นตอนตรวจที่ปลอดภัย ห้ามยืนยันการวินิจฉัยจากรูปอย่างเดียว และต้องสั่งหยุดใช้รถทันทีเมื่อพบความเสี่ยงเบรก ยาง เชื้อเพลิง ไฟฟ้าลัดวงจร กลิ่นไหม้ หรือเครื่องร้อน"
+    : "คุณคือ WIN-AI ผู้ช่วยส่วนตัวภาษาไทย ช่วยประเมินช่วงราคาสินค้า เปรียบเทียบปัจจัยตลาด คำนวณต้นทุน เขียนประกาศ และให้สูตรอาหาร ระบุว่าเป็นค่าประมาณ ห้ามอ้างราคาตลาดปัจจุบันหากไม่มีแหล่งข้อมูลสด และถามรายละเอียดเมื่อข้อมูลไม่พอ";
+  const parts: any[] = [{ text: message || "โปรดวิเคราะห์รูปนี้ตามบทบาทของคุณ" }];
+  if (image) parts.push({ inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") } });
+  try {
+    const result = await generateWithGemini([{ role: "user", parts }], { systemInstruction, temperature: 0.3 });
+    return res.json({ reply: result.text, source: result.model });
+  } catch (error: any) {
+    console.error("WIN-AI error", error?.message);
+    return res.status(503).json({ error: "WIN-AI ยังไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง" });
+  }
+});
+
+app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "").trim();
+  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
+  return res.json({ configured: Boolean(promptPayId && accountName), promptPayId, accountName });
+});
+
+app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const amountSatang = Math.round(Number(req.body?.amount) * 100);
+  const image = decodeImageDataUrl(req.body?.imageDataUrl);
+  const expectedName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
+  if (!expectedName || !process.env.ADMIN_PROMPTPAY_ID) return res.status(503).json({ error: "ผู้ดูแลยังไม่ได้ตั้งค่าบัญชีรับเงิน" });
+  if (!Number.isSafeInteger(amountSatang) || amountSatang < 100 || amountSatang > 10_000_000) return res.status(400).json({ error: "ยอดเติมเงินไม่ถูกต้อง" });
+  if (!image) return res.status(400).json({ error: "สลิปต้องเป็น JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB" });
+  try {
+    const schema = { type: "OBJECT", properties: {
+      amount: { type: "NUMBER" }, reference: { type: "STRING" }, recipientName: { type: "STRING" },
+      recipientAccountHint: { type: "STRING" }, transferDateTime: { type: "STRING" }, confidence: { type: "NUMBER" }
+    }, required: ["amount", "reference", "recipientName", "confidence"] };
+    const result = await generateWithGemini([{ role: "user", parts: [
+      { text: "อ่านสลิปโอนเงินนี้ตามข้อมูลที่มองเห็นเท่านั้น ห้ามเดาหรือเติมข้อมูลที่ไม่มี" },
+      { inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") } }
+    ]}], { responseMimeType: "application/json", responseSchema: schema, temperature: 0 });
+    const extracted = JSON.parse(result.text);
+    const reference = String(extracted.reference || "").replace(/\s/g, "").slice(0, 120);
+    const nameOk = String(extracted.recipientName || "").replace(/\s/g, "").includes(expectedName.replace(/\s/g, ""));
+    const amountOk = Math.round(Number(extracted.amount) * 100) === amountSatang;
+    const confidenceOk = Number(extracted.confidence) >= 0.75;
+    if (!reference || !nameOk || !amountOk || !confidenceOk) {
+      const reasons = [!amountOk && "ยอดเงินไม่ตรง", !nameOk && "ชื่อผู้รับไม่ตรง", !reference && "ไม่พบเลขอ้างอิง", !confidenceOk && "อ่านสลิปไม่ชัด"].filter(Boolean);
+      return res.status(422).json({ status: "REJECTED_AI", error: reasons.join(" • "), extracted });
+    }
+    const refHash = crypto.createHash("sha256").update(reference).digest("hex");
+    const imageHash = crypto.createHash("sha256").update(image.buffer).digest("hex");
+    const submissionRef = ordersDb.collection("topup_submissions").doc();
+    await ordersDb.runTransaction(async (tx) => {
+      const duplicateRef = ordersDb.collection("topup_references").doc(refHash);
+      const duplicate = await tx.get(duplicateRef);
+      if (duplicate.exists) throw new Error("DUPLICATE_SLIP");
+      tx.create(duplicateRef, { submissionId: submissionRef.id, status: "WAITING_ADMIN", createdAt: FieldValue.serverTimestamp() });
+      tx.create(submissionRef, { userId: user.uid, userEmail: user.email || null, amountSatang, reference, refHash, imageHash,
+        extracted, aiModel: result.model, status: "WAITING_ADMIN", createdAt: FieldValue.serverTimestamp() });
+    });
+    try {
+      const ext = image.mimeType.split('/')[1].replace('jpeg', 'jpg');
+      await getStorage().bucket().file(`topup-proofs/${user.uid}/${submissionRef.id}.${ext}`).save(image.buffer, { contentType: image.mimeType, resumable: false });
+    } catch (storageError: any) { console.error("Top-up proof storage error", storageError?.message); }
+    return res.status(202).json({ status: "WAITING_ADMIN", submissionId: submissionRef.id, message: "อ่านสลิปผ่านแล้ว กำลังรอ Super Admin ยืนยันยอด" });
+  } catch (error: any) {
+    if (error?.message === "DUPLICATE_SLIP") return res.status(409).json({ error: "เลขอ้างอิงสลิปนี้ถูกส่งแล้ว" });
+    console.error("Top-up proof error", error?.message);
+    return res.status(503).json({ error: "ตรวจสลิปไม่สำเร็จ กรุณาลองใหม่" });
+  }
+});
+
+app.get("/api/admin/topup-submissions", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
+  const snap = await ordersDb.collection("topup_submissions").where("status", "==", "WAITING_ADMIN").limit(50).get();
+  return res.json({ submissions: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) });
+});
+
+app.post("/api/admin/topup-review", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
+  const submissionId = String(req.body?.submissionId || "");
+  const decision = String(req.body?.decision || "");
+  if (!submissionId || !["APPROVE", "REJECT"].includes(decision)) return res.status(400).json({ error: "ข้อมูลการอนุมัติไม่ถูกต้อง" });
+  await ordersDb.runTransaction(async (tx) => {
+    const topupRef = ordersDb.collection("topup_submissions").doc(submissionId);
+    const snap = await tx.get(topupRef);
+    if (!snap.exists || snap.data()?.status !== "WAITING_ADMIN") throw new Error("ALREADY_REVIEWED");
+    const topup: any = snap.data();
+    if (decision === "REJECT") {
+      tx.update(topupRef, { status: "REJECTED_ADMIN", reviewedBy: user.uid, reviewedAt: FieldValue.serverTimestamp() });
+      tx.update(ordersDb.collection("topup_references").doc(topup.refHash), { status: "REJECTED_ADMIN" });
+      return;
+    }
+    const walletRef = ordersDb.collection("wallets").doc(topup.userId);
+    const wallet = await tx.get(walletRef);
+    const balance = Number(wallet.data()?.balanceSatang || 0);
+    tx.set(walletRef, { userId: topup.userId, balanceSatang: balance + topup.amountSatang, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    tx.create(ordersDb.collection("ledger_entries").doc(), { userId: topup.userId, amountSatang: topup.amountSatang, type: "TOP_UP_MANUAL_REVIEW", submissionId, reference: topup.reference, createdAt: FieldValue.serverTimestamp(), createdBy: user.uid });
+    tx.update(topupRef, { status: "APPROVED", reviewedBy: user.uid, reviewedAt: FieldValue.serverTimestamp() });
+    tx.update(ordersDb.collection("topup_references").doc(topup.refHash), { status: "APPROVED" });
+  });
+  return res.json({ ok: true, status: decision === "APPROVE" ? "APPROVED" : "REJECTED_ADMIN" });
+});
 
 async function requireFirebaseUser(req: express.Request, res: express.Response) {
   const header = req.headers.authorization || "";

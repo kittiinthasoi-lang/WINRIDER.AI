@@ -14,6 +14,8 @@ import { playTactileBlip, playRadarScan, playLevelUpFanfare } from '../utils/aud
 import { getCurrentUserSession } from '../utils/userSession';
 import confetti from 'canvas-confetti';
 import { loadProfileCustomization } from '../services/profileService';
+import { WalletTopUpPanel } from './WalletTopUpPanel';
+import { WinAiAssistantPanel } from './WinAiAssistantPanel';
 import { 
   ShoppingBag, 
   Users, 
@@ -420,6 +422,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
           {merchantXpToast}
         </div>
       )}
+      {canEdit && perspective === 'owner' && <><WalletTopUpPanel /><WinAiAssistantPanel mode="personal_commerce" /></>}
 
       {/* PERSPECTIVE SWITCHER BAR (แบบที่ 1 vs แบบที่ 2) */}
       <section className="p-4 rounded-3xl bg-gradient-to-r from-[#060E20] via-[#09152E] to-[#060E20] border-2 border-amber-400/40 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4">

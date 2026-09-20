@@ -29,6 +29,8 @@ import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { ReligiousNotificationsModal } from './ReligiousNotificationsModal';
+import { WalletTopUpPanel } from './WalletTopUpPanel';
+import { WinAiAssistantPanel } from './WinAiAssistantPanel';
 import { CyberGraphic, DreamRideVehicleImage } from './CyberGraphic';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import confetti from 'canvas-confetti';
@@ -2157,6 +2159,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             {/* 5. PROFILE TAB */}
             {activeTab === 'profile' && (
               <div className="space-y-4">
+                <WalletTopUpPanel />
+                <WinAiAssistantPanel mode="personal_commerce" />
                 {/* Profile Header Card */}
                 <div 
                   className={`p-5 rounded-3xl bg-gradient-to-r ${passengerProfileData.bannerGlow || 'from-[#0C1E40] via-[#091530] to-[#070D1E]'} border border-[#FFD700]/40 space-y-3 shadow-xl transition-all`}
