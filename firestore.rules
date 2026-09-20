@@ -128,28 +128,6 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Each account owns one receiving profile. Owners may submit or edit it,
-    // but only an admin can mark it verified and enable payouts.
-    match /payment_profiles/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
-      allow create: if isOwner(uid)
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.verificationStatus == 'pending'
-        && request.resource.data.payoutsEnabled == false;
-      allow update: if isAdmin() || (
-        isOwner(uid)
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.verificationStatus == 'pending'
-        && request.resource.data.payoutsEnabled == false
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'role', 'receiverType', 'accountName', 'promptPayType', 'promptPayId',
-          'promptPayMasked', 'qrImageUrl', 'verificationStatus', 'rejectionReason',
-          'payoutsEnabled', 'consentAccepted', 'updatedAt'
-        ])
-      );
-      allow delete: if isAdmin();
-    }
-
     // Rides are state-controlled by the trusted backend. Clients may read their own ride,
     // but cannot mutate status, driver assignment, fare, or financial fields directly.
     match /rides/{rideId} {
@@ -202,6 +180,23 @@ service cloud.firestore {
           && request.resource.data.userId == request.auth.uid);
       allow delete: if isAdmin()
         || (signedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // Payment Profiles: Real PromptPay and Bank QR receiver configuration
+    // - Users can read their own profile, or verified profiles can be read by clients for peer payment.
+    // - Users can create/update only their own profile, but status MUST be 'pending_review' (preventing self-approval).
+    // - Only Admin can approve ('verified'), reject/return ('needs_correction'), or suspend ('suspended').
+    match /payment_profiles/{uid} {
+      allow read: if isOwner(uid) || isAdmin() || resource.data.status == 'verified';
+      allow create: if (isOwner(uid) && request.resource.data.status == 'pending_review' && request.resource.data.userId == request.auth.uid)
+        || isAdmin();
+      allow update: if isAdmin()
+        || (
+          isOwner(uid)
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.status == 'pending_review'
+        );
+      allow delete: if isAdmin();
     }
 
     // Connection-test collection is disabled in production.

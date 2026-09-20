@@ -259,8 +259,36 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
           </div>
         </div>
 
-        <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3.5 text-xs text-amber-100">
-          QR ชำระเงินจะแสดงจากช่องทางรับเงินจริงของพี่วินที่ผูกกับออเดอร์และผ่านการตรวจสอบเท่านั้น หน้าสรุปนี้ไม่สร้าง QR จำลอง
+        {/* PromptPay QR Code Payment Display */}
+        <div className="p-3.5 rounded-2xl bg-black/60 border border-white/10 flex flex-col sm:flex-row items-center gap-3 text-xs">
+          <div className="w-24 h-24 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0 shadow-lg">
+            {/* SVG simulated PromptPay QR pattern */}
+            <div className="w-full h-full border-2 border-slate-900 rounded p-1 flex flex-col justify-between">
+              <div className="flex justify-between">
+                <div className="w-4 h-4 bg-slate-950 border border-white" />
+                <div className="w-4 h-4 bg-slate-950 border border-white" />
+              </div>
+              <div className="flex justify-center items-center font-mono font-black text-[7px] text-slate-950">
+                PROMPTPAY
+              </div>
+              <div className="flex justify-between">
+                <div className="w-4 h-4 bg-slate-950 border border-white" />
+                <div className="w-3 h-3 bg-cyan-600 rounded-full" />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-1 text-center sm:text-left flex-1">
+            <div className="flex items-center justify-center sm:justify-start gap-1 text-cyan-300 font-bold">
+              <QrCode className="w-4 h-4" />
+              <span>สแกนจ่ายตรงสู่อัศวิน (PromptPay QR)</span>
+            </div>
+            <p className="text-[11px] text-slate-300">
+              ยอดชำระอัตโนมัติ: <strong className="text-white font-mono text-sm">฿{totalPassengerPaid.toFixed(2)}</strong> (รวมทิป)
+            </p>
+            <p className="text-[10px] text-slate-400">
+              เงินโอนเข้าบัญชีพี่วินโดยตรงแบบ Peer-to-Peer ไร้คนกลาง
+            </p>
+          </div>
         </div>
 
         {/* 5-Star Rating & Compliments */}

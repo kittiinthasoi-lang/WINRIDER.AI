@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Vehicle } from '../types';
 import { KNIGHT_ARMOR_SUITS, ArmorSuit } from '../data/armorSuits';
 import { playTactileBlip, playLevelUpFanfare, playRadarScan, playEngineRev } from '../utils/audio';
@@ -19,7 +19,8 @@ import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCusto
 import { loadProfileCustomization } from '../services/profileService';
 import { WalletTopUpPanel } from './WalletTopUpPanel';
 import { WinAiAssistantPanel } from './WinAiAssistantPanel';
-import { ProfileQuickActions } from './ProfileQuickActions';
+import { PaymentReceiverSettingsPanel } from './PaymentReceiverSettingsPanel';
+import { getWalletMe } from '../services/walletService';
 import { calculateLevelMaxXp, getLevelDifficultyMetrics } from '../data/tierHierarchyData';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import { 
@@ -27,6 +28,7 @@ import {
   Wrench, 
   Plus, 
   Coins, 
+  Wallet,
   CheckCircle2, 
   ChevronRight, 
   Layers, 
@@ -100,9 +102,15 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   };
   const [isOnDuty, setIsOnDuty] = useState<boolean>(false);
   const [deviceFrameMode, setDeviceFrameMode] = useState(true);
-  const [balance, setBalance] = useState(125400);
+  const [balance, setBalance] = useState<number>(0);
   const [ridesPaid, setRidesPaid] = useState(35);
   const totalRidesDebt = 35;
+
+  useEffect(() => {
+    getWalletMe().then((res) => {
+      setBalance(res.balance || 0);
+    }).catch(() => {});
+  }, []);
 
   // Knight Financial Credit Score State (คะแนนเครดิตทางการเงินอัศวิน - สูงสุด AAA Sovereign)
   const [driverCreditScore, setDriverCreditScore] = useState<number>(850);
@@ -216,6 +224,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   // Active Vehicle & Registered Fleet State
   const [activeVehicleId, setActiveVehicleId] = useState<string>('wave-110i');
   const [showSwitchVehicleModal, setShowSwitchVehicleModal] = useState<boolean>(false);
+  const [showPaymentReceiverSettings, setShowPaymentReceiverSettings] = useState<boolean>(false);
   const [switchSuccessToast, setSwitchSuccessToast] = useState<string | null>(null);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -377,7 +386,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               </span>
             </h2>
             <p className="text-xs text-slate-400">
-              หน้าจออู่รถอัศวิน (กิตติ อินทะสร้อย • Level 100 Sovereign) • สลับรถรับงานได้ตลอดเวลา ({vehicles.length} คัน) • คลังชุดเกราะปลดล็อคทุกอย่าง • ผ่อนชำระ 5/35 รอบ & กระเป๋าเงิน ฿{balance.toLocaleString()}
+              หน้าจออู่รถอัศวิน (กิตติ อินทะสร้อย • Level 100 Sovereign) • สลับรถรับงานได้ตลอดเวลา ({vehicles.length} คัน) • คลังชุดเกราะปลดล็อคทุกอย่าง • ผ่อนชำระ 5/35 รอบ & WIN Wallet ฿{balance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
         </div>
@@ -470,6 +479,16 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                       className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 hover:bg-cyan-500/30 transition-all cursor-pointer shadow-sm"
                     >
                       <span>🎨 แต่งโปรไฟล์</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (audioEnabled) playTactileBlip(950);
+                        setShowPaymentReceiverSettings(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 hover:bg-cyan-500/30 transition-all cursor-pointer shadow-sm"
+                    >
+                      <QrCode className="w-3 h-3 text-cyan-400" />
+                      <span>ตั้งค่ารับเงิน</span>
                     </button>
                     <button
                       onClick={() => {
@@ -750,7 +769,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               { id: 'quests' as const, label: '🎯 ภารกิจ XP', icon: <Target className="w-4 h-4 mx-auto text-[#FFD700]" />, isHot: true },
               { id: 'garage' as const, label: 'อู่รถ (GARAGE)', icon: <Wrench className="w-4 h-4 mx-auto" /> },
               { id: 'cabinet' as const, label: 'ตู้ชุดเกราะ', icon: <Shirt className="w-4 h-4 mx-auto" /> },
-              { id: 'wallet' as const, label: 'กระเป๋าเงิน', icon: <Coins className="w-4 h-4 mx-auto" /> },
+              { id: 'wallet' as const, label: 'WIN Wallet', icon: <Wallet className="w-4 h-4 mx-auto text-emerald-400" /> },
               { id: 'mechanic' as const, label: 'WIN-AI ช่างส่วนตัว', icon: <Wrench className="w-4 h-4 mx-auto text-cyan-300" /> },
             ].map((tab) => (
               <button
@@ -854,16 +873,6 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                       <span>แสดง QR สแกนรับเงิน</span>
                     </button>
                   </div>
-
-                  <ProfileQuickActions
-                    audioEnabled={audioEnabled}
-                    questContent={<SovereignQuestCenter
-                      initialRole="driver"
-                      driverLevel={driverLevel}
-                      audioEnabled={audioEnabled}
-                      onGainDriverXp={(amount, reason) => handleGainDriverXp(amount, reason)}
-                    />}
-                  />
 
                   {/* Badges & Statistics Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/10 text-xs font-mono">
@@ -1130,41 +1139,22 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               </div>
             )}
 
-            {/* 6. WALLET & EQUIPMENT TAB (Matches IMG_6075 + Upgraded Armor/Helmet Cards) */}
+            {/* 6. WALLET & EQUIPMENT TAB (WIN Wallet) */}
             {activeDriverTab === 'wallet' && (
               <div className="space-y-4">
-                <WalletTopUpPanel />
+                <WalletTopUpPanel
+                  role="knight"
+                  userId="knight-sovereign-01"
+                  userName="กิตติ อินทะสร้อย"
+                  onBalanceUpdate={(b) => setBalance(b)}
+                />
+
                 {/* Credit Toast Notification */}
                 {creditToast && (
                   <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-bold text-xs text-center shadow-xl border border-white/30 animate-bounce">
                     {creditToast}
                   </div>
                 )}
-
-                {/* CURRENT BALANCE & WITHDRAW (IMG_6075) */}
-                <div className="p-5 rounded-3xl bg-gradient-to-br from-[#0F224A] via-[#091530] to-[#070D1E] border border-[#00D2FF]/40 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-cyan-300 font-bold">CURRENT BALANCE</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                      INSTANT 24/7 PAYOUT
-                    </span>
-                  </div>
-
-                  <div className="flex items-baseline justify-between">
-                    <div className="text-3xl font-black text-white tracking-tight">
-                      ฿{balance.toLocaleString()}.00
-                    </div>
-                    <span className="text-xs text-slate-400 font-mono">THB CURRENCY</span>
-                  </div>
-
-                  <button
-                    onClick={handleWithdraw}
-                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#FFD700] via-amber-500 to-[#FFD700] hover:brightness-110 text-slate-950 font-black text-sm shadow-[0_0_20px_rgba(255,215,0,0.4)] transition-all flex items-center justify-center gap-2 border border-white/40"
-                  >
-                    <Coins className="w-4 h-4" />
-                    <span>Withdraw Now (ถอนเงินสดเข้าบัญชี)</span>
-                  </button>
-                </div>
 
                 {/* KNIGHT FINANCIAL CREDIT SCORE CARD (คะแนนเครดิตทางการเงินอัศวิน) */}
                 <div className="p-5 rounded-3xl bg-gradient-to-br from-[#0D2447] via-[#091633] to-[#070E22] border-2 border-emerald-500/50 shadow-[0_0_25px_rgba(16,185,129,0.2)] space-y-4">
@@ -1957,17 +1947,32 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
         <DriverPaymentQrCodeModal
           isOpen={showDriverQrModal}
           onClose={() => setShowDriverQrModal(false)}
-          driverName="กิตติ อินทะสร้อย (อัศวิน Level 100)"
+          driverUserId={currentUserSession?.id}
+          driverName={driverProfileData.displayName}
           driverCode="WIN-BKK-LV100"
           fareAmount={50}
           tipAmount={10}
-          promptPayNumber=""
           audioEnabled={audioEnabled}
           onPaymentSuccess={(amt) => {
             setBalance(prev => prev + amt);
             handleGainDriverXp(50, `รับชำระเงินผ่าน QR สำเร็จ ฿${amt}`);
           }}
         />
+      )}
+
+      {/* DRIVER PAYMENT RECEIVER SETTINGS MODAL */}
+      {showPaymentReceiverSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+            <PaymentReceiverSettingsPanel
+              role="knight"
+              userId={currentUserSession?.id}
+              defaultName={driverProfileData.displayName}
+              audioEnabled={audioEnabled}
+              onClose={() => setShowPaymentReceiverSettings(false)}
+            />
+          </div>
+        </div>
       )}
 
       {/* FULL SHOWCASE MODAL FOR ARMOR LVL 1-70 (LVL 71-100 CLASSIFIED) */}

@@ -15,7 +15,8 @@ import {
   Sparkles,
   BarChart3,
   BadgeAlert,
-  HeartPulse
+  HeartPulse,
+  QrCode
 } from 'lucide-react';
 import { AdminLevel } from '../../types/admin';
 import { AdminDashboardView } from './AdminDashboardView';
@@ -41,18 +42,56 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onExitAdmin,
   onSwitchAdminLevel
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'health' | 'kyc' | 'payments' | 'users' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
 
-  const tabs: { id: 'dashboard' | 'health' | 'kyc' | 'payments' | 'users' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: 'dashboard', label: 'ภาพรวมระบบ', icon: <BarChart3 className="w-4 h-4" /> },
-    { id: 'health', label: 'System Health', icon: <HeartPulse className="w-4 h-4" /> },
-    { id: 'kyc', label: 'ตรวจเอกสาร KYC', icon: <FileCheck2 className="w-4 h-4" />, badge: '5 รอตรวจ' },
-    { id: 'payments', label: 'ตรวจช่องทางรับเงิน', icon: <BadgeAlert className="w-4 h-4" /> },
-    { id: 'users', label: 'จัดการผู้ใช้งาน', icon: <Users className="w-4 h-4" /> },
-    { id: 'wallet', label: 'กองทุน 5 ถัง & Ledger', icon: <Coins className="w-4 h-4" /> },
-    { id: 'topups', label: 'อนุมัติสลิปเติมเงิน', icon: <BadgeAlert className="w-4 h-4" /> },
-    { id: 'fees', label: 'กฎค่าธรรมเนียม & GP', icon: <Layers className="w-4 h-4" /> },
-    { id: 'audit', label: 'บันทึก Audit Logs', icon: <FileText className="w-4 h-4" /> },
+  const tabs: { id: 'dashboard' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
+    { 
+      id: 'dashboard', 
+      label: 'ภาพรวมระบบ', 
+      icon: <img src="/images/cyber_arena.jpg" alt="ภาพรวม" className="w-5 h-5 rounded-md object-cover ring-1 ring-cyan-400/50 shadow-sm" /> 
+    },
+    { 
+      id: 'health', 
+      label: 'System Health', 
+      icon: <img src="/images/cyber_vehicle.jpg" alt="System Health" className="w-5 h-5 rounded-md object-cover ring-1 ring-emerald-400/50 shadow-sm" /> 
+    },
+    { 
+      id: 'kyc', 
+      label: 'ตรวจเอกสาร KYC', 
+      icon: <img src="/images/avatar_knight.jpg" alt="ตรวจเอกสาร KYC" className="w-5 h-5 rounded-md object-cover ring-1 ring-amber-400/50 shadow-sm" />, 
+      badge: '5 รอตรวจ' 
+    },
+    { 
+      id: 'users', 
+      label: 'จัดการผู้ใช้งาน', 
+      icon: <img src="/images/avatar_citizen.jpg" alt="จัดการผู้ใช้งาน" className="w-5 h-5 rounded-md object-cover ring-1 ring-blue-400/50 shadow-sm" /> 
+    },
+    { 
+      id: 'payment-profiles', 
+      label: 'ตรวจช่องทางรับเงิน', 
+      icon: <img src="/images/cyber_coins.jpg" alt="ตรวจช่องทางรับเงิน" className="w-5 h-5 rounded-md object-cover ring-1 ring-cyan-400/50 shadow-sm" />, 
+      badge: 'PromptPay' 
+    },
+    { 
+      id: 'wallet', 
+      label: 'กองทุน 5 ถัง & Ledger', 
+      icon: <img src="/images/armor_goldentree.jpg" alt="กองทุน 5 ถัง" className="w-5 h-5 rounded-md object-cover ring-1 ring-[#FFD700]/50 shadow-sm" /> 
+    },
+    { 
+      id: 'topups', 
+      label: 'อนุมัติสลิปเติมเงิน', 
+      icon: <img src="/images/cookie_box.jpg" alt="อนุมัติสลิปเติมเงิน" className="w-5 h-5 rounded-md object-cover ring-1 ring-emerald-400/50 shadow-sm" /> 
+    },
+    { 
+      id: 'fees', 
+      label: 'กฎค่าธรรมเนียม & GP', 
+      icon: <img src="/images/armor_circuit.jpg" alt="กฎค่าธรรมเนียม" className="w-5 h-5 rounded-md object-cover ring-1 ring-indigo-400/50 shadow-sm" /> 
+    },
+    { 
+      id: 'audit', 
+      label: 'บันทึก Audit Logs', 
+      icon: <img src="/images/armor_lightning.jpg" alt="บันทึก Audit Logs" className="w-5 h-5 rounded-md object-cover ring-1 ring-purple-400/50 shadow-sm" /> 
+    },
   ];
 
   return (
@@ -62,9 +101,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           {/* Logo & Title */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#00D4FF] to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(0,212,255,0.4)]">
-              <Crown className="w-5 h-5 text-slate-950 font-black" />
-            </div>
+            <img 
+              src="/app-logo.png" 
+              alt="WINRIDER Logo" 
+              className="w-9 h-9 rounded-xl object-cover shadow-[0_0_15px_rgba(0,212,255,0.4)] ring-1 ring-[#00D4FF]/40" 
+            />
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-black text-base text-white tracking-wider">
@@ -159,9 +200,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {activeTab === 'kyc' && (
           <AdminKycView adminLevel={adminLevel} />
         )}
-        {activeTab === 'payments' && <AdminPaymentProfilesView />}
         {activeTab === 'users' && (
           <AdminUsersView adminLevel={adminLevel} />
+        )}
+        {activeTab === 'payment-profiles' && (
+          <AdminPaymentProfilesView adminLevel={adminLevel} />
         )}
         {activeTab === 'wallet' && (
           <AdminWalletView adminLevel={adminLevel} />
