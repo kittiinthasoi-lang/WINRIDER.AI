@@ -29,8 +29,7 @@ import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { ReligiousNotificationsModal } from './ReligiousNotificationsModal';
-import { WalletTopUpPanel } from './WalletTopUpPanel';
-import { WinAiAssistantPanel } from './WinAiAssistantPanel';
+import { ProfileQuickActions } from './ProfileQuickActions';
 import { CyberGraphic, DreamRideVehicleImage } from './CyberGraphic';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import confetti from 'canvas-confetti';
@@ -2172,8 +2171,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             {/* 5. PROFILE TAB */}
             {activeTab === 'profile' && (
               <div className="space-y-4">
-                <WalletTopUpPanel />
-                <WinAiAssistantPanel mode="personal_commerce" />
                 {/* Profile Header Card */}
                 <div 
                   className={`p-5 rounded-3xl bg-gradient-to-r ${passengerProfileData.bannerGlow || 'from-[#0C1E40] via-[#091530] to-[#070D1E]'} border border-[#FFD700]/40 space-y-3 shadow-xl transition-all`}
@@ -2311,49 +2308,18 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       <span className="text-cyan-300 font-mono text-[9px]">อัตราทดความยาก x11.0</span>
                     </div>
 
-                    {/* Quick Citizen XP Action Buttons */}
-                    <div className="pt-2 border-t border-white/5 space-y-1.5 font-mono">
-                      <div className="flex items-center justify-between text-[10px] text-slate-400">
-                        <span className="text-cyan-300 font-bold">ภารกิจพลเมืองเก็บ XP ด่วน:</span>
-                        <span className="text-amber-300">กดรับ XP ได้ทันที</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                        <button
-                          type="button"
-                          onClick={() => handleGainCitizenXp(150, "เดินทางด้วย WINRIDER 1 ทริป")}
-                          className="p-1.5 rounded-xl bg-black/40 hover:bg-cyan-950/60 border border-white/10 hover:border-cyan-400 text-left transition-all flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-1.5"><Bike className="w-3.5 h-3.5 text-cyan-400" /> นั่งวินไปทำงาน</span>
-                          <span className="text-cyan-300 font-bold">+150 XP</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleGainCitizenXp(120, "สั่งการด้วยเสียง AI Assistant")}
-                          className="p-1.5 rounded-xl bg-black/40 hover:bg-purple-950/60 border border-white/10 hover:border-purple-400 text-left transition-all flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-1.5"><Mic className="w-3.5 h-3.5 text-purple-400" /> สั่งเสียง AI</span>
-                          <span className="text-purple-300 font-bold">+120 XP</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleGainCitizenXp(250, "ทริปไหว้พระสายมู WIN MU BUDDY")}
-                          className="p-1.5 rounded-xl bg-black/40 hover:bg-amber-950/60 border border-white/10 hover:border-amber-400 text-left transition-all flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-amber-400" /> ไหว้พระสายมู</span>
-                          <span className="text-amber-300 font-bold">+250 XP</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleGainCitizenXp(300, "พาญาติผู้ใหญ่ทำศาสนกิจ WIN Spirit")}
-                          className="p-1.5 rounded-xl bg-black/40 hover:bg-emerald-950/60 border border-white/10 hover:border-emerald-400 text-left transition-all flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-emerald-400" /> WIN Spirit</span>
-                          <span className="text-emerald-300 font-bold">+300 XP</span>
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
+
+                <ProfileQuickActions
+                  audioEnabled={audioEnabled}
+                  questContent={<SovereignQuestCenter
+                    initialRole="citizen"
+                    citizenLevel={citizenLevel}
+                    audioEnabled={audioEnabled}
+                    onGainCitizenXp={(amount, reason) => handleGainCitizenXp(amount, reason)}
+                  />}
+                />
 
                 {/* วันนี้มีของมาขาย (ใต้โปรไฟล์ลูกค้า C2C Market Action Card) */}
                 <div className="p-4 rounded-3xl bg-gradient-to-br from-[#122442] via-[#0A1A33] to-[#070D1E] border-2 border-[#FFD700]/70 shadow-[0_0_25px_rgba(255,215,0,0.25)] space-y-3">
@@ -2605,13 +2571,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   )}
                 </div>
 
-                {/* Sovereign Quest Center for Citizen */}
-                <SovereignQuestCenter
-                  initialRole="citizen"
-                  citizenLevel={citizenLevel}
-                  audioEnabled={audioEnabled}
-                  onGainCitizenXp={(amount, reason) => handleGainCitizenXp(amount, reason)}
-                />
               </div>
             )}
           </div>

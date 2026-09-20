@@ -14,8 +14,7 @@ import { playTactileBlip, playRadarScan, playLevelUpFanfare } from '../utils/aud
 import { getCurrentUserSession } from '../utils/userSession';
 import confetti from 'canvas-confetti';
 import { loadProfileCustomization } from '../services/profileService';
-import { WalletTopUpPanel } from './WalletTopUpPanel';
-import { WinAiAssistantPanel } from './WinAiAssistantPanel';
+import { ProfileQuickActions } from './ProfileQuickActions';
 import { 
   ShoppingBag, 
   Users, 
@@ -422,8 +421,6 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
           {merchantXpToast}
         </div>
       )}
-      {canEdit && perspective === 'owner' && <><WalletTopUpPanel /><WinAiAssistantPanel mode="personal_commerce" /></>}
-
       {/* PERSPECTIVE SWITCHER BAR (แบบที่ 1 vs แบบที่ 2) */}
       <section className="p-4 rounded-3xl bg-gradient-to-r from-[#060E20] via-[#09152E] to-[#060E20] border-2 border-amber-400/40 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -889,6 +886,17 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
             </div>
           </div>
 
+          <ProfileQuickActions
+            audioEnabled={audioEnabled}
+            questContent={<SovereignQuestCenter
+              initialRole="merchant"
+              merchantLevel={merchantLevel}
+              audioEnabled={audioEnabled}
+              onGainMerchantXp={(amount, reason) => handleGainMerchantXp(amount, reason)}
+              onRewardBonusCash={(amount) => setWorkingCapitalAvailable(prev => prev + amount)}
+            />}
+          />
+
           {/* DYNAMIC 3D DENSITY RADAR OVERLAY */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -1153,16 +1161,6 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
             </div>
           </div>
 
-          {/* SOVEREIGN QUEST CENTER FOR MERCHANTS */}
-          <SovereignQuestCenter
-            initialRole="merchant"
-            merchantLevel={merchantLevel}
-            audioEnabled={audioEnabled}
-            onGainMerchantXp={(amount, reason) => handleGainMerchantXp(amount, reason)}
-            onRewardBonusCash={(amount) => {
-              setWorkingCapitalAvailable(prev => prev + amount);
-            }}
-          />
         </div>
       )}
 
