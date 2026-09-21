@@ -103,7 +103,7 @@ const PLACE_GROUP_STYLES: Record
   },
   faith: {
     label: 'ศาสนสถาน',
-    emoji: '☸️',
+    emoji: '🙏',
     markerClass: 'border-amber-400 bg-amber-950 text-amber-200',
     badgeClass: 'border-amber-400/50 bg-amber-500/20 text-amber-300',
     Icon: Landmark,
