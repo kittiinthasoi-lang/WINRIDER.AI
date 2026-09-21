@@ -252,6 +252,11 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
                       <span className="truncate text-slate-500"><MapPin className="mr-1 inline h-3.5 w-3.5" />{profile.address || 'ยังไม่ระบุที่อยู่'}</span>
                       {route ? <span className="shrink-0 font-black text-cyan-300">{route.distanceKm} กม.</span> : <span className="shrink-0 text-slate-600">—</span>}
                     </div>
+                    <div className="mt-3 flex items-center justify-end">
+                      <span className="inline-flex items-center gap-1 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-[10px] font-black text-cyan-200">
+                        ดูโปรไฟล์{profile.role === 'merchant' ? 'ร้านค้า' : 'พาร์ทเนอร์'} <ChevronRight className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
                   </div>
                 </button>
               );
