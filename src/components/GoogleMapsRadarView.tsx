@@ -389,7 +389,7 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
           <div className="absolute bottom-4 left-4 right-4 z-30 rounded-3xl border-2 border-cyan-400 bg-[#081226]/95 p-4 shadow-2xl backdrop-blur-md">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${selectedEntity.type === 'merchant' ? 'border-purple-400/50 bg-purple-500/20 text-purple-300' : 'border-sky-400/50 bg-sky-500/20 text-sky-300'}`}>{entityIcon(selectedEntity, 'w-6 h-6')}</div>
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${(getEntityGroupStyle(selectedEntity)?.badgeClass) || (selectedEntity.type === 'merchant' ? 'border-purple-400/50 bg-purple-500/20 text-purple-300' : 'border-sky-400/50 bg-sky-500/20 text-sky-300')}`}>{entityIcon(selectedEntity, 'w-6 h-6')}</div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2"><h4 className="text-sm font-black text-white">{selectedEntity.name}</h4><span className="rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold text-amber-300">{selectedEntity.specialBadge}</span></div>
                   <p className="mt-1 text-xs text-slate-300">{selectedEntity.status}</p>
