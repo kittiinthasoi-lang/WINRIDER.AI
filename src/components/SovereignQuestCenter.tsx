@@ -130,7 +130,33 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
 }) => {
   const [activeRole, setActiveRole] = useState<'driver' | 'citizen' | 'merchant' | 'partner'>(initialRole);
   const [activeCategory, setActiveCategory] = useState<'all' | 'daily' | 'weekly' | 'epic'>('all');
-  const [quests, setQuests] = useState<QuestItem[]>(INITIAL_QUESTS);
+  const [quests, setQuests] = useState<QuestItem[]>(() =>
+    INITIAL_QUESTS.map(q => ({ ...q, progress: 0, isClaimed: false }))
+  );
+
+  const updateQuestMetric = React.useCallback((metricKey: string, amount = 1) => {
+    setQuests(prev => prev.map(q => {
+      if (q.metricKey !== metricKey || q.isClaimed) return q;
+      return { ...q, progress: Math.min(q.totalRequired, q.progress + Math.max(0, amount)) };
+    }));
+  }, []);
+
+  React.useEffect(() => {
+    const handleQuestMetric = (event: Event) => {
+      const detail = (event as CustomEvent<{ metricKey?: string; amount?: number }>).detail;
+      if (detail?.metricKey) updateQuestMetric(detail.metricKey, detail.amount ?? 1);
+    };
+    window.addEventListener('winrider:quest-metric', handleQuestMetric as EventListener);
+    return () => window.removeEventListener('winrider:quest-metric', handleQuestMetric as EventListener);
+  }, [updateQuestMetric]);
+
+  const emitQuestMetric = React.useCallback((metricKey: string, amount = 1) => {
+    window.dispatchEvent(new CustomEvent('winrider:quest-metric', {
+      detail: { metricKey, amount }
+    }));
+  }, []);
+
+
   const [claimedToast, setClaimedToast] = useState<string | null>(null);
 
   const filteredQuests = quests.filter(q => {
@@ -156,8 +182,9 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
       colors: ['#FFD700', '#00D2FF', '#10B981', '#FFFFFF']
     });
 
-    // Update quest state
+    // Update local state and publish the real completion event for persistence hooks.
     setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, isClaimed: true } : q));
+    emitQuestMetric(`quest.claimed.${quest.id}`, 1);
 
     // Award XP based on role
     if (quest.role === 'driver' && onGainDriverXp) {
