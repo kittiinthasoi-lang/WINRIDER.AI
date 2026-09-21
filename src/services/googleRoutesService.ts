@@ -50,6 +50,77 @@ export interface ComputedLiveRoute {
   timestamp: string;
 }
 
+export interface ResolvedDestinationSearch extends RouteDestination {
+  placeId?: string;
+  distanceKm?: number;
+  etaMinutes?: number | null;
+}
+
+/**
+ * Search a real destination from the Knight's current GPS through the existing
+ * authenticated Google Places (New) + Routes API backend resolver.
+ * The backend returns real coordinates/place IDs; the final turn-by-turn route
+ * is still calculated separately by computeLiveRoute().
+ */
+export async function searchDestinationsFromGps(params: {
+  latitude: number;
+  longitude: number;
+  query: string;
+}): Promise<ResolvedDestinationSearch[]> {
+  const query = params.query.trim();
+  if (!query || !Number.isFinite(params.latitude) || !Number.isFinite(params.longitude)) return [];
+
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Authentication required for destination search');
+
+  const response = await fetch('/api/places/resolve-routes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      latitude: params.latitude,
+      longitude: params.longitude,
+      places: [{ key: 'knight-destination-search', query: `${query} ประเทศไทย` }]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('ค้นหาปลายทางจริงไม่สำเร็จ');
+  }
+
+  const payload = await response.json() as {
+    routes?: Array<{
+      key: string;
+      placeId?: string;
+      name?: string;
+      address?: string;
+      latitude?: number;
+      longitude?: number;
+      distanceKm?: number;
+      etaMinutes?: number | null;
+    }>;
+  };
+
+  return (payload.routes || [])
+    .filter((route) => Number.isFinite(route.latitude) && Number.isFinite(route.longitude))
+    .map((route) => ({
+      id: String(route.placeId || route.key),
+      name: String(route.name || query),
+      nameEn: '',
+      category: 'Google Places',
+      lat: Number(route.latitude),
+      lng: Number(route.longitude),
+      address: String(route.address || ''),
+      landmark: '',
+      estimatedFare: 0,
+      placeId: route.placeId,
+      distanceKm: Number.isFinite(route.distanceKm) ? Number(route.distanceKm) : undefined,
+      etaMinutes: route.etaMinutes ?? null
+    }));
+}
+
 /**
  * Curated Bangkok Destinations for Quick Route Testing and Navigation
  */
