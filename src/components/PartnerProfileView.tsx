@@ -68,6 +68,9 @@ interface PartnerProfileViewProps {
   onRideToPartner?: (partnerName: string, partnerAddress: string, distanceKm?: number) => void;
   initialPerspective?: 'owner' | 'customer';
   canEdit?: boolean;
+  customerProfile?: {
+    id: string; name: string; description: string; avatarUrl: string; avatarEmoji: string; address: string; phone: string; category: string; products: Array<Record<string, unknown>>; services: Array<Record<string, unknown>>; promotions: Array<Record<string, unknown>>; highlights: string[]; openHours?: string;
+  };
 }
 
 const EMPTY_PARTNER_PROFILE: PartnerProfile = {
@@ -105,9 +108,14 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   onOpenWinBuddy,
   onRideToPartner,
   initialPerspective,
-  canEdit = false
+  canEdit = false,
+  customerProfile
 }) => {
   const [selectedPartner, setSelectedPartner] = useState<PartnerProfile>(SAMPLE_PARTNERS[0]);
+  useEffect(() => {
+    if (!customerProfile) return;
+    setSelectedPartner(prev => ({ ...prev, id: customerProfile.id, name: customerProfile.name, description: customerProfile.description, icon: customerProfile.avatarEmoji, address: customerProfile.address, phone: customerProfile.phone, categoryLabel: customerProfile.category, openHours: customerProfile.openHours || prev.openHours, specialHighlights: customerProfile.highlights, promotionsToday: customerProfile.promotions as PartnerPromotion[], amenities: customerProfile.services }));
+  }, [customerProfile]);
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'discounts' | 'parking' | 'hours' | 'events' | 'radar3d' | 'overview'>('discounts');
   const [showProfileCustomizerModal, setShowProfileCustomizerModal] = useState<boolean>(false);
