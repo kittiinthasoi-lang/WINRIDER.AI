@@ -137,7 +137,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">ผู้สมัครใหม่วันนี้</span>
             <img 
-              src="/images/avatar_citizen.jpg" 
+              src="/images/admin/users-management.svg" 
               alt="ผู้สมัครใหม่" 
               className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#00D4FF]/40 shadow-sm" 
             />
@@ -176,7 +176,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               {metrics.pendingKycCount > 0 ? 'รอตรวจสอบ KYC ด่วน' : 'สถานะคิวตรวจสอบ KYC'}
             </span>
             <img 
-              src="/images/avatar_knight.jpg" 
+              src="/images/admin/kyc-review.svg" 
               alt="KYC Verification" 
               className={`w-8 h-8 rounded-xl object-cover shadow-sm ring-1 ${
                 metrics.pendingKycCount > 0 ? 'ring-[#FFC93C] animate-pulse' : 'ring-emerald-400/40'
@@ -248,7 +248,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">รายได้เข้าถังระบบวันนี้</span>
             <img 
-              src="/images/cyber_coins.jpg" 
+              src="/images/admin/payment-profiles.svg" 
               alt="System Revenue" 
               className="w-8 h-8 rounded-xl object-cover ring-1 ring-indigo-400/50 shadow-sm" 
             />
@@ -271,7 +271,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">สิทธิ์ Founding Knight คงเหลือ</span>
             <img 
-              src="/images/armor_goldentree.jpg" 
+              src="/images/admin/wallet-ledger.svg" 
               alt="Founding Knight Quota" 
               className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#FFC93C]/60 shadow-sm" 
             />
