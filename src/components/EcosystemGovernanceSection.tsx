@@ -214,4 +214,6 @@ export const EcosystemGovernanceSection: React.FC<Props> = ({ audioEnabled, onOp
           </p>
         </div>
       </div>
-
+    </section>
+  );
+};
