@@ -227,6 +227,14 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
               <p className="text-[11px] text-slate-400">
                 กระเป๋าเงินดิจิทัลกลาง • ยอดเงินจริงในระบบ Double-Entry
               </p>
+              {walletData?.walletId && (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold tracking-wider text-cyan-200">WIN Wallet ID</span>
+                  <span className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-mono font-black text-cyan-300">
+                    {walletData.walletId}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -391,7 +399,10 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
                 </div>
               </div>
 
-              <div className="text-[11px] text-slate-400 space-y-1">
+              <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 p-2.5 text-[10px] text-cyan-100">
+              ID นี้เป็นรหัสอ้างอิงสั้นของเจ้าของ WIN Wallet สำหรับค้นหา/ตรวจสอบในระบบ ไม่ใช่เลขบัตรประชาชนหรือข้อมูลลับ
+            </div>
+            <div className="text-[11px] text-slate-400 space-y-1">
                 <p>• ยอดเงินใน QR: <strong className="text-[#FFD700] font-mono font-bold">฿{depositAmount.toLocaleString()}</strong></p>
                 <p>• โอนเสร็จแล้วให้แนบรูปภาพสลิปด้านล่างเพื่ออัปเดตยอดเข้า WIN Wallet</p>
               </div>
