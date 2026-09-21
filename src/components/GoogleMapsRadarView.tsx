@@ -72,6 +72,7 @@ interface GoogleMapsRadarViewProps {
   onBookRideWithRider?: (rider: MapRadarEntity) => void;
   onAcceptJobFromCustomer?: (customer: MapRadarEntity) => void;
   onNavigateToEntity?: (entity: MapRadarEntity) => void;
+  onSelectDestinationForRide?: (entity: MapRadarEntity) => void | Promise<void>;
   onBackToHome?: () => void;
 }
 
@@ -153,6 +154,7 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
   audioEnabled = true,
   onSelectEntity,
   onNavigateToEntity,
+  onSelectDestinationForRide,
   onBackToHome,
 }) => {
   const { gpsState } = useRealtimeGps(true);
@@ -450,7 +452,14 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
               </div>
               <button type="button" onClick={() => setSelectedEntity(null)} className="rounded-full bg-white/10 p-2 text-white"><X className="h-4 w-4" /></button>
             </div>
-            <button type="button" onClick={() => navigateToEntity(selectedEntity)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 py-2.5 text-xs font-black text-slate-950"><Navigation className="h-4 w-4" />นำทางไปสถานที่นี้</button>
+            <button type="button" onClick={() => {
+              if (onSelectDestinationForRide) {
+                if (audioEnabled) playTactileBlip(1100);
+                void onSelectDestinationForRide(selectedEntity);
+              } else {
+                navigateToEntity(selectedEntity);
+              }
+            }} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 py-2.5 text-xs font-black text-slate-950"><Navigation className="h-4 w-4" />ใช้สถานที่นี้เป็นปลายทาง</button>
           </div>
         )}
       </div>
