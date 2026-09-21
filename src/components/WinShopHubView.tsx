@@ -306,11 +306,33 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
                 const records = selectedProfile[key];
                 return <section key={key}><div className="mb-2 flex items-end justify-between"><div><h4 className="flex items-center gap-2 text-sm font-black text-white"><SectionIcon kind={icon} />{title}</h4><p className="text-[10px] text-slate-500">{subtitle}</p></div><span className="text-[10px] font-mono text-slate-500">{records.length} รายการ</span></div>
                   {records.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/15 p-5 text-center text-xs text-slate-500">เจ้าของโปรไฟล์ยังไม่ได้ลงข้อมูลส่วนนี้</div> :
-                    <div className="grid gap-2 sm:grid-cols-2">{records.map((record, index) => <article key={index} className="rounded-2xl border border-white/10 bg-[#0A1730] p-3.5">
-                      <div className="flex items-start justify-between gap-2"><h5 className="text-sm font-black text-white">{valueText(record, ['title', 'name', 'serviceName']) || `${title} ${index + 1}`}</h5><span className="text-xs font-black text-amber-300">{valueText(record, ['price', 'discountText'])}</span></div>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-300">{valueText(record, ['description', 'detail', 'condition']) || 'เจ้าของโปรไฟล์ยังไม่ได้เพิ่มรายละเอียด'}</p>
-                      {valueText(record, ['validUntil']) && <p className="mt-2 text-[10px] text-slate-500">ใช้ได้ถึง {valueText(record, ['validUntil'])}</p>}
-                    </article>)}</div>}
+                    <div className="grid gap-3 sm:grid-cols-2">{records.map((record, index) => {
+                      const titleText = valueText(record, ['title', 'name', 'serviceName']) || `${title} ${index + 1}`;
+                      const imageUrl = valueText(record, ['imageUrl', 'image', 'photoUrl']);
+                      const priceText = valueText(record, ['price', 'discountText', 'fee']);
+                      const stockText = valueText(record, ['stock', 'available', 'capacity']);
+                      return <article key={index} className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#0A1730] to-[#071126]">
+                        <div className="flex gap-3 p-3.5">
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/30 text-2xl">
+                            {imageUrl ? <img src={imageUrl} alt="" className="h-full w-full object-cover" /> : key === 'products' ? '🛍️' : key === 'services' ? '🤝' : '🏷️'}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <h5 className="text-sm font-black text-white">{titleText}</h5>
+                              {priceText && <span className="shrink-0 text-xs font-black text-amber-300">{priceText}</span>}
+                            </div>
+                            <p className="mt-1 text-xs leading-relaxed text-slate-300">{valueText(record, ['description', 'detail', 'condition']) || 'เจ้าของโปรไฟล์ยังไม่ได้เพิ่มรายละเอียด'}</p>
+                            <div className="mt-2 flex flex-wrap gap-1.5 text-[9px]">
+                              {stockText && <span className="rounded-full bg-emerald-400/10 px-2 py-1 text-emerald-300">{key === 'products' ? `คงเหลือ ${stockText}` : `รองรับ ${stockText}`}</span>}
+                              {valueText(record, ['validUntil']) && <span className="rounded-full bg-white/5 px-2 py-1 text-slate-400">ถึง {valueText(record, ['validUntil'])}</span>}
+                              {valueText(record, ['category']) && <span className="rounded-full bg-cyan-400/10 px-2 py-1 text-cyan-300">{valueText(record, ['category'])}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {key === 'products' && <div className="border-t border-white/5 px-3.5 py-2.5 text-[10px] text-slate-400">สินค้าในหน้าร้านจริง • ตรวจสอบราคา/สต็อกก่อนสั่งซื้อ</div>}
+                        {key === 'services' && <div className="border-t border-white/5 px-3.5 py-2.5 text-[10px] text-slate-400">บริการจากพาร์ทเนอร์ • ติดต่อเพื่อยืนยันคิวและเงื่อนไข</div>}
+                      </article>;
+                    })}</div>}
                 </section>;
               })}
             </div>
