@@ -61,7 +61,7 @@ export default function App() {
 
   // Mode & Tabs
   const [activeMode, setActiveMode] = useState<AppMode>('passenger');
-  const [passengerTab, setPassengerTab] = useState<'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile'>('home');
+  const [passengerTab, setPassengerTab] = useState<'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile' | 'navigation'>('home');
   const [driverTab, setDriverTab] = useState<DriverTabType>('jobs');
   const [activeChapter, setActiveChapter] = useState<ChapterId>('soul');
   const [audioEnabled, setAudioEnabled] = useState<boolean>(true);
