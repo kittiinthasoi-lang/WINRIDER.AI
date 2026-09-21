@@ -57,6 +57,7 @@ export interface NavigationProps {
   audioEnabled?: boolean;
   onArrivedAtPickup?: () => void;
   onArrivedAtDropoff?: () => void;
+  onRouteUpdate?: (route: ComputedLiveRoute | null) => void;
   onClose?: () => void;
   onOpenChat?: () => void;
 }
@@ -135,6 +136,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
   audioEnabled = true,
   onArrivedAtPickup,
   onArrivedAtDropoff,
+  onRouteUpdate,
   onClose,
   onOpenChat
 }) => {
@@ -181,6 +183,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
       const destination = phase === 'approaching' ? pickupCoords : dropoffCoords;
       if (!hasDriverPosition || !Number.isFinite(destination.lat) || !Number.isFinite(destination.lng) || destination.lat === 0 && destination.lng === 0) {
         setLiveRoute(null);
+        onRouteUpdate?.(null);
         setIsLoadingRoute(false);
         return;
       }
@@ -215,7 +218,10 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
           routingPreference: 'TRAFFIC_AWARE'
         });
 
-        if (!isCancelled) setLiveRoute(res);
+        if (!isCancelled) {
+          setLiveRoute(res);
+          onRouteUpdate?.(res.success ? res : null);
+        }
       } catch (err) {
         console.warn('Routes calculation error:', err);
       } finally {
