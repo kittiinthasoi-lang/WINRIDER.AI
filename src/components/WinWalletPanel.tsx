@@ -70,7 +70,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
     if (!isSilent) setLoading(true);
     else setRefreshing(true);
     try {
-      const data = await getWalletMe();
+      const data = await getWalletMe(role);
       setWalletData(data);
       if (onBalanceUpdate) {
         onBalanceUpdate(data.balance);
