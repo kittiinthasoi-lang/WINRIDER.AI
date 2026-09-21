@@ -116,7 +116,7 @@ export async function searchDestinationsFromGps(params: {
       landmark: '',
       estimatedFare: 0,
       placeId: route.placeId,
-      distanceKm: Number.isFinite(route.distanceKm) ? Number(route.distanceKm) : undefined,
+      distanceKm: typeof route.distanceKm === 'number' && Number.isFinite(route.distanceKm) ? Number(route.distanceKm) : undefined,
       etaMinutes: route.etaMinutes ?? null
     }));
 }
