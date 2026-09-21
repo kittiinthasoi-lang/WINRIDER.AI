@@ -19,7 +19,7 @@ import {
   ImageIcon
 } from 'lucide-react';
 import { auth } from '../firebase';
-import { AiStatusModal } from './AiStatusModal';
+import { AiStatusModal } from './AiStatusModal';\nimport { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';
 
 export type AssistantMode = 'motorcycle_mechanic' | 'personal_commerce';
 
