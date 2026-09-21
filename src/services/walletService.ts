@@ -51,7 +51,8 @@ export async function getWalletMe(role?: 'citizen' | 'knight' | 'merchant' | 'pa
     };
   }
 
-  const query = role ? `?role=${encodeURIComponent(role)}` : '';\n  const res = await fetch(`/api/wallet/me${query}`, {
+  const query = role ? `?role=${encodeURIComponent(role)}` : '';
+  const res = await fetch(`/api/wallet/me${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
