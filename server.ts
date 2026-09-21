@@ -1312,24 +1312,26 @@ const WALLET_ROLE_PREFIX: Record<string, string> = {
   partner: "P",
 };
 
-const WALLET_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";\nconst WALLET_ID_ROLE_PREFIX = WALLET_ROLE_PREFIX;
+const WALLET_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function createShortWalletId(role: string): string {
   const prefix = WALLET_ROLE_PREFIX[role] || "U";
   const bytes = crypto.randomBytes(8);
   let suffix = "";
-  for (let i = 0; i < 8; i += 1) {
-    suffix += WALLET_ID_ALPHABET[bytes[i] % WALLET_ID_ALPHABET.length];
-  }
+  for (let i = 0; i < 8; i += 1) suffix += WALLET_ID_ALPHABET[bytes[i] % WALLET_ID_ALPHABET.length];
   return `WIN-${prefix}-${suffix}`;
 }
 
 async function ensureWalletIdentityId(uid: string, requestedRole?: string): Promise<{ walletId: string; role: string }> {
+  const roleHint = WALLET_ROLE_PREFIX[requestedRole || ""] ? String(requestedRole) : "";
+  const identityRef = ordersDb.collection("wallet_identities").doc(`${uid}_${roleHint || "default"}`);
   const walletRef = ordersDb.collection("wallets").doc(uid);
   const userRef = ordersDb.collection("users").doc(uid);
 
   return ordersDb.runTransaction(async (tx) => {
-    const [identitySnap, walletSnap, userSnap] = await Promise.all([tx.get(identityRef), tx.get(walletRef), tx.get(userRef)]);
+    const [identitySnap, walletSnap, userSnap] = await Promise.all([
+      tx.get(identityRef), tx.get(walletRef), tx.get(userRef)
+    ]);
     const resolvedRole = roleHint || String(walletSnap.data()?.role || userSnap.data()?.role || "citizen").trim();
     const existingWalletId = String(identitySnap.data()?.walletId || "").trim();
     if (existingWalletId) return { walletId: existingWalletId, role: resolvedRole };
@@ -1339,7 +1341,7 @@ async function ensureWalletIdentityId(uid: string, requestedRole?: string): Prom
     let idSnap = await tx.get(idRef);
     let attempts = 0;
     while (idSnap.exists && attempts < 5) {
-      walletId = createShortWalletId(role);
+      walletId = createShortWalletId(resolvedRole);
       idRef = ordersDb.collection("wallet_ids").doc(walletId);
       idSnap = await tx.get(idRef);
       attempts += 1;
@@ -1349,17 +1351,17 @@ async function ensureWalletIdentityId(uid: string, requestedRole?: string): Prom
     tx.create(idRef, {
       walletId,
       userId: uid,
-      role,
+      role: resolvedRole,
       createdAt: FieldValue.serverTimestamp(),
     });
-    tx.set(walletRef, {
-      userId: uid,
+    tx.set(identityRef, {
       walletId,
-      role,
-      updatedAt: FieldValue.serverTimestamp(),
+      userId: uid,
+      role: resolvedRole,
+      createdAt: FieldValue.serverTimestamp(),
     }, { merge: true });
 
-    return { walletId, role };
+    return { walletId, role: resolvedRole };
   });
 }
 
@@ -1367,7 +1369,8 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   try {
-    const requestedRole = String(req.query?.role || "").trim();\n    const walletIdentity = await ensureWalletIdentityId(user.uid, requestedRole);
+    const requestedRole = String(req.query?.role || "").trim();
+    const walletIdentity = await ensureWalletIdentityId(user.uid, requestedRole);
     const walletSnap = await ordersDb.collection("wallets").doc(user.uid).get();
     const walletData = walletSnap.data() || {};
     const balanceSatang = typeof walletData.balanceSatang === "number" ? walletData.balanceSatang : 0;
@@ -1394,11 +1397,7 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
       role: walletIdentity.role,
       balanceSatang,
       balance: balanceSatang / 100,
-      systemPromptPay: {
-        configured: true,
-        promptPayId,
-        accountName
-      },
+      systemPromptPay: { configured: true, promptPayId, accountName },
       submissions,
       withdrawals
     });
