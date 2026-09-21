@@ -173,7 +173,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   const merchantDifficultyMetrics = useMemo(() => getLevelDifficultyMetrics(merchantLevel), [merchantLevel]);
 
   // Merchant Financial Credit Score (คะแนนเครดิตทางการเงินร้านค้า)
-  const [merchantCreditScore, setMerchantCreditScore] = useState<number>(825);
+  const [merchantCreditScore, setMerchantCreditScore] = useState<number>(0);
   const [workingCapitalAvailable, setWorkingCapitalAvailable] = useState<number>(250000);
 
   // Products catalog state
