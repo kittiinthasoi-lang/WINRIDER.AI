@@ -37,6 +37,7 @@ import {
 import { Vehicle } from '../types';
 import { ThreeDimensionalDriverRadar, Radar3DPing } from './ThreeDimensionalDriverRadar';
 import { KnightNavigationMapScreen } from './KnightNavigationMapScreen';
+import { PersonalNavigationScreen } from './PersonalNavigationScreen';
 import {
   getGoogleMapsNavigationUrl
 } from '../data/realBangkokLocations';
@@ -678,9 +679,8 @@ distanceKm: pending.distanceKm,
 
       {/* โหมดแท็บแผนที่นำทาง: ยังไม่มีงานที่รับ → แสดงหน้านำทางแบบรอรับงาน */}
       {mode === 'navigation' && !currentActiveTrip && (
-        <KnightNavigationMapScreen
-          activeVehicle={activeVehicle}
-          driverLevel={driverLevel}
+        <PersonalNavigationScreen
+          role="driver"
           audioEnabled={audioEnabled}
           onClose={onExitNavigation}
         />
