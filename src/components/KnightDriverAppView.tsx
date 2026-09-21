@@ -105,8 +105,8 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   const [isOnDuty, setIsOnDuty] = useState<boolean>(false);
   const [deviceFrameMode, setDeviceFrameMode] = useState(true);
   const [balance, setBalance] = useState<number>(0);
-  const [ridesPaid, setRidesPaid] = useState(35);
-  const totalRidesDebt = 35;
+  const [ridesPaid, setRidesPaid] = useState(0);
+  const totalRidesDebt = 0;
 
   useEffect(() => {
     getWalletMe().then((res) => {
@@ -115,9 +115,9 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   }, []);
 
   // Knight Financial Credit Score State (คะแนนเครดิตทางการเงินอัศวิน - สูงสุด AAA Sovereign)
-  const [driverCreditScore, setDriverCreditScore] = useState<number>(850);
+  const [driverCreditScore, setDriverCreditScore] = useState<number>(currentUserSession?.creditScore ?? 0);
   const [emergencyCreditLimit] = useState<number>(50000);
-  const [emergencyCreditAvailable, setEmergencyCreditAvailable] = useState<number>(50000);
+  const [emergencyCreditAvailable, setEmergencyCreditAvailable] = useState<number>(0);
   const [creditToast, setCreditToast] = useState<string | null>(null);
 
   // 3D Density Radar (2.5 km) & Driver QR Code Modals & Armor Showcase Modal
@@ -126,9 +126,9 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   const [showArmorShowcaseModal, setShowArmorShowcaseModal] = useState<boolean>(false);
 
   // --- Win Knight Level & XP System (Progressive Proportional Scaling) ---
-  const [driverLevel, setDriverLevel] = useState<number>(100);
-  const [driverNextXp, setDriverNextXp] = useState<number>(() => calculateLevelMaxXp(100, 'knight'));
-  const [driverXp, setDriverXp] = useState<number>(() => Math.round(calculateLevelMaxXp(100, 'knight') * 0.88));
+  const [driverLevel, setDriverLevel] = useState<number>(currentUserSession?.level ?? 1);
+  const [driverNextXp, setDriverNextXp] = useState<number>(() => calculateLevelMaxXp(currentUserSession?.level ?? 1, 'knight'));
+  const [driverXp, setDriverXp] = useState<number>(currentUserSession?.xp ?? 0);
   const [driverXpToast, setDriverXpToast] = useState<string | null>(null);
   const [showTiersModal, setShowTiersModal] = useState<boolean>(false);
   const [tiersModalInitialRole, setTiersModalInitialRole] = useState<'knight' | 'citizen' | 'merchant'>('knight');
