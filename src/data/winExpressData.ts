@@ -55,9 +55,7 @@ export const WIN_EXPRESS_BOX_OPTIONS: WinExpressBoxOption[] = [
 ];
 
 export const WIN_EXPRESS_DRIVER_REQUIREMENTS = {
-  minDriverLevel: 10,
-  minDriverRank: 'Bronze Knight (อัศวินทองแดง) ขึ้นไป',
-  reason: 'เนื่องจากงาน Win Express ขนส่งพัสดุมูลค่าสูง เอกสารสัญญาสำคัญ และอาหารที่ต้องรักษาความสะอาด คนขับต้องมีทักษะขับขี่นุ่มนวลและรับผิดชอบสูง',
+  reason: 'พี่วินทุกคนที่ลงทะเบียนและเปิดรับงานผ่านการคัดเลือกและอบรมด้านความปลอดภัยและการให้บริการโดยแอดมินแล้ว; งาน WIN Express ยังคงใช้อุปกรณ์และมาตรฐานเฉพาะบริการ',
   standardEquipment: [
     'กล่องท้ายรถมาตรฐาน WIN Express Quick-Vault พร้อมกุญแจดิจิทัล',
     'ชุดคลุมกันฝนเกรดพรีเมียมสำหรับปกป้องกล่องพัสดุ',
