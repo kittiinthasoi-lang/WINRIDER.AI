@@ -94,6 +94,9 @@ interface MerchantCommandCenterProps {
   onRideToStore?: (storeName: string, storeAddress: string, distanceKm?: number) => void;
   initialPerspective?: 'owner' | 'customer';
   canEdit?: boolean;
+  customerProfile?: {
+    id: string; name: string; description: string; avatarUrl: string; avatarEmoji: string; address: string; phone: string; category: string; products: Array<Record<string, unknown>>; services: Array<Record<string, unknown>>; promotions: Array<Record<string, unknown>>; highlights: string[]; openHours?: string;
+  };
 }
 
 export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({ 
@@ -101,7 +104,8 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   onOpenWinBuddy,
   onRideToStore,
   initialPerspective,
-  canEdit = false
+  canEdit = false,
+  customerProfile
 }) => {
   // Perspective state: แบบที่ 1 (ของร้านค้าเอง) หรือ แบบที่ 2 (หน้าร้านสำหรับลูกค้า)
   const [perspective, setPerspective] = useState<'owner' | 'customer'>(() => {
@@ -178,6 +182,12 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
 
   // Products catalog state
   const [storeProducts, setStoreProducts] = useState<StoreCatalogProduct[]>(INITIAL_STORE_PRODUCTS);
+  React.useEffect(() => {
+    if (!customerProfile) return;
+    setMerchantProfileData(prev => ({ ...prev, displayName: customerProfile.name, bioStatus: customerProfile.description, avatarUrl: customerProfile.avatarUrl || prev.avatarUrl }));
+    if (Array.isArray(customerProfile.products)) setStoreProducts(customerProfile.products as StoreCatalogProduct[]);
+  }, [customerProfile]);
+
   const [customerCategoryFilter, setCustomerCategoryFilter] = useState<string>('all');
   const [collectedVouchers, setCollectedVouchers] = useState<string[]>([]);
   const [selectedVoucherCode, setSelectedVoucherCode] = useState<string | null>(null);
@@ -211,12 +221,12 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
 
   // Store metadata
   const storeInfo = {
-    name: merchantProfileData.displayName || 'ยังไม่ได้ตั้งชื่อร้านค้า',
-    address: '',
+    name: customerProfile?.name || merchantProfileData.displayName || 'ยังไม่ได้ตั้งชื่อร้านค้า',
+    address: customerProfile?.address || '',
     distanceKm: 0,
     estimatedWinFare: 0,
-    openHours: 'ยังไม่ได้ระบุเวลาทำการ',
-    phone: '',
+    openHours: customerProfile?.openHours || 'ยังไม่ได้ระบุเวลาทำการ',
+    phone: customerProfile?.phone || '',
     rating: 0,
     reviewsCount: 0
   };
