@@ -31,6 +31,7 @@ interface DensityRadarOverlayProps {
   audioEnabled?: boolean;
   onSelectEntity?: (entity: RadarEntity) => void;
   onBookRideWithRider?: (rider: RadarEntity) => void;
+  onSelectDestinationForRide?: (entity: MapRadarEntity) => void | Promise<void>;
   isCompact?: boolean;
   className?: string;
   onBackToHome?: () => void;
@@ -50,6 +51,7 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
   audioEnabled = true,
   onSelectEntity,
   onBookRideWithRider,
+  onSelectDestinationForRide,
   className = '',
   onBackToHome
 }) => {
@@ -76,6 +78,7 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
             onBookRideWithRider(r as any);
           }
         }}
+        onSelectDestinationForRide={onSelectDestinationForRide}
         onBackToHome={onBackToHome}
       />
     </div>
