@@ -104,6 +104,18 @@ export async function registerKnight(payload: KnightRegistrationPayload): Promis
       province: payload.province.trim(),
       district: payload.district.trim(),
       status: 'pending_review' as UserStatus,
+      level: 1,
+      xp: 0,
+      points: 0,
+      creditScore: 0,
+      financialScore: 0,
+      rideLaterCredit: 0,
+      missionsCompleted: 0,
+      missionStreak: 0,
+      badges: [],
+      achievements: [],
+      questSeason: '2026-S3',
+      questState: {},
       pdpaConsent: {
         version: '1.0',
         acceptedAt: serverTimestamp(),
@@ -114,8 +126,7 @@ export async function registerKnight(payload: KnightRegistrationPayload): Promis
 
     // 2. knights/{uid}
     transaction.set(knightRef, {
-      level: 1,
-      xp: 0,
+      ...progression,
       isOnline: false,
       vehicleType: payload.vehicleType,
       plateNumber: payload.plateNumber.trim(),
@@ -155,6 +166,18 @@ export async function registerCitizen(payload: CitizenRegistrationPayload): Prom
       province: payload.province.trim(),
       district: payload.district.trim(),
       status: 'active' as UserStatus, // Citizen gets immediate active pass!
+      level: 1,
+      xp: 0,
+      points: 0,
+      creditScore: 0,
+      financialScore: 0,
+      rideLaterCredit: 0,
+      missionsCompleted: 0,
+      missionStreak: 0,
+      badges: [],
+      achievements: [],
+      questSeason: '2026-S3',
+      questState: {},
       pdpaConsent: {
         version: '1.0',
         acceptedAt: serverTimestamp(),
@@ -164,6 +187,7 @@ export async function registerCitizen(payload: CitizenRegistrationPayload): Prom
     });
 
     transaction.set(citizenRef, {
+      ...progression,
       savedAddresses: [],
       emergencyContact: {
         name: payload.emergencyContactName.trim(),
@@ -193,6 +217,18 @@ export async function registerMerchant(payload: MerchantRegistrationPayload): Pr
       province: payload.province.trim(),
       district: payload.district.trim(),
       status: 'pending_review' as UserStatus,
+      level: 1,
+      xp: 0,
+      points: 0,
+      creditScore: 0,
+      financialScore: 0,
+      rideLaterCredit: 0,
+      missionsCompleted: 0,
+      missionStreak: 0,
+      badges: [],
+      achievements: [],
+      questSeason: '2026-S3',
+      questState: {},
       pdpaConsent: {
         version: '1.0',
         acceptedAt: serverTimestamp(),
@@ -202,6 +238,7 @@ export async function registerMerchant(payload: MerchantRegistrationPayload): Pr
     });
 
     transaction.set(merchantRef, {
+      ...progression,
       shopName: payload.shopName.trim(),
       shopType: payload.shopType.trim(),
       address: payload.address.trim(),
@@ -231,6 +268,18 @@ export async function registerPartner(payload: PartnerRegistrationPayload): Prom
       province: payload.province.trim(),
       district: payload.district.trim(),
       status: 'pending_review' as UserStatus,
+      level: 1,
+      xp: 0,
+      points: 0,
+      creditScore: 0,
+      financialScore: 0,
+      rideLaterCredit: 0,
+      missionsCompleted: 0,
+      missionStreak: 0,
+      badges: [],
+      achievements: [],
+      questSeason: '2026-S3',
+      questState: {},
       pdpaConsent: {
         version: '1.0',
         acceptedAt: serverTimestamp(),
@@ -240,6 +289,7 @@ export async function registerPartner(payload: PartnerRegistrationPayload): Prom
     });
 
     transaction.set(partnerRef, {
+      ...progression,
       orgName: payload.orgName.trim(),
       orgType: payload.orgType.trim(),
       contactPerson: payload.contactPerson.trim(),
