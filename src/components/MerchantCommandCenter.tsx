@@ -475,6 +475,30 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
         </div>
       </section>
 
+      {/* OWNER CONTROL RAIL: compact back-office actions */}
+      {perspective === 'owner' && (
+        <section className="rounded-3xl border border-amber-400/25 bg-gradient-to-r from-[#151A2B] via-[#0B1730] to-[#081226] p-4 shadow-lg">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2"><Store className="h-4 w-4 text-amber-300" /><h3 className="text-sm font-black text-white">ศูนย์จัดการหน้าร้าน</h3><span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[9px] font-mono font-bold text-amber-300">OWNER CONTROL</span></div>
+              <p className="mt-1 text-[10px] text-slate-400">จัดการสิ่งที่ลูกค้าจะเห็นใน WIN Shop จากจุดเดียว แล้วกดดูหน้าร้านจริงเพื่อเช็กประสบการณ์ลูกค้า</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <button type="button" onClick={() => setShowProfileCustomizerModal(true)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black text-white hover:border-cyan-400/40">🎨 โปรไฟล์</button>
+              <button type="button" onClick={() => setShowAddProductModal(true)} className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-[10px] font-black text-emerald-200 hover:bg-emerald-500/20">＋ ลงสินค้า</button>
+              <button type="button" onClick={() => { setNewProdIsFlash(true); setShowAddProductModal(true); }} className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[10px] font-black text-amber-200 hover:bg-amber-400/20">⚡ Flash Sale</button>
+              <button type="button" onClick={() => handleTogglePerspective('customer')} className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-[10px] font-black text-cyan-200 hover:bg-cyan-400/20">👁 ดูหน้าร้าน</button>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-xl bg-black/20 p-2"><p className="text-[9px] text-slate-500">สินค้าที่ลง</p><p className="text-sm font-black text-white">{storeProducts.length} รายการ</p></div>
+            <div className="rounded-xl bg-black/20 p-2"><p className="text-[9px] text-slate-500">สต็อกรวม</p><p className="text-sm font-black text-cyan-300">{storeProducts.reduce((sum, item) => sum + item.stock, 0)} ชิ้น</p></div>
+            <div className="rounded-xl bg-black/20 p-2"><p className="text-[9px] text-slate-500">Flash Sale</p><p className="text-sm font-black text-amber-300">{storeProducts.filter((item) => item.isFlashSale).length} รายการ</p></div>
+            <div className="rounded-xl bg-black/20 p-2"><p className="text-[9px] text-slate-500">ออเดอร์/ส่งของ</p><p className="text-sm font-black text-emerald-300">{deliveries.length} รายการ</p></div>
+          </div>
+        </section>
+      )}
+
       {/* ========================================================================= */}
       {/* MODE 2: CUSTOMER STOREFRONT (แบบที่ 2 สำหรับลูกค้าเข้ามาดูของที่ลงขาย ส่วนลด รายละเอียด และปักหมุดมาที่ร้าน) */}
       {/* ========================================================================= */}
