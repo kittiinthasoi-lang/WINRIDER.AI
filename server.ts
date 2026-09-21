@@ -1706,6 +1706,311 @@ function nextDispatchOffer(order: ServerOrder, now = new Date()) {
   };
 }
 
+const QUEST_SEASON_ID = "2026-S3";
+const QUEST_DEFINITIONS: Record<string, { role: string; period: "daily" | "weekly" | "epic"; xp: number; required: number; metricKey: string }> = {
+  "S3-KN-D01": {
+    "role": "driver",
+    "period": "daily",
+    "xp": 60,
+    "required": 1,
+    "metricKey": "driver.preflight"
+  },
+  "S3-KN-D02": {
+    "role": "driver",
+    "period": "daily",
+    "xp": 80,
+    "required": 1,
+    "metricKey": "driver.online"
+  },
+  "S3-KN-D03": {
+    "role": "driver",
+    "period": "daily",
+    "xp": 180,
+    "required": 3,
+    "metricKey": "driver.completed_trip"
+  },
+  "S3-KN-D04": {
+    "role": "driver",
+    "period": "daily",
+    "xp": 140,
+    "required": 2,
+    "metricKey": "driver.routed_trip"
+  },
+  "S3-KN-W01": {
+    "role": "driver",
+    "period": "weekly",
+    "xp": 500,
+    "required": 5,
+    "metricKey": "driver.active_days"
+  },
+  "S3-KN-W02": {
+    "role": "driver",
+    "period": "weekly",
+    "xp": 700,
+    "required": 3,
+    "metricKey": "driver.special_service"
+  },
+  "S3-KN-E01": {
+    "role": "driver",
+    "period": "epic",
+    "xp": 1600,
+    "required": 50,
+    "metricKey": "driver.trusted_completed_trip"
+  },
+  "S3-CT-D01": {
+    "role": "citizen",
+    "period": "daily",
+    "xp": 100,
+    "required": 1,
+    "metricKey": "citizen.completed_trip"
+  },
+  "S3-CT-D02": {
+    "role": "citizen",
+    "period": "daily",
+    "xp": 80,
+    "required": 1,
+    "metricKey": "citizen.win_alert_preview"
+  },
+  "S3-CT-D03": {
+    "role": "citizen",
+    "period": "daily",
+    "xp": 60,
+    "required": 1,
+    "metricKey": "citizen.shop_profile_view"
+  },
+  "S3-CT-D04": {
+    "role": "citizen",
+    "period": "daily",
+    "xp": 60,
+    "required": 1,
+    "metricKey": "citizen.street_market_view"
+  },
+  "S3-CT-W01": {
+    "role": "citizen",
+    "period": "weekly",
+    "xp": 350,
+    "required": 3,
+    "metricKey": "citizen.feature_categories"
+  },
+  "S3-CT-W02": {
+    "role": "citizen",
+    "period": "weekly",
+    "xp": 450,
+    "required": 5,
+    "metricKey": "citizen.rated_completed_trip"
+  },
+  "S3-CT-E01": {
+    "role": "citizen",
+    "period": "epic",
+    "xp": 1400,
+    "required": 25,
+    "metricKey": "citizen.engagement_score"
+  },
+  "S3-ME-D01": {
+    "role": "merchant",
+    "period": "daily",
+    "xp": 80,
+    "required": 1,
+    "metricKey": "merchant.storefront_ready"
+  },
+  "S3-ME-D02": {
+    "role": "merchant",
+    "period": "daily",
+    "xp": 100,
+    "required": 1,
+    "metricKey": "merchant.catalog_update"
+  },
+  "S3-ME-D03": {
+    "role": "merchant",
+    "period": "daily",
+    "xp": 100,
+    "required": 1,
+    "metricKey": "merchant.promotion_publish"
+  },
+  "S3-ME-D04": {
+    "role": "merchant",
+    "period": "daily",
+    "xp": 140,
+    "required": 3,
+    "metricKey": "merchant.dispatch_ready"
+  },
+  "S3-ME-W01": {
+    "role": "merchant",
+    "period": "weekly",
+    "xp": 450,
+    "required": 5,
+    "metricKey": "merchant.active_days"
+  },
+  "S3-ME-W02": {
+    "role": "merchant",
+    "period": "weekly",
+    "xp": 650,
+    "required": 20,
+    "metricKey": "merchant.completed_orders"
+  },
+  "S3-ME-E01": {
+    "role": "merchant",
+    "period": "epic",
+    "xp": 1800,
+    "required": 121,
+    "metricKey": "merchant.store_growth"
+  },
+  "S3-PA-D01": {
+    "role": "partner",
+    "period": "daily",
+    "xp": 80,
+    "required": 1,
+    "metricKey": "partner.profile_ready"
+  },
+  "S3-PA-D02": {
+    "role": "partner",
+    "period": "daily",
+    "xp": 100,
+    "required": 1,
+    "metricKey": "partner.service_update"
+  },
+  "S3-PA-D03": {
+    "role": "partner",
+    "period": "daily",
+    "xp": 100,
+    "required": 1,
+    "metricKey": "partner.offer_publish"
+  },
+  "S3-PA-D04": {
+    "role": "partner",
+    "period": "daily",
+    "xp": 120,
+    "required": 1,
+    "metricKey": "partner.customer_connect"
+  },
+  "S3-PA-W01": {
+    "role": "partner",
+    "period": "weekly",
+    "xp": 450,
+    "required": 5,
+    "metricKey": "partner.active_days"
+  },
+  "S3-PA-W02": {
+    "role": "partner",
+    "period": "weekly",
+    "xp": 650,
+    "required": 15,
+    "metricKey": "partner.completed_connections"
+  },
+  "S3-PA-E01": {
+    "role": "partner",
+    "period": "epic",
+    "xp": 1800,
+    "required": 52,
+    "metricKey": "partner.network_growth"
+  }
+};
+
+function bangkokDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(date);
+}
+function weekKey(date = new Date()) {
+  const d = new Date(date);
+  const bangkok = bangkokDateKey(d);
+  const [y,m,day] = bangkok.split("-").map(Number);
+  const local = new Date(Date.UTC(y, m - 1, day));
+  const weekday = local.getUTCDay() || 7;
+  local.setUTCDate(local.getUTCDate() - weekday + 1);
+  return `${local.getUTCFullYear()}-${String(local.getUTCMonth()+1).padStart(2,"0")}-${String(local.getUTCDate()).padStart(2,"0")}`;
+}
+function questPeriodKey(period: "daily" | "weekly" | "epic") {
+  return period === "daily" ? bangkokDateKey() : period === "weekly" ? weekKey() : "lifetime";
+}
+function questCounterKey(period: "daily" | "weekly" | "epic") {
+  return period === "daily" ? "daily" : period === "weekly" ? "weekly" : "lifetime";
+}
+
+app.get("/api/quests/state", rateLimit(60), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const seasonId = String(req.query.season || QUEST_SEASON_ID);
+  if (seasonId !== QUEST_SEASON_ID) return res.status(400).json({ error: "Unsupported quest season" });
+  try {
+    const snap = await ordersDb.collection("users").doc(user.uid).collection("progression").doc(seasonId).get();
+    const data = snap.exists ? snap.data() || {} : {};
+    return res.json({ seasonId, daily: data.daily || {}, weekly: data.weekly || {}, lifetime: data.lifetime || {}, claimed: data.claimed || {} });
+  } catch (error: any) {
+    console.error("[Quest State GET Error]:", error?.message);
+    return res.status(503).json({ error: "Quest state unavailable" });
+  }
+});
+
+app.post("/api/quests/event", rateLimit(120), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const metricKey = String(req.body?.metricKey || "");
+  const amount = Math.min(5, Math.max(1, Math.floor(Number(req.body?.amount) || 1)));
+  const eventId = String(req.body?.eventId || `${metricKey}:${Date.now()}:${crypto.randomBytes(6).toString("hex")}`).slice(0, 180);
+  const definition = Object.values(QUEST_DEFINITIONS).find(q => q.metricKey === metricKey);
+  if (!definition) return res.status(400).json({ error: "Unknown quest metric" });
+  try {
+    const userSnap = await ordersDb.collection("users").doc(user.uid).get();
+    const role = String(userSnap.data()?.role || "");
+    if (role !== definition.role) return res.status(403).json({ error: "Quest metric does not match account role" });
+    const seasonRef = ordersDb.collection("users").doc(user.uid).collection("progression").doc(QUEST_SEASON_ID);
+    const eventRef = seasonRef.collection("events").doc(crypto.createHash("sha256").update(eventId).digest("hex"));
+    let newValue = 0, duplicate = false;
+    await ordersDb.runTransaction(async transaction => {
+      const [seasonSnap, eventSnap] = await Promise.all([transaction.get(seasonRef), transaction.get(eventRef)]);
+      if (eventSnap.exists) { duplicate = true; return; }
+      const data = seasonSnap.exists ? seasonSnap.data() || {} : {};
+      const bucketName = questCounterKey(definition.period);
+      const bucket = { ...(data[bucketName] || {}) };
+      newValue = (Number(bucket[metricKey]) || 0) + amount;
+      bucket[metricKey] = newValue;
+      transaction.set(seasonRef, { seasonId: QUEST_SEASON_ID, [bucketName]: bucket, updatedAt: new Date().toISOString() }, { merge: true });
+      transaction.create(eventRef, { eventId, metricKey, amount, createdAt: FieldValue.serverTimestamp() });
+    });
+    return res.json({ success: true, duplicate, metricKey, value: newValue });
+  } catch (error: any) {
+    console.error("[Quest Event Error]:", error?.message);
+    return res.status(503).json({ error: "Quest event could not be recorded" });
+  }
+});
+
+app.post("/api/quests/claim", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const questId = String(req.body?.questId || "");
+  const definition = QUEST_DEFINITIONS[questId];
+  if (!definition) return res.status(400).json({ error: "Unknown quest" });
+  try {
+    const userRef = ordersDb.collection("users").doc(user.uid);
+    const seasonRef = userRef.collection("progression").doc(QUEST_SEASON_ID);
+    let result: { alreadyClaimed?: boolean; xp?: number } = {};
+    await ordersDb.runTransaction(async transaction => {
+      const [userSnap, seasonSnap] = await Promise.all([transaction.get(userRef), transaction.get(seasonRef)]);
+      const userData = userSnap.data() || {};
+      if (String(userData.role || "") !== definition.role) throw new Error("ROLE_MISMATCH");
+      const data = seasonSnap.exists ? seasonSnap.data() || {} : {};
+      const bucketName = questCounterKey(definition.period);
+      const bucket = { ...(data[bucketName] || {}) };
+      const value = Number(bucket[definition.metricKey]) || 0;
+      const periodKey = questPeriodKey(definition.period);
+      const claims = { ...(data.claimed || {}) };
+      const claimKey = `${questId}:${periodKey}`;
+      if (claims[claimKey]) { result = { alreadyClaimed: true, xp: Number(userData.xp) || 0 }; return; }
+      if (value < definition.required) throw new Error("QUEST_NOT_COMPLETE");
+      claims[claimKey] = new Date().toISOString();
+      const nextXp = (Number(userData.xp) || 0) + definition.xp;
+      transaction.set(seasonRef, { seasonId: QUEST_SEASON_ID, claimed: claims, updatedAt: new Date().toISOString() }, { merge: true });
+      transaction.set(userRef, { xp: nextXp, questSeason: QUEST_SEASON_ID, missionsCompleted: (Number(userData.missionsCompleted) || 0) + 1, updatedAt: new Date().toISOString() }, { merge: true });
+      result = { alreadyClaimed: false, xp: nextXp };
+    });
+    return res.json({ success: true, ...result });
+  } catch (error: any) {
+    if (error?.message === "ROLE_MISMATCH") return res.status(403).json({ error: "Quest role mismatch" });
+    if (error?.message === "QUEST_NOT_COMPLETE") return res.status(409).json({ error: "Quest not complete" });
+    console.error("[Quest Claim Error]:", error?.message);
+    return res.status(503).json({ error: "Quest claim unavailable" });
+  }
+});
+
 const ordersCollection = ordersDb.collection("rides");
 
 // Approved, online knights for driver-matching. Reads through the trusted Admin
