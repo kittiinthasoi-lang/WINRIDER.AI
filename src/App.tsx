@@ -444,6 +444,11 @@ export default function App() {
               audioEnabled={audioEnabled}
               onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
               onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+              onOpenEmergencyCenter={() => {
+                if (audioEnabled) playTactileBlip(500);
+                setActiveMode('hospital');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               onNavigateToMarket={() => setActiveMode('market')}
               onAddNewCustomerItem={handleAddCustomerItem}
               activeTab={passengerTab}

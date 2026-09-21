@@ -203,6 +203,7 @@ interface PassengerAppViewProps {
   audioEnabled: boolean;
   onOpenCustomerVoice?: () => void;
   onOpenWinBuddy?: () => void;
+  onOpenEmergencyCenter?: () => void;
   onNavigateToMarket?: () => void;
   onAddNewCustomerItem?: (item: any) => void;
   activeTab?: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile';
@@ -215,6 +216,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   audioEnabled, 
   onOpenCustomerVoice,
   onOpenWinBuddy,
+  onOpenEmergencyCenter,
   onNavigateToMarket,
   onAddNewCustomerItem,
   activeTab: propActiveTab,
@@ -244,7 +246,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [selectedService, setSelectedService] = useState<string | null>('WIN KNIGHT');
   const [activeServiceId, setActiveServiceId] = useState<string>('knight');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSosActive, setIsSosActive] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showDriverMatchingModal, setShowDriverMatchingModal] = useState(false);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
@@ -1007,14 +1008,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     }
   };
 
-  const handleTriggerSos = () => {
-    if (audioEnabled) {
-      playTactileBlip(400);
-      speakThaiText("สัญญาณฉุกเฉิน SOS ส่งถึงศูนย์บัญชาการ Cosmo-Ko และอัศวินรอบข้างในรัศมี 1 กิโลเมตรแล้ว");
-    }
-    setIsSosActive(true);
-  };
-
   const handleCancelActiveRide = async () => {
     if (!activeLiveOrder || ['completed', 'cancelled'].includes(activeLiveOrder.status)) return;
     if (!window.confirm('ยืนยันยกเลิกการเรียกรถรายการนี้?')) return;
@@ -1637,17 +1630,18 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
                   <button
                     id="emergency-sos-btn"
-                    onClick={handleTriggerSos}
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(500);
+                      onOpenEmergencyCenter?.();
+                    }}
                     className="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-base shadow-[0_0_25px_rgba(225,29,72,0.8)] active:scale-95 transition-all flex items-center justify-center gap-2 border-2 border-white/40"
                   >
                     <AlertTriangle className="w-6 h-6 animate-bounce" />
-                    <span>🚨 ขอความช่วยเหลือด่วน (EMERGENCY SOS)</span>
+                    <span>🚨 ศูนย์พยาบาล & กู้ชีพฉุกเฉิน (EMERGENCY SOS)</span>
                   </button>
 
                   <p className="text-[10px] text-slate-400">
-                    {isSosActive 
-                      ? "⚠️ กำลังส่งสัญญาณฉุกเฉินไปยังศูนย์บัญชาการ Cosmo-Ko และอัศวินใกล้เคียง" 
-                      : "กดปุ่มนี้เพื่อส่งสัญญาณคลื่นวิทยุฉุกเฉินให้อัศวินในรัศมี 1 กม. และศูนย์บัญชาการ Cosmo-Ko ทันที"}
+                    กดเพื่อเปิดศูนย์พยาบาล & กู้ชีพฉุกเฉิน พร้อมค้นหาโรงพยาบาล หน่วยดับเพลิง และสถานีตำรวจใกล้ตำแหน่งจริง
                   </p>
                 </div>
               </div>
