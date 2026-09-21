@@ -30,10 +30,10 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
     setActiveTool(tool);
   };
   const actions = [
-    { id: 'wallet' as const, label: 'WIN Wallet', image: '/ui/profile-actions/win-wallet.svg' },
-    { id: 'payment' as const, label: 'ตั้งค่ารับเงิน', image: '/ui/profile-actions/payment.svg' },
-    { id: 'assistant' as const, label: 'WIN-AI ผู้ช่วย', image: '/ui/profile-actions/win-ai.svg' },
-    { id: 'quests' as const, label: 'ภารกิจ XP', image: '/ui/profile-actions/xp.svg' },
+    { id: 'wallet' as const, label: 'WIN Wallet', image: `/ui/profile-actions/${role}-wallet.svg` },
+    { id: 'payment' as const, label: 'ตั้งค่ารับเงิน', image: `/ui/profile-actions/${role}-payment.svg` },
+    { id: 'assistant' as const, label: 'WIN-AI ผู้ช่วย', image: `/ui/profile-actions/${role}-assistant.svg` },
+    { id: 'quests' as const, label: 'ภารกิจ XP', image: `/ui/profile-actions/${role}-quests.svg` },
   ];
 
   return <>
