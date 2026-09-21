@@ -136,6 +136,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   React.useEffect(() => {
     if (!canEdit) return;
     loadProfileCustomization('merchant').then((saved) => {
+      void emitQuestMetric('merchant.storefront_ready', 1);
       if (saved) setMerchantProfileData(saved);
     }).catch((error) => console.warn('Unable to load merchant profile:', error));
   }, [canEdit]);
