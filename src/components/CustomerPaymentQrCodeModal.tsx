@@ -20,7 +20,7 @@ import {
   RefreshCw,
   FileText
 } from 'lucide-react';
-import { playTactileBlip, playLevelUpFanfare, speakThaiText } from '../utils/audio';
+import { playTactileBlip } from '../utils/audio';
 import QRCode from 'qrcode';
 import { getWalletMe } from '../services/walletService';
 
@@ -52,7 +52,6 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
   const [sellerName, setSellerName] = useState<string>(customerName);
   const [promptPayNumber, setPromptPayNumber] = useState<string>(customerPromptPay);
   const [copied, setCopied] = useState<boolean>(false);
-  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
   const [qrType, setQrType] = useState<'win_pay'>('win_pay');
   const [walletQrDataUrl, setWalletQrDataUrl] = useState<string>('');
   const [walletLoading, setWalletLoading] = useState(false);
@@ -105,21 +104,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleSimulatePayment = () => {
-    const amt = customAmount > 0 ? customAmount : 150;
-    if (audioEnabled) {
-      playLevelUpFanfare();
-      speakThaiText(`แสดง QR WIN Wallet สำหรับยอด ฿${amt} กรุณายืนยันธุรกรรมผ่านระบบจริง`);
-    }
-    setPaymentSuccess(true);
-    if (onPaymentSuccess) {
-      onPaymentSuccess(amt, itemNote);
-    }
 
-    setTimeout(() => {
-      setPaymentSuccess(false);
-    }, 4500);
-  };
 
   return (
     <div 
@@ -178,13 +163,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
           </button>
         </div>
 
-        {/* PAYMENT SUCCESS BANNER */}
-        {paymentSuccess && (
-          <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-slate-950 font-black text-xs font-mono text-center shadow-2xl border-2 border-white animate-bounce flex items-center justify-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-slate-950" />
-            <span>แสดง QR WIN Wallet แล้ว — ยังไม่ถือว่าเงินเข้าจนกว่าธุรกรรมจริงจะยืนยัน</span>
-          </div>
-        )}
+
 
         {/* TOGGLE PROMPTPAY VS WIN WALLET */}
         <div className="grid grid-cols-1 gap-2 bg-black/50 p-1 rounded-2xl border border-white/10 font-mono text-xs">
