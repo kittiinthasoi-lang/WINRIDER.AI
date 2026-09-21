@@ -19,7 +19,8 @@ import {
   ImageIcon
 } from 'lucide-react';
 import { auth } from '../firebase';
-import { AiStatusModal } from './AiStatusModal';\nimport { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';
+import { AiStatusModal } from './AiStatusModal';
+import { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';\nimport { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';
 
 export type AssistantMode = 'motorcycle_mechanic' | 'personal_commerce';
 
@@ -81,40 +82,85 @@ export const WinAiAssistantPanel: React.FC<Props> = ({ mode: propMode, onModeCha
     }
   }, [propMode]);
 
-  // Load chat history from localStorage on mode change
+  // Load account chat history from Firestore, with localStorage migration/fallback.
   useEffect(() => {
-    const saved = localStorage.getItem(`win_ai_history_${currentMode}`);
-    if (saved) {
+    let cancelled = false;
+    const loadHistory = async () => {
+      const key = `win_ai_history_${currentMode}`;
+      const localSaved = localStorage.getItem(key);
+      let localMessages: ChatMessage[] | null = null;
+      if (localSaved) {
+        try {
+          const parsed = JSON.parse(localSaved);
+          if (Array.isArray(parsed)) localMessages = parsed;
+        } catch (e) {
+          console.error('Failed to parse chat history', e);
+        }
+      }
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setMessages(parsed);
+        const cloudMessages = await loadAccountPreference<ChatMessage[]>(key);
+        if (cancelled) return;
+        if (Array.isArray(cloudMessages)) {
+          setMessages(cloudMessages);
           return;
         }
-      } catch (e) {
-        console.error('Failed to parse chat history', e);
+        if (localMessages) {
+          setMessages(localMessages);
+          await saveAccountPreference(key, localMessages.slice(-20));
+          return;
+        }
+      } catch {
+        if (cancelled) return;
+        if (localMessages) {
+          setMessages(localMessages);
+          return;
+        }
       }
-    }
-    // Default initial greeting if no history
-    const initialGreeting: ChatMessage = {
-      id: 'greeting',
-      role: 'assistant',
-      text: currentMode === 'motorcycle_mechanic'
-        ? `สวัสดีครับ! ผมคือ **WIN-AI ช่างส่วนตัว** 🛵\nพร้อมช่วยวิเคราะห์อาการรถจักรยานยนต์ จัดโครงสร้างคำตอบ 5 มิติ:\n\n1. 🚨 **ระดับความเร่งด่วน** (ต่ำ / ปานกลาง / สูงมาก)\n2. 🔍 **สาเหตุที่เป็นไปได้**\n3. 🛠️ **วิธีตรวจเช็กเบื้องต้นอย่างปลอดภัย**\n4. ⚠️ **สิ่งที่ห้ามทำเด็ดขาด**\n5. 💵 **ประมาณการค่าใช้จ่ายและค่าอะไหล่**\n\n*สามารถแนบรูปถ่ายชิ้นส่วน (JPG, PNG, WEBP) หรือพิมพ์ยี่ห้อ รุ่น และอาการได้เลยครับ!*`
-        : `สวัสดีครับ! ผมคือ **WIN-AI ผู้ช่วยส่วนตัว** 💼\nพร้อมเป็นที่ปรึกษาด้านการค้าขายและการประกอบอาชีพ:\n\n• 💰 **คำนวณต้นทุน & กำไร (Margin)** และตั้งราคาขายที่แข่งขันได้\n• 📢 **เขียนแคปชั่น/ประกาศขายสินค้า** ที่ดึงดูดลูกค้าและปิดการขายไว\n• 🍳 **แจกสูตรอาหาร/เครื่องดื่ม** พร้อมคำนวณขนาดเสิร์ฟและต้นทุนต่อจาน\n• 💡 **แนะนำโปรโมชั่นและกลยุทธ์การขาย**\n\n*พิมพ์คำถามหรือเลือกหัวข้อตัวอย่างด้านล่างได้ทันทีครับ!*`,
-      timestamp: Date.now(),
-      source: 'WIN-AI System'
+      if (cancelled) return;
+      const initialGreeting: ChatMessage = {
+        id: 'greeting',
+        role: 'assistant',
+        text: currentMode === 'motorcycle_mechanic'
+          ? `สวัสดีครับ! ผมคือ **WIN-AI ช่างส่วนตัว** 🛵
+พร้อมช่วยวิเคราะห์อาการรถจักรยานยนต์ จัดโครงสร้างคำตอบ 5 มิติ:
+
+1. 🚨 **ระดับความเร่งด่วน** (ต่ำ / ปานกลาง / สูงมาก)
+2. 🔍 **สาเหตุที่เป็นไปได้**
+3. 🛠️ **วิธีตรวจเช็กเบื้องต้นอย่างปลอดภัย**
+4. ⚠️ **สิ่งที่ห้ามทำเด็ดขาด**
+5. 💵 **ประมาณการค่าใช้จ่ายและค่าอะไหล่**
+
+*สามารถแนบรูปถ่ายชิ้นส่วน (JPG, PNG, WEBP) หรือพิมพ์ยี่ห้อ รุ่น และอาการได้เลยครับ!*`
+          : `สวัสดีครับ! ผมคือ **WIN-AI ผู้ช่วยส่วนตัว** 💼
+พร้อมเป็นที่ปรึกษาด้านการค้าขายและการประกอบอาชีพ:
+
+• 💰 **คำนวณต้นทุน & กำไร (Margin)** และตั้งราคาขายที่แข่งขันได้
+• 📢 **เขียนแคปชั่น/ประกาศขายสินค้า** ที่ดึงดูดลูกค้าและปิดการขายไว
+• 🍳 **แจกสูตรอาหาร/เครื่องดื่ม** พร้อมคำนวณขนาดเสิร์ฟและต้นทุนต่อจาน
+• 💡 **แนะนำโปรโมชั่นและกลยุทธ์การขาย**
+
+*พิมพ์คำถามหรือเลือกหัวข้อตัวอย่างด้านล่างได้ทันทีครับ!*`,
+        timestamp: Date.now(),
+        source: 'WIN-AI System'
+      };
+      setMessages([initialGreeting]);
     };
-    setMessages([initialGreeting]);
+    void loadHistory();
+    return () => { cancelled = true; };
   }, [currentMode]);
 
-  // Save history to localStorage
+  // Save history locally for fast UX and to the account for cross-session recovery.
   useEffect(() => {
     if (messages.length > 0) {
-      localStorage.setItem(`win_ai_history_${currentMode}`, JSON.stringify(messages.slice(-20)));
+      const trimmed = messages.slice(-20);
+      localStorage.setItem(`win_ai_history_${currentMode}`, JSON.stringify(trimmed));
+      if (auth.currentUser) {
+        void saveAccountPreference(`win_ai_history_${currentMode}`, trimmed).catch(() => { /* local cache remains available */ });
+      }
     }
   }, [messages, currentMode]);
 
+  const handleModeSwitch = (newMode: AssistantMode) => {
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -128,6 +174,7 @@ export const WinAiAssistantPanel: React.FC<Props> = ({ mode: propMode, onModeCha
 
   const clearHistory = () => {
     localStorage.removeItem(`win_ai_history_${currentMode}`);
+    void saveAccountPreference(`win_ai_history_${currentMode}`, []).catch(() => { /* ignore persistence failure */ });
     const initialGreeting: ChatMessage = {
       id: `greeting-${Date.now()}`,
       role: 'assistant',
