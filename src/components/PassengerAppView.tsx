@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { emitQuestMetric } from '../services/questService';
+import { createSosIncident } from '../services/sosIncidentService';
 import { WIN_SHOP_ITEMS, WinShopItem } from '../data/winShopItems';
 import { DREAM_RIDES_FLEET } from '../data/dreamRidesData';
 import { AMENITIES_CATALOG, calculateAmenitiesSummary, isHelmetAmenity } from '../data/amenitiesData';
@@ -1674,7 +1675,27 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     id="emergency-sos-btn"
                     onClick={() => {
                       if (audioEnabled) playTactileBlip(500);
-                      onOpenEmergencyCenter?.();
+                      const openCenter = () => onOpenEmergencyCenter?.();
+                      if (!navigator.geolocation) {
+                        void createSosIncident({ note: 'SOS จากอุปกรณ์ที่ไม่มี GPS' }).catch(() => undefined);
+                        openCenter();
+                        return;
+                      }
+                      navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                          void createSosIncident({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            note: 'ผู้ใช้กด Emergency SOS'
+                          }).catch(() => undefined);
+                          openCenter();
+                        },
+                        () => {
+                          void createSosIncident({ note: 'SOS แต่ไม่สามารถอ่าน GPS ได้' }).catch(() => undefined);
+                          openCenter();
+                        },
+                        { enableHighAccuracy: true, timeout: 5000, maximumAge: 15000 }
+                      );
                     }}
                     className="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-base shadow-[0_0_25px_rgba(225,29,72,0.8)] active:scale-95 transition-all flex items-center justify-center gap-2 border-2 border-white/40"
                   >
