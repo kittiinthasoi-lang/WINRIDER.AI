@@ -538,7 +538,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const citizenDifficultyMetrics = useMemo(() => getLevelDifficultyMetrics(citizenLevel), [citizenLevel]);
 
   // --- Citizen Financial Credit Score System ---
-  const [citizenCreditScore, setCitizenCreditScore] = useState<number>(815);
+  const [citizenCreditScore, setCitizenCreditScore] = useState<number>(0);
   const [citizenRideLaterCredit, setCitizenRideLaterCredit] = useState<number>(3500);
   const [citizenShopCredit, setCitizenShopCredit] = useState<number>(12000);
 
