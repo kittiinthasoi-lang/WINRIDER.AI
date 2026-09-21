@@ -277,7 +277,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [currentUserSession?.id]);
 
 
 
