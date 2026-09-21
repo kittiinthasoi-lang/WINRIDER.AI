@@ -599,7 +599,7 @@ export default function App() {
                 <HardwareWeaponsSection audioEnabled={audioEnabled} />
               )}
               {activeChapter === 'ecosystem' && (
-                <EcosystemGovernanceSection audioEnabled={audioEnabled} />
+                <EcosystemGovernanceSection audioEnabled={audioEnabled} onOpenMarket={() => { setActiveMode('market'); setPassengerTab('shop'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
               )}
               {activeChapter === 'hub_galactic' && (
                 <WinHubGalacticSection audioEnabled={audioEnabled} />
