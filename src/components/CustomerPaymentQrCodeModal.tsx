@@ -65,7 +65,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
     void (async () => {
       try {
         const wallet = customerWalletId ? null : await getWalletMe();
-        const walletId = customerWalletId || wallet?.wallet?.walletId || wallet?.walletId || '';
+        const walletId = customerWalletId || wallet?.walletId || '';
         if (!cancelled) setResolvedWalletId(walletId);
         if (!/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(walletId)) throw new Error('ไม่มี WIN Wallet ID จริง');
         const payload = JSON.stringify({ type: 'WIN_WALLET_PAYMENT', walletId, amount: customAmount > 0 ? customAmount : undefined, item: itemNote });
