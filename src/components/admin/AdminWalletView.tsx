@@ -187,7 +187,7 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-[#00D4FF]">1. ถังค่าระบบ (System)</span>
               <img 
-                src="/images/cyber_coins.jpg" 
+                src="/images/admin/payment-profiles.svg" 
                 alt="System Bucket" 
                 className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#00D4FF]/40 shadow-sm" 
               />
@@ -233,7 +233,7 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-[#FFC93C]">3. ถังบำนาญอัศวิน (Pension)</span>
               <img 
-                src="/images/armor_goldentree.jpg" 
+                src="/images/admin/wallet-ledger.svg" 
                 alt="Pension Bucket" 
                 className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#FFC93C]/50 shadow-sm" 
               />
