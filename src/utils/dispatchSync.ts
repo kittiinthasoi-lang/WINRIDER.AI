@@ -310,7 +310,9 @@ export async function acceptLiveOrder(
     body: JSON.stringify({}),
   });
   if (!acceptResponse.ok) {
-    throw new Error(`ORDER_ACCEPT_FAILED_${acceptResponse.status}`);
+    const failure = await acceptResponse.json().catch(() => ({})) as { error?: string; code?: string };
+    const reason = failure.code || failure.error || `HTTP_${acceptResponse.status}`;
+    throw new Error(`ORDER_ACCEPT_FAILED:${reason}`);
   }
   const acceptedServerOrder = await acceptResponse.json();
   if (!isValidLiveOrder(acceptedServerOrder?.order)) return null;
