@@ -1,69 +1,80 @@
-import { auth, db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth } from '../firebase';
 
 export const QUEST_SEASON_ID = '2026-S3';
 
 export type QuestMetricEvent = {
   metricKey: string;
   amount?: number;
+  eventId?: string;
 };
 
-export async function loadQuestState(uid: string) {
-  const snap = await getDoc(doc(db, 'users', uid, 'progression', QUEST_SEASON_ID));
-  return snap.exists() ? snap.data() : { seasonId: QUEST_SEASON_ID, progress: {}, claimed: [] };
+async function authHeaders() {
+  const user = auth.currentUser;
+  if (!user) throw new Error('ต้องเข้าสู่ระบบก่อน');
+  const token = await user.getIdToken();
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
 
-export async function saveQuestState(uid: string, state: { progress?: Record<string, number>; claimed?: string[] }) {
-  await setDoc(doc(db, 'users', uid, 'progression', QUEST_SEASON_ID), {
-    seasonId: QUEST_SEASON_ID,
-    progress: state.progress || {},
-    claimed: state.claimed || [],
-    updatedAt: new Date().toISOString(),
-  }, { merge: true });
+export async function loadQuestState(uid: string) {
+  const user = auth.currentUser;
+  if (!user || user.uid !== uid) return { seasonId: QUEST_SEASON_ID, progress: {}, claimed: [] };
+  const response = await fetch(`/api/quests/state?season=${encodeURIComponent(QUEST_SEASON_ID)}`, {
+    headers: await authHeaders(),
+  });
+  if (!response.ok) throw new Error(`QUEST_STATE_${response.status}`);
+  const data = await response.json();
+  return {
+    seasonId: data.seasonId || QUEST_SEASON_ID,
+    progress: { ...(data.lifetime || {}), ...(data.weekly || {}), ...(data.daily || {}) },
+    daily: data.daily || {},
+    weekly: data.weekly || {},
+    lifetime: data.lifetime || {},
+    claimed: Object.keys(data.claimed || {}),
+  };
+}
+
+export async function saveQuestState() {
+  // Quest state is server-authoritative. This function remains as a compatibility
+  // no-op so legacy callers cannot bypass server validation.
+  return loadQuestState(auth.currentUser?.uid || '');
 }
 
 export async function recordQuestMetric(event: QuestMetricEvent) {
-  const user = auth.currentUser;
-  if (!user || !event.metricKey) return null;
-  const current = await loadQuestState(user.uid);
-  const progress = { ...(current.progress || {}) };
-  progress[event.metricKey] = (Number(progress[event.metricKey]) || 0) + Math.max(0, event.amount ?? 1);
-  await saveQuestState(user.uid, { progress, claimed: current.claimed || [] });
-  return progress[event.metricKey];
+  if (!auth.currentUser || !event.metricKey) return null;
+  const response = await fetch('/api/quests/event', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({
+      metricKey: event.metricKey,
+      amount: Math.min(5, Math.max(1, Math.floor(event.amount ?? 1))),
+      ...(event.eventId ? { eventId: event.eventId } : {}),
+    }),
+  });
+  if (!response.ok) throw new Error(`QUEST_EVENT_${response.status}`);
+  const data = await response.json();
+  return Number(data.value) || 0;
 }
 
-export async function claimQuest(questId: string, rewardXp: number, metricKey: string, totalRequired: number) {
-  const user = auth.currentUser;
-  if (!user) throw new Error('ต้องเข้าสู่ระบบก่อนรับรางวัล');
-  const current = await loadQuestState(user.uid);
-  const claimed = new Set<string>(current.claimed || []);
-  if (claimed.has(questId)) return { alreadyClaimed: true };
-
-  const progress = Number((current.progress || {})[metricKey]) || 0;
-  if (progress < totalRequired) throw new Error('ภารกิจยังไม่ถึงเป้าหมาย');
-
-  claimed.add(questId);
-  const userRef = doc(db, 'users', user.uid);
-  const userSnap = await getDoc(userRef);
-  const userData = userSnap.data() || {};
-
-  await saveQuestState(user.uid, { progress: current.progress || {}, claimed: Array.from(claimed) });
-  await setDoc(userRef, {
-    xp: (Number(userData.xp) || 0) + rewardXp,
-    questSeason: QUEST_SEASON_ID,
-    missionsCompleted: (Number(userData.missionsCompleted) || 0) + 1,
-    updatedAt: new Date().toISOString(),
-  }, { merge: true });
-
-  return { alreadyClaimed: false };
-}
-
-
-export function emitQuestMetric(metricKey: string, amount = 1) {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('winrider:quest-metric', { detail: { metricKey, amount } }));
+export async function claimQuest(questId: string) {
+  const response = await fetch('/api/quests/claim', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ questId }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(String(payload.error || `QUEST_CLAIM_${response.status}`));
   }
-  return recordQuestMetric({ metricKey, amount }).catch(error => {
+  return response.json();
+}
+
+export function emitQuestMetric(metricKey: string, amount = 1, eventId?: string) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('winrider:quest-metric', {
+      detail: { metricKey, amount, eventId }
+    }));
+  }
+  return recordQuestMetric({ metricKey, amount, eventId }).catch(error => {
     console.warn('Quest metric persistence failed:', error);
     return null;
   });
