@@ -20,7 +20,8 @@ export interface PaymentProfile {
   role: 'knight' | 'citizen' | 'merchant' | 'partner';
   accountName: string; // ชื่อบัญชี / ชื่อ-นามสกุล / ชื่อร้านค้า
   receiverType: PaymentReceiverType;
-  promptPayId: string; // PromptPay / bank account; ว่างเมื่อใช้ WIN Wallet ID\n  walletId?: string; // WIN Wallet ID ประจำบทบาท
+  promptPayId: string; // PromptPay / bank account; ว่างเมื่อใช้ WIN Wallet ID
+  walletId?: string; // WIN Wallet ID ประจำบทบาท
   bankName?: string; // ธนาคาร
   qrCodeDataUrl?: string; // Base64 PromptPay QR สร้างจาก EMVCo จริง
   bankSlipQrUrl?: string | null; // รูปภาพ QR จากแอปธนาคาร
@@ -94,7 +95,11 @@ export async function savePaymentProfile(params: {
   }
     const cleanPromptPay = promptPayId.replace(/[^0-9]/g, '');
 
-  if (receiverType === 'win_wallet') {\n    if (!walletId || !/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(walletId)) {\n      throw new Error('WIN Wallet ID ไม่ถูกต้องหรือยังไม่ได้จัดสรร');\n    }\n  } else if (receiverType === 'bank_account') {
+  if (receiverType === 'win_wallet') {
+    if (!walletId || !/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(walletId)) {
+      throw new Error('WIN Wallet ID ไม่ถูกต้องหรือยังไม่ได้จัดสรร');
+    }
+  } else if (receiverType === 'bank_account') {
     if (!cleanPromptPay || cleanPromptPay.length < 10 || cleanPromptPay.length > 15) {
       throw new Error('กรุณากรอกเลขบัญชีธนาคารให้ถูกต้อง (10-15 หลัก)');
     }
@@ -124,7 +129,8 @@ export async function savePaymentProfile(params: {
     role,
     accountName: accountName.trim(),
     receiverType,
-    promptPayId: receiverType === 'win_wallet' ? '' : cleanPromptPay,\n    walletId: receiverType === 'win_wallet' ? walletId : undefined,
+    promptPayId: receiverType === 'win_wallet' ? '' : cleanPromptPay,
+    walletId: receiverType === 'win_wallet' ? walletId : undefined,
     bankName: bankName?.trim() || '',
     qrCodeDataUrl: realQrDataUrl,
     bankSlipQrUrl: bankSlipQrUrl !== undefined ? bankSlipQrUrl : (existing?.bankSlipQrUrl || null),
