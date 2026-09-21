@@ -119,6 +119,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   const [destinationInput, setDestinationInput] = useState(selectedDestination);
   const [destinationError, setDestinationError] = useState('');
   const [matchingStarted, setMatchingStarted] = useState(false);
+  const [matchingRunId, setMatchingRunId] = useState(0);
   const destinationRequiredBeforeMatching = ['knight', 'express', 'spirit', 'family'].includes(serviceId);
   
   // Local gender state for reactive switching
@@ -150,21 +151,35 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     setDestinationInput(selectedDestination);
   }, [selectedDestination]);
 
+  // IMPORTANT: driver discovery is a snapshot per matching run.
+  // Do not re-query when live GPS keeps updating; otherwise the result list
+  // continuously replaces itself and the customer cannot tap a driver.
   useEffect(() => {
-    if (!matchingStarted) return;
+    if (!matchingStarted || matchingRunId === 0) return;
     let active = true;
     setDriversLoading(true);
     setDriversError(null);
-    fetchLiveDrivers(geo.isRealGps && geo.latitude !== null && geo.longitude !== null
+
+    const searchLocation = geo.isRealGps && geo.latitude !== null && geo.longitude !== null
       ? { latitude: geo.latitude, longitude: geo.longitude }
-      : undefined).then((drivers) => {
+      : undefined;
+
+    fetchLiveDrivers(searchLocation).then((drivers) => {
       if (active) setLiveDrivers(drivers);
     }).catch((error) => {
       console.error('Unable to load live drivers:', error);
-      if (active) { setLiveDrivers([]); setDriversError('ไม่สามารถเชื่อมต่อรายชื่อพี่วินจากระบบจริงได้'); }
-    }).finally(() => { if (active) setDriversLoading(false); });
+      if (active) {
+        setLiveDrivers([]);
+        setDriversError('ไม่สามารถเชื่อมต่อรายชื่อพี่วินจากระบบจริงได้');
+      }
+    }).finally(() => {
+      if (active) setDriversLoading(false);
+    });
+
     return () => { active = false; };
-  }, [matchingStarted, geo.isRealGps, geo.latitude, geo.longitude]);
+    // matchingRunId intentionally controls the fetch. GPS updates must not
+    // restart an active matching run.
+  }, [matchingStarted, matchingRunId]);
 
   // Criteria rules based on service and gender
   const serviceCriteria = useMemo(() => {
@@ -417,9 +432,11 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     setDestinationError('');
     setSelectedDriver(null);
     setLiveDrivers([]);
+    setDriversError(null);
     if (destination) onDestinationChange(destination);
     setMatchingStep('scanning');
     setMatchingStarted(true);
+    setMatchingRunId((current) => current + 1);
     if (audioEnabled) {
       playRadarScan();
       speakThaiText(destination ? `เริ่มค้นหาพี่วินสำหรับปลายทาง ${destination}` : 'เริ่มค้นหาพี่วินสำหรับบริการที่เลือก');
