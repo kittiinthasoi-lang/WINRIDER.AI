@@ -1768,6 +1768,58 @@ app.get("/api/knights/available", rateLimit(30), async (req, res) => {
   }
 });
 
+app.get("/api/knights/settings", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const userSnap = await ordersDb.collection("users").doc(user.uid).get();
+    const userData = userSnap.data() || {};
+    const knightSnap = await ordersDb.collection("knights").doc(user.uid).get();
+    if (userData.role !== "knight" && !isSuperAdminToken(user)) {
+      return res.status(403).json({ error: "Knight account required" });
+    }
+    const knight = knightSnap.data() || {};
+    return res.json({
+      vehicles: Array.isArray(knight.vehicles) ? knight.vehicles.slice(0, 50) : [],
+      activeVehicleId: typeof knight.activeVehicleId === "string" ? knight.activeVehicleId : null,
+      equippedSuitId: typeof knight.equippedSuitId === "string" ? knight.equippedSuitId : null,
+    });
+  } catch (error: any) {
+    console.error("[Knight Settings GET Error]:", error?.message);
+    return res.status(503).json({ error: "Knight settings unavailable" });
+  }
+});
+
+app.put("/api/knights/settings", rateLimit(60), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const userSnap = await ordersDb.collection("users").doc(user.uid).get();
+    const userData = userSnap.data() || {};
+    if (userData.role !== "knight" && !isSuperAdminToken(user)) {
+      return res.status(403).json({ error: "Knight account required" });
+    }
+
+    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    if (Array.isArray(req.body?.vehicles)) {
+      updates.vehicles = req.body.vehicles.filter((item: unknown) => item && typeof item === "object").slice(0, 50);
+    }
+    if (typeof req.body?.activeVehicleId === "string") updates.activeVehicleId = req.body.activeVehicleId.slice(0, 120);
+    if (typeof req.body?.equippedSuitId === "string") updates.equippedSuitId = req.body.equippedSuitId.slice(0, 120);
+
+    await ordersDb.collection("knights").doc(user.uid).set(updates, { merge: true });
+    return res.json({
+      success: true,
+      vehicles: Array.isArray(updates.vehicles) ? updates.vehicles : undefined,
+      activeVehicleId: updates.activeVehicleId,
+      equippedSuitId: updates.equippedSuitId,
+    });
+  } catch (error: any) {
+    console.error("[Knight Settings PUT Error]:", error?.message);
+    return res.status(503).json({ error: "บันทึกการตั้งค่าอัศวินไม่สำเร็จ" });
+  }
+});
+
 app.post("/api/knights/presence", rateLimit(120), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
