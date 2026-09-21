@@ -258,6 +258,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [currentMatchedDriver, setCurrentMatchedDriver] = useState<MatchedDriver | null>(null);
   const [isCreatingRide, setIsCreatingRide] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [isCalculatingDestination, setIsCalculatingDestination] = useState(false);
+  const [destinationEtaMinutes, setDestinationEtaMinutes] = useState<number | null>(null);
+  const [destinationFareEstimate, setDestinationFareEstimate] = useState<number | null>(null);
 
   // --- Real-Time Active Ride, AI Voice Announcer & Live Dispatch Sync ---
   const [activeLiveOrder, setActiveLiveOrder] = useState<LiveRideOrder | null>(null);
@@ -900,15 +903,52 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     }
   };
 
-  const handleSelectLifestylePlace = (place: LifestylePlace) => {
-    setSelectedDestination(`${place.name} (${place.area})`);
-    setTripDistanceKm(place.distanceKm);
-    if (audioEnabled) {
-      playTactileBlip(900);
-      speakThaiText(`เลือกปลายทาง ${place.name} ห่าง ${place.distanceKm} กิโลเมตร`);
-    }
+  const calculateDestinationRoute = async (destinationQuery: string, fallbackLabel: string) => {
+    setIsCalculatingDestination(true);
+    setBookingError(null);
+    setDestinationEtaMinutes(null);
+    setDestinationFareEstimate(null);
+    setSelectedDestination(fallbackLabel);
+    try {
+      const currentPosition = await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+        if (!navigator.geolocation) { reject(new Error('GPS_UNAVAILABLE')); return; }
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+          () => reject(new Error('GPS_PERMISSION_OR_FIX_FAILED')),
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+        );
+      });
+      const response = await fetch('/api/places/resolve-routes', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ latitude: currentPosition.lat, longitude: currentPosition.lng, places: [{ key: 'destination-preview', query: destinationQuery + ' ประเทศไทย' }] }),
+      });
+      const payload = await response.json() as { routes?: Array<{ latitude: number; longitude: number; address: string; distanceKm: number; etaMinutes: number | null }> };
+      const route = payload.routes?.[0];
+      if (!response.ok || !route || !Number.isFinite(route.distanceKm)) throw new Error('DESTINATION_ROUTE_UNAVAILABLE');
+      const distanceKm = Number(route.distanceKm);
+      const distanceFare = distanceKm <= 1 ? 0 : Math.round((distanceKm - 1) * 7.5);
+      const fare = 15 + distanceFare + expressBoxFee + selectedDreamRide.priceAddon + amenitiesSummary.totalPrice + 5 + serviceAddonFee;
+      setSelectedDestination(route.address || fallbackLabel);
+      setTripDistanceKm(distanceKm);
+      setDestinationEtaMinutes(route.etaMinutes ?? null);
+      setDestinationFareEstimate(fare);
+      setShowBookingModal(true);
+      if (audioEnabled) {
+        playTactileBlip(900);
+        speakThaiText('ระยะทางจริงประมาณ ' + distanceKm.toFixed(1) + ' กิโลเมตร ค่าโดยสารประมาณ ' + fare + ' บาท');
+      }
+    } catch (error) {
+      console.error('Destination route preview failed:', error);
+      const reason = error instanceof Error ? error.message : '';
+      setBookingError(reason.startsWith('GPS_') ? 'ต้องอนุญาตตำแหน่ง GPS เพื่อคำนวณระยะทางและค่าโดยสารจริง' : 'ไม่สามารถคำนวณเส้นทางจริงของปลายทางนี้ได้ กรุณาลองใหม่อีกครั้ง');
+      setShowBookingModal(false);
+    } finally { setIsCalculatingDestination(false); }
   };
 
+  const handleSelectLifestylePlace = (place: LifestylePlace) => {
+    void calculateDestinationRoute(place.name + ' (' + place.area + ')', place.name + ' (' + place.area + ')');
+  };
   const handleConfirmRide = async () => {
     if (!currentUserSession?.id) {
       setBookingError('กรุณาเข้าสู่ระบบก่อนเรียกรถ เพื่อป้องกันการสร้างออเดอร์โดยไม่มีเจ้าของบัญชี');
@@ -1548,11 +1588,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                         onClick={() => {
                           if (audioEnabled) playTactileBlip(900);
                           const randomLoc = REAL_BANGKOK_LOCATIONS[Math.floor(Math.random() * REAL_BANGKOK_LOCATIONS.length)];
-                          setSelectedDestination(`${randomLoc.name} (${randomLoc.zoneTitle})`);
-                          setShowBookingModal(true);
-                          if (audioEnabled) {
-                            speakThaiText(`เลือกปลายทาง Google Maps ${randomLoc.name} แล้วค่ะ`);
-                          }
+                          void calculateDestinationRoute(
+                            randomLoc.name + ' (' + randomLoc.zoneTitle + ')',
+                            randomLoc.name + ' (' + randomLoc.zoneTitle + ')'
+                          );
                         }}
                         className="px-2 py-0.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-400 hover:text-slate-950 text-cyan-300 text-[10px] font-mono font-bold border border-cyan-400/40 transition-all flex items-center gap-1"
                       >
@@ -1601,8 +1640,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                         key={idx}
                         onClick={() => {
                           if (audioEnabled) playTactileBlip(800);
-                          setSelectedDestination(dest.title);
-                          setShowBookingModal(true);
+                          void calculateDestinationRoute(dest.title, dest.title);
                         }}
                         className="flex-shrink-0 w-44 p-3 rounded-2xl bg-[#0E1B36] border border-white/10 hover:border-cyan-400/50 transition-all cursor-pointer snap-start"
                       >
