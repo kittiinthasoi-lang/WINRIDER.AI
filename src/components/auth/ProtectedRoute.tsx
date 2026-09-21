@@ -11,12 +11,15 @@ interface Props {
   allowedRoles: UserRole[];
   children: React.ReactNode;
   onRedirectToMyDashboard?: (role: UserRole) => void;
+  /** Allow a role-locked area to render when it is explicitly being shown in customer/read-only mode. */
+  allowCustomerView?: boolean;
 }
 
 export const ProtectedRoute: React.FC<Props> = ({ 
   allowedRoles, 
   children, 
-  onRedirectToMyDashboard 
+  onRedirectToMyDashboard,
+  allowCustomerView = false,
 }) => {
   const { firebaseUser, userData, loading, role } = useAuth();
 
@@ -52,12 +55,12 @@ export const ProtectedRoute: React.FC<Props> = ({
   }
 
   // 3. Status is pending_review (and not citizen) -> Show Pending Review
-  if (userData.status === 'pending_review' && userData.role !== 'citizen') {
+  if (userData.status === 'pending_review' && userData.role !== 'citizen' && !allowCustomerView) {
     return <PendingReviewView />;
   }
 
   // 4. Role mismatch check
-  if (!allowedRoles.includes(userData.role)) {
+  if (!allowedRoles.includes(userData.role) && !allowCustomerView) {
     const roleNames: Record<UserRole, string> = {
       knight: 'อัศวินไรเดอร์',
       citizen: 'พลเมืองอัศวิน',
