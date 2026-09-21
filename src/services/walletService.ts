@@ -32,7 +32,7 @@ const getToken = async (): Promise<string | null> => {
   return (await auth.currentUser?.getIdToken()) || null;
 };
 
-export async function getWalletMe(): Promise<WalletStateResponse> {
+export async function getWalletMe(role?: 'citizen' | 'knight' | 'merchant' | 'partner'): Promise<WalletStateResponse> {
   const token = await getToken();
   if (!token) {
     return {
@@ -51,7 +51,7 @@ export async function getWalletMe(): Promise<WalletStateResponse> {
     };
   }
 
-  const res = await fetch('/api/wallet/me', {
+  const query = role ? `?role=${encodeURIComponent(role)}` : '';\n  const res = await fetch(`/api/wallet/me${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
