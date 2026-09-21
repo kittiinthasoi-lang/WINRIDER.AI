@@ -61,6 +61,7 @@ export default function App() {
 
   // Mode & Tabs
   const [activeMode, setActiveMode] = useState<AppMode>('passenger');
+  const [selectedShopProfile, setSelectedShopProfile] = useState<{ id: string; role: 'merchant' | 'partner'; name: string; description: string; avatarUrl: string; avatarEmoji: string; address: string; phone: string; category: string; products: Array<Record<string, unknown>>; services: Array<Record<string, unknown>>; promotions: Array<Record<string, unknown>>; highlights: string[]; openHours?: string } | null>(null);
   const [passengerTab, setPassengerTab] = useState<'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile' | 'navigation'>('home');
   const [driverTab, setDriverTab] = useState<DriverTabType>('jobs');
   const [activeChapter, setActiveChapter] = useState<ChapterId>('soul');
@@ -489,6 +490,7 @@ export default function App() {
             }}
           >
             <MerchantCommandCenter
+              customerProfile={selectedShopProfile?.role === 'merchant' ? selectedShopProfile : undefined}
               audioEnabled={audioEnabled}
               onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
               onRideToStore={handleRideToDestination}
@@ -508,6 +510,7 @@ export default function App() {
             }}
           >
             <PartnerProfileView
+              customerProfile={selectedShopProfile?.role === 'partner' ? selectedShopProfile : undefined}
               audioEnabled={audioEnabled}
               onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
               onRideToPartner={handleRideToDestination}
@@ -540,6 +543,11 @@ export default function App() {
             customerListedItems={customerListedItems}
             onAddNewCustomerItem={handleAddCustomerItem}
             onBackToMain={() => setActiveMode('passenger')}
+            onOpenBusinessProfile={(profile) => {
+              setSelectedShopProfile(profile);
+              setActiveMode(profile.role === 'merchant' ? 'merchant' : 'partner');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onRideToDestination={handleRideToDestination}
           />
         )}
