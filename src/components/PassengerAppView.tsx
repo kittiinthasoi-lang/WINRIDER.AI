@@ -3588,12 +3588,17 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       />
 
       {/* REAL GPS SATELLITE MAP MODAL */}
-      <RealGpsMapModal
-        isOpen={showRealGpsModal}
-        onClose={() => setShowRealGpsModal(false)}
-        destinationTitle={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
-        audioEnabled={audioEnabled}
-      />
+<RealGpsMapModal
+  isOpen={showRealGpsModal}
+  onClose={() => setShowRealGpsModal(false)}
+  destinationTitle={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
+  destinationCoords={
+    activeLiveOrder?.dropoffCoord
+      ? { latitude: activeLiveOrder.dropoffCoord.lat, longitude: activeLiveOrder.dropoffCoord.lng }
+      : undefined
+  }
+  audioEnabled={audioEnabled}
+/>
 
       {/* PROFILE CUSTOMIZER MODAL */}
       <ProfileCustomizerModal
