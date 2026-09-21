@@ -39,6 +39,7 @@ const normalize = (raw: Partial<MarketItem> & Record<string, unknown>): MarketIt
   aiCertificateId: typeof raw.aiCertificateId === 'string' ? raw.aiCertificateId : undefined,
   aiQualityScore: typeof raw.aiQualityScore === 'number' ? raw.aiQualityScore : undefined,
   aiVerifiedDate: typeof raw.aiVerifiedDate === 'string' ? raw.aiVerifiedDate : undefined,
+  sellerWalletId: typeof raw.sellerWalletId === 'string' ? raw.sellerWalletId : undefined,
 });
 
 export const WinStreetMarketView: React.FC<Props> = ({ customerListedItems = [], onAddNewCustomerItem, onBackToMain }) => {
