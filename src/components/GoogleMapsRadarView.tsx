@@ -360,7 +360,7 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
                 return (
                   <AdvancedMarker key={entity.id} position={{ lat: entity.lat, lng: entity.lng }} title={entity.name}
                     zIndex={selected ? 40 : 20} onClick={() => selectEntity(entity)}>
-                    <div className={`flex cursor-pointer items-center gap-1.5 rounded-2xl border-2 px-2 py-1 shadow-xl ${entity.type === 'merchant' ? 'border-purple-400 bg-purple-950 text-purple-200' : 'border-sky-400 bg-sky-950 text-sky-200'} ${selected ? 'scale-110 ring-2 ring-white' : ''}`}>
+                                  <div className={`flex cursor-pointer items-center gap-1.5 rounded-2xl border-2 px-2 py-1 shadow-xl ${(getEntityGroupStyle(entity)?.markerClass) || (entity.type === 'merchant' ? 'border-purple-400 bg-purple-950 text-purple-200' : 'border-sky-400 bg-sky-950 text-sky-200')} ${selected ? 'scale-110 ring-2 ring-white' : ''}`}>
                       {entityIcon(entity)}
                       <div className="font-mono text-[9px]"><div className="max-w-[100px] truncate font-black">{entity.name}</div><div>{entity.distanceMeters} ม.</div></div>
                     </div>
