@@ -49,7 +49,7 @@ export const AdminTopupReviewView: React.FC = () => {
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-3">
         <img 
-          src="/images/cookie_box.jpg" 
+          src="/images/admin/topup-review.svg" 
           alt="ตรวจสลิปเติมเงิน" 
           className="w-10 h-10 rounded-2xl object-cover ring-1 ring-emerald-400/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]" 
         />
