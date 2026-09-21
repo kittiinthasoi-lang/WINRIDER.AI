@@ -442,29 +442,15 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
     }
   };
 
-  // The accepted job's dropoff is kept as a real recommendation, but the driver
-  // chooses/confirms the destination only after arriving at pickup.
+  // Destination is deliberately chosen after pickup. The accepted job's dropoff
+  // remains available as a recommendation inside the picker, not as an automatic route.
   useEffect(() => {
     setLiveRoute(null);
     setDestinationSearchQuery('');
     setDestinationSearchResults([]);
     setDestinationInputError('');
     setShowDestinationPicker(false);
-    if (!activeJob?.dropoffCoord) {
-      setSelectedDestination({ id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0, address: '', landmark: '', estimatedFare: 0 });
-      return;
-    }
-    setSelectedDestination({
-      id: activeJob.id,
-      name: activeJob.dropoffLocation || activeJob.dropoffAddressTh || 'ปลายทางจากงาน',
-      nameEn: '',
-      category: activeJob.serviceId,
-      lat: activeJob.dropoffCoord.lat,
-      lng: activeJob.dropoffCoord.lng,
-      address: activeJob.dropoffAddressTh || activeJob.dropoffLocation || '',
-      landmark: 'ปลายทางที่มากับงานที่รับ',
-      estimatedFare: activeJob.netFare || activeJob.baseFare || 0
-    });
+    setSelectedDestination({ id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0, address: '', landmark: '', estimatedFare: 0 });
   }, [activeJob?.id]);
 
   // Holo Overlay & Weather
@@ -950,6 +936,26 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
           )}
           <div className="mt-3 pt-3 border-t border-white/10">
             <div className="text-[9px] font-black text-amber-300 mb-1.5">⭐ ปลายทางที่ระบบแนะนำ</div>
+            {activeJob?.dropoffCoord && (
+              <button
+                type="button"
+                onClick={() => handleSelectDestination({
+                  id: activeJob.id,
+                  name: activeJob.dropoffLocation || activeJob.dropoffAddressTh || 'ปลายทางจากงาน',
+                  nameEn: '',
+                  category: activeJob.serviceId,
+                  lat: activeJob.dropoffCoord!.lat,
+                  lng: activeJob.dropoffCoord!.lng,
+                  address: activeJob.dropoffAddressTh || activeJob.dropoffLocation || '',
+                  landmark: 'ปลายทางที่มากับงานที่รับ',
+                  estimatedFare: activeJob.netFare || activeJob.baseFare || 0
+                })}
+                className="w-full mb-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 hover:bg-emerald-500/20 p-2 text-left"
+              >
+                <div className="text-[10px] font-black text-emerald-300 truncate">📋 ใช้ปลายทางจากงานที่รับ</div>
+                <div className="text-[9px] text-slate-400 truncate">{activeJob.dropoffLocation || activeJob.dropoffAddressTh}</div>
+              </button>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               {POPULAR_BANGKOK_DESTINATIONS.slice(0, 6).map((destination) => (
                 <button key={destination.id} type="button" onClick={() => handleSelectDestination(destination)} className="rounded-xl border border-white/10 bg-white/5 hover:bg-amber-400/10 hover:border-amber-300/40 p-2 text-left">
@@ -1008,6 +1014,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             onArrivedAtPickup={() => {
               if (audioEnabled) playTactileBlip(950);
               setDriverLegPhase('to_destination');
+              setSelectedDestination({ id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0, address: '', landmark: '', estimatedFare: 0 });
               setLiveRoute(null);
               setShowDestinationPicker(true);
               triggerVoiceGuidance('ถึงจุดรับแล้ว กรุณาค้นหาหรือเลือกปลายทางเพื่อเริ่มนำทาง');
