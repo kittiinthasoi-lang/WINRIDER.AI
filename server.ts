@@ -2560,10 +2560,6 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
     driverAvatarEmoji: String(eligibility.user.avatarEmoji || eligibility.knight.avatarEmoji || "🏍️"),
     driverVehicle: String(eligibility.knight.vehicle || eligibility.knight.vehicleModel || ""),
   };
-  if (!driverInfo.driverPlate) {
-    return res.status(409).json({ error: "Verified driver plate is required before accepting orders" });
-  }
-
   try {
     const orderRef = ordersCollection.doc(id);
     let acceptedOrder: ServerOrder | null = null;
