@@ -679,6 +679,8 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
   }
   try {
     const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
+    const sellerRole = String(userData.role || "citizen").trim();
+    const sellerWallet = await ensureWalletIdentityId(user.uid, WALLET_ROLE_PREFIX[sellerRole] ? sellerRole : "citizen");
     const id = `listing-${crypto.randomUUID()}`;
     const now = new Date().toISOString();
     const listing = {
@@ -686,6 +688,8 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
       sellerUserId: user.uid,
       sellerType: userData.role === "merchant" ? "merchant" : "citizen",
       sellerName: String(userData.displayName || user.name || "ผู้ขาย WIN"),
+      sellerWalletId: sellerWallet.walletId,
+      sellerWalletRole: sellerWallet.role,
       sellerAvatar: String(userData.avatarEmoji || "👤"),
       title,
       price,
@@ -1410,8 +1414,8 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
       balanceSatang: 0,
       balance: 0.0,
       systemPromptPay: {
-        configured: true,
-        promptPayId: String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim(),
+        configured: Boolean(process.env.ADMIN_PROMPTPAY_ID),
+        promptPayId: String(process.env.ADMIN_PROMPTPAY_ID || "").trim(),
         accountName: String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim()
       },
       submissions: [],
