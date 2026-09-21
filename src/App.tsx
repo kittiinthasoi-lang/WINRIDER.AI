@@ -483,6 +483,7 @@ export default function App() {
         {activeMode === 'merchant' && (
           <ProtectedRoute 
             allowedRoles={['merchant']}
+            allowCustomerView={selectedShopProfile?.role === 'merchant'}
             onRedirectToMyDashboard={(r) => {
               if (r === 'knight') setActiveMode('driver');
               else if (r === 'citizen') setActiveMode('passenger');
@@ -503,6 +504,7 @@ export default function App() {
         {activeMode === 'partner' && (
           <ProtectedRoute 
             allowedRoles={['partner']}
+            allowCustomerView={selectedShopProfile?.role === 'partner'}
             onRedirectToMyDashboard={(r) => {
               if (r === 'knight') setActiveMode('driver');
               else if (r === 'citizen') setActiveMode('passenger');
