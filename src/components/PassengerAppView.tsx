@@ -22,7 +22,7 @@ import { AIProductPhotoVerifier, AIVerificationResult } from './AIProductPhotoVe
 import { SpecializedServicePreMatchingModal, SpecializedPreMatchingData } from './SpecializedServicePreMatchingModal';
 import { ServicePhotoVerificationModal } from './ServicePhotoVerificationModal';
 import { CustomerPaymentQrCodeModal } from './CustomerPaymentQrCodeModal';
-import { createLiveOrder, cancelLiveOrder, subscribeToLiveOrders, getOrdersForPassenger, fetchFirestoreOrdersForUser, fetchMyOrders, getAuthHeaders, LiveRideOrder } from '../utils/dispatchSync';
+import { createLiveOrder, cancelLiveOrder, subscribeToLiveOrders, getOrdersForPassenger, fetchFirestoreOrdersForUser, fetchMyPassengerOrders, getAuthHeaders, LiveRideOrder } from '../utils/dispatchSync';
 import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
@@ -329,7 +329,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     let cancelled = false;
     const refresh = async () => {
       try {
-        const orders = await fetchMyOrders();
+        const orders = await fetchMyPassengerOrders();
         if (cancelled) return;
         setUserRideHistory(orders);
         setActiveLiveOrder((previous) => {
@@ -1026,7 +1026,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       if (audioEnabled) speakThaiText('ยกเลิกการเรียกรถเรียบร้อยแล้ว');
     } catch (error) {
       console.error('Cancel ride failed:', error);
-      setBookingError('ยกเลิกการเรียกรถไม่สำเร็จ กรุณาลองอีกครั้ง');
+      window.alert(`ยกเลิกการเรียกรถไม่สำเร็จ (${error instanceof Error ? error.message : 'ไม่ทราบสาเหตุ'})`);
     }
   };
 
