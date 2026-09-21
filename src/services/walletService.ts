@@ -2,6 +2,8 @@ import { auth } from '../firebase';
 
 export interface WalletStateResponse {
   userId: string;
+  walletId: string;
+  role: 'citizen' | 'knight' | 'merchant' | 'partner';
   balanceSatang: number;
   balance: number;
   systemPromptPay: {
@@ -35,6 +37,8 @@ export async function getWalletMe(): Promise<WalletStateResponse> {
   if (!token) {
     return {
       userId: '',
+      walletId: '',
+      role: 'citizen',
       balanceSatang: 0,
       balance: 0.0,
       systemPromptPay: {
