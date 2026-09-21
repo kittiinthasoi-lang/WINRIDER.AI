@@ -2052,7 +2052,13 @@ app.post("/api/quests/event", rateLimit(120), async (req, res) => {
 
       bucketRoot[periodKey] = bucket;
       transaction.set(seasonRef, { seasonId: QUEST_SEASON_ID, [bucketName]: bucketRoot, updatedAt: new Date().toISOString() }, { merge: true });
-      transaction.create(eventRef, { eventId, metricKey, amount: metricKey.endsWith(".active_days") ? 1 : amount, dayKey: metricKey.endsWith(".active_days") ? bangkokDateKey() : undefined, createdAt: FieldValue.serverTimestamp() });
+      transaction.create(eventRef, {
+        eventId,
+        metricKey,
+        amount: metricKey.endsWith(".active_days") ? 1 : amount,
+        ...(metricKey.endsWith(".active_days") ? { dayKey: bangkokDateKey() } : {}),
+        createdAt: FieldValue.serverTimestamp()
+      });
     });
     return res.json({ success: true, duplicate, metricKey, value: newValue });
   } catch (error: any) {
