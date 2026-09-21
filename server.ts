@@ -8,6 +8,7 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
+import { calculateServerFare } from "./src/core/serverFare";
 
 dotenv.config();
 
@@ -2350,8 +2351,12 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
     const passenger = passengerSnap.data() || {};
     const now = new Date();
     const welfareFund2Baht = 2;
-    const minimumFare = 15 + Math.max(0, Math.round((distanceKm - 1) * 7.5)) + (input.serviceId === "express" ? 5 : 0) + 5;
-    const fare = Math.max(requestedFare, minimumFare);
+    const authoritativeQuote = calculateServerFare(String(input.serviceId), distanceKm);
+    const fare = authoritativeQuote.fareBaht;
+    // Client fare is retained only for compatibility/telemetry; it never changes the charge.
+    if (Number.isFinite(requestedFare) && Math.abs(requestedFare - fare) > 1) {
+      console.info("[Order Fare] client quote differs from authoritative server fare", { requestedFare, fare, serviceId: input.serviceId, distanceKm });
+    }
     const normalizedOrder: ServerOrder = {
       id: String(input.id),
       serviceId: String(input.serviceId),
@@ -2366,6 +2371,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       ...(validCoordinates(input.dropoffCoord) ? { dropoffCoord: { lat: Number(input.dropoffCoord.lat), lng: Number(input.dropoffCoord.lng) } } : {}),
       distanceKm,
       fare,
+      fareQuote: authoritativeQuote,
       welfareFund2Baht,
       netFare: Math.max(0, fare - welfareFund2Baht),
       estMinutes: liveRoute.estMinutes,
