@@ -64,9 +64,9 @@ export async function getWalletMe(role?: string): Promise<WalletStateResponse> {
       balanceSatang: 0,
       balance: 0.0,
       systemPromptPay: {
-        configured: true,
-        promptPayId: '0899999999',
-        accountName: 'WINRIDER.AI SYSTEM WALLET',
+        configured: false,
+        promptPayId: '',
+        accountName: '',
       },
       submissions: [],
       withdrawals: [],
