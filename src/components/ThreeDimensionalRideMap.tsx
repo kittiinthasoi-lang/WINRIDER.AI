@@ -123,8 +123,8 @@ export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = (
 
   // Assigned driver coordinates
   const driverCoords = useMemo(() => ({
-    lat: pickupCoords.lat,
-    lng: pickupCoords.lng
+    lat: pickupCoords?.lat ?? 0,
+    lng: pickupCoords?.lng ?? 0
   }), [pickupCoords]);
 
   // Real nearby riders, merchants, and hubs within the radius
