@@ -350,8 +350,20 @@ distanceKm: pending.distanceKm,
       setCurrentActiveTrip(job); setTripStep('heading_pickup'); setActiveIncomingJob(null); onAcceptJob(job);
     } catch (error) {
       console.error('Accept dispatch failed:', error);
-      setDispatchError('รับงานไม่สำเร็จ งานอาจหมดเวลาหรือถูกส่งต่อแล้ว กรุณารอรายการถัดไป');
-      setActiveIncomingJob(null);
+      const reason = error instanceof Error ? error.message : '';
+      const friendly = reason.includes('ORDER_NOT_OFFERED_TO_DRIVER')
+        ? 'งานนี้ถูกส่งต่อให้พี่วินคนอื่นแล้ว'
+        : reason.includes('ORDER_OFFER_EXPIRED')
+          ? 'ข้อเสนองานหมดเวลาแล้ว ระบบกำลังส่งงานต่อ'
+          : reason.includes('DRIVER_ALREADY_ON_RIDE')
+            ? 'พี่วินมีงานที่กำลังวิ่งอยู่ กรุณาจบงานเดิมก่อน'
+            : reason.includes('SERVICE_REQUIREMENTS_NOT_MET')
+              ? 'งานนี้ไม่ตรงกับคุณสมบัติบริการที่ระบบตรวจสอบไว้'
+              : reason.includes('403')
+                ? 'บัญชีพี่วินยังไม่พร้อมรับงาน กรุณาตรวจสถานะ KYC/ออนไลน์'
+                : 'รับงานไม่สำเร็จ กรุณาลองกดรับอีกครั้ง';
+      setDispatchError(friendly);
+      // Keep the card visible so a transient network/server failure can be retried.
     } finally { setDispatchActionPending(false); }
   };
 
