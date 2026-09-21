@@ -180,6 +180,24 @@ export const CustomerVoiceCommandModal: React.FC<CustomerVoiceCommandModalProps>
 
     if (audioEnabled) playTactileBlip(900);
 
+    const destinationMatch = text.match(/(?:เรียกวิน|เรียกรถ|พาไป|ไปส่ง)(?:ให้ฉัน|ฉัน|ผม|หนู)?(?:ไป)?\\s+(.+)/);
+    if (destinationMatch?.[1] && !text.includes('ร้านค้า') && !text.includes('พาร์ทเนอร์')) {
+      const destination = destinationMatch[1].replace(/[ค่ะครับผมคะ]+$/g, '').trim();
+      if (destination.length >= 3) {
+        onNavigateMode('passenger');
+        onNavigateTab('ride');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('winrider:set_destination', { detail: { name: destination } }));
+        }
+        const response = 'รับทราบค่ะ กำลังเปิดหน้าเรียกรถและเตรียมปลายทาง “' + destination + '” ให้คุณ';
+        setLastResponse(response);
+        setActiveActionHint('ปลายทาง: ' + destination);
+        if (audioEnabled) speakThaiText(response, 'fah_sai');
+        setTimeout(onClose, 900);
+        return;
+      }
+    }
+
     // Matching logic
     let matchedCommand = commandLibrary.find(cmd => 
       text.includes(cmd.phrase.toLowerCase()) ||
