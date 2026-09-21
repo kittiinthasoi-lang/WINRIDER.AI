@@ -267,11 +267,13 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
           vehicles?: Vehicle[];
           activeVehicleId?: string | null;
           equippedSuitId?: string | null;
+          isOnline?: boolean;
         };
         if (cancelled) return;
         if (Array.isArray(payload.vehicles)) setVehicles(payload.vehicles);
         if (payload.activeVehicleId) setActiveVehicleId(payload.activeVehicleId);
         if (payload.equippedSuitId) setEquippedSuitId(payload.equippedSuitId);
+        if (typeof payload.isOnline === 'boolean') setIsOnDuty(payload.isOnline);
       } catch (error) {
         console.warn('Unable to load Knight settings:', error);
       }
