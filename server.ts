@@ -2517,6 +2517,19 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
     return res.status(201).json({ success: true, order: newOrder, dispatch: { matched: Boolean(firstDriverId), mode: newOrder.dispatchMode, waitingForDriver: !firstDriverId } });
   } catch (error: any) {
     if (error?.message === "ORDER_ALREADY_EXISTS") {
+      const existing = await orderRef.get();
+      if (existing.exists && String((existing.data() as ServerOrder)?.passengerUserId || "") === user.uid) {
+        return res.status(200).json({
+          success: true,
+          idempotentReplay: true,
+          order: existing.data(),
+          dispatch: {
+            matched: Boolean((existing.data() as any)?.offeredDriverId),
+            mode: String((existing.data() as any)?.dispatchMode || "automatic"),
+            waitingForDriver: !(existing.data() as any)?.offeredDriverId,
+          }
+        });
+      }
       return res.status(409).json({ error: "Order already exists" });
     }
     console.error("[Orders POST Error]:", error?.message);
