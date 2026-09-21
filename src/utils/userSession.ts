@@ -408,8 +408,8 @@ export async function loginWithEmailPassword(
             lineUserId: data.lineUserId,
             lineDisplayName: data.lineDisplayName,
             bio: data.bio,
-            creditScore: data.creditScore ?? 750,
-            rideLaterCredit: data.rideLaterCredit ?? 500,
+            creditScore: data.creditScore ?? 0,
+            rideLaterCredit: data.rideLaterCredit ?? 0,
           };
           await saveUserSession(session);
           return { success: true, session };
