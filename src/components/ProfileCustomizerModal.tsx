@@ -16,6 +16,7 @@ import confetti from 'canvas-confetti';
 import { auth } from '../firebase';
 import { uploadProfileImage } from '../utils/imageUpload';
 import { loadProfileCustomization, ProfileRole, saveProfileCustomization } from '../services/profileService';
+import { emitQuestMetric } from '../services/questService';
 
 export interface ProfileCustomizationData {
   avatarUrl?: string;
@@ -143,6 +144,8 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
       };
       await saveProfileCustomization(role, updated);
       onSave(updated);
+      if (role === 'merchant') void emitQuestMetric('merchant.storefront_ready', 1);
+      if (role === 'partner') void emitQuestMetric('partner.profile_ready', 1);
       if (audioEnabled) playLevelUpFanfare();
       confetti({ particleCount: 50, spread: 60, colors: [themeColor, '#FFD700', '#FFFFFF'] });
       onClose();
