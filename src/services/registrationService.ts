@@ -46,6 +46,24 @@ export interface PartnerRegistrationPayload extends BaseRegistrationPayload {
   estimatedUsers: number;
 }
 
+const FRESH_PROGRESSION = {
+  level: 1,
+  xp: 0,
+  points: 0,
+  creditScore: 0,
+  financialScore: 0,
+  rideLaterCredit: 0,
+  missionsCompleted: 0,
+  missionStreak: 0,
+  badges: [],
+  achievements: [],
+  dailyStats: {},
+  weeklyStats: {},
+  lifetimeStats: {},
+  questSeason: '2026-S3',
+  questState: {},
+} as const;
+
 /**
  * Subscribe to real-time founding knight counter
  */
@@ -126,7 +144,7 @@ export async function registerKnight(payload: KnightRegistrationPayload): Promis
 
     // 2. knights/{uid}
     transaction.set(knightRef, {
-      ...progression,
+      ...FRESH_PROGRESSION,
       isOnline: false,
       vehicleType: payload.vehicleType,
       plateNumber: payload.plateNumber.trim(),
@@ -187,7 +205,7 @@ export async function registerCitizen(payload: CitizenRegistrationPayload): Prom
     });
 
     transaction.set(citizenRef, {
-      ...progression,
+      ...FRESH_PROGRESSION,
       savedAddresses: [],
       emergencyContact: {
         name: payload.emergencyContactName.trim(),
@@ -238,7 +256,7 @@ export async function registerMerchant(payload: MerchantRegistrationPayload): Pr
     });
 
     transaction.set(merchantRef, {
-      ...progression,
+      ...FRESH_PROGRESSION,
       shopName: payload.shopName.trim(),
       shopType: payload.shopType.trim(),
       address: payload.address.trim(),
@@ -289,7 +307,7 @@ export async function registerPartner(payload: PartnerRegistrationPayload): Prom
     });
 
     transaction.set(partnerRef, {
-      ...progression,
+      ...FRESH_PROGRESSION,
       orgName: payload.orgName.trim(),
       orgType: payload.orgType.trim(),
       contactPerson: payload.contactPerson.trim(),
