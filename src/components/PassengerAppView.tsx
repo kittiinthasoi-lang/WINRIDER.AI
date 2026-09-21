@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { emitQuestMetric } from '../services/questService';
 import { WIN_SHOP_ITEMS, WinShopItem } from '../data/winShopItems';
 import { DREAM_RIDES_FLEET } from '../data/dreamRidesData';
 import { AMENITIES_CATALOG, calculateAmenitiesSummary, isHelmetAmenity } from '../data/amenitiesData';
@@ -343,6 +344,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         });
         const currentLatest = activeLiveOrder ? orders.find((order) => order.id === activeLiveOrder.id) : undefined;
         if (currentLatest?.status === 'completed') setRidePhase('arrived_destination');
+          void emitQuestMetric('citizen.completed_trip', 1);;
         const active = orders.find((order) => !['completed', 'cancelled'].includes(order.status));
         if (active) {
           setActiveLiveOrder(active);
