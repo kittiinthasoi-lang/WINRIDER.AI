@@ -96,7 +96,7 @@ export const AdminFeeRulesView: React.FC<AdminFeeRulesViewProps> = ({ adminLevel
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0A1633] p-5 rounded-2xl border border-[#00D4FF]/20 shadow-xl">
         <div className="flex items-center gap-3">
           <img 
-            src="/images/armor_circuit.jpg" 
+            src="/images/admin/fee-rules.svg" 
             alt="Fee Rules" 
             className="w-11 h-11 rounded-2xl object-cover ring-1 ring-amber-400/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]" 
           />
