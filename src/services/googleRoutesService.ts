@@ -104,7 +104,7 @@ export async function searchDestinationsFromGps(params: {
   };
 
   return (payload.routes || [])
-    .filter((route) => Number.isFinite(route.latitude) && Number.isFinite(route.longitude))
+    .filter((route) => typeof route.latitude === 'number' && Number.isFinite(route.latitude) && typeof route.longitude === 'number' && Number.isFinite(route.longitude))
     .map((route) => ({
       id: String(route.placeId || route.key),
       name: String(route.name || query),
