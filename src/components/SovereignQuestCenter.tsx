@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { auth } from '../firebase';
-import { loadQuestState, recordQuestMetric, claimQuest as persistClaimQuest } from '../services/questService';
+import { loadQuestState, claimQuest as persistClaimQuest } from '../services/questService';
 import { playTactileBlip, playLevelUpFanfare, playRadarScan } from '../utils/audio';
 import confetti from 'canvas-confetti';
 import {
@@ -159,7 +159,6 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
   }, [initialRole]);
 
   const updateQuestMetric = React.useCallback((metricKey: string, amount = 1) => {
-    void recordQuestMetric({ metricKey, amount });
     setQuests(prev => prev.map(q => {
       if (q.metricKey !== metricKey || q.isClaimed) return q;
       return { ...q, progress: Math.min(q.totalRequired, q.progress + Math.max(0, amount)) };
@@ -207,10 +206,14 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
       colors: ['#FFD700', '#00D2FF', '#10B981', '#FFFFFF']
     });
 
-    // Update local state and publish the real completion event for persistence hooks.
-    setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, isClaimed: true } : q));
-    emitQuestMetric(`quest.claimed.${quest.id}`, 1);
-    void persistClaimQuest(quest.id, quest.xpReward, quest.metricKey || '', quest.totalRequired).catch(error => console.warn('Quest claim persistence failed:', error));
+    // The server is authoritative for claim validation and XP reward.
+    void persistClaimQuest(quest.id).then((result) => {
+      if (result?.alreadyClaimed) return;
+      setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, isClaimed: true } : q));
+    }).catch(error => {
+      console.warn('Quest claim persistence failed:', error);
+      alert('รับรางวัลภารกิจไม่สำเร็จ กรุณาลองใหม่');
+    });
 
     // Award XP based on role
     if (quest.role === 'driver' && onGainDriverXp) {
