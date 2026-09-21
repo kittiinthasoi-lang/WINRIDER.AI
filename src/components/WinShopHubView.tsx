@@ -32,6 +32,7 @@ interface WinShopHubViewProps {
   onAddNewCustomerItem?: (item: MarketItem) => void;
   onBackToMain?: () => void;
   onRideToDestination?: (name: string, address?: string, distanceKm?: number) => void;
+  onOpenBusinessProfile?: (profile: ShopProfile) => void;
 }
 
 const valueText = (record: Record<string, unknown>, keys: string[]) => {
@@ -46,7 +47,7 @@ const SectionIcon = ({ kind }: { kind: 'products' | 'services' | 'promos' }) => 
 };
 
 export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
-  audioEnabled, customerListedItems, onAddNewCustomerItem, onBackToMain, onRideToDestination,
+  audioEnabled, customerListedItems, onAddNewCustomerItem, onBackToMain, onRideToDestination, onOpenBusinessProfile,
 }) => {
   const geo = useRealGeolocation(true);
   const [activeTab, setActiveTab] = useState<'merchants' | 'partners' | 'community'>('merchants');
@@ -225,7 +226,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
               const route = routes[profile.id];
               const totalContent = profile.products.length + profile.services.length + profile.promotions.length;
               return (
-                <button key={profile.id} type="button" onClick={() => openProfile(profile)}
+                <button key={profile.id} type="button" onClick={() => { openProfile(profile); onOpenBusinessProfile?.(profile); }}
                   className="group overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#0B1830] to-[#071126] text-left shadow-lg transition-all hover:-translate-y-0.5 hover:border-cyan-400/50">
                   <div className="h-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-amber-400 opacity-70" />
                   <div className="p-4">
