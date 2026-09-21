@@ -39,6 +39,8 @@ interface ThreeDimensionalRideMapProps {
   driverLevel?: number;
   driverEmoji?: string;
   etaMinutes?: number;
+  pickupCoords?: { lat: number; lng: number };
+  dropoffCoords?: { lat: number; lng: number };
   onEmergencyClick?: () => void;
   audioEnabled?: boolean;
 }
@@ -96,6 +98,8 @@ export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = (
   driverLevel = 100,
   driverEmoji = '🦁',
   etaMinutes = 3,
+  pickupCoords: pickupCoordsProp,
+  dropoffCoords: dropoffCoordsProp,
   onEmergencyClick,
   audioEnabled = true
 }) => {
@@ -104,15 +108,18 @@ export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = (
   const [showRadiusIcons, setShowRadiusIcons] = useState<boolean>(true);
 
   // Default coordinates around Bangkok Sukhumvit / Phrom Phong
-  const pickupCoords = useMemo(() => ({
-    lat: gpsState.latitude || 0,
-    lng: gpsState.longitude || 0
-  }), [gpsState.latitude, gpsState.longitude]);
+  const pickupCoords = useMemo(() => {
+    if (pickupCoordsProp && Number.isFinite(pickupCoordsProp.lat) && Number.isFinite(pickupCoordsProp.lng)) return pickupCoordsProp;
+    if (gpsState.isRealGps && Number.isFinite(gpsState.latitude) && Number.isFinite(gpsState.longitude)) {
+      return { lat: gpsState.latitude, lng: gpsState.longitude };
+    }
+    return null;
+  }, [pickupCoordsProp, gpsState.isRealGps, gpsState.latitude, gpsState.longitude]);
 
-  const dropoffCoords = useMemo(() => ({
-    lat: 0,
-    lng: 0
-  }), []);
+  const dropoffCoords = useMemo(() => {
+    if (dropoffCoordsProp && Number.isFinite(dropoffCoordsProp.lat) && Number.isFinite(dropoffCoordsProp.lng)) return dropoffCoordsProp;
+    return null;
+  }, [dropoffCoordsProp]);
 
   // Assigned driver coordinates
   const driverCoords = useMemo(() => ({
@@ -131,9 +138,10 @@ export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = (
 
     async function fetchRoute() {
       try {
+        if (!pickupCoords || !dropoffCoords) return;
         const res = await computeLiveRoute({
           origin: { latitude: driverCoords.lat, longitude: driverCoords.lng },
-          destination: { latitude: pickupCoords.lat, longitude: pickupCoords.lng },
+          destination: { latitude: dropoffCoords.lat, longitude: dropoffCoords.lng },
           travelMode: 'TWO_WHEELER'
         });
         if (!isCancelled) {
@@ -149,16 +157,33 @@ export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = (
     return () => {
       isCancelled = true;
     };
-  }, [driverCoords.lat, driverCoords.lng, pickupCoords.lat, pickupCoords.lng]);
+  }, [driverCoords.lat, driverCoords.lng, pickupCoords, dropoffCoords]);
 
   // Open Real Google Maps App Navigation
   const handleOpenGoogleMapsApp = () => {
     if (audioEnabled) playTactileBlip(850);
+    if (!pickupCoords || !dropoffCoords) return;
     const originParam = `${pickupCoords.lat},${pickupCoords.lng}`;
     const destParam = `${dropoffCoords.lat},${dropoffCoords.lng}`;
     const url = `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=two-wheeler`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
+
+  if (!GOOGLE_MAPS_API_KEY || !pickupCoords || !dropoffCoords) {
+    return (
+      <div className="relative w-full h-[520px] rounded-3xl overflow-hidden bg-[#070F1E] border-2 border-cyan-500/50 shadow-[0_0_40px_rgba(0,210,255,0.25)] flex items-center justify-center p-6 text-center">
+        <div className="max-w-sm space-y-3">
+          <Navigation className="w-10 h-10 mx-auto text-cyan-300" />
+          <h3 className="text-lg font-black text-white">กำลังเตรียมแผนที่รอรถ</h3>
+          <p className="text-xs text-slate-400">
+            {!pickupCoords || !dropoffCoords
+              ? 'กำลังรอพิกัด GPS/ปลายทางจริงเพื่อแสดงเส้นทาง'
+              : 'ยังไม่ได้ตั้งค่า Google Maps API สำหรับหน้านี้'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-[520px] rounded-3xl overflow-hidden bg-[#070F1E] border-2 border-cyan-500/50 shadow-[0_0_40px_rgba(0,210,255,0.25)] flex flex-col font-sans text-white select-none">
