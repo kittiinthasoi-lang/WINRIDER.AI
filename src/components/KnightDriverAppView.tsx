@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { emitQuestMetric } from '../services/questService';
 import { Vehicle } from '../types';
 import { KNIGHT_ARMOR_SUITS, ArmorSuit } from '../data/armorSuits';
 import { playTactileBlip, playLevelUpFanfare, playRadarScan, playEngineRev } from '../utils/audio';
@@ -335,6 +336,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   };
 
   const handleAddVehicle = (e: React.FormEvent) => {
+    void emitQuestMetric('driver.preflight', 1);
     e.preventDefault();
     if (!newRideName) return;
     const newId = `ride-${Date.now()}`;
