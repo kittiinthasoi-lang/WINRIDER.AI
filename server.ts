@@ -224,6 +224,72 @@ app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]),
   }
 });
 
+app.post("/api/sos/incidents", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  const validLocation = Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+  const incidentRef = ordersDb.collection("sosIncidents").doc();
+  const now = new Date().toISOString();
+  const incident = {
+    id: incidentRef.id,
+    userId: user.uid,
+    status: "open",
+    ...(validLocation ? { latitude, longitude } : {}),
+    note: String(req.body?.note || "").slice(0, 500),
+    createdAt: now,
+    updatedAt: now,
+  };
+  try {
+    await incidentRef.create(incident);
+    await ordersDb.collection("users").doc(user.uid).set({ lastSosIncidentId: incidentRef.id, updatedAt: now }, { merge: true });
+    return res.status(201).json({ incident });
+  } catch (error: any) {
+    console.error("[SOS Create]", error?.message);
+    return res.status(503).json({ error: "ไม่สามารถบันทึกเหตุฉุกเฉินได้" });
+  }
+});
+
+app.get("/api/sos/incidents", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const snapshot = await ordersDb.collection("sosIncidents").where("userId", "==", user.uid).limit(50).get();
+    const incidents = snapshot.docs.map((doc) => doc.data()).sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return res.json({ incidents });
+  } catch (error: any) {
+    console.error("[SOS List]", error?.message);
+    return res.status(503).json({ error: "โหลดประวัติเหตุฉุกเฉินไม่สำเร็จ", incidents: [] });
+  }
+});
+
+app.patch("/api/sos/incidents/:id", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const status = String(req.body?.status || "");
+  if (!["acknowledged", "resolved", "cancelled"].includes(status)) {
+    return res.status(400).json({ error: "สถานะ SOS ไม่ถูกต้อง" });
+  }
+  try {
+    const ref = ordersDb.collection("sosIncidents").doc(String(req.params.id));
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: "ไม่พบเหตุฉุกเฉิน" });
+    const data = snap.data() || {};
+    if (data.userId !== user.uid && !isSuperAdminToken(user)) return res.status(403).json({ error: "ไม่มีสิทธิ์แก้ไขเหตุฉุกเฉินนี้" });
+    const now = new Date().toISOString();
+    await ref.update({ status, updatedAt: now, ...(isSuperAdminToken(user) ? { acknowledgedBy: user.uid } : {}) });
+    await ordersDb.collection("sosIncidents").doc(String(req.params.id)).collection("audit").add({
+      actorUid: user.uid, action: status, createdAt: FieldValue.serverTimestamp()
+    });
+    return res.json({ success: true, id: ref.id, status });
+  } catch (error: any) {
+    console.error("[SOS Update]", error?.message);
+    return res.status(503).json({ error: "อัปเดตเหตุฉุกเฉินไม่สำเร็จ" });
+  }
+});
+
 app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
