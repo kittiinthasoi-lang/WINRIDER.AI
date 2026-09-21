@@ -1924,6 +1924,9 @@ function questPeriodKey(period: "daily" | "weekly" | "epic") {
 function questCounterKey(period: "daily" | "weekly" | "epic") {
   return period === "daily" ? "daily" : period === "weekly" ? "weekly" : "lifetime";
 }
+function questBucketKey(period: "daily" | "weekly" | "epic") {
+  return period === "daily" ? bangkokDateKey() : period === "weekly" ? weekKey() : "lifetime";
+}
 
 app.get("/api/quests/state", rateLimit(60), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
@@ -1933,7 +1936,9 @@ app.get("/api/quests/state", rateLimit(60), async (req, res) => {
   try {
     const snap = await ordersDb.collection("users").doc(user.uid).collection("progression").doc(seasonId).get();
     const data = snap.exists ? snap.data() || {} : {};
-    return res.json({ seasonId, daily: data.daily || {}, weekly: data.weekly || {}, lifetime: data.lifetime || {}, claimed: data.claimed || {} });
+    const today = bangkokDateKey();
+    const thisWeek = weekKey();
+    return res.json({ seasonId, daily: (data.daily || {})[today] || {}, weekly: (data.weekly || {})[thisWeek] || {}, lifetime: (data.lifetime || {}).lifetime || {}, claimed: data.claimed || {} });
   } catch (error: any) {
     console.error("[Quest State GET Error]:", error?.message);
     return res.status(503).json({ error: "Quest state unavailable" });
@@ -1960,10 +1965,13 @@ app.post("/api/quests/event", rateLimit(120), async (req, res) => {
       if (eventSnap.exists) { duplicate = true; return; }
       const data = seasonSnap.exists ? seasonSnap.data() || {} : {};
       const bucketName = questCounterKey(definition.period);
-      const bucket = { ...(data[bucketName] || {}) };
+      const periodKey = questBucketKey(definition.period);
+      const bucketRoot = { ...(data[bucketName] || {}) };
+      const bucket = { ...(bucketRoot[periodKey] || {}) };
       newValue = (Number(bucket[metricKey]) || 0) + amount;
       bucket[metricKey] = newValue;
-      transaction.set(seasonRef, { seasonId: QUEST_SEASON_ID, [bucketName]: bucket, updatedAt: new Date().toISOString() }, { merge: true });
+      bucketRoot[periodKey] = bucket;
+      transaction.set(seasonRef, { seasonId: QUEST_SEASON_ID, [bucketName]: bucketRoot, updatedAt: new Date().toISOString() }, { merge: true });
       transaction.create(eventRef, { eventId, metricKey, amount, createdAt: FieldValue.serverTimestamp() });
     });
     return res.json({ success: true, duplicate, metricKey, value: newValue });
@@ -1989,9 +1997,10 @@ app.post("/api/quests/claim", rateLimit(30), async (req, res) => {
       if (String(userData.role || "") !== definition.role) throw new Error("ROLE_MISMATCH");
       const data = seasonSnap.exists ? seasonSnap.data() || {} : {};
       const bucketName = questCounterKey(definition.period);
-      const bucket = { ...(data[bucketName] || {}) };
-      const value = Number(bucket[definition.metricKey]) || 0;
+      const bucketRoot = { ...(data[bucketName] || {}) };
       const periodKey = questPeriodKey(definition.period);
+      const bucket = { ...(bucketRoot[periodKey] || {}) };
+      const value = Number(bucket[definition.metricKey]) || 0;
       const claims = { ...(data.claimed || {}) };
       const claimKey = `${questId}:${periodKey}`;
       if (claims[claimKey]) { result = { alreadyClaimed: true, xp: Number(userData.xp) || 0 }; return; }
