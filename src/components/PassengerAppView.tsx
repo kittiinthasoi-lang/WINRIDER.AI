@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { auth } from '../firebase';
 import { emitQuestMetric } from '../services/questService';
 import { createSosIncident } from '../services/sosIncidentService';
 import { WIN_SHOP_ITEMS, WinShopItem } from '../data/winShopItems';
@@ -2314,8 +2315,11 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           {passengerProfileData.bioStatus}
                         </p>
                         <p className="text-[10px] text-slate-300 font-mono mt-0.5">
-                          ID: <strong className="text-cyan-300">{currentUserSession?.id || 'CTZ-SLOTH-999'}</strong> • เขตคลองสาน-เจริญนคร
+                          UID: <strong className="text-cyan-300">{auth.currentUser?.uid || currentUserSession?.id || '—'}</strong>
                         </p>
+                        {passengerProfileData.locationEnabled && Number.isFinite(passengerProfileData.latitude) && Number.isFinite(passengerProfileData.longitude) && (
+                          <p className="text-[10px] text-emerald-300 font-mono mt-1 flex items-center gap-1"><MapPin className="w-3 h-3" />{passengerProfileData.locationLabel || 'ตำแหน่งปัจจุบัน'} • {passengerProfileData.latitude!.toFixed(5)}, {passengerProfileData.longitude!.toFixed(5)}</p>
+                        )}
                       </div>
                     </div>
 
