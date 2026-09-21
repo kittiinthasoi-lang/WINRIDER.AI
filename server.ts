@@ -45,6 +45,7 @@ const RATE_LIMITS: Record<string, number> = {
   "/api/places/resolve-routes": 20,
   "/api/shop/directory": 30,
   "/api/shop/listings": 20,
+  "/api/shop/profile-content": 20,
   "/api/events/daily": 30,
 };
 
@@ -527,6 +528,7 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
         products: recordArray(roleData.products),
         services: recordArray(roleData.services),
         promotions: recordArray(roleData.promotions),
+        openHours: String(roleData.openHours || ""),
         highlights: stringArray(roleData.highlights || roleData.amenities),
         updatedAt: roleData.updatedAt || entry.updatedAt || null,
       };
@@ -535,6 +537,53 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
   } catch (error) {
     console.error("[Shop Directory]", error instanceof Error ? error.message : error);
     return res.status(503).json({ error: "โหลดรายชื่อร้านค้าและพาร์ทเนอร์จริงไม่ได้", profiles: [] });
+  }
+});
+
+app.get("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
+    const role = userData.role === "partner" ? "partner" : userData.role === "merchant" ? "merchant" : null;
+    if (!role) return res.status(403).json({ error: "บัญชีนี้ไม่มีสิทธิ์จัดการโปรไฟล์ร้านค้า/พาร์ทเนอร์" });
+    const collectionName = role === "merchant" ? "merchants" : "partners";
+    const roleSnapshot = await ordersDb.collection(collectionName).doc(user.uid).get();
+    const roleData = roleSnapshot.data() || {};
+    return res.json({
+      role,
+      products: Array.isArray(roleData.products) ? roleData.products.slice(0, 100) : [],
+      services: Array.isArray(roleData.services) ? roleData.services.slice(0, 100) : [],
+      promotions: Array.isArray(roleData.promotions) ? roleData.promotions.slice(0, 100) : [],
+      highlights: Array.isArray(roleData.highlights) ? roleData.highlights.slice(0, 30) : [],
+    });
+  } catch (error) {
+    console.error("[Shop Profile Content GET]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ error: "โหลดข้อมูลหน้าร้านไม่สำเร็จ" });
+  }
+});
+
+app.put("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
+    const role = userData.role === "partner" ? "partner" : userData.role === "merchant" ? "merchant" : null;
+    if (!role) return res.status(403).json({ error: "บัญชีนี้ไม่มีสิทธิ์จัดการโปรไฟล์ร้านค้า/พาร์ทเนอร์" });
+    const collectionName = role === "merchant" ? "merchants" : "partners";
+    const cleanArray = (value: unknown, max: number) => Array.isArray(value) ? value.filter((item) => item && typeof item === "object").slice(0, max) : [];
+    const cleanStrings = (value: unknown, max: number) => Array.isArray(value) ? value.filter((item) => typeof item === "string").slice(0, max) : [];
+    const products = cleanArray(req.body?.products, 100);
+    const services = cleanArray(req.body?.services, 100);
+    const promotions = cleanArray(req.body?.promotions, 100);
+    const highlights = cleanStrings(req.body?.highlights, 30);
+    await ordersDb.collection(collectionName).doc(user.uid).set({
+      products, services, promotions, highlights, updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    return res.json({ ok: true, role, products, services, promotions, highlights });
+  } catch (error) {
+    console.error("[Shop Profile Content PUT]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ error: "บันทึกข้อมูลหน้าร้านไม่สำเร็จ" });
   }
 });
 
