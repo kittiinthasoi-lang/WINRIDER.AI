@@ -658,8 +658,16 @@ app.get("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asyn
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   try {
-    const snapshot = await ordersDb.collection("marketListings").orderBy("createdAt", "desc").limit(100).get();
-    const listings = snapshot.docs.map((doc) => doc.data()).filter((item: any) => item.status === "active");
+    let docs;
+    try {
+      docs = (await ordersDb.collection("marketListings").orderBy("createdAt", "desc").limit(100).get()).docs;
+    } catch (queryError) {
+      console.warn("[Shop Listings GET] ordered query failed; using fallback:", queryError instanceof Error ? queryError.message : queryError);
+      docs = (await ordersDb.collection("marketListings").limit(200).get()).docs
+        .sort((a, b) => String(b.data().createdAt || "").localeCompare(String(a.data().createdAt || "")))
+        .slice(0, 100);
+    }
+    const listings = docs.map((doc) => doc.data()).filter((item: any) => item.status === "active");
     return res.json({ listings });
   } catch (error) {
     console.error("[Shop Listings GET]", error instanceof Error ? error.message : error);
