@@ -40,7 +40,8 @@ export const CustomerVoiceCommandModal: React.FC<CustomerVoiceCommandModalProps>
   );
   const [activeActionHint, setActiveActionHint] = useState<string | null>(null);
   const [customInput, setCustomInput] = useState('');
-  const recognitionRef = useRef<any>(null);\n  const transcriptRef = useRef('');
+  const recognitionRef = useRef<any>(null);
+  const transcriptRef = useRef('');
 
   // Command library specifically crafted for customer & passenger app operations
   const commandLibrary: CommandAction[] = [
@@ -147,7 +148,8 @@ export const CustomerVoiceCommandModal: React.FC<CustomerVoiceCommandModalProps>
           const transcript = Array.from(event.results)
             .map((result: any) => result[0].transcript)
             .join('');
-          transcriptRef.current = transcript;\n          setSpokenText(transcript);
+          transcriptRef.current = transcript;
+          setSpokenText(transcript);
         };
 
         recognition.onend = () => {
@@ -208,10 +210,23 @@ export const CustomerVoiceCommandModal: React.FC<CustomerVoiceCommandModalProps>
       (cmd.id === 'view_profile_credit' && (text.includes('โปรไฟล์') || text.includes('เครดิต') || text.includes('วงเงิน') || text.includes('สลอต') || text.includes('พลเมือง'))) ||
       (cmd.id === 'pet_care_ride' && (text.includes('สัตว์เลี้ยง') || text.includes('หมา') || text.includes('แมว') || text.includes('pet') || text.includes('หาหมอ'))) ||
       (cmd.id === 'emergency_sos' && (text.includes('ฉุกเฉิน') || text.includes('sos') || text.includes('กู้ชีพ') || text.includes('โรงพยาบาล') || text.includes('ช่วยด้วย'))) ||
-      (cmd.id === 'check_fare_policy' && (text.includes('2 บาท') || text.includes('ค่าโดยสาร') || text.includes('ราคา') || text.includes('ครองเมือง'))) ||\n      (text.includes('ร้านค้า') && text.includes('เปิด')) || (text.includes('พาร์ทเนอร์') && text.includes('เปิด')) ||\n      text.includes('เรียกวิน') || text.includes('เรียกรถ') || text.includes('ไป '));
+      (cmd.id === 'check_fare_policy' && (text.includes('2 บาท') || text.includes('ค่าโดยสาร') || text.includes('ราคา') || text.includes('ครองเมือง')))
     );
 
-    if (!matchedCommand && text.includes('ร้านค้า') && (text.includes('เปิด') || text.includes('ไป'))) {\n      setLastResponse('ได้เลยค่ะ กำลังเปิดศูนย์ร้านค้าให้คุณ');\n      onNavigateMode('merchant');\n      onClose();\n      return;\n    }\n    if (!matchedCommand && text.includes('พาร์ทเนอร์') && (text.includes('เปิด') || text.includes('ไป'))) {\n      setLastResponse('ได้เลยค่ะ กำลังเปิดศูนย์พาร์ทเนอร์ให้คุณ');\n      onNavigateMode('partner');\n      onClose();\n      return;\n    }\n\n    if (matchedCommand) {
+    if (!matchedCommand && text.includes('ร้านค้า') && (text.includes('เปิด') || text.includes('ไป'))) {
+      setLastResponse('ได้เลยค่ะ กำลังเปิดศูนย์ร้านค้าให้คุณ');
+      onNavigateMode('merchant');
+      onClose();
+      return;
+    }
+    if (!matchedCommand && text.includes('พาร์ทเนอร์') && (text.includes('เปิด') || text.includes('ไป'))) {
+      setLastResponse('ได้เลยค่ะ กำลังเปิดศูนย์พาร์ทเนอร์ให้คุณ');
+      onNavigateMode('partner');
+      onClose();
+      return;
+    }
+
+    if (matchedCommand) {
       setLastResponse(matchedCommand.speechResponse);
       setActiveActionHint(`ดำเนินการ: ${matchedCommand.phrase}`);
       if (audioEnabled) {
@@ -242,7 +257,8 @@ export const CustomerVoiceCommandModal: React.FC<CustomerVoiceCommandModalProps>
         setSpokenText('');
         setIsListening(true);
         if (audioEnabled) playTactileBlip(1200);
-        transcriptRef.current = '';\n        recognitionRef.current.start();
+        transcriptRef.current = '';
+        recognitionRef.current.start();
         return;
       } catch (error) {
         console.warn('Unable to start speech recognition:', error);

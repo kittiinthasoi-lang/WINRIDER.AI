@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 import { NearbyEventsResponse, WinAlertCategory, WinAlertEvent } from '../data/winAlertEventsData';
 import { playTactileBlip, speakThaiText } from '../utils/audio';
-import { sendBrowserNotification } from '../utils/notifications';\nimport { auth } from '../firebase';\nimport { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';
+import { sendBrowserNotification } from '../utils/notifications';
+import { auth } from '../firebase';
+import { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';
 
 interface WinAlertEventsCardProps {
   audioEnabled: boolean;

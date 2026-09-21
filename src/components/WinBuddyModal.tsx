@@ -29,9 +29,34 @@ export const WinBuddyModal: React.FC<Props> = ({ isOpen, onClose, audioEnabled }
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);\n  const recognitionRef = useRef<any>(null);\n  const transcriptRef = useRef('');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const transcriptRef = useRef('');
 
-  useEffect(() => {\n    if (typeof window === 'undefined') return;\n    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;\n    if (!SpeechRecognition) return;\n    const recognition = new SpeechRecognition();\n    recognition.continuous = false;\n    recognition.interimResults = true;\n    recognition.lang = 'th-TH';\n    recognition.onresult = (event: any) => {\n      const transcript = Array.from(event.results).map((r: any) => r[0].transcript).join('');\n      transcriptRef.current = transcript;\n      setQuery(transcript);\n    };\n    recognition.onend = () => {\n      setIsListening(false);\n      const transcript = transcriptRef.current.trim();\n      if (transcript) void handleSend(transcript);\n    };\n    recognition.onerror = () => setIsListening(false);\n    recognitionRef.current = recognition;\n    return () => recognition.abort();\n  }, []);\n\n  if (!isOpen) return null;
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'th-TH';
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results).map((r: any) => r[0].transcript).join('');
+      transcriptRef.current = transcript;
+      setQuery(transcript);
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+      const transcript = transcriptRef.current.trim();
+      if (transcript) void handleSend(transcript);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    return () => recognition.abort();
+  }, []);
+
+  if (!isOpen) return null;
 
   const handleSend = async (customText?: string) => {
     const textToSend = customText || query;

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { auth } from '../firebase';
 import { AiStatusModal } from './AiStatusModal';
-import { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';\nimport { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';
+import { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';
 
 export type AssistantMode = 'motorcycle_mechanic' | 'personal_commerce';
 
@@ -160,7 +160,6 @@ export const WinAiAssistantPanel: React.FC<Props> = ({ mode: propMode, onModeCha
     }
   }, [messages, currentMode]);
 
-  const handleModeSwitch = (newMode: AssistantMode) => {
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

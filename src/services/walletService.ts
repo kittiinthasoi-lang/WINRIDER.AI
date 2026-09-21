@@ -32,7 +32,7 @@ const getToken = async (): Promise<string | null> => {
   return (await auth.currentUser?.getIdToken()) || null;
 };
 
-export async function getWalletMe(role?: 'citizen' | 'knight' | 'merchant' | 'partner'): Promise<WalletStateResponse> {
+export async function getWalletMe(role?: string): Promise<WalletStateResponse> {
   const token = await getToken();
   if (!token) {
     return {
@@ -59,6 +59,8 @@ export async function getWalletMe(role?: 'citizen' | 'knight' | 'merchant' | 'pa
   if (!res.ok) {
     return {
       userId: auth.currentUser?.uid || '',
+      walletId: '',
+      role: (role as any) || 'citizen',
       balanceSatang: 0,
       balance: 0.0,
       systemPromptPay: {

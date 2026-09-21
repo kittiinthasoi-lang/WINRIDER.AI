@@ -5,6 +5,7 @@ import {
   requestNotificationPermission,
   sendBrowserNotification,
 } from '../utils/notifications';
+import { saveAccountPreference } from '../services/accountPersistenceService';
 
 type FaithId =
   | 'all'
@@ -108,7 +109,9 @@ export const ReligiousNotificationsModal: React.FC<ReligiousNotificationsModalPr
 
   useEffect(() => {
     if (!isOpen || typeof localStorage === 'undefined') return;
-    const preferences = { faiths, kinds, city, country } satisfies SavedPreferences;\n    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));\n    void saveAccountPreference('faith_sacred_calendar', preferences).catch(() => { /* local cache remains available */ });
+    const preferences = { faiths, kinds, city, country } satisfies SavedPreferences;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+    void saveAccountPreference('faith_sacred_calendar', preferences).catch(() => { /* local cache remains available */ });
   }, [isOpen, faiths, kinds, city, country]);
 
   const showPrayerTimes = kinds.includes('prayer') && (faiths.includes('all') || faiths.includes('islam'));

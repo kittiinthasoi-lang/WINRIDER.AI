@@ -261,6 +261,7 @@ export interface MarketItem {
   aiCertificateId?: string;
   aiQualityScore?: number;
   aiVerifiedDate?: string;
+  sellerWalletId?: string;
 }
 
 export type PartnerCategory = 'pub_bar' | 'hotel' | 'buffet' | 'cafe_club' | 'wellness';

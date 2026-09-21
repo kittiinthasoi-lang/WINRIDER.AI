@@ -500,6 +500,31 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     }, 4500);
   };
 
+  const handleTriggerSos = () => {
+    if (audioEnabled) playTactileBlip(500);
+    const openCenter = () => onOpenEmergencyCenter?.();
+    if (!navigator.geolocation) {
+      void createSosIncident({ note: 'SOS จากอุปกรณ์ที่ไม่มี GPS' }).catch(() => undefined);
+      openCenter();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        void createSosIncident({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          note: 'ผู้ใช้กด Emergency SOS'
+        }).catch(() => undefined);
+        openCenter();
+      },
+      () => {
+        void createSosIncident({ note: 'SOS แต่ไม่สามารถอ่าน GPS ได้' }).catch(() => undefined);
+        openCenter();
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 15000 }
+    );
+  };
+
   // --- Citizen Level & XP System for Customer Profile (Progressive Proportional Scaling) ---
   const [citizenLevel, setCitizenLevel] = useState<number>(91);
   const [citizenNextXp, setCitizenNextXp] = useState<number>(() => calculateLevelMaxXp(91, 'citizen'));
@@ -1690,30 +1715,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
                   <button
                     id="emergency-sos-btn"
-                    onClick={() => {
-                      if (audioEnabled) playTactileBlip(500);
-                      const openCenter = () => onOpenEmergencyCenter?.();
-                      if (!navigator.geolocation) {
-                        void createSosIncident({ note: 'SOS จากอุปกรณ์ที่ไม่มี GPS' }).catch(() => undefined);
-                        openCenter();
-                        return;
-                      }
-                      navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                          void createSosIncident({
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude,
-                            note: 'ผู้ใช้กด Emergency SOS'
-                          }).catch(() => undefined);
-                          openCenter();
-                        },
-                        () => {
-                          void createSosIncident({ note: 'SOS แต่ไม่สามารถอ่าน GPS ได้' }).catch(() => undefined);
-                          openCenter();
-                        },
-                        { enableHighAccuracy: true, timeout: 5000, maximumAge: 15000 }
-                      );
-                    }}
+                    onClick={handleTriggerSos}
                     className="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-base shadow-[0_0_25px_rgba(225,29,72,0.8)] active:scale-95 transition-all flex items-center justify-center gap-2 border-2 border-white/40"
                   >
                     <AlertTriangle className="w-6 h-6 animate-bounce" />

@@ -369,8 +369,8 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
             <p className="text-[10px] text-slate-300">1 บทบาท = 1 WIN Wallet ID • ไม่เปิดเผย UID และไม่ซ้ำกับ ID ของบทบาทอื่น</p>
           </div>
         ) : (
-        /* PromptPay ID / Bank Account Number Input */}
-        <div className="space-y-1.5">
+          /* PromptPay ID / Bank Account Number Input */
+          <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-200 flex items-center justify-between">
             <span>{receiverType === 'bank_account' ? 'เลขบัญชีธนาคาร *' : 'หมายเลข PromptPay *'}</span>
             <span className="text-[10px] text-cyan-300 font-mono">

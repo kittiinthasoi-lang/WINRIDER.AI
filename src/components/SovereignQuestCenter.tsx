@@ -143,6 +143,7 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
   onGainDriverXp,
   onGainCitizenXp,
   onGainMerchantXp,
+  onGainPartnerXp,
   onRewardBonusCash
 }) => {
   const [activeRole, setActiveRole] = useState<'driver' | 'citizen' | 'merchant' | 'partner'>(initialRole);

@@ -896,6 +896,7 @@ interface ServerOrder {
   dispatchCandidateIndex?: number;
   dispatchAttempt?: number;
   dispatchMode?: "preferred" | "automatic";
+  fareQuote?: any;
 }
 
 function getAdminDb() {
@@ -2511,6 +2512,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
     return res.status(503).json({ error: "ไม่สามารถยืนยันเส้นทางจริงของการเดินทางได้", code: "LIVE_ROUTE_REQUIRED" });
   }
   const distanceKm = liveRoute.distanceKm;
+  const orderRef = ordersCollection.doc(String(input.id));
 
   try {
     const existingRideSnap = await ordersCollection.where("passengerUserId", "==", user.uid).limit(20).get();
@@ -2582,7 +2584,6 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       offeredDriverId: firstDriverId || undefined,
       offerExpiresAt: firstDriverId ? new Date(now.getTime() + 30_000).toISOString() : undefined,
     };
-    const orderRef = ordersCollection.doc(newOrder.id);
     await ordersDb.runTransaction(async (transaction) => {
       const existing = await transaction.get(orderRef);
       if (existing.exists) {
