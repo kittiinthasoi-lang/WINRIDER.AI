@@ -1,4 +1,5 @@
 import { buildWebhookPayload, dispatchToWebhook, isAutoDispatchEnabled } from './webhookDispatcher';
+import { emitQuestMetric } from '../services/questService';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
@@ -400,6 +401,11 @@ export async function advanceLiveOrderStep(
   const payload = await stepResponse.json();
   if (!isValidLiveOrder(payload?.order)) return null;
   const updatedOrder = payload.order as LiveRideOrder;
+  if (newStatus === 'completed') {
+    void emitQuestMetric('driver.completed_trip', 1);
+    if (updatedOrder.routeEta || updatedOrder.distanceKm) void emitQuestMetric('driver.routed_trip', 1);
+    if (updatedOrder.serviceType === 'spirit' || updatedOrder.serviceType === 'family' || updatedOrder.serviceType === 'pet' || updatedOrder.serviceType === 'express') void emitQuestMetric('driver.special_service', 1);
+  }
   const orders = getLocalLiveOrders().filter((order) => order.id !== orderId);
   orders.unshift(updatedOrder);
   saveLocalLiveOrders(orders);
