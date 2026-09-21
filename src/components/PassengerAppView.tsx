@@ -1570,8 +1570,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   onBookEventRide={(event) => {
                     if (audioEnabled) playTactileBlip(1000);
                     setSelectedService('WIN KNIGHT (Special Event Dispatch)');
-                    setSelectedDestination(event.venueName);
-                    setShowBookingModal(true);
+                    void calculateDestinationRoute(
+                      event.venueName + (event.venueArea ? ' ' + event.venueArea : ''),
+                      event.venueName
+                    );
                   }}
                 />
 
