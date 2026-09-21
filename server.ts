@@ -1969,11 +1969,23 @@ app.post("/api/quests/event", rateLimit(120), async (req, res) => {
       const periodKey = questBucketKey(definition.period);
       const bucketRoot = { ...(data[bucketName] || {}) };
       const bucket = { ...(bucketRoot[periodKey] || {}) };
-      newValue = (Number(bucket[metricKey]) || 0) + amount;
-      bucket[metricKey] = newValue;
+
+      // "active_days" means distinct Bangkok calendar days, not raw button/heartbeat count.
+      // Store a day marker per event and derive the counter from unique markers.
+      if (metricKey.endsWith(".active_days")) {
+        const dayKey = bangkokDateKey();
+        const activeDays = { ...((bucket.activeDayKeys || {}) as Record<string, true>) };
+        activeDays[dayKey] = true;
+        bucket.activeDayKeys = activeDays;
+        newValue = Object.keys(activeDays).length;
+      } else {
+        newValue = Math.min(100000, (Number(bucket[metricKey]) || 0) + amount);
+        bucket[metricKey] = newValue;
+      }
+
       bucketRoot[periodKey] = bucket;
       transaction.set(seasonRef, { seasonId: QUEST_SEASON_ID, [bucketName]: bucketRoot, updatedAt: new Date().toISOString() }, { merge: true });
-      transaction.create(eventRef, { eventId, metricKey, amount, createdAt: FieldValue.serverTimestamp() });
+      transaction.create(eventRef, { eventId, metricKey, amount: metricKey.endsWith(".active_days") ? 1 : amount, dayKey: metricKey.endsWith(".active_days") ? bangkokDateKey() : undefined, createdAt: FieldValue.serverTimestamp() });
     });
     return res.json({ success: true, duplicate, metricKey, value: newValue });
   } catch (error: any) {
