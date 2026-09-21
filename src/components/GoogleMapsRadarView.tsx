@@ -1,3 +1,6 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { getAuth } from 'firebase/auth';
+import { APIProvider, AdvancedMarker, Map, useMap } from '@vis.gl/react-google-maps';
 import {
   Building2,
   Clock,
@@ -83,7 +86,7 @@ function MapViewController({ center, zoom, trigger }: { center: { lat: number; l
   return null;
 }
 
-const PLACE_GROUP_STYLES: Record
+const PLACE_GROUP_STYLES: Record<
   'shop' | 'transport' | 'faith' | 'community',
   { label: string; emoji: string; markerClass: string; badgeClass: string; Icon: React.ComponentType<{ className?: string }> }
 > = {
