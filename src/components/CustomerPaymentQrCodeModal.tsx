@@ -56,6 +56,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
   const [qrType, setQrType] = useState<'win_pay'>('win_pay');
   const [walletQrDataUrl, setWalletQrDataUrl] = useState<string>('');
   const [walletLoading, setWalletLoading] = useState(false);
+  const [resolvedWalletId, setResolvedWalletId] = useState('');
   const [itemEmoji, setItemEmoji] = useState<string>('🛍️');
 
   useEffect(() => {
@@ -63,7 +64,9 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
     let cancelled = false;
     void (async () => {
       try {
-        const walletId = customerWalletId || (await getWalletMe())?.wallet?.walletId || (await getWalletMe())?.walletId || '';
+        const wallet = customerWalletId ? null : await getWalletMe();
+        const walletId = customerWalletId || wallet?.wallet?.walletId || wallet?.walletId || '';
+        if (!cancelled) setResolvedWalletId(walletId);
         if (!/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(walletId)) throw new Error('ไม่มี WIN Wallet ID จริง');
         const payload = JSON.stringify({ type: 'WIN_WALLET_PAYMENT', walletId, amount: customAmount > 0 ? customAmount : undefined, item: itemNote });
         const url = await QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 2, width: 280 });
@@ -343,49 +346,9 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
             </div>
           </div>
 
-          {/* SVG QR CODE VISUAL */}
-          <div className="relative mx-auto w-48 h-48 sm:w-52 sm:h-52 bg-slate-950 p-3 rounded-2xl shadow-inner flex items-center justify-center border-4 border-amber-400">
-            <div className="relative w-full h-full bg-white p-2 rounded-xl flex items-center justify-center">
-              {/* Removed: synthetic QR */}
-              <svg viewBox="0 0 100 100" className="w-full h-full">
-                {/* QR Finder Corners */}
-                <rect x="5" y="5" width="28" height="28" fill="#1C1402" rx="3" />
-                <rect x="9" y="9" width="20" height="20" fill="#FFFFFF" rx="2" />
-                <rect x="13" y="13" width="12" height="12" fill="#1C1402" rx="1.5" />
-
-                <rect x="67" y="5" width="28" height="28" fill="#1C1402" rx="3" />
-                <rect x="71" y="9" width="20" height="20" fill="#FFFFFF" rx="2" />
-                <rect x="75" y="13" width="12" height="12" fill="#1C1402" rx="1.5" />
-
-                <rect x="5" y="67" width="28" height="28" fill="#1C1402" rx="3" />
-                <rect x="9" y="71" width="20" height="20" fill="#FFFFFF" rx="2" />
-                <rect x="13" y="75" width="12" height="12" fill="#1C1402" rx="1.5" />
-
-                {/* QR Patterns & Timing */}
-                <rect x="38" y="8" width="6" height="6" fill="#1C1402" />
-                <rect x="48" y="12" width="6" height="6" fill="#1C1402" />
-                <rect x="58" y="8" width="6" height="6" fill="#1C1402" />
-
-                <rect x="38" y="38" width="6" height="6" fill="#1C1402" />
-                <rect x="48" y="48" width="6" height="6" fill="#1C1402" />
-                <rect x="58" y="38" width="6" height="6" fill="#1C1402" />
-                <rect x="48" y="28" width="6" height="6" fill="#1C1402" />
-                <rect x="28" y="48" width="6" height="6" fill="#1C1402" />
-                <rect x="68" y="48" width="6" height="6" fill="#1C1402" />
-
-                <rect x="38" y="68" width="6" height="6" fill="#1C1402" />
-                <rect x="48" y="78" width="6" height="6" fill="#1C1402" />
-                <rect x="58" y="68" width="6" height="6" fill="#1C1402" />
-                <rect x="68" y="78" width="6" height="6" fill="#1C1402" />
-                <rect x="78" y="68" width="6" height="6" fill="#1C1402" />
-                <rect x="88" y="88" width="6" height="6" fill="#1C1402" />
-              </svg>
-
-              {/* Center Item Badge */}
-              <div className="absolute inset-0 m-auto w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 via-orange-500 to-amber-600 text-white font-black text-base flex items-center justify-center shadow-lg border-2 border-white">
-                {itemEmoji}
-              </div>
-            </div>
+          {/* Real QR generated from the recipient WIN Wallet ID */}
+          <div className="relative mx-auto w-48 h-48 sm:w-52 sm:h-52 bg-white p-3 rounded-2xl shadow-inner flex items-center justify-center border-4 border-amber-400">
+            {walletQrDataUrl ? <img src={walletQrDataUrl} alt="WIN Wallet QR" className="h-full w-full object-contain" /> : <span className="text-center text-xs font-bold text-slate-500">{walletLoading ? 'กำลังสร้าง QR จาก WIN Wallet จริง…' : 'ไม่พบ WIN Wallet ID จริง'}</span>}
           </div>
 
           <div className="font-mono">
@@ -410,7 +373,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
               </div>
             )}
             <p className="text-[10px] text-slate-400 mt-1">
-              {qrType === 'promptpay' ? promptPayNumber : `Wallet: ${customerWalletId}`}
+              {qrType === 'promptpay' ? promptPayNumber : `WIN Wallet: ${resolvedWalletId || customerWalletId}`}
             </p>
           </div>
         </div>
