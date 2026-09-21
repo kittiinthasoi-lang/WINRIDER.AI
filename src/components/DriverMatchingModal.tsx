@@ -280,12 +280,12 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
       }
       if (serviceId === 'mu') {
         // MU BUDDY: Recommend matching gender with service eligibility
-        // If passenger is female, recommend female driver (Level 15+)
-        // If passenger is male, recommend male driver (Level 15+)
+        // If passenger is female, recommend female driver (service eligibility)
+        // If passenger is male, recommend male driver (service eligibility)
         if (currentGender === 'female') {
-          return driver.gender === 'female' && driver.level >= 15;
+          return driver.gender === 'female' && true;
         } else {
-          return driver.gender === 'male' && driver.level >= 15;
+          return driver.gender === 'male' && true;
         }
       }
       if (serviceId === 'spirit') {
