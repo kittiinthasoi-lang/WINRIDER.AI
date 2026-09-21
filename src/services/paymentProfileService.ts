@@ -82,6 +82,7 @@ export async function savePaymentProfile(params: {
   accountName: string;
   receiverType: PaymentReceiverType;
   promptPayId: string;
+  walletId?: string;
   bankName?: string;
   bankSlipQrUrl?: string | null;
 }): Promise<PaymentProfile> {
@@ -113,7 +114,9 @@ export async function savePaymentProfile(params: {
   }
 
     // สร้าง QR: PromptPay (EMVCo) หรือ ข้อมูลบัญชีธนาคาร แล้วแต่ receiverType
-  const realQrDataUrl = receiverType === 'bank_account'
+  const realQrDataUrl = receiverType === 'win_wallet'
+    ? ''
+    : receiverType === 'bank_account'
     ? await generateBankAccountQRDataUrl({
         bankName: bankName!.trim(),
         accountNumber: cleanPromptPay,
