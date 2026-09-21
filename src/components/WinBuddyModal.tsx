@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { playTactileBlip, speakThaiText } from '../utils/audio';
 import { 
   Bot, 
@@ -29,9 +29,9 @@ export const WinBuddyModal: React.FC<Props> = ({ isOpen, onClose, audioEnabled }
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
+  const [isListening, setIsListening] = useState(false);\n  const recognitionRef = useRef<any>(null);\n  const transcriptRef = useRef('');
 
-  if (!isOpen) return null;
+  useEffect(() => {\n    if (typeof window === 'undefined') return;\n    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;\n    if (!SpeechRecognition) return;\n    const recognition = new SpeechRecognition();\n    recognition.continuous = false;\n    recognition.interimResults = true;\n    recognition.lang = 'th-TH';\n    recognition.onresult = (event: any) => {\n      const transcript = Array.from(event.results).map((r: any) => r[0].transcript).join('');\n      transcriptRef.current = transcript;\n      setQuery(transcript);\n    };\n    recognition.onend = () => {\n      setIsListening(false);\n      const transcript = transcriptRef.current.trim();\n      if (transcript) void handleSend(transcript);\n    };\n    recognition.onerror = () => setIsListening(false);\n    recognitionRef.current = recognition;\n    return () => recognition.abort();\n  }, []);\n\n  if (!isOpen) return null;
 
   const handleSend = async (customText?: string) => {
     const textToSend = customText || query;
