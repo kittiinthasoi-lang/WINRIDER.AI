@@ -210,31 +210,37 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
     void persistClaimQuest(quest.id).then((result) => {
       if (result?.alreadyClaimed) return;
       setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, isClaimed: true } : q));
+
+        // Award XP after server commit
+      if (quest.role === 'driver' && onGainDriverXp) {
+        onGainDriverXp(quest.xpReward, `สำเร็จภารกิจ: ${quest.title}`);
+      } else if (quest.role === 'citizen' && onGainCitizenXp) {
+        onGainCitizenXp(quest.xpReward, `สำเร็จภารกิจ: ${quest.title}`);
+      } else if (quest.role === 'merchant' && onGainMerchantXp) {
+        onGainMerchantXp(quest.xpReward, `สำเร็จภารกิจ: ${quest.title}`);
+      } else if (quest.role === 'partner' && onGainPartnerXp) {
+        onGainPartnerXp(quest.xpReward, `สำเร็จภารกิจ: ${quest.title}`);
+      }
+
+      if (quest.bonusReward && onRewardBonusCash && quest.bonusReward.includes('฿')) {
+        const match = quest.bonusReward.match(/฿(\d+)/);
+        if (match) {
+          onRewardBonusCash(parseInt(match[1], 10));
+        }
+      }
+
+      if (quest.bonusReward && onRewardBonusCash && quest.bonusReward.includes('฿')) {
+        const match = quest.bonusReward.match(/฿(\d+)/);
+        if (match) {
+          onRewardBonusCash(parseInt(match[1], 10));
+        }
+      }
+
     }).catch(error => {
       console.warn('Quest claim persistence failed:', error);
       alert('รับรางวัลภารกิจไม่สำเร็จ กรุณาลองใหม่');
     });
 
-    // Award XP based on role
-    if (quest.role === 'driver' && onGainDriverXp) {
-      onGainDriverXp(quest.xpReward, `สำเร็จภารกิจ: ${quest.title}`);
-    } else if (quest.role === 'citizen' && onGainCitizenXp) {
-      onGainCitizenXp(quest.xpReward, `สำเร็จภารกิจ: ${quest.title}`);
-    } else if (quest.role === 'merchant' && onGainMerchantXp) {
-      onGainMerchantXp(quest.xpReward, `สำเร็จภารกิจ: ${quest.title}`);
-    } else if (quest.role === 'partner' && onGainPartnerXp) {
-      onGainPartnerXp(quest.xpReward, `สำเร็จภารกิจ: ${quest.title}`);
-    }
-
-    if (quest.bonusReward && onRewardBonusCash && quest.bonusReward.includes('฿')) {
-      const match = quest.bonusReward.match(/฿(\d+)/);
-      if (match) {
-        onRewardBonusCash(parseInt(match[1], 10));
-      }
-    }
-
-    setClaimedToast(`🎉 รับรางวัลสำเร็จ! +${quest.xpReward} XP ${quest.bonusReward ? `(${quest.bonusReward})` : ''}`);
-    setTimeout(() => setClaimedToast(null), 4000);
   };
 
   return (
