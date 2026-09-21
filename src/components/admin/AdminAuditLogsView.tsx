@@ -63,7 +63,7 @@ export const AdminAuditLogsView: React.FC<AdminAuditLogsViewProps> = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0A1633] p-5 rounded-2xl border border-[#00D4FF]/20 shadow-xl">
         <div className="flex items-center gap-3">
           <img 
-            src="/images/armor_lightning.jpg" 
+            src="/images/admin/audit-logs.svg" 
             alt="Audit Logs" 
             className="w-11 h-11 rounded-2xl object-cover ring-1 ring-purple-400/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]" 
           />
