@@ -79,7 +79,22 @@ const makeQuest = (
  * ทุกบัญชีใหม่เริ่มจาก 0 และชุดภารกิจไม่ใช้ข้อมูล/ความคืบหน้าจากซีซันเก่า
  * metricKey ถูกออกแบบให้ผูกกับ event จริงของแอปต่อไป
  */
-export const INITIAL_QUESTS: QuestItem[] = [
+export function currentQuestPeriodKey(period: QuestItem["category"]): string {
+  if (period === "epic") return "lifetime";
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(now);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value || 0);
+  const y = get("year"), m = get("month"), d = get("day");
+  if (period === "daily") return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const weekday = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() - weekday + 1);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,"0")}-${String(date.getUTCDate()).padStart(2,"0")}`;
+}
+
+const INITIAL_QUESTS: QuestItem[] = [
   // KNIGHT — งานจริง, ความปลอดภัย, GPS, บริการพิเศษ
   makeQuest('S3-KN-D01','driver','daily','เช็กความพร้อมก่อนออกงาน','เปิด Garage ตรวจรถหลักและยืนยันว่ารถพร้อมรับงานก่อนเริ่มกะ',60,1,'🛵','Garage Ready','driver.preflight'),
   makeQuest('S3-KN-D02','driver','daily','เปิดโหมดพร้อมรับงาน','เปิดโหมดออนไลน์/พร้อมรับงานและอยู่ในพื้นที่ให้บริการ',80,1,'🟢','Ready to Ride','driver.online'),
@@ -149,7 +164,7 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
         setQuests(INITIAL_QUESTS.map(q => ({
           ...q,
           progress: Math.min(q.totalRequired, Number(progress[q.metricKey || '']) || 0),
-          isClaimed: claimed.has(q.id),
+          isClaimed: claimed.has(`${q.id}:${currentQuestPeriodKey(q.category)}`),
         })));
       } catch (error) {
         console.warn('Unable to load quest state:', error);
