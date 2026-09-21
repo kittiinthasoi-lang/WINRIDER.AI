@@ -329,7 +329,17 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
             </button>
           )})}
         </div>
-        <span className="whitespace-nowrap text-[10px] font-bold text-cyan-300">แสดง {filteredEntities.length}/20 จุด</span>
+               <span className="whitespace-nowrap text-[10px] font-bold text-cyan-300">แสดง {filteredEntities.length}/20 จุด</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-white/10 bg-[#060D1E] px-4 py-2 font-mono">
+        <span className="text-[9px] font-bold text-slate-400">สัญลักษณ์:</span>
+        {(Object.entries(PLACE_GROUP_STYLES) as Array<[keyof typeof PLACE_GROUP_STYLES, typeof PLACE_GROUP_STYLES[keyof typeof PLACE_GROUP_STYLES]]>).map(([id, style]) => (
+          <span key={id} className={`flex items-center gap-1 rounded-lg border px-1.5 py-0.5 text-[9px] font-bold ${style.badgeClass}`}>
+            <span>{style.emoji}</span>
+            <span>{style.label}</span>
+          </span>
+        ))}
       </div>
 
       <div className="relative w-full" style={{ height }}>
