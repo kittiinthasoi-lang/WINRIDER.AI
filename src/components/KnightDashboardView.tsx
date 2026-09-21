@@ -27,6 +27,7 @@ import { globalLedgerEngine } from '../core/ledger';
 import { TripModel, TripStateMachine } from '../core/tripStateMachine';
 import { defaultNotifyProvider } from '../adapters/defaultProviders';
 import { KnightWalletView } from './KnightWalletView';
+import { ProfileQuickActions } from './ProfileQuickActions';
 
 interface KnightDashboardViewProps {
   userName?: string;
@@ -480,6 +481,15 @@ export const KnightDashboardView: React.FC<KnightDashboardViewProps> = ({
               </div>
               <h3 className="text-sm font-bold text-white">{userName}</h3>
               <p className="text-xs text-gray-400 font-mono">ID: KNT-SOVEREIGN-01</p>
+
+              <div className="pt-3 border-t border-white/10">
+                <ProfileQuickActions
+                  role="knight"
+                  userName={userName}
+                  audioEnabled={true}
+                  questEmptyText="ยังไม่มีภารกิจจริงสำหรับบัญชีอัศวินนี้"
+                />
+              </div>
 
               <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
                 {onLogout && (
