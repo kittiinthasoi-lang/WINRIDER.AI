@@ -21,7 +21,8 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { auth } from '../firebase';
-import { generateBankAccountQRDataUrl } from '../utils/promptpay';\nimport { getWalletMe } from '../services/walletService';
+import { generateBankAccountQRDataUrl } from '../utils/promptpay';
+import { getWalletMe } from '../services/walletService';
 import { 
   getPaymentProfile, 
   savePaymentProfile, 
@@ -57,14 +58,16 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
 
   const [accountName, setAccountName] = useState<string>(defaultName);
   const [receiverType, setReceiverType] = useState<PaymentReceiverType>('citizen_phone');
-  const [promptPayId, setPromptPayId] = useState<string>('');\n  const [walletId, setWalletId] = useState<string>('');
+  const [promptPayId, setPromptPayId] = useState<string>('');
+  const [walletId, setWalletId] = useState<string>('');
   const [bankName, setBankName] = useState<string>('');
   const [bankSlipQrUrl, setBankSlipQrUrl] = useState<string | null>(null);
 
   const [existingProfile, setExistingProfile] = useState<PaymentProfile | null>(null);
   const [previewQr, setPreviewQr] = useState<string>('');
   const [testAmount, setTestAmount] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState<'info' | 'preview'>('info');\n  const roleForWallet = role;
+  const [activeTab, setActiveTab] = useState<'info' | 'preview'>('info');
+  const roleForWallet = role;
 
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -80,7 +83,8 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
           setExistingProfile(p);
           setAccountName(p.accountName);
           setReceiverType(p.receiverType);
-          setPromptPayId(p.promptPayId);\n          setWalletId(p.walletId || '');
+          setPromptPayId(p.promptPayId);
+          setWalletId(p.walletId || '');
           setBankName(p.bankName || '');
           setBankSlipQrUrl(p.bankSlipQrUrl || null);
           if (p.qrCodeDataUrl) {
@@ -103,7 +107,11 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
   useEffect(() => {
     const clean = promptPayId.replace(/[^0-9]/g, '');
 
-    if (receiverType === 'win_wallet') { setPreviewQr(''); return; }\n\n    if (receiverType === 'win_wallet') {\n      if (!walletId) { setErrorMessage('ยังไม่มี WIN Wallet ID สำหรับบทบาทนี้'); return; }\n    } else if (receiverType === 'bank_account') {
+    if (receiverType === 'win_wallet') { setPreviewQr(''); return; }
+
+    if (receiverType === 'win_wallet') {
+      if (!walletId) { setErrorMessage('ยังไม่มี WIN Wallet ID สำหรับบทบาทนี้'); return; }
+    } else if (receiverType === 'bank_account') {
       if (clean.length >= 10 && clean.length <= 15 && bankName.trim() && accountName.trim()) {
         generateBankAccountQRDataUrl({
           bankName: bankName.trim(),
@@ -178,7 +186,8 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
         role: role as 'knight' | 'citizen' | 'merchant' | 'partner',
         accountName: accountName.trim(),
         receiverType,
-        promptPayId: receiverType === 'win_wallet' ? '' : cleanId,\n        walletId: receiverType === 'win_wallet' ? walletId : undefined,
+        promptPayId: receiverType === 'win_wallet' ? '' : cleanId,
+        walletId: receiverType === 'win_wallet' ? walletId : undefined,
         bankName: bankName.trim(),
         bankSlipQrUrl
       });
@@ -350,7 +359,17 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
           </div>
         </div>
 
-        {receiverType === 'win_wallet' ? (\n          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 space-y-2">\n            <div className="text-xs font-bold text-emerald-200">WIN Wallet ID สำหรับรับเงิน</div>\n            <div className="flex items-center gap-2">\n              <Wallet className="w-5 h-5 text-emerald-300" />\n              <span className="rounded-xl border border-emerald-400/30 bg-black/30 px-3 py-2 font-mono font-black text-emerald-300">{walletId || 'กำลังจัดสรร…'}</span>\n            </div>\n            <p className="text-[10px] text-slate-300">1 บทบาท = 1 WIN Wallet ID • ไม่เปิดเผย UID และไม่ซ้ำกับ ID ของบทบาทอื่น</p>\n          </div>\n        ) : (\n        /* PromptPay ID / Bank Account Number Input */}
+        {receiverType === 'win_wallet' ? (
+          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 space-y-2">
+            <div className="text-xs font-bold text-emerald-200">WIN Wallet ID สำหรับรับเงิน</div>
+            <div className="flex items-center gap-2">
+              <Wallet className="w-5 h-5 text-emerald-300" />
+              <span className="rounded-xl border border-emerald-400/30 bg-black/30 px-3 py-2 font-mono font-black text-emerald-300">{walletId || 'กำลังจัดสรร…'}</span>
+            </div>
+            <p className="text-[10px] text-slate-300">1 บทบาท = 1 WIN Wallet ID • ไม่เปิดเผย UID และไม่ซ้ำกับ ID ของบทบาทอื่น</p>
+          </div>
+        ) : (
+        /* PromptPay ID / Bank Account Number Input */}
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-200 flex items-center justify-between">
             <span>{receiverType === 'bank_account' ? 'เลขบัญชีธนาคาร *' : 'หมายเลข PromptPay *'}</span>
@@ -374,7 +393,9 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
           />
         </div>
 
-        )}\n\n        {/* Bank Name */}
+        )}
+
+        {/* Bank Name */}
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-200">
             {receiverType === 'bank_account' ? 'ธนาคารเจ้าของบัญชี *' : 'ธนาคารเจ้าของบัญชี (ระบุเพื่อความชัดเจน)'}
