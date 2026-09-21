@@ -21,7 +21,8 @@ import {
   FileText
 } from 'lucide-react';
 import { playTactileBlip, playLevelUpFanfare, speakThaiText } from '../utils/audio';
-import confetti from 'canvas-confetti';
+import QRCode from 'qrcode';
+import { getWalletMe } from '../services/walletService';
 
 interface CustomerPaymentQrCodeModalProps {
   isOpen: boolean;
@@ -41,8 +42,8 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
   customerName = 'คุณลูกค้า (ผู้ขายชุมชน C2C)',
   defaultItemTitle = 'สินค้าจาก วันนี้มีของมาขาย',
   defaultAmount = 150,
-  customerPromptPay = '081-998-XXXX (พร้อมเพย์)',
-  customerWalletId = 'WIN-CUST-7749-TH',
+  customerPromptPay = '',
+  customerWalletId = '',
   audioEnabled = true,
   onPaymentSuccess
 }) => {
@@ -52,8 +53,29 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
   const [promptPayNumber, setPromptPayNumber] = useState<string>(customerPromptPay);
   const [copied, setCopied] = useState<boolean>(false);
   const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
-  const [qrType, setQrType] = useState<'promptpay' | 'win_pay'>('promptpay');
+  const [qrType, setQrType] = useState<'win_pay'>('win_pay');
+  const [walletQrDataUrl, setWalletQrDataUrl] = useState<string>('');
+  const [walletLoading, setWalletLoading] = useState(false);
   const [itemEmoji, setItemEmoji] = useState<string>('🛍️');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const walletId = customerWalletId || (await getWalletMe())?.wallet?.walletId || (await getWalletMe())?.walletId || '';
+        if (!/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(walletId)) throw new Error('ไม่มี WIN Wallet ID จริง');
+        const payload = JSON.stringify({ type: 'WIN_WALLET_PAYMENT', walletId, amount: customAmount > 0 ? customAmount : undefined, item: itemNote });
+        const url = await QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 2, width: 280 });
+        if (!cancelled) setWalletQrDataUrl(url);
+      } catch {
+        if (!cancelled) setWalletQrDataUrl('');
+      } finally {
+        if (!cancelled) setWalletLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, customerWalletId, customAmount, itemNote]);
 
   // Handle ESC key to dismiss
   useEffect(() => {
@@ -84,15 +106,9 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
     const amt = customAmount > 0 ? customAmount : 150;
     if (audioEnabled) {
       playLevelUpFanfare();
-      speakThaiText(`ได้รับยอดเงินค่าสินค้า ฿${amt} จากผู้ซื้อเรียบร้อยแล้ว`);
+      speakThaiText(`แสดง QR WIN Wallet สำหรับยอด ฿${amt} กรุณายืนยันธุรกรรมผ่านระบบจริง`);
     }
     setPaymentSuccess(true);
-    confetti({
-      particleCount: 90,
-      spread: 80,
-      colors: ['#FFD700', '#00D2FF', '#10B981', '#FF6B6B']
-    });
-
     if (onPaymentSuccess) {
       onPaymentSuccess(amt, itemNote);
     }
@@ -163,16 +179,16 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
         {paymentSuccess && (
           <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-slate-950 font-black text-xs font-mono text-center shadow-2xl border-2 border-white animate-bounce flex items-center justify-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-slate-950" />
-            <span>🎉 ได้รับเงินค่าสินค้า ฿{customAmount > 0 ? customAmount : 150} สำเร็จแล้ว! (เข้าบัญชีทันที)</span>
+            <span>แสดง QR WIN Wallet แล้ว — ยังไม่ถือว่าเงินเข้าจนกว่าธุรกรรมจริงจะยืนยัน</span>
           </div>
         )}
 
         {/* TOGGLE PROMPTPAY VS WIN WALLET */}
-        <div className="grid grid-cols-2 gap-2 bg-black/50 p-1 rounded-2xl border border-white/10 font-mono text-xs">
+        <div className="grid grid-cols-1 gap-2 bg-black/50 p-1 rounded-2xl border border-white/10 font-mono text-xs">
           <button
             onClick={() => {
               if (audioEnabled) playTactileBlip(800);
-              setQrType('promptpay');
+              setQrType('win_pay');
             }}
             className={`py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
               qrType === 'promptpay'
@@ -181,7 +197,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
             }`}
           >
             <Zap className="w-3.5 h-3.5" />
-            <span>พร้อมเพย์ (PromptPay)</span>
+            <span>WIN Wallet จริง</span>
           </button>
 
           <button
@@ -318,7 +334,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
           <div className="flex items-center justify-between border-b pb-2 text-xs font-mono">
             <div className="text-left">
               <span className="text-[10px] text-slate-500 font-bold uppercase">
-                {qrType === 'promptpay' ? 'THAI QR PAYMENT (PROMPTPAY)' : 'WIN CUSTOMER WALLET'}
+                {false ? 'THAI QR PAYMENT (PROMPTPAY)' : 'WIN CUSTOMER WALLET'}
               </span>
               <p className="font-black text-slate-900 truncate max-w-[180px]">{sellerName}</p>
             </div>
@@ -330,7 +346,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
           {/* SVG QR CODE VISUAL */}
           <div className="relative mx-auto w-48 h-48 sm:w-52 sm:h-52 bg-slate-950 p-3 rounded-2xl shadow-inner flex items-center justify-center border-4 border-amber-400">
             <div className="relative w-full h-full bg-white p-2 rounded-xl flex items-center justify-center">
-              {/* Synthetic Vector QR Code */}
+              {/* Removed: synthetic QR */}
               <svg viewBox="0 0 100 100" className="w-full h-full">
                 {/* QR Finder Corners */}
                 <rect x="5" y="5" width="28" height="28" fill="#1C1402" rx="3" />
@@ -405,7 +421,7 @@ export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProp
             className="py-2.5 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 flex items-center justify-center gap-1.5 transition-colors"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? 'คัดลอกแล้ว!' : 'คัดลอกเลขบัญชี'}</span>
+            <span>{copied ? 'คัดลอกแล้ว!' : 'คัดลอก WIN Wallet ID'}</span>
           </button>
 
         </div>
