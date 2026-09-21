@@ -1248,3 +1248,810 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                     </div>
                     <div className="w-full h-3 rounded-full bg-slate-950 overflow-hidden border border-white/10 p-0.5 relative">
                       <div 
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 via-cyan-400 to-emerald-400 transition-all duration-700 relative"
+                        style={{ width: `${Math.min(100, Math.max(10, ((driverCreditScore - 300) / 550) * 100))}%` }}
+                      >
+                        <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Key Financial Metrics Breakdown */}
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1">
+                      <div className="text-[10px] text-slate-400">ประวัติผ่อนชำระ 4฿ & 2฿:</div>
+                      <div className="text-sm font-bold text-emerald-400">100% ตรงเวลา</div>
+                      <div className="text-[9px] text-slate-400">ชำระครบ 20 รอบต่อเนื่องทุกวัน</div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1">
+                      <div className="text-[10px] text-slate-400">วงเงินฉุกเฉิน 0% ดอกเบี้ย:</div>
+                      <div className="text-sm font-bold text-[#FFD700]">฿{emergencyCreditAvailable.toLocaleString()}</div>
+                      <div className="text-[9px] text-slate-400">จากวงเงินอนุมัติ ฿{emergencyCreditLimit.toLocaleString()}</div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1">
+                      <div className="text-[10px] text-slate-400">กองทุนสวัสดิการ & เงินออม:</div>
+                      <div className="text-sm font-bold text-cyan-300">ยังไม่มีข้อมูลจริง</div>
+                      <div className="text-[9px] text-slate-400">สะสมจากทริปอัศวิน</div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1">
+                      <div className="text-[10px] text-slate-400">วงเงินซ่อมบำรุงล่วงหน้า:</div>
+                      <div className="text-sm font-bold text-amber-300">ยังไม่มีข้อมูลจริง</div>
+                      <div className="text-[9px] text-slate-400">เปลี่ยนยาง/น้ำมันเครื่องที่ศูนย์</div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* EQUIPMENT STATUS GRID (Including Armor Shirt & Helmet) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Shield className="w-4 h-4" />
+                      EQUIPMENT STATUS (สถานะชุดเกราะ & อุปกรณ์)
+                    </h4>
+                    <button
+                      onClick={() => setActiveDriverTab('armor')}
+                      className="text-[10px] text-cyan-300 hover:underline font-mono"
+                    >
+                      ปรับแต่ง &rarr;
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {/* 1. ARMOR SHIRT / JACKET */}
+                    <div className="p-3 rounded-2xl bg-[#0D1C38] border border-cyan-500/40 space-y-1">
+                      <div className="w-8 h-8 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-300 mb-1">
+                        <Shirt className="w-4 h-4" />
+                      </div>
+                      <div className="text-[11px] font-bold text-white">WIN Armor (เสื้อ)</div>
+                      <p className="text-[9px] text-slate-400 line-clamp-1">{equippedSuit.jacket.name}</p>
+                      <span className="text-[9px] font-mono text-emerald-400 block font-bold">● Active 100%</span>
+                    </div>
+
+                    {/* 2. SMART HELMET */}
+                    <div className="p-3 rounded-2xl bg-[#0D1C38] border border-amber-500/40 space-y-1">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-300 mb-1">
+                        <HardHat className="w-4 h-4" />
+                      </div>
+                      <div className="text-[11px] font-bold text-white">WIN Helmet (หมวก)</div>
+                      <p className="text-[9px] text-slate-400 line-clamp-1">{equippedSuit.helmet.name}</p>
+                      <span className="text-[9px] font-mono text-cyan-400 block font-bold">● HUD Synced</span>
+                    </div>
+
+                    {/* 3. BLUETOOTH COMMS */}
+                    <div className="p-3 rounded-2xl bg-[#0D1C38] border border-purple-500/40 space-y-1">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-300 mb-1">
+                        <Headphones className="w-4 h-4" />
+                      </div>
+                      <div className="text-[11px] font-bold text-white">WIN Headset</div>
+                      <p className="text-[9px] text-slate-400">WIN-Comm Pro 3.0</p>
+                      <span className="text-[9px] font-mono text-emerald-400 block font-bold">● Connected</span>
+                    </div>
+
+                    {/* 4. PRO GLOVES */}
+                    <div className="p-3 rounded-2xl bg-[#0D1C38] border border-cyan-500/30 space-y-1">
+                      <div className="w-8 h-8 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-300 mb-1">
+                        <Hand className="w-4 h-4" />
+                      </div>
+                      <div className="text-[11px] font-bold text-white">WIN Pro Gloves</div>
+                      <p className="text-[9px] text-slate-400">Carbon & NFC</p>
+                      <span className="text-[9px] font-mono text-emerald-400 block font-bold">● Operational</span>
+                    </div>
+
+                    {/* 5. GUARDIAN PLATES */}
+                    <div className="p-3 rounded-2xl bg-[#0D1C38] border border-emerald-500/30 space-y-1">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-300 mb-1">
+                        <Shield className="w-4 h-4" />
+                      </div>
+                      <div className="text-[11px] font-bold text-white">Guardian Plates</div>
+                      <p className="text-[9px] text-slate-400">D3O Knee Guards</p>
+                      <span className="text-[9px] font-mono text-emerald-400 block font-bold">● Mounted</span>
+                    </div>
+
+                    {/* 6. VIBRATION MOUNT */}
+                    <div className="p-3 rounded-2xl bg-[#0D1C38] border border-blue-500/30 space-y-1">
+                      <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-300 mb-1">
+                        <Zap className="w-4 h-4" />
+                      </div>
+                      <div className="text-[11px] font-bold text-white">WIN-Grip Mount</div>
+                      <p className="text-[9px] text-slate-400">CNC 7075 Damper</p>
+                      <span className="text-[9px] font-mono text-cyan-400 block font-bold">● Qi2 Charging</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* EQUIPMENT DEBT REPAYMENT (5 / 35 RIDES PAID) */}
+                <div className="p-4 rounded-2xl bg-[#0C172E] border border-white/10 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-slate-300 font-bold">EQUIPMENT DEBT REPAYMENT</span>
+                    <span className="text-[#00D2FF] font-bold">{ridesPaid} / {totalRidesDebt} RIDES PAID</span>
+                  </div>
+
+                  <div className="w-full h-3 rounded-full bg-black/60 overflow-hidden border border-white/10 p-[1px]">
+                    <div 
+                      className="h-full rounded-full bg-[#00D2FF] shadow-[0_0_10px_#00D2FF] transition-all duration-500" 
+                      style={{ width: `${(ridesPaid / totalRidesDebt) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    โมเดล 0 บาทรับเกราะ: หักชำระอัตโนมัติเพียงรอบละ 10 บาทต่อเที่ยว เมื่อครบ 35 รอบ เกราะจะเป็นกรรมสิทธิ์ของอัศวิน 100%
+                  </p>
+                </div>
+
+                {/* DAILY DEDUCTIONS (Platform fee, Armor, Insurance) */}
+                <div className="p-4 rounded-2xl bg-[#091224] border border-white/10 space-y-2 text-xs">
+                  <h5 className="font-bold text-slate-300 text-[11px] font-mono uppercase">
+                    DAILY DEDUCTIONS (แจกแจงค่าใช้จ่ายรายวัน)
+                  </h5>
+
+                  <div className="space-y-1.5 text-[11px] font-mono">
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Platform Flat Fee (1฿ ต่อเที่ยว x 75 เที่ยว)</span>
+                      <span className="text-slate-400 font-bold">ยังไม่มีข้อมูล</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Armor Installment (ผ่อนชุดเกราะ)</span>
+                      <span className="text-slate-400 font-bold">ยังไม่มีข้อมูล</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Welfare & Retirement Fund (สวัสดิการเกษียณ)</span>
+                      <span className="text-slate-400 font-bold">ยังไม่มีข้อมูล</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between font-bold text-emerald-400">
+                    <span>รายได้สุทธิวันนี้ (Net Day Payout):</span>
+                    <span>ยังไม่มีข้อมูลธุรกรรมจริง</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeDriverTab === 'mechanic' && <WinAiAssistantPanel mode="motorcycle_mechanic" />}
+
+            {/* 4. LIVE JOBS & DISPATCH TAB (STANDBY RADAR & FAIR PROXIMITY DISPATCH) */}
+            {activeDriverTab === 'jobs' && (
+              <div className="space-y-4">
+                {/* STANDBY RADAR & INCOMING JOB POPUP SYSTEM */}
+                <DriverStandbyAndIncomingJob
+                  isOnDuty={isOnDuty}
+                  onToggleDuty={(duty) => setIsOnDuty(duty)}
+                  activeVehicle={activeVehicle}
+                  driverLevel={driverLevel}
+                  driverCreditScore={driverCreditScore}
+                  audioEnabled={audioEnabled}
+                  onAcceptJob={(job: IncomingJobData) => {
+                    // Job accepted
+                  }}
+                  onGainXp={(amount, reason) => handleGainDriverXp(amount, reason)}
+                  onAddEarnings={(amount) => {
+                    setBalance(prev => prev + amount);
+                    setRidesPaid(prev => Math.min(prev + 1, totalRidesDebt));
+                  }}
+                />
+
+                {/* REAL DISPATCH ONLY: no synthetic jobs or earnings */}
+                <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 text-sm text-slate-300">
+                  <div className="flex items-center gap-2 text-cyan-300 font-bold">
+                    <Radio className="w-4 h-4" />
+                    <span>งานพิเศษจากระบบจริง</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed">
+                    งานรับส่งจะปรากฏเมื่อมีออเดอร์จริงและคุณเปิดสถานะปฏิบัติงาน ระบบจะไม่สร้างงาน รายได้ หรือ XP จำลองบนหน้านี้
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 5. SOVEREIGN XP QUEST CENTER TAB (ภารกิจเก็บ XP พี่วิน & เครือข่าย) */}
+            {activeDriverTab === 'quests' && (
+              <SovereignQuestCenter
+                initialRole="driver"
+                driverLevel={driverLevel}
+                audioEnabled={audioEnabled}
+                onGainDriverXp={(amount, reason) => handleGainDriverXp(amount, reason)}
+                onRewardBonusCash={(amount) => {
+                  setBalance(prev => prev + amount);
+                  setRidesPaid(prev => Math.min(prev + 1, totalRidesDebt));
+                }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* INSPECT SUIT DETAIL MODAL */}
+      {selectedInspectSuit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg bg-[#0A152E] rounded-3xl border-2 border-cyan-400 p-6 shadow-[0_0_50px_rgba(0,210,255,0.4)] space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🛡️</span>
+                <div>
+                  <h3 className="text-base font-bold text-white">{selectedInspectSuit.name}</h3>
+                  <span className="text-[10px] font-mono text-cyan-300">{selectedInspectSuit.code} • {selectedInspectSuit.nameEn}</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedInspectSuit(null)}
+                className="p-1.5 rounded-xl bg-white/10 text-slate-400 hover:text-white hover:bg-white/20"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed bg-[#070E20] p-3 rounded-2xl border border-white/5">
+              {selectedInspectSuit.designLore}
+            </p>
+
+            {/* JACKET DETAILS */}
+            <div className="p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/40 space-y-2 text-xs">
+              <div className="flex items-center gap-2 text-cyan-300 font-bold">
+                <Shirt className="w-4 h-4 text-cyan-400" />
+                <span>รายละเอียดเสื้อเกราะ (Jacket Spec): {selectedInspectSuit.jacket.name}</span>
+              </div>
+              <div className="space-y-1 text-[11px] text-slate-300">
+                <div>• <strong>เนื้อผ้าและวัสดุ:</strong> {selectedInspectSuit.jacket.material}</div>
+                <div>• <strong>ระบบไฟเรืองแสง:</strong> {selectedInspectSuit.jacket.lighting}</div>
+                <div>• <strong>ซิปอธิปไตย:</strong> {selectedInspectSuit.jacket.zipperType}</div>
+                <div>• <strong>ฟีเจอร์พิเศษ:</strong> {selectedInspectSuit.jacket.specialFeature}</div>
+              </div>
+            </div>
+
+            {/* HELMET DETAILS */}
+            <div className="p-3.5 rounded-2xl bg-amber-950/20 border border-amber-500/40 space-y-2 text-xs">
+              <div className="flex items-center gap-2 text-amber-300 font-bold">
+                <HardHat className="w-4 h-4 text-amber-400" />
+                <span>รายละเอียดหมวกกันน็อค (Helmet Spec): {selectedInspectSuit.helmet.name}</span>
+              </div>
+              <div className="space-y-1 text-[11px] text-slate-300">
+                <div>• <strong>ชิลด์หน้าและกระจก:</strong> {selectedInspectSuit.helmet.visorType}</div>
+                <div>• <strong>ระบบสื่อสารและเสียง:</strong> {selectedInspectSuit.helmet.commsIntegration}</div>
+                <div>• <strong>มาตรฐานความปลอดภัย:</strong> {selectedInspectSuit.helmet.safetyStandard}</div>
+                <div>• <strong>ฟังก์ชันพิเศษ:</strong> {selectedInspectSuit.helmet.specialFeature}</div>
+              </div>
+            </div>
+
+            {/* STATS BARS */}
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/10">
+                <div className="flex justify-between text-[11px] mb-1">
+                  <span className="text-slate-400">DEFENSE:</span>
+                  <span className="text-cyan-300 font-bold">{selectedInspectSuit.stats.defense}%</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-black/60 overflow-hidden">
+                  <div className="h-full bg-cyan-400 rounded-full" style={{ width: `${selectedInspectSuit.stats.defense}%` }} />
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/10">
+                <div className="flex justify-between text-[11px] mb-1">
+                  <span className="text-slate-400">AERODYNAMICS:</span>
+                  <span className="text-emerald-400 font-bold">{selectedInspectSuit.stats.aerodynamics}%</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-black/60 overflow-hidden">
+                  <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${selectedInspectSuit.stats.aerodynamics}%` }} />
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/10">
+                <div className="flex justify-between text-[11px] mb-1">
+                  <span className="text-slate-400">WEATHERPROOF:</span>
+                  <span className="text-blue-400 font-bold">{selectedInspectSuit.stats.weatherProof}%</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-black/60 overflow-hidden">
+                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${selectedInspectSuit.stats.weatherProof}%` }} />
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/10">
+                <div className="flex justify-between text-[11px] mb-1">
+                  <span className="text-slate-400">HONOR XP:</span>
+                  <span className="text-amber-400 font-bold">{selectedInspectSuit.stats.sovereignHonor}%</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-black/60 overflow-hidden">
+                  <div className="h-full bg-amber-400 rounded-full" style={{ width: `${selectedInspectSuit.stats.sovereignHonor}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setSelectedInspectSuit(null)}
+                className="flex-1 py-2.5 rounded-xl bg-white/10 text-slate-300 font-semibold text-xs"
+              >
+                ปิดหน้าต่าง
+              </button>
+              <button
+                onClick={() => {
+                  handleEquipSuit(selectedInspectSuit);
+                  setSelectedInspectSuit(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-amber-400 text-slate-950 font-black text-xs shadow-lg flex items-center justify-center gap-1.5"
+              >
+                <Zap className="w-4 h-4" />
+                <span>สวมใส่ชุดเกราะนี้</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INSPECT VEHICLE / DREAM RIDE DETAILS MODAL */}
+      {selectedInspectVehicle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg bg-[#0A152E] rounded-3xl border-2 border-[#00D2FF] p-6 shadow-[0_0_50px_rgba(0,210,255,0.4)] space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-cyan-400 bg-black/60 shadow-lg flex-shrink-0">
+                  <img 
+                    src={selectedInspectVehicle.image || '/images/garage_wave.jpg'} 
+                    alt={selectedInspectVehicle.name} 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black font-mono px-2 py-0.5 rounded bg-cyan-400 text-slate-950">
+                      {selectedInspectVehicle.brand || 'HONDA'}
+                    </span>
+                    <span className="text-[11px] px-2 py-0.5 rounded bg-black/50 text-amber-300 font-mono border border-amber-400/40">
+                      {selectedInspectVehicle.plateNumber}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-white mt-1">
+                    {selectedInspectVehicle.modelName || selectedInspectVehicle.name}
+                  </h3>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedInspectVehicle(null)}
+                className="p-1.5 rounded-xl bg-white/10 text-slate-400 hover:text-white hover:bg-white/20"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Real Vehicle Showcase Hero Photo */}
+            <div className="w-full h-44 sm:h-52 rounded-2xl overflow-hidden border border-cyan-500/40 relative shadow-inner bg-black/60">
+              <img
+                src={selectedInspectVehicle.image || '/images/garage_wave.jpg'}
+                alt={selectedInspectVehicle.name}
+                className="w-full h-full object-cover select-none pointer-events-none transition-transform duration-500 hover:scale-105"
+                referrerPolicy="no-referrer"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0A152E] via-transparent to-transparent pointer-events-none" />
+              <div className="absolute bottom-2.5 left-3.5 flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500 text-slate-950 text-[10px] font-black font-mono shadow-md">
+                  {selectedInspectVehicle.brand || 'HONDA'}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-black/80 backdrop-blur-sm text-amber-300 border border-amber-400/40 text-[10px] font-mono">
+                  ทะเบียน {selectedInspectVehicle.plateNumber}
+                </span>
+              </div>
+            </div>
+
+            {/* Vehicle Description */}
+            <div className="p-3 rounded-2xl bg-black/40 border border-white/10 text-xs text-slate-300 leading-relaxed">
+              {selectedInspectVehicle.description}
+            </div>
+
+            {/* Core Specifications */}
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+              <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20">
+                <span className="text-[10px] text-cyan-400 block font-bold">ประเภท / รุ่นอัศวิน:</span>
+                <span className="text-white font-semibold text-[11px]">{selectedInspectVehicle.type}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20">
+                <span className="text-[10px] text-cyan-400 block font-bold">ความจุ / กำลังขับเคลื่อน:</span>
+                <span className="text-amber-300 font-semibold text-[11px]">{selectedInspectVehicle.displacement}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20">
+                <span className="text-[10px] text-cyan-400 block font-bold">เล่มทะเบียนยานพาหนะ:</span>
+                <span className="text-slate-300 font-semibold text-[11px]">{selectedInspectVehicle.registrationNumber || 'ยังไม่มีเลขทะเบียนระบบ'}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20">
+                <span className="text-[10px] text-cyan-400 block font-bold">อัตราสิ้นเปลือง / เชื้อเพลิง:</span>
+                <span className="text-purple-300 font-semibold text-[11px]">{selectedInspectVehicle.fuelEconomy || '50 กม./ลิตร'}</span>
+              </div>
+            </div>
+
+            {/* Telemetry Progress Gauges */}
+            <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-2 text-xs font-mono">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">เลขไมล์สะสม (Mileage):</span>
+                <span className="text-cyan-300 font-bold">{selectedInspectVehicle.mileage}</span>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-[11px] mb-1">
+                  <span className="text-slate-400">เชื้อเพลิง / แบตเตอรี่ (Fuel/Battery):</span>
+                  <span className="text-emerald-400 font-bold">{selectedInspectVehicle.fuel}%</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-black/60 overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 rounded-full" style={{ width: `${selectedInspectVehicle.fuel}%` }} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-[11px] mb-1">
+                  <span className="text-slate-400">สุขภาพน้ำมันเครื่อง (Oil Health):</span>
+                  <span className="text-amber-400 font-bold">{selectedInspectVehicle.oil}%</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-black/60 overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full" style={{ width: `${selectedInspectVehicle.oil}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Insurance & Legal Protection Status */}
+            <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/40 flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-2 text-emerald-300">
+                <FileCheck className="w-4 h-4 text-emerald-400" />
+                <span>{selectedInspectVehicle.insuranceStatus || 'พ.ร.บ. & ประกันภัยชั้น 1 คุ้มครองผู้โดยสาร (Active)'}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setSelectedInspectVehicle(null)}
+                className="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 font-semibold text-xs transition-all"
+              >
+                ปิดหน้าต่าง
+              </button>
+
+              {selectedInspectVehicle.id === activeVehicleId ? (
+                <div className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/40 text-center flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>กำลังใช้งานรับงานอยู่</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    handleSwitchActiveVehicle(selectedInspectVehicle.id);
+                    setSelectedInspectVehicle(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-500 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>สลับเป็นคันรับงานทันที</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK SWITCH ACTIVE VEHICLE MODAL */}
+      {showSwitchVehicleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg bg-[#0A152E] rounded-3xl border-2 border-[#00D2FF] p-6 shadow-[0_0_50px_rgba(0,210,255,0.4)] space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🏍️</span>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <span>สลับยานรบรับงาน (Switch Active Vehicle)</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">
+                      {vehicles.length} คันในอู่
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">เลือกยานรบที่ต้องการนำออกวิ่งรับงาน ระบบจะอัปเดตข้อมูลบนแอปผู้โดยสารแบบ Real-time</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowSwitchVehicleModal(false)}
+                className="p-1.5 rounded-xl bg-white/10 text-slate-400 hover:text-white hover:bg-white/20"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {vehicles.map((v) => {
+                const isActive = v.id === activeVehicleId;
+                return (
+                  <div
+                    key={v.id}
+                    className={`p-3.5 rounded-2xl border transition-all space-y-2.5 ${
+                      isActive
+                        ? 'border-[#00D2FF] bg-[#0C224A] ring-2 ring-[#00D2FF]/50 shadow-[0_0_20px_rgba(0,210,255,0.3)]'
+                        : 'border-white/10 bg-[#070D1E] hover:border-cyan-400/50 hover:bg-white/5'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-12 h-12 rounded-xl overflow-hidden border flex-shrink-0 flex items-center justify-center ${
+                          isActive ? 'border-[#00D2FF] ring-2 ring-cyan-400/50 shadow-md' : 'border-white/10 bg-black/40'
+                        }`}>
+                          <img
+                            src={v.image || '/images/garage_wave.jpg'}
+                            alt={v.name}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                          />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-white">{v.name}</h4>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/40 text-amber-300 font-mono border border-amber-400/30">
+                              {v.plateNumber}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{v.type} • ซีซี: {v.displacement}</p>
+                        </div>
+                      </div>
+
+                      {isActive ? (
+                        <span className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-500 text-slate-950 font-black text-[11px] flex items-center gap-1 shadow-md flex-shrink-0">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>กำลังใช้งาน</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            handleSwitchActiveVehicle(v.id);
+                            setShowSwitchVehicleModal(false);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-cyan-400/20 hover:bg-[#00D2FF] text-cyan-300 hover:text-slate-950 font-bold text-[11px] border border-cyan-400/40 hover:border-cyan-300 transition-all flex items-center gap-1 flex-shrink-0"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>เลือกคันนี้</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Compact Specs Row */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-[10px] font-mono">
+                      <div className="bg-black/30 p-1.5 rounded-lg text-center">
+                        <span className="text-slate-400 block text-[9px]">ไมล์สะสม:</span>
+                        <span className="text-cyan-300 font-bold">{v.mileage}</span>
+                      </div>
+                      <div className="bg-black/30 p-1.5 rounded-lg text-center">
+                        <span className="text-slate-400 block text-[9px]">เชื้อเพลิง/แบต:</span>
+                        <span className="text-emerald-400 font-bold">{v.fuel}%</span>
+                      </div>
+                      <div className="bg-black/30 p-1.5 rounded-lg text-center">
+                        <span className="text-slate-400 block text-[9px]">อัตราประหยัด:</span>
+                        <span className="text-purple-300 font-bold">{v.fuelEconomy?.slice(0, 10) || '50 กม./ลิตร'}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-2 flex items-center justify-between gap-2">
+              <button
+                onClick={() => {
+                  setShowSwitchVehicleModal(false);
+                  setShowAddRideModal(true);
+                }}
+                className="px-3 py-2 rounded-xl bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] text-xs font-bold border border-[#FFD700]/40 flex items-center gap-1.5 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ เพิ่มยานรบคันใหม่</span>
+              </button>
+
+              <button
+                onClick={() => setShowSwitchVehicleModal(false)}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-semibold"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Vehicle Modal */}
+      {showAddRideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <form onSubmit={handleAddVehicle} className="relative w-full max-w-md bg-[#0A1428] rounded-3xl border-2 border-[#FFD700] p-6 shadow-[0_0_40px_rgba(255,215,0,0.3)] space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🏍️</span>
+                <h3 className="text-base font-bold text-[#FFD700]">เพิ่มยานรบในอู่ (New Dream Ride)</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowAddRideModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 mb-1">ชื่อรุ่นรถจักรยานยนต์:</label>
+                <input
+                  type="text"
+                  required
+                  value={newRideName}
+                  onChange={(e) => setNewRideName(e.target.value)}
+                  placeholder="เช่น Yamaha XMAX 300, Honda ADV350, Vespa GTS 300"
+                  className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#FFD700]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-300 mb-1">ป้ายทะเบียน:</label>
+                  <input
+                    type="text"
+                    required
+                    value={newRidePlate}
+                    onChange={(e) => setNewRidePlate(e.target.value)}
+                    placeholder="เช่น 2ขง 9988 กทม."
+                    className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#FFD700]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 mb-1">ขนาดกระบอกสูบ (cc):</label>
+                  <input
+                    type="text"
+                    value={newRideDisplacement}
+                    onChange={(e) => setNewRideDisplacement(e.target.value)}
+                    placeholder="เช่น 292 cc"
+                    className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#FFD700]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1">หมวดหมู่ยานรบ:</label>
+                <select
+                  value={newRideCategory}
+                  onChange={(e) => {
+                    const cat = e.target.value as any;
+                    setNewRideCategory(cat);
+                    if (cat === 'commuter') setNewRideType('Daily Commuter & Capillary Specialist');
+                    else if (cat === 'touring') setNewRideType('Adventure Long-Distance Beast');
+                    else if (cat === 'scooter') setNewRideType('VIP Super-Scooter First Class');
+                    else if (cat === 'ev') setNewRideType('EV Clean Knight Fleet');
+                    else setNewRideType('Sport Performance');
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#FFD700]"
+                >
+                  <option value="scooter">สกู๊ตเตอร์พรีเมียม (Scooter / Maxi-Scooter)</option>
+                  <option value="commuter">รถแม่บ้านคล่องตัวสูง (Daily Commuter 110-125cc)</option>
+                  <option value="touring">ทัวร์ริ่ง / ลุยน้ำท่วมแอดเวนเจอร์ (Touring Adventure)</option>
+                  <option value="ev">มอเตอร์ไซค์ไฟฟ้า 100% (Clean Energy EV)</option>
+                  <option value="sport">สปอร์ตไบค์สมรรถนะสูง (Sport Performance)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1">เลขไมล์สะสม (Mileage):</label>
+                <input
+                  type="text"
+                  value={newRideMileage}
+                  onChange={(e) => setNewRideMileage(e.target.value)}
+                  placeholder="เช่น 12,500 km"
+                  className="w-full px-3 py-2 rounded-xl bg-[#070D1E] border border-white/20 text-white focus:outline-none focus:border-[#FFD700]"
+                />
+              </div>
+
+              <div className="p-3 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="setAsActive"
+                  checked={newRideSetAsActive}
+                  onChange={(e) => setNewRideSetAsActive(e.target.checked)}
+                  className="w-4 h-4 rounded text-cyan-400 bg-black/40 border-white/20 focus:ring-0"
+                />
+                <label htmlFor="setAsActive" className="text-xs text-cyan-200 cursor-pointer">
+                  ตั้งเป็น <strong>"ยานรบรับงานหลักทันที"</strong> หลังบันทึก
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddRideModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-white/10 text-slate-300 font-semibold text-xs"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-2.5 rounded-xl bg-[#FFD700] hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md"
+              >
+                บันทึกลงสมุดทะเบียน
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 10-TIER SOVEREIGN CODEX MODAL */}
+      <SovereignTiersModal
+        isOpen={showTiersModal}
+        onClose={() => setShowTiersModal(false)}
+        initialRole={tiersModalInitialRole}
+        currentLevel={driverLevel}
+        audioEnabled={audioEnabled}
+      />
+
+      {/* 3D DENSITY RADAR OVERLAY MODAL (2.5 KM) FOR DRIVER */}
+      {showDriverRadarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DensityRadarOverlay
+              targetPerspective="driver"
+              radiusKm={2.5}
+              audioEnabled={audioEnabled}
+              onBackToHome={() => setShowDriverRadarModal(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* DRIVER PROMPTPAY QR PAYMENT MODAL */}
+      {showDriverQrModal && (
+        <DriverPaymentQrCodeModal
+          isOpen={showDriverQrModal}
+          onClose={() => setShowDriverQrModal(false)}
+          driverUserId={currentUserSession?.id}
+          driverName={driverProfileData.displayName}
+          driverCode="WIN-BKK-LV100"
+          fareAmount={50}
+          tipAmount={10}
+          audioEnabled={audioEnabled}
+          onPaymentSuccess={(amt) => {
+            setBalance(prev => prev + amt);
+            handleGainDriverXp(50, `รับชำระเงินผ่าน QR สำเร็จ ฿${amt}`);
+          }}
+        />
+      )}
+
+      {/* DRIVER PAYMENT RECEIVER SETTINGS MODAL */}
+      {showPaymentReceiverSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+            <PaymentReceiverSettingsPanel
+              role="knight"
+              userId={currentUserSession?.id}
+              defaultName={driverProfileData.displayName}
+              audioEnabled={audioEnabled}
+              onClose={() => setShowPaymentReceiverSettings(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* FULL SHOWCASE MODAL FOR ARMOR LVL 1-70 (LVL 71-100 CLASSIFIED) */}
+      <ArmorLevels1to70ShowcaseModal
+        isOpen={showArmorShowcaseModal}
+        onClose={() => setShowArmorShowcaseModal(false)}
+        equippedSuitId={equippedSuitId}
+        onEquipSuit={(suit) => {
+          handleEquipSuit(suit);
+          setShowArmorShowcaseModal(false);
+        }}
+        audioEnabled={audioEnabled}
+      />
+
+      {/* PROFILE CUSTOMIZER MODAL FOR KNIGHT DRIVER */}
+      <ProfileCustomizerModal
+        isOpen={showProfileCustomizerModal}
+        onClose={() => setShowProfileCustomizerModal(false)}
+        currentData={driverProfileData}
+        role="driver"
+        onSave={(updated) => setDriverProfileData(updated)}
+        audioEnabled={audioEnabled}
+      />
+    </div>
+  );
+};
