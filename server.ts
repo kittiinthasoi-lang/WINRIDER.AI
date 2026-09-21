@@ -1978,6 +1978,7 @@ app.post("/api/quests/event", rateLimit(120), async (req, res) => {
         activeDays[dayKey] = true;
         bucket.activeDayKeys = activeDays;
         newValue = Object.keys(activeDays).length;
+        bucket[metricKey] = newValue;
       } else {
         newValue = Math.min(100000, (Number(bucket[metricKey]) || 0) + amount);
         bucket[metricKey] = newValue;
