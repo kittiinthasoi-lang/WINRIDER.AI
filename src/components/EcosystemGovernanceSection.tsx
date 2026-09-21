@@ -45,20 +45,6 @@ export const EcosystemGovernanceSection: React.FC<Props> = ({ audioEnabled, onOp
     }
   };
 
-  const handleOrderC2c = (item: C2CProduct) => {
-    if (audioEnabled) playTactileBlip(1200);
-    setOrderedItemTitle(item.title);
-    confetti({
-      particleCount: 40,
-      spread: 60,
-      origin: { y: 0.7 },
-      colors: ['#00D2FF', '#FFD700']
-    });
-    setTimeout(() => setOrderedItemTitle(null), 3500);
-  };
-
-
-
   return (
     <section className="space-y-10">
       {/* Title Header */}

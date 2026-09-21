@@ -42,7 +42,6 @@ import {
   ShieldCheck,
   MapPin, 
   Search, 
-  Flower2,
   Dog, 
   Zap, 
   Sparkles, 
@@ -83,7 +82,6 @@ import {
   QrCode,
   Coins,
   Award,
-  AudioWaveform,
   Mic,
   Package,
   UserCheck,
@@ -1313,10 +1311,19 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   if (audioEnabled) playTactileBlip(1200);
                   if (onOpenCustomerVoice) onOpenCustomerVoice();
                 }}
-                className="relative p-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-[#00D2FF] border border-[#00D2FF]/40 cursor-pointer active:scale-95 transition-all shadow-[0_0_10px_rgba(0,210,255,0.25)]"
+                className="relative p-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-[#00D2FF] border border-[#00D2FF]/40 cursor-pointer active:scale-95 transition-all shadow-[0_0_10px_rgba(0,210,255,0.25)] flex items-center justify-center overflow-hidden group"
                 title="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป (Customer Voice AI)"
+                aria-label="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป"
               >
-                <AudioWaveform className="w-4 h-4 animate-pulse text-[#00D2FF]" />
+                <img 
+                  src="/images/voice_command.jpg" 
+                  alt="สั่งการด้วยเสียง AI" 
+                  className="w-5 h-5 rounded-md object-cover animate-pulse group-hover:scale-110 transition-transform shadow-sm"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/images/voice-command-header.svg';
+                  }}
+                  referrerPolicy="no-referrer"
+                />
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#00D2FF]" />
               </button>
 
@@ -1327,11 +1334,19 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   if (audioEnabled) playTactileBlip(1000);
                   setShowReligiousNotificationsModal(true);
                 }}
-                className="relative p-1.5 rounded-lg bg-amber-300/10 hover:bg-amber-300/20 text-amber-200 border border-amber-300/25 cursor-pointer active:scale-95 transition-all"
-                title="Faith & Sacred Calendar"
+                className="relative p-1 rounded-lg bg-amber-300/10 hover:bg-amber-300/20 text-amber-200 border border-amber-300/25 cursor-pointer active:scale-95 transition-all flex items-center justify-center overflow-hidden group shadow-[0_0_10px_rgba(252,211,77,0.15)]"
+                title="ศูนย์แจ้งเตือนศาสนาและวันสำคัญทางศาสนา (Faith & Sacred Calendar)"
                 aria-label="เปิดศูนย์แจ้งเตือนศาสนาและวันสำคัญ"
               >
-                <Flower2 className="w-4 h-4" />
+                <img 
+                  src="/images/faith_religion.jpg" 
+                  alt="ศูนย์แจ้งเตือนศาสนาและวันสำคัญ" 
+                  className="w-5 h-5 rounded-md object-cover group-hover:scale-110 transition-transform shadow-sm"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/images/religious-faith-header.svg';
+                  }}
+                  referrerPolicy="no-referrer"
+                />
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-300 shadow-[0_0_7px_rgba(252,211,77,0.8)]" />
               </button>
 

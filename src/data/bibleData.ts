@@ -387,3 +387,84 @@ export const EIGHT_PILLARS: PillarItem[] = [
     imageUrl: '/images/pillar_link.jpg'
   }
 ];
+
+export const CI_MAP_ZONES: CIZone[] = [
+  {
+    id: 'zone-1',
+    name: 'Thonburi Central',
+    nameTh: 'ใจกลางฝั่งธนฯ (วงเวียนใหญ่ - ตลาดพลู)',
+    ghostRunnersCount: 142,
+    capillaryRoutesMapped: 1240,
+    floodRisk: 'Low',
+    stealthCoverage: 98.4,
+    keyShortcut: 'ตรอกศาลเจ้าพ่อเสือ ทะลุ ซอยเทอดไท 19 เลี่ยงแยกตลาดพลู 14 นาที'
+  },
+  {
+    id: 'zone-2',
+    name: 'Charan Sanitwong Canal Belt',
+    nameTh: 'แนวคลองจรัญสนิทวงศ์ (ซอย 13 - แยกไฟฉาย)',
+    ghostRunnersCount: 98,
+    capillaryRoutesMapped: 890,
+    floodRisk: 'Medium',
+    stealthCoverage: 94.2,
+    keyShortcut: 'สะพานไม้เลียบคลองบางหลวง ทะลุ วัดคูหาสวรรค์ ข้ามไปเพชรเกษม'
+  },
+  {
+    id: 'zone-3',
+    name: 'Khlong San & Riverfront',
+    nameTh: 'คลองสาน - ริมเจ้าพระยา (เจริญนคร - กะดีจีน)',
+    ghostRunnersCount: 115,
+    capillaryRoutesMapped: 1020,
+    floodRisk: 'High',
+    stealthCoverage: 96.8,
+    keyShortcut: 'ทางเลียบชุมชนกะดีจีน ทะลุ สะพานพุทธฯ เลี่ยงไฟแดงถนนประชาธิปก 18 นาที'
+  },
+  {
+    id: 'zone-4',
+    name: 'Rama 2 & Dao Khanong',
+    nameTh: 'พระราม 2 - ดาวคะนอง - จอมทอง',
+    ghostRunnersCount: 160,
+    capillaryRoutesMapped: 1450,
+    floodRisk: 'Low',
+    stealthCoverage: 99.1,
+    keyShortcut: 'ซอยสุขสวัสดิ์ 14 ทะลุ จอมทอง 19 ลัดออกถนนเอกชัยโดยไม่ต้องขึ้นสะพานพระราม 2'
+  }
+];
+
+export const LAUNCH_TIMELINE = [
+  {
+    dayRange: 'Day 1 - 30',
+    phase: 'Phase 1: Ghost Protocol',
+    title: 'ยุทธการ Ghost Runners เก็บข้อมูล CI Map 1,000 เส้นทาง',
+    desc: 'ส่งทีมสำรวจเส้นเลือดฝอยลับ 100 นาย แผนที่รังนกกระจอกในฝั่งธนบุรี และทดสอบระบบ WIN Buddy AI NLP Voice ภาคสนาม',
+    status: 'Completed'
+  },
+  {
+    dayRange: 'Day 31 - 60',
+    phase: 'Phase 2: Armor & Hardware Genesis',
+    title: 'ผลิต 10 มหาศาสตราวุธ และแจกจ่ายชุดเกราะ The Guardian Zipper',
+    desc: 'เปิดสายการผลิต WIN-Comm, WIN-Grip และชุดเกราะเลเวล 1-50 พร้อมติดตั้งชิปติดตามอธิปไตย NB-IoT',
+    status: 'Completed'
+  },
+  {
+    dayRange: 'Day 61 - 90',
+    phase: 'Phase 3: Seed Round & Castle Grounding',
+    title: 'ปิดดีล Seed Round 50 ล้านบาท & เปิดฐาน WIN-Hub 3 ชั้น',
+    desc: 'สร้างปราสาทอัศวิน WIN-Hub แห่งแรก ณ วงเวียนใหญ่ พร้อมโซนชาร์จแบตเตอรี่ เลานจ์พักผ่อน และร้านค้า WIN-Shop',
+    status: 'In Progress'
+  },
+  {
+    dayRange: 'Day 91 - 120',
+    phase: 'Phase 4: Sovereign Pilot 8 Pillars',
+    title: 'ทดสอบระบบ 8 Pillars เต็มรูปแบบใน 50 เขตกรุงเทพฯ',
+    desc: 'เปิดบริการ WIN Knight, Pet, Express, MU Buddy และตลาด C2C รันโมเดล 2 บาทครองเมือง 100%',
+    status: 'Upcoming'
+  },
+  {
+    dayRange: 'Day 121 - 135',
+    phase: 'Phase 5: Galactic Grand Opening',
+    title: 'วันประกาศอิสรภาพและปักธงสู่มูลค่า 3.5 แสนล้านบาท',
+    desc: 'Launch สู่สาธารณชน ขยายสู่อาเซียน และเตรียมความพร้อมสู่การตั้งโครงการ WINRIDER Cosmic Space Initiative',
+    status: 'Upcoming'
+  }
+];
