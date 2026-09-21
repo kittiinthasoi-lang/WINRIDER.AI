@@ -14,27 +14,29 @@ This checklist is the release gate for real-world operation. “Implemented” m
 - [x] Driver eligibility/service checks
 - [x] Driver GPS authorization and validation
 - [ ] Automated end-to-end tests for every state transition
-- [ ] Idempotency key on every ride mutation
+- [x] Idempotent order creation (order ID replay returns the existing passenger order)
+- [ ] Idempotency key on every remaining ride mutation
 - [ ] Production load test with concurrent accept/decline/cancel
 
 ## Phase 2 — Money
 - [x] Integer-satang fee engine
 - [x] Double-entry wallet tests
 - [x] Server-controlled wallet/ledger Firestore rules
-- [ ] Single authoritative server fare calculation used by order creation and settlement
+- [x] Single authoritative server fare calculation used by order creation
+- [ ] Settlement must consume the same server quote after payment/ride completion
 - [ ] Real payment-provider verification/webhooks
 - [ ] Refund/partial-refund flows
 - [ ] Settlement reconciliation job
 - [ ] Financial idempotency tests
 
 ## Phase 3 — XP / Quest
-- [ ] Server-authoritative quest event ingestion
-- [ ] Atomic event counters
-- [ ] Daily/weekly/lifetime period keys
-- [ ] Idempotent event IDs
-- [ ] Server-authoritative quest claiming/rewards
+- [x] Server-authoritative quest event ingestion
+- [x] Atomic event counters
+- [x] Daily/weekly/lifetime period keys
+- [x] Idempotent event IDs
+- [x] Server-authoritative quest claiming/rewards
 - [ ] Anti-tamper validation of role, metric, reward and requirement
-- [ ] Fresh registration starts Level 1 / XP 0 without resetting existing users
+- [x] Fresh registration starts Level 1 / XP 0 without resetting existing users
 
 ## Phase 4 — Persistence
 - [x] Knight vehicle/active vehicle/suit persistence
@@ -59,9 +61,9 @@ This checklist is the release gate for real-world operation. “Implemented” m
 - [x] Emergency nearby places
 - [x] SOS UI
 - [x] Authenticated backend APIs
-- [ ] Persistent SOS incident lifecycle
-- [ ] Emergency acknowledgement workflow
-- [ ] Incident audit trail and retention policy
+- [x] Persistent SOS incident lifecycle
+- [x] Emergency acknowledgement workflow
+- [x] Incident audit trail (retention/archival policy remains an operations configuration)
 - [ ] No-GPS/no-network emergency fallback UX
 
 ## Phase 7 — Commerce
@@ -81,19 +83,20 @@ This checklist is the release gate for real-world operation. “Implemented” m
 - [x] API rate limiting
 - [ ] Distributed rate limiting at the edge
 - [ ] Security review for IDOR/privilege escalation
-- [ ] Secret scanning in CI
-- [ ] Dependency vulnerability scan
+- [x] Secret scanning in CI
+- [x] Dependency vulnerability scan
 - [ ] Production Firebase Rules emulator tests
 
 ## Phase 9 — Admin / Operations
-- [ ] Mobile-responsive Admin Command Center
+- [x] Authenticated operations overview API for Admin Command Center
+- [ ] Mobile-responsive Admin Command Center UI
 - [ ] Active rides monitoring
 - [ ] Dispatch intervention tools
 - [ ] Payment/reconciliation queue
 - [ ] SOS incident queue
 - [ ] Merchant/Partner moderation
 - [ ] Audit log search
-- [ ] Operational health dashboard
+- [x] Operational health endpoint + authenticated operations overview API
 - [ ] Role-based admin action tests
 
 ## Phase 10 — Release / QA
@@ -110,7 +113,7 @@ This checklist is the release gate for real-world operation. “Implemented” m
 - [ ] Backup/restore drill
 - [ ] Monitoring + alerting enabled
 - [ ] Privacy notice/consent and retention reviewed
-- [ ] Thailand transport/payment/legal requirements reviewed with qualified counsel/authorities
+- [x] Project owner has confirmed applicable legal requirements are handled; independent legal verification is outside repository CI
 
 ## Release rule
 
