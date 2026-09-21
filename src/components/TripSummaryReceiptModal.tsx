@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { emitQuestMetric } from '../services/questService';
 import {
   Shield,
   CheckCircle2,
@@ -77,6 +78,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
       ratingGiven: rating,
       reviewComment: selectedBadges.join(', ')
     });
+    void emitQuestMetric('citizen.rated_completed_trip', 1);
 
     setTimeout(() => {
       onClose();
