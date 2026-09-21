@@ -107,7 +107,9 @@ import {
   computeLiveRoute,
   ComputedLiveRoute,
   LiveRouteStep,
-  RouteDestination
+  RouteDestination,
+  POPULAR_BANGKOK_DESTINATIONS,
+  searchDestinationsFromGps
 } from '../services/googleRoutesService';
 import confetti from 'canvas-confetti';
 import {
@@ -277,7 +279,9 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   const [currentRouteStepIndex, setCurrentRouteStepIndex] = useState<number>(0);
   const [routeTravelMode, setRouteTravelMode] = useState<'TWO_WHEELER' | 'DRIVE' | 'BICYCLE'>('TWO_WHEELER');
   const [showDestinationPicker, setShowDestinationPicker] = useState<boolean>(false);
-  const [customDestInput, setCustomDestInput] = useState<string>('');
+  const [destinationSearchQuery, setDestinationSearchQuery] = useState<string>('');
+  const [destinationSearchResults, setDestinationSearchResults] = useState<RouteDestination[]>([]);
+  const [isSearchingDestination, setIsSearchingDestination] = useState<boolean>(false);
   const [destinationInputError, setDestinationInputError] = useState<string>('');
 
   // Real-time mobile camera backdrop behind 3D map
@@ -366,39 +370,61 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
     }
   };
 
-  // Accept a pasted "latitude,longitude" destination and immediately route from live GPS.
-  // Example: 13.7462,100.5348
-  const handleUseCoordinateDestination = () => {
-    const raw = customDestInput.trim();
-    const parts = raw.split(/[,\s]+/).map(v => v.trim()).filter(Boolean);
-    if (parts.length < 2) {
-      setDestinationInputError('กรุณาใส่พิกัดแบบ ละติจูด,ลองจิจูด เช่น 13.7462,100.5348');
-      return;
-    }
-    const lat = Number(parts[0]);
-    const lng = Number(parts[1]);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      setDestinationInputError('พิกัดไม่ถูกต้อง ตรวจสอบละติจูด (-90 ถึง 90) และลองจิจูด (-180 ถึง 180)');
+  // Search a real destination by name/address using the Knight's current GPS.
+  // Results come from Google Places (New); the selected result is then routed by Google Routes API.
+  const handleSearchDestination = async () => {
+    const query = destinationSearchQuery.trim();
+    if (query.length < 2) {
+      setDestinationInputError('กรุณาพิมพ์ชื่อสถานที่หรือที่อยู่อย่างน้อย 2 ตัวอักษร');
       return;
     }
     if (!gpsState.isRealGps || !Number.isFinite(gpsState.latitude) || !Number.isFinite(gpsState.longitude)) {
       setDestinationInputError('ยังไม่ได้ตำแหน่ง GPS จริงของพี่วิน กรุณาเปิด Location ก่อน');
       return;
     }
-    const destination: RouteDestination = {
-      id: 'manual-' + lat + '-' + lng,
-      name: 'ปลายทาง ' + lat.toFixed(5) + ', ' + lng.toFixed(5),
-      nameEn: 'Manual destination',
-      category: 'manual',
-      lat,
-      lng,
-      address: lat.toFixed(6) + ', ' + lng.toFixed(6),
-      landmark: 'กำหนดโดยพี่วิน',
-      estimatedFare: 0
-    };
+    setIsSearchingDestination(true);
+    setDestinationInputError('');
+    try {
+      const results = await searchDestinationsFromGps({
+        latitude: gpsState.latitude,
+        longitude: gpsState.longitude,
+        query
+      });
+      setDestinationSearchResults(results.map((result) => ({
+        id: result.id,
+        name: result.name,
+        nameEn: result.nameEn,
+        category: result.category,
+        lat: result.lat,
+        lng: result.lng,
+        address: result.address,
+        landmark: result.landmark,
+        estimatedFare: result.estimatedFare
+      })));
+      if (results.length === 0) {
+        setDestinationInputError('ไม่พบปลายทางจริงจาก Google Places ลองค้นชื่อสถานที่หรือที่อยู่อีกครั้ง');
+      }
+    } catch (error) {
+      console.warn('[Knight Destination Search]', error);
+      setDestinationSearchResults([]);
+      setDestinationInputError('ค้นหาปลายทางจริงไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setIsSearchingDestination(false);
+    }
+  };
+
+  const handleSelectDestination = (destination: RouteDestination) => {
+    if (!Number.isFinite(destination.lat) || !Number.isFinite(destination.lng)) return;
     setDestinationInputError('');
     setSelectedDestination(destination);
+    setShowDestinationPicker(false);
     void handleCalculateRoute(destination);
+  };
+
+  const handleOpenDestinationPicker = () => {
+    setDestinationInputError('');
+    setDestinationSearchResults([]);
+    setShowDestinationPicker(true);
   };
 
   // Step selector
@@ -416,13 +442,19 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
     }
   };
 
-  // Route destination comes only from the accepted live job.
+  // The accepted job's dropoff is kept as a real recommendation, but the driver
+  // chooses/confirms the destination only after arriving at pickup.
   useEffect(() => {
+    setLiveRoute(null);
+    setDestinationSearchQuery('');
+    setDestinationSearchResults([]);
+    setDestinationInputError('');
+    setShowDestinationPicker(false);
     if (!activeJob?.dropoffCoord) {
-      setLiveRoute(null);
+      setSelectedDestination({ id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0, address: '', landmark: '', estimatedFare: 0 });
       return;
     }
-    const destination: RouteDestination = {
+    setSelectedDestination({
       id: activeJob.id,
       name: activeJob.dropoffLocation || activeJob.dropoffAddressTh || 'ปลายทางจากงาน',
       nameEn: '',
@@ -430,12 +462,10 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
       lat: activeJob.dropoffCoord.lat,
       lng: activeJob.dropoffCoord.lng,
       address: activeJob.dropoffAddressTh || activeJob.dropoffLocation || '',
-      landmark: '',
+      landmark: 'ปลายทางที่มากับงานที่รับ',
       estimatedFare: activeJob.netFare || activeJob.baseFare || 0
-    };
-    setSelectedDestination(destination);
-    if (gpsState.isRealGps) handleCalculateRoute(destination);
-  }, [activeJob?.id, gpsState.isRealGps]);
+    });
+  }, [activeJob?.id]);
 
   // Holo Overlay & Weather
   const [showRoutesOverlay, setShowRoutesOverlay] = useState<boolean>(false);
@@ -765,52 +795,44 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
               </button>
             </div>
 
-            <div className="w-full lg:w-[330px] flex flex-col gap-1.5">
+            <div className="w-full lg:w-[360px] flex flex-col gap-1.5">
               <div className="flex items-center gap-1.5">
-                <input
-                  value={customDestInput}
-                  onChange={(e) => {
-                    setCustomDestInput(e.target.value);
-                    if (destinationInputError) setDestinationInputError('');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleUseCoordinateDestination();
-                  }}
-                  inputMode="decimal"
-                  placeholder="พิกัดปลายทาง เช่น 13.7462,100.5348"
-                  className="min-w-0 flex-1 rounded-xl bg-black/70 border border-cyan-400/50 px-2.5 py-1.5 text-[11px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-300"
-                  aria-label="พิกัดปลายทาง"
-                />
                 <button
                   type="button"
-                  onClick={handleUseCoordinateDestination}
-                  className="shrink-0 px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-400/30 border border-emerald-400/50 text-emerald-300 font-black text-[10px] active:scale-95"
+                  onClick={handleOpenDestinationPicker}
+                  className="flex-1 min-w-0 rounded-xl bg-black/70 border border-cyan-400/50 px-3 py-2 text-left text-[11px] text-white hover:border-cyan-300 active:scale-[0.99]"
                 >
-                  ใช้พิกัด
+                  <span className="block text-[9px] text-cyan-300 font-black">🏁 ปลายทาง</span>
+                  <span className="block truncate mt-0.5">{selectedDestination.name || 'ค้นหาปลายทางหลังถึงจุดรับ'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenDestinationPicker}
+                  className="shrink-0 px-2.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-400/30 border border-cyan-400/50 text-cyan-200 font-black text-[10px] active:scale-95"
+                >
+                  🔍 ค้นหา
                 </button>
               </div>
-              {destinationInputError && (
-                <div className="text-[10px] text-rose-300 font-semibold px-1">
-                  ⚠️ {destinationInputError}
-                </div>
+              {selectedDestination.name && (
+                <div className="text-[9px] text-slate-400 px-1 truncate">📍 {selectedDestination.address || 'พิกัดจากระบบสถานที่จริง'}</div>
               )}
-              <div className="bg-black/80 text-white text-xs border border-cyan-400/50 rounded-xl px-2.5 py-1.5 truncate">
-                🏁 {selectedDestination.name || 'รอปลายทางจากงานที่รับ'}
-              </div>
+              {destinationInputError && (
+                <div className="text-[10px] text-rose-300 font-semibold px-1">⚠️ {destinationInputError}</div>
+              )}
             </div>
 
             {/* Calculate Button */}
             <button
               type="button"
-              disabled={isComputingRoute}
+              disabled={isComputingRoute || !selectedDestination.lat || !selectedDestination.lng || driverLegPhase !== 'to_destination'}
               onClick={() => {
                 if (audioEnabled) playTactileBlip(950);
-                handleCalculateRoute(selectedDestination);
+                void handleCalculateRoute(selectedDestination);
               }}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00D2FF] via-cyan-500 to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-[0_0_15px_#00D2FF] flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all disabled:opacity-50"
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00D2FF] via-cyan-500 to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-[0_0_15px_#00D2FF] flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all disabled:opacity-40"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${isComputingRoute ? 'animate-spin' : ''}`} />
-              <span>{isComputingRoute ? 'กำลังคำนวณ...' : 'คำนวณเส้นทางสด'}</span>
+              <span>{isComputingRoute ? 'กำลังคำนวณ...' : '🔄 คำนวณเส้นทาง'}</span>
             </button>
           </div>
         </div>
@@ -879,6 +901,68 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
       </div>
 
       {/* ========================================================================= */}
+      {/* DESTINATION PICKER: shown after the Knight arrives at pickup */}
+      {/* ========================================================================= */}
+      {showDestinationPicker && driverLegPhase === 'to_destination' && (
+        <div className="w-full rounded-2xl border-2 border-cyan-400/50 bg-[#07132B]/95 p-3 shadow-xl font-mono">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div>
+              <div className="text-sm font-black text-white">🏁 ปลายทาง</div>
+              <div className="text-[10px] text-cyan-300">ค้นหาจาก Google Places หรือเลือกปลายทางที่ระบบแนะนำ</div>
+            </div>
+            <button type="button" onClick={() => setShowDestinationPicker(false)} className="p-1.5 rounded-lg bg-white/10 text-slate-300 hover:bg-white/20"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              value={destinationSearchQuery}
+              onChange={(e) => {
+                setDestinationSearchQuery(e.target.value);
+                if (destinationInputError) setDestinationInputError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleSearchDestination();
+              }}
+              placeholder="🔍 ค้นหาปลายทาง เช่น สยามพารากอน, สนามบินสุวรรณภูมิ"
+              className="min-w-0 flex-1 rounded-xl bg-black/70 border border-cyan-400/50 px-3 py-2 text-xs text-white placeholder:text-slate-500 outline-none focus:border-cyan-300"
+              aria-label="ค้นหาปลายทาง"
+            />
+            <button type="button" onClick={() => void handleSearchDestination()} disabled={isSearchingDestination} className="shrink-0 px-3 py-2 rounded-xl bg-cyan-400 text-slate-950 font-black text-xs disabled:opacity-50">
+              {isSearchingDestination ? 'กำลังค้นหา…' : 'ค้นหา'}
+            </button>
+          </div>
+          {destinationInputError && <div className="mt-2 text-[10px] text-rose-300 font-semibold">⚠️ {destinationInputError}</div>}
+          {destinationSearchResults.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              <div className="text-[9px] font-black text-cyan-300">ผลการค้นหาจริง</div>
+              {destinationSearchResults.map((destination) => (
+                <button key={destination.id} type="button" onClick={() => handleSelectDestination(destination)} className="w-full rounded-xl border border-white/10 bg-black/30 hover:bg-cyan-500/10 hover:border-cyan-400/50 p-2.5 text-left transition-all">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-4 h-4 text-cyan-300 mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-black text-white truncate">{destination.name}</div>
+                      <div className="text-[10px] text-slate-400 truncate">{destination.address}</div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <div className="text-[9px] font-black text-amber-300 mb-1.5">⭐ ปลายทางที่ระบบแนะนำ</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {POPULAR_BANGKOK_DESTINATIONS.slice(0, 6).map((destination) => (
+                <button key={destination.id} type="button" onClick={() => handleSelectDestination(destination)} className="rounded-xl border border-white/10 bg-white/5 hover:bg-amber-400/10 hover:border-amber-300/40 p-2 text-left">
+                  <div className="text-[10px] font-black text-white truncate">{destination.name}</div>
+                  <div className="text-[9px] text-slate-500 truncate">{destination.address}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* 2. NAVIGATION VIEWPORT: CAMERA AR / GOOGLE MAPS / PURE 3D MAP */}
       {/* ========================================================================= */}
       {navDisplayMode === 'live_camera_ar' ? (
@@ -907,7 +991,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
         </div>
       ) : navDisplayMode === 'google_maps' ? (
         <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">
-          {activeJob?.pickupCoord && activeJob?.dropoffCoord ? <GoogleMapsNavigationScreen
+          {activeJob?.pickupCoord && activeJob?.dropoffCoord && (driverLegPhase === 'to_pickup' || (driverLegPhase === 'to_destination' && selectedDestination.lat && selectedDestination.lng)) ? <GoogleMapsNavigationScreen
             role="driver"
             initialPhase={driverLegPhase === 'to_pickup' ? 'approaching' : 'in_transit'}
             driverName={activeVehicle?.name || 'พี่วินอัศวิน'}
@@ -917,14 +1001,16 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             passengerName={selectedJob?.customerName || ''}
             pickupAddress={activeJob?.pickupLocation || ''}
             pickupCoords={activeJob.pickupCoord}
-            dropoffAddress={activeJob?.dropoffLocation || ''}
-            dropoffCoords={activeJob.dropoffCoord}
+            dropoffAddress={driverLegPhase === 'to_destination' ? (selectedDestination.address || selectedDestination.name) : (activeJob?.dropoffLocation || '')}
+            dropoffCoords={driverLegPhase === 'to_destination' && selectedDestination.lat && selectedDestination.lng ? { lat: selectedDestination.lat, lng: selectedDestination.lng } : activeJob.dropoffCoord}
             fareBaht={activeJob.netFare || activeJob.baseFare || 0}
             audioEnabled={audioEnabled}
             onArrivedAtPickup={() => {
               if (audioEnabled) playTactileBlip(950);
               setDriverLegPhase('to_destination');
-              triggerVoiceGuidance('ถึงจุดรับผู้โดยสารเรียบร้อย เริ่มการเดินทางไปสู่ปลายทาง');
+              setLiveRoute(null);
+              setShowDestinationPicker(true);
+              triggerVoiceGuidance('ถึงจุดรับแล้ว กรุณาค้นหาหรือเลือกปลายทางเพื่อเริ่มนำทาง');
             }}
             onArrivedAtDropoff={() => {
               if (audioEnabled) playTactileBlip(950);
@@ -935,7 +1021,9 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             onOpenChat={() => setShowDirectChatModal(true)}
           /> : (
             <div className="min-h-[420px] flex items-center justify-center p-8 text-center text-sm text-slate-300 bg-slate-950">
-              ยังไม่มีงานจริงที่มีพิกัดจุดรับและปลายทาง จึงไม่แสดงเส้นทางจำลอง
+              {driverLegPhase === 'to_destination' && !selectedDestination.lat
+                ? 'ถึงจุดรับแล้ว — กรุณาค้นหาหรือเลือกปลายทางด้านบน เพื่อคำนวณเส้นทางจริง'
+                : 'ยังไม่มีงานจริงที่มีพิกัดจุดรับและปลายทาง จึงไม่แสดงเส้นทางจำลอง'}
             </div>
           )}
         </div>
