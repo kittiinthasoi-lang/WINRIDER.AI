@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { emitQuestMetric } from '../services/questService';
 import { getAuth } from 'firebase/auth';
 import { FlashSaleItem } from '../types';
 import { NeonProfileAvatar } from './NeonProfileAvatar';
@@ -263,6 +264,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   };
 
   const handleBulkPickup = () => {
+    void emitQuestMetric('merchant.dispatch_ready', 1);
     if (audioEnabled) playRadarScan();
     alert('ยังไม่มีออเดอร์จริงสำหรับเรียกพี่วินรับพัสดุ');
   };
