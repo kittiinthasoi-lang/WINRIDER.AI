@@ -160,6 +160,21 @@ export async function authenticateUser(identifier: string): Promise<UserSession 
   return null;
 }
 
+const FRESH_USER_PROGRESSION = {
+  level: 1,
+  xp: 0,
+  points: 0,
+  creditScore: 0,
+  financialScore: 0,
+  rideLaterCredit: 0,
+  missionsCompleted: 0,
+  missionStreak: 0,
+  badges: [],
+  achievements: [],
+  questSeason: '2026-S3',
+  questState: {},
+};
+
 export function getRoleTitleTh(role: UserRole): string {
   switch (role) {
     case 'driver':
@@ -306,6 +321,7 @@ export async function registerWithEmailPassword(params: {
 
     // 2. Create UserSession object
     const newSession: UserSession = {
+      ...FRESH_USER_PROGRESSION,
       id: uid,
       email: cleanEmail,
       name: params.name.trim(),
@@ -323,8 +339,7 @@ export async function registerWithEmailPassword(params: {
       avatarEmoji: getRoleAvatarEmoji(params.role),
       registeredAt: new Date().toISOString(),
       bio: params.district ? `ประจำพื้นที่ ${params.district}` : 'สมาชิก WINRIDER.AI บัญชีส่วนบุคคล',
-      creditScore: 750,
-      rideLaterCredit: 500,
+      ...FRESH_USER_PROGRESSION,
     };
 
     // 3. Persist to Firestore & Local Storage
@@ -506,6 +521,7 @@ export async function loginWithPhone(
 
     // 2. If phone not found in DB, auto-provision personal citizen profile
     const newCitizen: UserSession = {
+      ...FRESH_USER_PROGRESSION,
       id: `WIN-CTZ-${cleanPhone.slice(-6) || Math.floor(100000 + Math.random() * 900000)}`,
       name: `คุณพลเมือง (${phone.trim()})`,
       phone: phone.trim(),
@@ -519,8 +535,7 @@ export async function loginWithPhone(
       avatarEmoji: '🦥',
       registeredAt: new Date().toISOString(),
       bio: 'สมาชิกบุคคลใหม่ เข้าสู่ระบบด้วยเบอร์โทรศัพท์',
-      creditScore: 750,
-      rideLaterCredit: 500,
+      ...FRESH_USER_PROGRESSION,
     };
     await saveUserSession(newCitizen);
     return { success: true, session: newCitizen };
@@ -583,6 +598,7 @@ export async function loginWithLine(lineProfile: {
 
     // Otherwise create a fresh Level 1 session for this LINE account
     const newSession: UserSession = {
+      ...FRESH_USER_PROGRESSION,
       id: lineDocId,
       name: lineProfile.displayName || 'สมาชิก LINE WINRIDER',
       phone: '',
