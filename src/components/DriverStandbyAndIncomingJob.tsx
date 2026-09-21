@@ -91,7 +91,9 @@ interface DriverStandbyAndIncomingJobProps {
   audioEnabled: boolean;
   onAcceptJob: (job: IncomingJobData) => void;
   onGainXp: (amount: number, reason: string) => void;
-  onAddEarnings: (amount: number) => void;
+  onAddEarnings: (amount: number) => void;  /** 'navigation' = ใช้ในแท็บแผนที่นำทาง (ซ่อนการ์ดเรดาร์ แสดงเฉพาะหน้านำทางงาน) */
+  mode?: 'standby' | 'navigation';
+  onExitNavigation?: () => void;
 }
 
 export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobProps> = ({
@@ -103,7 +105,9 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   audioEnabled,
   onAcceptJob,
   onGainXp,
-  onAddEarnings
+    onAddEarnings,
+  mode = 'standby',
+  onExitNavigation
 }) => {
   const [activeIncomingJob, setActiveIncomingJob] = useState<IncomingJobData | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number>(30);
@@ -439,7 +443,7 @@ distanceKm: pending.distanceKm,
           {dispatchError}
         </div>
       )}
-      {/* 1. ON-DUTY / STANDBY HERO CONTROL CARD */}
+      {/* 1. ON-DUTY / STANDBY HERO CONTROL CARD */}      {mode === 'standby' && (
       <div className={`p-4 sm:p-5 rounded-3xl border-2 transition-all relative overflow-hidden ${
         isOnDuty
           ? 'bg-gradient-to-br from-[#0A2246] via-[#081735] to-[#040C1E] border-[#00D2FF] shadow-[0_0_30px_rgba(0,210,255,0.25)]'
@@ -653,7 +657,7 @@ distanceKm: pending.distanceKm,
           </div>
         )}
       </div>
-
+      )}
       {/* 3. ACTIVE TRIP EXECUTION VIEW (WITH LIVE GPS NAVIGATION MAP SCREEN) */}
       {currentActiveTrip && (
         <div className="space-y-4 animate-fade-in">
@@ -672,6 +676,15 @@ distanceKm: pending.distanceKm,
         </div>
       )}
 
+      {/* โหมดแท็บแผนที่นำทาง: ยังไม่มีงานที่รับ → แสดงหน้านำทางแบบรอรับงาน */}
+      {mode === 'navigation' && !currentActiveTrip && (
+        <KnightNavigationMapScreen
+          activeVehicle={activeVehicle}
+          driverLevel={driverLevel}
+          audioEnabled={audioEnabled}
+          onClose={onExitNavigation}
+        />
+      )}
       {/* STANDALONE / PREVIEW GPS NAVIGATION MAP MODAL */}
       {showNavigationMapModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
