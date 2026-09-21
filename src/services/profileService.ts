@@ -22,6 +22,10 @@ export async function saveProfileCustomization(role: ProfileRole, profile: Profi
     bannerGlow: profile.bannerGlow,
     avatarUrl: profile.avatarUrl || '',
     avatarEmoji: profile.avatarEmoji || '',
+    locationEnabled: profile.locationEnabled === true,
+    ...(profile.locationEnabled === true && Number.isFinite(profile.latitude) && Number.isFinite(profile.longitude)
+      ? { latitude: Number(profile.latitude), longitude: Number(profile.longitude), locationLabel: profile.locationLabel || 'ตำแหน่งปัจจุบัน' }
+      : { latitude: null, longitude: null, locationLabel: '' }),
     updatedAt: serverTimestamp(),
   };
 
