@@ -35,7 +35,7 @@ export const AdminSystemHealthView: React.FC = () => {
   return <div className="space-y-6">
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        <img src="/images/cyber_vehicle.jpg" alt="System Health" className="w-10 h-10 rounded-2xl object-cover ring-1 ring-cyan-400/50 shadow-sm" />
+        <img src="/images/admin/system-health.svg" alt="System Health" className="w-10 h-10 rounded-2xl object-cover ring-1 ring-cyan-400/50 shadow-sm" />
         <div>
           <h2 className="text-xl font-black text-white">System Health Telemetry</h2>
           <p className="text-xs text-slate-400">ตรวจบริการจริงและหลักฐาน Order Flow โดยไม่สร้างข้อมูลจำลอง</p>
