@@ -17,6 +17,7 @@ import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { DriverPaymentQrCodeModal } from './DriverPaymentQrCodeModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { loadProfileCustomization } from '../services/profileService';
+import { auth } from '../firebase';
 import { WalletTopUpPanel } from './WalletTopUpPanel';
 import { WinAiAssistantPanel } from './WinAiAssistantPanel';
 import { PaymentReceiverSettingsPanel } from './PaymentReceiverSettingsPanel';
@@ -229,6 +230,57 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
+  const persistKnightSettings = React.useCallback(async (patch: {
+    vehicles?: Vehicle[];
+    activeVehicleId?: string;
+    equippedSuitId?: string;
+  }) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const response = await fetch('/api/knights/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(patch),
+      });
+      if (!response.ok) {
+        console.warn('Unable to persist Knight settings:', await response.text());
+      }
+    } catch (error) {
+      console.warn('Unable to persist Knight settings:', error);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const token = await user.getIdToken();
+        const response = await fetch('/api/knights/settings', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return;
+        const payload = await response.json() as {
+          vehicles?: Vehicle[];
+          activeVehicleId?: string | null;
+          equippedSuitId?: string | null;
+        };
+        if (cancelled) return;
+        if (Array.isArray(payload.vehicles)) setVehicles(payload.vehicles);
+        if (payload.activeVehicleId) setActiveVehicleId(payload.activeVehicleId);
+        if (payload.equippedSuitId) setEquippedSuitId(payload.equippedSuitId);
+      } catch (error) {
+        console.warn('Unable to load Knight settings:', error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+
+
   const emptyVehicle: Vehicle = {
     id: 'unregistered', brand: '', modelName: 'ยังไม่มีรถที่ลงทะเบียน', name: 'ยังไม่มีรถที่ลงทะเบียน',
     type: '', category: 'commuter', displacement: '', plateNumber: '', registrationNumber: '',
@@ -251,11 +303,13 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
   // Switch Active Vehicle Function
   const handleSwitchActiveVehicle = (targetId: string) => {
     setActiveVehicleId(targetId);
-    setVehicles(prev => prev.map(v => ({
+    const nextVehicles = vehicles.map(v => ({
       ...v,
       isPrimary: v.id === targetId,
-      status: v.id === targetId ? 'READY' : v.status
-    })));
+      status: v.id === targetId ? 'READY' as const : v.status
+    }));
+    setVehicles(nextVehicles);
+    void persistKnightSettings({ vehicles: nextVehicles, activeVehicleId: targetId });
 
     const switched = vehicles.find(v => v.id === targetId);
     if (audioEnabled) {
@@ -311,12 +365,15 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
       dailyRidesDone: 0
     };
 
-    if (newRideSetAsActive) {
-      setActiveVehicleId(newId);
-      setVehicles(prev => [...prev.map(item => ({ ...item, isPrimary: false })), v]);
-    } else {
-      setVehicles(prev => [...prev, v]);
-    }
+    const nextVehicles = newRideSetAsActive
+      ? [...vehicles.map(item => ({ ...item, isPrimary: false })), v]
+      : [...vehicles, v];
+    setVehicles(nextVehicles);
+    if (newRideSetAsActive) setActiveVehicleId(newId);
+    void persistKnightSettings({
+      vehicles: nextVehicles,
+      ...(newRideSetAsActive ? { activeVehicleId: newId } : {}),
+    });
 
     setNewRideName('');
     setNewRidePlate('');
@@ -337,6 +394,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
       return;
     }
     setEquippedSuitId(suit.id);
+    void persistKnightSettings({ equippedSuitId: suit.id });
     if (audioEnabled) playLevelUpFanfare();
     confetti({
       particleCount: 60,
