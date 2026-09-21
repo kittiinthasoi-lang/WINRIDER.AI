@@ -369,9 +369,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       }
     };
     void refresh();
-    const timer = window.setInterval(refresh, 4000);
+    const timer = window.setInterval(refresh, 8000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [currentUserSession?.id, activeLiveOrder?.id]);
+  }, [currentUserSession?.id]);
 
   // Cross-tab Live Dispatch Listener: updates passenger UI when Knight accepts or advances trip
   React.useEffect(() => {
