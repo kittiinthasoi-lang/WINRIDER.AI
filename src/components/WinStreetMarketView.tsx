@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { emitQuestMetric } from '../services/questService';
 import { getAuth } from 'firebase/auth';
 import { Loader2, MapPin, Package, PlusCircle, Search, ShieldCheck, ShoppingBag, Store, User, X } from 'lucide-react';
 import { MarketItem, MarketItemCategory } from '../types';
@@ -103,6 +104,7 @@ export const WinStreetMarketView: React.FC<Props> = ({ customerListedItems = [],
       setItems((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       onAddNewCustomerItem?.(created);
       setTitle(''); setPrice(''); setDescription(''); setLocation(''); setVerification(null); setSellOpen(false);
+      void emitQuestMetric('merchant.catalog_update', 1);;
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'บันทึกรายการสินค้าไม่สำเร็จ'); }
     finally { setPublishing(false); }
   };
