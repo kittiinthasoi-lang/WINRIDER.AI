@@ -1954,6 +1954,32 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 
+async function getLiveRouteForOrder(input: ServerOrder) {
+  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) throw new Error("ROUTES_API_NOT_CONFIGURED");
+  const origin = input.pickupCoord!;
+  const destination = input.dropoffCoord!;
+  const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "routes.distanceMeters,routes.duration" },
+    body: JSON.stringify({
+      origin: { location: { latLng: { latitude: Number(origin.lat), longitude: Number(origin.lng) } } },
+      destination: { location: { latLng: { latitude: Number(destination.lat), longitude: Number(destination.lng) } } },
+      travelMode: "TWO_WHEELER", routingPreference: "TRAFFIC_AWARE", computeAlternativeRoutes: false,
+      routeModifiers: { avoidTolls: false, avoidHighways: true, avoidFerries: false },
+      languageCode: "th-TH", units: "METRIC"
+    }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!response.ok) throw new Error(`ROUTES_API_HTTP_${response.status}`);
+  const payload = await response.json() as { routes?: Array<{ distanceMeters?: number; duration?: string }> };
+  const route = payload.routes?.[0];
+  const distanceMeters = Number(route?.distanceMeters);
+  const durationSeconds = Number.parseFloat(String(route?.duration || "").replace("s", ""));
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0 || !Number.isFinite(durationSeconds) || durationSeconds <= 0) throw new Error("ROUTES_API_EMPTY");
+  return { distanceKm: Math.round((distanceMeters / 1000) * 100) / 100, estMinutes: Math.max(1, Math.ceil(durationSeconds / 60)) };
+}
+
 app.post("/api/orders", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
@@ -1963,14 +1989,23 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
   }
 
   const allowedServices = new Set(["knight", "express", "mu", "spirit", "family", "pet", "link", "lifestyle", "food", "backhaul"]);
-  const distanceKm = Number(input.distanceKm);
+  const clientDistanceKm = Number(input.distanceKm);
   const requestedFare = Number(input.fare);
   if (!allowedServices.has(String(input.serviceId)) || !validCoordinates(input.pickupCoord) || !validCoordinates(input.dropoffCoord)
     || typeof input.dropoffLocation !== "string" || input.dropoffLocation.trim().length < 3
-    || !Number.isFinite(distanceKm) || distanceKm < 0 || distanceKm > 500
+    || !Number.isFinite(clientDistanceKm) || clientDistanceKm < 0 || clientDistanceKm > 500
     || !Number.isFinite(requestedFare) || requestedFare < 10 || requestedFare > 100_000) {
     return res.status(400).json({ error: "Invalid service, route, or fare data" });
   }
+
+  let liveRoute: { distanceKm: number; estMinutes: number };
+  try {
+    liveRoute = await getLiveRouteForOrder(input);
+  } catch (error: any) {
+    console.error("[Order Route Validation Error]:", error?.message);
+    return res.status(503).json({ error: "ไม่สามารถยืนยันเส้นทางจริงของการเดินทางได้", code: "LIVE_ROUTE_REQUIRED" });
+  }
+  const distanceKm = liveRoute.distanceKm;
 
   try {
     const existingRideSnap = await ordersCollection.where("passengerUserId", "==", user.uid).limit(20).get();
@@ -2019,7 +2054,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       fare,
       welfareFund2Baht,
       netFare: Math.max(0, fare - welfareFund2Baht),
-      estMinutes: Math.max(1, Math.min(1440, Math.round(Number(input.estMinutes) || distanceKm * 3.5))),
+      estMinutes: liveRoute.estMinutes,
       status: "pending",
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
