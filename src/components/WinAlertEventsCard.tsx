@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { emitQuestMetric } from '../services/questService';
 import {
   AlertCircle,
   Bookmark,
@@ -185,7 +186,8 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
       {!loading && filteredEvents.length > 0 && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{filteredEvents.map((event) => {
         const meta = categoryMeta[event.category];
         const saved = bookmarkedIds.includes(event.id);
-        return <article key={event.id} onClick={() => { if (audioEnabled) playTactileBlip(900); setSelectedEventModal(event); onSelectEvent?.(event); }} className="cursor-pointer rounded-2xl border border-white/10 bg-gradient-to-b from-[#0F2248] to-[#060E22] p-4 shadow-lg transition-colors hover:border-cyan-400/50">
+        return <article key={event.id} onClick={() => { if (audioEnabled) playTactileBlip(900); setSelectedEventModal(event); onSelectEvent?.(event);
+    emitQuestMetric('citizen.win_alert_preview', 1); }} className="cursor-pointer rounded-2xl border border-white/10 bg-gradient-to-b from-[#0F2248] to-[#060E22] p-4 shadow-lg transition-colors hover:border-cyan-400/50">
           <div className="flex items-start justify-between gap-3"><span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${meta.className}`}>{meta.icon} {meta.label}</span><div className="flex gap-1"><button type="button" onClick={(clickEvent) => toggleBookmark(event.id, clickEvent)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/30 text-amber-300" aria-label={saved ? 'ยกเลิกบันทึกกิจกรรม' : 'บันทึกกิจกรรม'}>{saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}</button><button type="button" onClick={(clickEvent) => void shareEvent(event, clickEvent)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/30 text-slate-300" aria-label="แชร์กิจกรรม"><Share2 className="h-4 w-4" /></button></div></div>
           <h4 className="mt-3 text-base font-black leading-snug text-white">{event.title}</h4>
           <div className="mt-3 space-y-2 text-sm text-slate-300">
