@@ -276,10 +276,10 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     return liveDrivers.filter(driver => {
       const capabilities = [...driver.certifications, ...driver.specialtyTags].join(' ').toLowerCase();
       if (serviceId === 'express') {
-        return driver.level >= 10 && driver.hasDeliveryBox;
+        return driver.hasDeliveryBox;
       }
       if (serviceId === 'mu') {
-        // MU BUDDY: Recommend matching gender with level 15+
+        // MU BUDDY: Recommend matching gender with service eligibility
         // If passenger is female, recommend female driver (Level 15+)
         // If passenger is male, recommend male driver (Level 15+)
         if (currentGender === 'female') {
@@ -289,10 +289,10 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
         }
       }
       if (serviceId === 'spirit') {
-        return driver.level >= 20 && ['spirit', 'ผู้สูงอายุ', 'ศาสนา', 'elder'].some((tag) => capabilities.includes(tag));
+        return ['spirit', 'ผู้สูงอายุ', 'ศาสนา', 'elder'].some((tag) => capabilities.includes(tag));
       }
       if (serviceId === 'family') {
-        return driver.level >= 15 && ['family', 'เด็ก', 'ผู้สูงอายุ', 'ผู้พิการ', 'child', 'elder', 'disabled'].some((tag) => capabilities.includes(tag));
+        return ['family', 'เด็ก', 'ผู้สูงอายุ', 'ผู้พิการ', 'child', 'elder', 'disabled'].some((tag) => capabilities.includes(tag));
       }
       if (serviceId === 'pet') {
         return ['pet', 'สัตว์'].some((tag) => capabilities.includes(tag));
