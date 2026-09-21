@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#00D4FF"/><stop offset="1" stop-color="#2563EB"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="520" height="150" rx="28" fill="#06152F"/><rect x="2" y="2" width="516" height="146" rx="26" fill="none" stroke="url(#g)" stroke-width="2"/>
+<circle cx="72" cy="75" r="48" fill="url(#g)" opacity=".12"/><g filter="url(#glow)"><path d="M18 28h60v40H18zM18 37h60M27 49h18M63 49h7v10h-7a5 5 0 1 1 0-10z" stroke="url(#g)" fill="none" stroke-width="4" stroke-linejoin="round"/></g>
+<text x="142" y="54" fill="#fff" font-family="Arial,sans-serif" font-size="24" font-weight="900">WIN Wallet</text>
+<text x="142" y="82" fill="#A7B4CC" font-family="Arial,sans-serif" font-size="15">จัดการกระเป๋าเงินดิจิทัล</text>
+<rect x="142" y="101" width="96" height="24" rx="12" fill="#00D4FF" opacity=".12"/><text x="190" y="118" text-anchor="middle" fill="#00D4FF" font-family="Arial,sans-serif" font-size="10" font-weight="800">CITIZEN PROFILE</text>
+<circle cx="475" cy="75" r="20" fill="#07111F" stroke="#00D4FF" stroke-width="2"/><path d="M468 75h12M475 68l7 7-7 7" stroke="#00D4FF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
