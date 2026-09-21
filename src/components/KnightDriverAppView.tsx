@@ -895,6 +895,20 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                     </button>
                   </div>
 
+                  {/* MOBILE KNIGHT PROFILE ARTWORK — visual layer only; existing controls remain unchanged */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      ['/ui/profile-actions/knight-honor.svg', 'เกียรติยศพี่วิน'],
+                      ['/ui/profile-actions/knight-receive.svg', 'รับเงิน WIN Wallet'],
+                      ['/ui/profile-actions/knight-vehicle.svg', 'ยานพาหนะรับงาน'],
+                      ['/ui/profile-actions/knight-armor.svg', 'ชุดเกราะพี่อัศวิน'],
+                    ].map(([image, alt]) => (
+                      <div key={image} className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_0_18px_rgba(255,215,0,0.08)]">
+                        <img src={image} alt={alt} className="block h-20 w-full object-fill" />
+                      </div>
+                    ))}
+                  </div>
+
                   {/* PROMPTPAY QR QUICK ACTION BANNER IN PROFILE */}
                   <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#2A1F06]/80 via-[#3D2C08]/90 to-[#1E1604]/80 border border-[#FFD700]/50 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
                     <div className="flex items-center gap-3 w-full sm:w-auto">
