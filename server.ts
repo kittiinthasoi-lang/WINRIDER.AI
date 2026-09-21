@@ -1305,10 +1305,75 @@ app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
   return res.json({ configured: true, promptPayId, accountName });
 });
 
+const WALLET_ROLE_PREFIX: Record<string, string> = {
+  citizen: "C",
+  knight: "K",
+  merchant: "M",
+  partner: "P",
+};
+
+const WALLET_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function createShortWalletId(role: string): string {
+  const prefix = WALLET_ROLE_PREFIX[role] || "U";
+  const bytes = crypto.randomBytes(8);
+  let suffix = "";
+  for (let i = 0; i < 8; i += 1) {
+    suffix += WALLET_ID_ALPHABET[bytes[i] % WALLET_ID_ALPHABET.length];
+  }
+  return `WIN-${prefix}-${suffix}`;
+}
+
+async function ensureWalletIdentityId(uid: string): Promise<{ walletId: string; role: string }> {
+  const walletRef = ordersDb.collection("wallets").doc(uid);
+  const userRef = ordersDb.collection("users").doc(uid);
+
+  return ordersDb.runTransaction(async (tx) => {
+    const [walletSnap, userSnap] = await Promise.all([tx.get(walletRef), tx.get(userRef)]);
+    const existingWalletId = String(walletSnap.data()?.walletId || "").trim();
+    const role = String(walletSnap.data()?.role || userSnap.data()?.role || "citizen").trim();
+
+    if (existingWalletId) {
+      if (!walletSnap.exists || walletSnap.data()?.role !== role) {
+        tx.set(walletRef, { walletId: existingWalletId, role, userId: uid, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      }
+      return { walletId: existingWalletId, role };
+    }
+
+    let walletId = createShortWalletId(role);
+    let idRef = ordersDb.collection("wallet_ids").doc(walletId);
+    let idSnap = await tx.get(idRef);
+    let attempts = 0;
+    while (idSnap.exists && attempts < 5) {
+      walletId = createShortWalletId(role);
+      idRef = ordersDb.collection("wallet_ids").doc(walletId);
+      idSnap = await tx.get(idRef);
+      attempts += 1;
+    }
+    if (idSnap.exists) throw new Error("WALLET_ID_ALLOCATION_FAILED");
+
+    tx.create(idRef, {
+      walletId,
+      userId: uid,
+      role,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    tx.set(walletRef, {
+      userId: uid,
+      walletId,
+      role,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return { walletId, role };
+  });
+}
+
 app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   try {
+    const walletIdentity = await ensureWalletIdentityId(user.uid);
     const walletSnap = await ordersDb.collection("wallets").doc(user.uid).get();
     const walletData = walletSnap.data() || {};
     const balanceSatang = typeof walletData.balanceSatang === "number" ? walletData.balanceSatang : 0;
@@ -1331,6 +1396,8 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
 
     return res.json({
       userId: user.uid,
+      walletId: walletIdentity.walletId,
+      role: walletIdentity.role,
       balanceSatang,
       balance: balanceSatang / 100,
       systemPromptPay: {
@@ -1345,6 +1412,8 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
     console.error("wallet me error:", err);
     return res.json({
       userId: user.uid,
+      walletId: "กำลังจัดสรร",
+      role: "citizen",
       balanceSatang: 0,
       balance: 0.0,
       systemPromptPay: {
