@@ -2062,7 +2062,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     🛡️ อุปกรณ์ทางการ (WIN OFFICIAL)
                   </button>
                   <button onClick={onNavigateToMarket} className="flex-1 rounded-xl border border-amber-400/40 py-2 text-xs font-bold text-amber-300 hover:bg-amber-400/10">
-                    🏪 เปิดตลาดประชาชน
+                    🛍️ เปิด WIN Street Market
                   </button>
                 </div>
 
