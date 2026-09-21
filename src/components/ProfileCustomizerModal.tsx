@@ -40,6 +40,28 @@ interface ProfileCustomizerModalProps {
   audioEnabled?: boolean;
 }
 
+
+interface ReverseLocationResult {
+  principalSubdivision?: string;
+  city?: string;
+  locality?: string;
+  localityInfo?: { administrative?: Array<{ name?: string; adminLevel?: number }> };
+}
+
+async function reverseGeocodeCurrentLocation(latitude: number, longitude: number): Promise<string> {
+  const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}&localityLanguage=th`);
+  if (!response.ok) throw new Error('ค้นหาชื่อเขต/อำเภอและจังหวัดไม่สำเร็จ');
+  const data = await response.json() as ReverseLocationResult;
+  const administrative = Array.isArray(data.localityInfo?.administrative) ? data.localityInfo!.administrative! : [];
+  const district = administrative.find((item) => item.adminLevel === 6)?.name
+    || data.locality
+    || data.city;
+  const province = data.principalSubdivision;
+  if (!district && !province) throw new Error('ไม่พบชื่อเขต/อำเภอและจังหวัดจากตำแหน่งปัจจุบัน');
+  if (district && province && district !== province) return `เขต/อำเภอ ${district} • จังหวัด${province}`;
+  return province ? `จังหวัด${province}` : `เขต/อำเภอ ${district}`;
+}
+
 const PRESET_THEME_COLORS = [
   { label: 'Cyber Neon Blue', hex: '#00D2FF', border: 'border-cyan-400', shadow: 'shadow-cyan-500/50' },
   { label: 'Sovereign Gold', hex: '#FFD700', border: 'border-amber-400', shadow: 'shadow-amber-500/50' },
@@ -137,7 +159,14 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
   const captureCurrentLocation = () => {
     if (!navigator.geolocation) { setSaveError('อุปกรณ์นี้ไม่รองรับ GPS'); return; }
     navigator.geolocation.getCurrentPosition(
-      (position) => { setLatitude(position.coords.latitude); setLongitude(position.coords.longitude); setLocationEnabled(true); setLocationLabel('ตำแหน่งปัจจุบัน'); setSaveError(null); },
+      async (position) => {
+        try {
+          const nextLabel = await reverseGeocodeCurrentLocation(position.coords.latitude, position.coords.longitude);
+          setLatitude(position.coords.latitude); setLongitude(position.coords.longitude); setLocationEnabled(true); setLocationLabel(nextLabel); setSaveError(null);
+        } catch (error) {
+          setSaveError(error instanceof Error ? error.message : 'ค้นหาพื้นที่ปัจจุบันไม่สำเร็จ');
+        }
+      },
       () => setSaveError('ไม่สามารถอ่านตำแหน่งปัจจุบันได้ กรุณาอนุญาต Location แล้วลองใหม่'),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     );
@@ -353,8 +382,8 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
 
           {/* Current Location */}
           <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/5 p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2"><div><p className="text-[11px] font-bold text-emerald-300">📍 ตำแหน่งปัจจุบันบนโปรไฟล์</p><p className="text-[10px] text-slate-400">แสดงใต้ UID เมื่อเปิดใช้งาน</p></div><button type="button" onClick={() => { const next = !locationEnabled; setLocationEnabled(next); if (!next) { setLatitude(undefined); setLongitude(undefined); } }} className={`rounded-full px-3 py-1 text-[10px] font-bold ${locationEnabled ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-slate-300'}`}>{locationEnabled ? 'เปิด' : 'ปิด'}</button></div>
-            {locationEnabled && <><button type="button" onClick={captureCurrentLocation} className="w-full rounded-xl border border-emerald-400/30 bg-black/30 py-2 text-[10px] font-bold text-emerald-300">ใช้ตำแหน่ง GPS ปัจจุบัน</button>{Number.isFinite(latitude) && Number.isFinite(longitude) && <p className="text-[9px] font-mono text-slate-400">GPS: {latitude!.toFixed(5)}, {longitude!.toFixed(5)}</p>}</>}
+            <div className="flex items-center justify-between gap-2"><div><p className="text-[11px] font-bold text-emerald-300">📍 ตำแหน่งปัจจุบันบนโปรไฟล์</p><p className="text-[10px] text-slate-400">แสดงใต้ UID เป็นเขต/อำเภอ และจังหวัด — ไม่แสดงตัวเลขพิกัด</p></div><button type="button" onClick={() => { const next = !locationEnabled; setLocationEnabled(next); if (!next) { setLatitude(undefined); setLongitude(undefined); } }} className={`rounded-full px-3 py-1 text-[10px] font-bold ${locationEnabled ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-slate-300'}`}>{locationEnabled ? 'เปิด' : 'ปิด'}</button></div>
+            {locationEnabled && <><button type="button" onClick={captureCurrentLocation} className="w-full rounded-xl border border-emerald-400/30 bg-black/30 py-2 text-[10px] font-bold text-emerald-300">ใช้ตำแหน่ง GPS ปัจจุบัน</button>{Number.isFinite(latitude) && Number.isFinite(longitude) && <p className="text-[9px] font-mono text-slate-400">พื้นที่: {locationLabel || 'กำลังค้นหาพื้นที่...'}</p>}</>}
           </div>
 
           {/* Theme Color Selector */}
