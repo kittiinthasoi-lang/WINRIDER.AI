@@ -278,6 +278,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   const [routeTravelMode, setRouteTravelMode] = useState<'TWO_WHEELER' | 'DRIVE' | 'BICYCLE'>('TWO_WHEELER');
   const [showDestinationPicker, setShowDestinationPicker] = useState<boolean>(false);
   const [customDestInput, setCustomDestInput] = useState<string>('');
+  const [destinationInputError, setDestinationInputError] = useState<string>('');
 
   // Real-time mobile camera backdrop behind 3D map
   const [cameraBackdropActive, setCameraBackdropActive] = useState<boolean>(false);
@@ -363,6 +364,41 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
     } finally {
       setIsComputingRoute(false);
     }
+  };
+
+  // Accept a pasted "latitude,longitude" destination and immediately route from live GPS.
+  // Example: 13.7462,100.5348
+  const handleUseCoordinateDestination = () => {
+    const raw = customDestInput.trim();
+    const parts = raw.split(/[,\s]+/).map(v => v.trim()).filter(Boolean);
+    if (parts.length < 2) {
+      setDestinationInputError('กรุณาใส่พิกัดแบบ ละติจูด,ลองจิจูด เช่น 13.7462,100.5348');
+      return;
+    }
+    const lat = Number(parts[0]);
+    const lng = Number(parts[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      setDestinationInputError('พิกัดไม่ถูกต้อง ตรวจสอบละติจูด (-90 ถึง 90) และลองจิจูด (-180 ถึง 180)');
+      return;
+    }
+    if (!gpsState.isRealGps || !Number.isFinite(gpsState.latitude) || !Number.isFinite(gpsState.longitude)) {
+      setDestinationInputError('ยังไม่ได้ตำแหน่ง GPS จริงของพี่วิน กรุณาเปิด Location ก่อน');
+      return;
+    }
+    const destination: RouteDestination = {
+      id: 'manual-' + lat + '-' + lng,
+      name: 'ปลายทาง ' + lat.toFixed(5) + ', ' + lng.toFixed(5),
+      nameEn: 'Manual destination',
+      category: 'manual',
+      lat,
+      lng,
+      address: lat.toFixed(6) + ', ' + lng.toFixed(6),
+      landmark: 'กำหนดโดยพี่วิน',
+      estimatedFare: 0
+    };
+    setDestinationInputError('');
+    setSelectedDestination(destination);
+    void handleCalculateRoute(destination);
   };
 
   // Step selector
@@ -508,7 +544,9 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   };
 
   const remainingDistM = Math.max(30, Math.round((1 - tripProgress) * activeRoute.distanceKm * 1000));
-  const remainingMinutes = (remainingDistM / (currentSpeed * 16.6)).toFixed(1);
+  const remainingMinutes = currentSpeed > 0.5
+    ? (remainingDistM / (currentSpeed * 16.6)).toFixed(1)
+    : 'กำลังคำนวณ';
 
   const getStageTransform = () => {
     const pitchOffset = Math.round((elevation3D - 45) * 0.25);
@@ -727,8 +765,38 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
               </button>
             </div>
 
-            <div className="bg-black/80 text-white text-xs border border-cyan-400/50 rounded-xl px-2.5 py-1.5 max-w-[260px] truncate">
-              🏁 {selectedDestination.name || 'รอปลายทางจากงานที่รับ'}
+            <div className="w-full lg:w-[330px] flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={customDestInput}
+                  onChange={(e) => {
+                    setCustomDestInput(e.target.value);
+                    if (destinationInputError) setDestinationInputError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleUseCoordinateDestination();
+                  }}
+                  inputMode="decimal"
+                  placeholder="พิกัดปลายทาง เช่น 13.7462,100.5348"
+                  className="min-w-0 flex-1 rounded-xl bg-black/70 border border-cyan-400/50 px-2.5 py-1.5 text-[11px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-300"
+                  aria-label="พิกัดปลายทาง"
+                />
+                <button
+                  type="button"
+                  onClick={handleUseCoordinateDestination}
+                  className="shrink-0 px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-400/30 border border-emerald-400/50 text-emerald-300 font-black text-[10px] active:scale-95"
+                >
+                  ใช้พิกัด
+                </button>
+              </div>
+              {destinationInputError && (
+                <div className="text-[10px] text-rose-300 font-semibold px-1">
+                  ⚠️ {destinationInputError}
+                </div>
+              )}
+              <div className="bg-black/80 text-white text-xs border border-cyan-400/50 rounded-xl px-2.5 py-1.5 truncate">
+                🏁 {selectedDestination.name || 'รอปลายทางจากงานที่รับ'}
+              </div>
             </div>
 
             {/* Calculate Button */}
