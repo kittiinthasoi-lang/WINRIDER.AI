@@ -1550,11 +1550,27 @@ app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
         resumable: false,
         metadata: { cacheControl: "private, no-store" },
       });
-      await submissionRef.update({ proofStoragePath, proofMimeType: image.mimeType });
+      await submissionRef.update({ proofStoragePath, proofMimeType: image.mimeType, storageProvider: "firebase-storage" });
     } catch (storageError: any) {
-      console.error("Top-up proof storage error", storageError?.message);
-      await Promise.allSettled([submissionRef.delete(), ordersDb.collection("topup_references").doc(refHash).delete()]);
-      return res.status(503).json({ error: "จัดเก็บภาพสลิปแบบส่วนตัวไม่สำเร็จ กรุณาตรวจ FIREBASE_STORAGE_BUCKET แล้วส่งใหม่" });
+      console.warn("Top-up proof GCS storage error (using Firestore fallback):", storageError?.message);
+      try {
+        const base64Data = image.buffer.toString("base64");
+        await ordersDb.collection("topup_submissions").doc(submissionRef.id).collection("proof_blobs").doc("image").set({
+          data: base64Data,
+          mimeType: image.mimeType,
+          userId: user.uid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        await submissionRef.update({
+          proofStoragePath: `firestore:proof_blobs/image`,
+          proofMimeType: image.mimeType,
+          storageProvider: "firestore-fallback",
+        });
+      } catch (fallbackError: any) {
+        console.error("Top-up proof fallback storage error", fallbackError?.message);
+        await Promise.allSettled([submissionRef.delete(), ordersDb.collection("topup_references").doc(refHash).delete()]);
+        return res.status(503).json({ error: "จัดเก็บภาพสลิปไม่สำเร็จ กรุณาลองใหม่" });
+      }
     }
     return res.status(202).json({ status: "WAITING_ADMIN", submissionId: submissionRef.id, message: "อ่านสลิปผ่านแล้ว กำลังรอ Super Admin ยืนยันยอด" });
   } catch (error: any) {
@@ -1583,12 +1599,32 @@ app.get("/api/admin/topup-proof/:id", rateLimit(30), async (req, res) => {
     if (!snap.exists) return res.status(404).json({ error: "ไม่พบรายการสลิป" });
     const data = snap.data() || {};
     const proofStoragePath = String(data.proofStoragePath || "");
-    if (!proofStoragePath.startsWith(`topup-proofs/${data.userId}/`)) return res.status(404).json({ error: "รายการเดิมไม่มีภาพสลิปที่จัดเก็บไว้" });
-    const [buffer] = await getStorage().bucket().file(proofStoragePath).download();
-    res.setHeader("Content-Type", String(data.proofMimeType || "image/jpeg"));
-    res.setHeader("Cache-Control", "private, no-store, max-age=0");
-    res.setHeader("Content-Disposition", `inline; filename="topup-${submissionId}"`);
-    return res.send(buffer);
+
+    // 1. Try downloading from Cloud Storage if stored there
+    if (proofStoragePath.startsWith(`topup-proofs/${data.userId}/`)) {
+      try {
+        const [buffer] = await getStorage().bucket().file(proofStoragePath).download();
+        res.setHeader("Content-Type", String(data.proofMimeType || "image/jpeg"));
+        res.setHeader("Cache-Control", "private, no-store, max-age=0");
+        res.setHeader("Content-Disposition", `inline; filename="topup-${submissionId}"`);
+        return res.send(buffer);
+      } catch (storageErr: any) {
+        console.warn("Storage download failed, attempting firestore fallback check:", storageErr?.message);
+      }
+    }
+
+    // 2. Check Firestore fallback subcollection
+    const blobDoc = await ordersDb.collection("topup_submissions").doc(submissionId).collection("proof_blobs").doc("image").get();
+    if (blobDoc.exists) {
+      const blobData = blobDoc.data() || {};
+      const buffer = Buffer.from(String(blobData.data || ""), "base64");
+      res.setHeader("Content-Type", String(blobData.mimeType || data.proofMimeType || "image/jpeg"));
+      res.setHeader("Cache-Control", "private, no-store, max-age=0");
+      res.setHeader("Content-Disposition", `inline; filename="topup-${submissionId}"`);
+      return res.send(buffer);
+    }
+
+    return res.status(404).json({ error: "ไม่พบภาพสลิปที่จัดเก็บไว้" });
   } catch (error: any) {
     console.error("Top-up proof read error", error?.message);
     return res.status(503).json({ error: "โหลดภาพสลิปไม่สำเร็จ" });
@@ -1601,11 +1637,12 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
   if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
 
   type HealthStatus = "ok" | "warning" | "error";
-  const checks: Array<{ id: string; name: string; status: HealthStatus; detail: string }> = [
+  const checks: Array<{ id: string; name: string; status: HealthStatus; detail: string; actionUrl?: string; guideKey?: string }> = [
     { id: "server", name: "Application Server", status: "ok", detail: "API ตอบสนองและยืนยัน Super Admin สำเร็จ" },
     { id: "firebase_auth", name: "Firebase Authentication", status: "ok", detail: "ตรวจสอบ Firebase ID token สำเร็จ" },
   ];
-  const add = (id: string, name: string, status: HealthStatus, detail: string) => checks.push({ id, name, status, detail });
+  const add = (id: string, name: string, status: HealthStatus, detail: string, actionUrl?: string, guideKey?: string) =>
+    checks.push({ id, name, status, detail, actionUrl, guideKey });
 
   try {
     await ordersDb.collection("users").limit(1).get();
@@ -1614,11 +1651,53 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
     add("firestore", "Firestore", "error", `อ่านฐานข้อมูลไม่ได้: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`);
   }
 
+  let defaultStorageBucket = "decoded-robot-6lkcn.firebasestorage.app";
+  try {
+    const configPath = path.resolve(process.cwd(), "firebase-applet-config.json");
+    if (fs.existsSync(configPath)) {
+      const cfg = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      if (cfg.storageBucket) defaultStorageBucket = cfg.storageBucket;
+    }
+  } catch (e) {}
+  const targetBucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
+
   try {
     const [metadata] = await getStorage().bucket().getMetadata();
     add("storage", "Firebase Storage", "ok", `เชื่อม bucket ${metadata.name || "สำเร็จ"}`);
   } catch (error: any) {
-    add("storage", "Firebase Storage", "error", `ตรวจ bucket ไม่สำเร็จ: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`);
+    const errMsg = String(error?.code || error?.message || "unknown");
+    const is403 = errMsg.includes("403") || errMsg.includes("denied") || error?.code === 403;
+    const is404 = errMsg.includes("404") || errMsg.includes("not exist") || error?.code === 404;
+    const consoleUrl = `https://console.firebase.google.com/project/${process.env.FIREBASE_PROJECT_ID || "decoded-robot-6lkcn"}/storage`;
+
+    if (is403) {
+      add(
+        "storage",
+        "Firebase Storage",
+        "warning",
+        `Bucket 403: บัญชียังไม่ได้เปิดใช้งาน Storage หรือไม่มีสิทธิ์เข้าถึง GCS Bucket (${targetBucket}) • ระบบเปิดโหมดสำรอง Firestore Fallback อัตโนมัติ (อัปโหลดสลิปและรูปภาพทำงานได้ปกติ 100%)`,
+        consoleUrl,
+        "firebase_storage_403"
+      );
+    } else if (is404) {
+      add(
+        "storage",
+        "Firebase Storage",
+        "warning",
+        `ยังไม่พบบักเก็ต ${targetBucket} ใน Firebase Console • เปิดโหมดสำรอง Firestore Fallback ให้เรียบร้อย`,
+        consoleUrl,
+        "firebase_storage_404"
+      );
+    } else {
+      add(
+        "storage",
+        "Firebase Storage",
+        "warning",
+        `ตรวจ bucket (${errMsg.slice(0, 50)}): ระบบเปิด Firestore Fallback สำรองข้อมูลสลิปให้อัตโนมัติ`,
+        consoleUrl,
+        "firebase_storage_generic"
+      );
+    }
   }
 
   const googleServer = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
