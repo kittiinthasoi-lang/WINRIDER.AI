@@ -1756,6 +1756,28 @@ app.post("/api/knights/presence", rateLimit(120), async (req, res) => {
   return res.json({ success: true, isOnline, heartbeatAt: now });
 });
 
+app.get("/api/knights/:driverUserId/location", async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const driverUserId = String(req.params.driverUserId || "").trim();
+  if (!driverUserId || driverUserId === user.uid) return res.status(400).json({ error: "Invalid driver id" });
+  try {
+    const passengerRides = await ordersCollection.where("passengerUserId", "==", user.uid).limit(20).get();
+    const activeRide = passengerRides.docs.map(doc => doc.data() as ServerOrder)
+      .find(order => order.driverUserId === driverUserId && !["completed", "cancelled"].includes(String(order.status)));
+    if (!activeRide) return res.status(403).json({ error: "Active ride access required" });
+    const knightSnap = await ordersDb.collection("knights").doc(driverUserId).get();
+    if (!knightSnap.exists) return res.status(404).json({ error: "Driver not found" });
+    const knight = knightSnap.data() || {};
+    const location = knight.lastDispatchLocation;
+    if (!validCoordinates(location)) return res.status(404).json({ error: "Driver location unavailable" });
+    return res.json({ location: { lat: Number(location.lat), lng: Number(location.lng), timestamp: knight.dispatchHeartbeatAt || knight.updatedAt || null } });
+  } catch (error: any) {
+    console.error("[Driver Location GET Error]:", error?.message);
+    return res.status(503).json({ error: "Driver location unavailable" });
+  }
+});
+
 app.get("/api/orders", async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;

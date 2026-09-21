@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { playTactileBlip } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
+import { fetchDriverLiveLocation } from '../utils/dispatchSync';
 import {
   computeLiveRoute,
   ComputedLiveRoute,

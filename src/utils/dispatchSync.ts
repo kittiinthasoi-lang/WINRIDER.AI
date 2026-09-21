@@ -419,6 +419,24 @@ export async function cancelLiveOrder(orderId: string): Promise<LiveRideOrder | 
   return advanceLiveOrderStep(orderId, 'cancelled');
 }
 
+export interface DriverLiveLocation {
+  lat: number;
+  lng: number;
+  timestamp?: string;
+}
+
+export async function fetchDriverLiveLocation(driverUserId: string): Promise<DriverLiveLocation | null> {
+  if (!driverUserId) return null;
+  try {
+    const response = await fetch(`/api/knights/${encodeURIComponent(driverUserId)}/location`, { headers: await getAuthHeaders() });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const location = payload?.location;
+    if (!location || !Number.isFinite(Number(location.lat)) || !Number.isFinite(Number(location.lng))) return null;
+    return { lat: Number(location.lat), lng: Number(location.lng), timestamp: location.timestamp };
+  } catch { return null; }
+}
+
 export async function updateDriverPresence(input: {
   isOnline: boolean;
   latitude?: number;
