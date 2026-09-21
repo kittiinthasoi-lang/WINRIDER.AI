@@ -1733,17 +1733,42 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             {/* 3. RIDE TRACKING TAB */}
             {activeTab === 'ride' && (
               <div className="space-y-4">
-                {/* 3D Holographic Capillary Map Navigation Component */}
-                <ThreeDimensionalRideMap
-                  selectedDreamRide={selectedDreamRide}
-                  pickupLocation={activeLiveOrder?.pickupLocation || preMatchingData?.family?.pickupSpecificPoint || 'กำลังรอระบุจุดรับ'}
-                  destinationLocation={selectedDestination || "ยังไม่ได้เลือกปลายทาง"}
-                  driverName={currentMatchedDriver?.name || "กำลังรอพี่วิน"}
-                  driverLevel={currentMatchedDriver?.level || 0}
-                  driverEmoji={currentMatchedDriver?.avatarEmoji || "🛵"}
-                  etaMinutes={ridePhase === 'picking_up' ? pickupEtaMinutes : destEtaMinutes}
-                  onEmergencyClick={handleTriggerSos}
-                />
+                {/* "รอรถ 3D" is a tracking screen name, not a requirement to render 3D/WebGL.
+                    Keep the screen safe and useful before a ride exists. The live map is mounted
+                    only after a real active order exists. */}
+                {activeLiveOrder && !['completed', 'cancelled'].includes(activeLiveOrder.status) ? (
+                  <ThreeDimensionalRideMap
+                    selectedDreamRide={selectedDreamRide}
+                    pickupLocation={activeLiveOrder.pickupLocation || preMatchingData?.family?.pickupSpecificPoint || 'กำลังรอระบุจุดรับ'}
+                    destinationLocation={selectedDestination || activeLiveOrder.dropoffLocation || "ยังไม่ได้เลือกปลายทาง"}
+                    driverName={currentMatchedDriver?.name || "กำลังรอพี่วิน"}
+                    driverLevel={currentMatchedDriver?.level || 0}
+                    driverEmoji={currentMatchedDriver?.avatarEmoji || "🛵"}
+                    etaMinutes={ridePhase === 'picking_up' ? pickupEtaMinutes : destEtaMinutes}
+                    onEmergencyClick={handleTriggerSos}
+                  />
+                ) : (
+                  <div className="rounded-3xl border-2 border-cyan-500/40 bg-gradient-to-b from-[#0A1633] via-[#071126] to-[#030710] p-6 text-center shadow-[0_0_35px_rgba(0,210,255,0.12)]">
+                    <div className="mx-auto w-20 h-20 rounded-3xl bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center shadow-[0_0_25px_rgba(0,210,255,0.18)]">
+                      <Activity className="w-10 h-10 text-cyan-300" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-black text-white">รอรถ 3D</h3>
+                    <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                      หน้านี้เปิดดูได้ตลอด แม้ยังไม่ได้เรียกรถ
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                      เมื่อมีงานที่กำลังรอพี่วิน ระบบจะแสดงแผนที่ ตำแหน่ง และสถานะการเดินทางจริงที่นี่
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('home')}
+                      className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_18px_rgba(0,210,255,0.35)] active:scale-95 transition-all"
+                    >
+                      <Bike className="w-4 h-4" />
+                      ไปหน้าเรียกรถ
+                    </button>
+                  </div>
+                )}
 
                 {activeLiveOrder && !['completed', 'cancelled'].includes(activeLiveOrder.status) && (
                   <button
