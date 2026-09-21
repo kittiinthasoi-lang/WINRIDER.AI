@@ -172,7 +172,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
   const [isLoadingRoute, setIsLoadingRoute] = useState<boolean>(true);
   const lastRouteRequestRef = useRef<{ lat: number; lng: number; at: number; phase: NavigationPhase; destLat: number; destLng: number } | null>(null);
 
-  // Calculate a real route from the Knight's current GPS to the active waypoint.
+  // Calculate a real route from the Knight's current GPS to the active waypoint (CI verification branch).
   // Refresh on meaningful movement or after 10s so ETA/traffic stays current without
   // firing a Routes API request for every GPS update.
   useEffect(() => {
