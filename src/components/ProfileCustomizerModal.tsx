@@ -25,6 +25,10 @@ export interface ProfileCustomizationData {
   bioStatus: string;
   themeColor: string; // e.g. '#00D2FF', '#FFD700', '#EC4899', '#10B981', '#8B5CF6'
   bannerGlow: string;
+  locationEnabled?: boolean;
+  latitude?: number;
+  longitude?: number;
+  locationLabel?: string;
 }
 
 interface ProfileCustomizerModalProps {
@@ -80,6 +84,10 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
   const [themeColor, setThemeColor] = useState(currentData.themeColor || '#00D2FF');
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(currentData.avatarUrl);
   const [avatarEmoji, setAvatarEmoji] = useState(currentData.avatarEmoji || '🦥');
+  const [locationEnabled, setLocationEnabled] = useState(currentData.locationEnabled === true);
+  const [latitude, setLatitude] = useState<number | undefined>(currentData.latitude);
+  const [longitude, setLongitude] = useState<number | undefined>(currentData.longitude);
+  const [locationLabel, setLocationLabel] = useState(currentData.locationLabel || 'ตำแหน่งปัจจุบัน');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -96,6 +104,10 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
       setThemeColor(data.themeColor || '#00D2FF');
       setAvatarUrl(data.avatarUrl);
       setAvatarEmoji(data.avatarEmoji || '🦥');
+      setLocationEnabled(data.locationEnabled === true);
+      setLatitude(data.latitude);
+      setLongitude(data.longitude);
+      setLocationLabel(data.locationLabel || 'ตำแหน่งปัจจุบัน');
       setAvatarFile(null);
       setSaveError(null);
     }).catch((error) => console.warn('Unable to load saved profile:', error));
@@ -122,6 +134,15 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
     }
   };
 
+  const captureCurrentLocation = () => {
+    if (!navigator.geolocation) { setSaveError('อุปกรณ์นี้ไม่รองรับ GPS'); return; }
+    navigator.geolocation.getCurrentPosition(
+      (position) => { setLatitude(position.coords.latitude); setLongitude(position.coords.longitude); setLocationEnabled(true); setLocationLabel('ตำแหน่งปัจจุบัน'); setSaveError(null); },
+      () => setSaveError('ไม่สามารถอ่านตำแหน่งปัจจุบันได้ กรุณาอนุญาต Location แล้วลองใหม่'),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  };
+
   const handleSave = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -140,7 +161,9 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
         themeColor,
         avatarUrl: persistedAvatarUrl,
         avatarEmoji,
-        bannerGlow: `0 0 25px ${themeColor}40`
+        bannerGlow: `0 0 25px ${themeColor}40`,
+        locationEnabled: locationEnabled && Number.isFinite(latitude) && Number.isFinite(longitude),
+        latitude, longitude, locationLabel: locationEnabled ? locationLabel : ''
       };
       await saveProfileCustomization(role, updated);
       onSave(updated);
@@ -326,6 +349,12 @@ export const ProfileCustomizerModal: React.FC<ProfileCustomizerModalProps> = ({
                 className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/15 focus:border-cyan-400 text-white text-xs font-sans outline-none transition-colors"
               />
             </div>
+          </div>
+
+          {/* Current Location */}
+          <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/5 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2"><div><p className="text-[11px] font-bold text-emerald-300">📍 ตำแหน่งปัจจุบันบนโปรไฟล์</p><p className="text-[10px] text-slate-400">แสดงใต้ UID เมื่อเปิดใช้งาน</p></div><button type="button" onClick={() => { const next = !locationEnabled; setLocationEnabled(next); if (!next) { setLatitude(undefined); setLongitude(undefined); } }} className={`rounded-full px-3 py-1 text-[10px] font-bold ${locationEnabled ? 'bg-emerald-400 text-slate-950' : 'bg-white/10 text-slate-300'}`}>{locationEnabled ? 'เปิด' : 'ปิด'}</button></div>
+            {locationEnabled && <><button type="button" onClick={captureCurrentLocation} className="w-full rounded-xl border border-emerald-400/30 bg-black/30 py-2 text-[10px] font-bold text-emerald-300">ใช้ตำแหน่ง GPS ปัจจุบัน</button>{Number.isFinite(latitude) && Number.isFinite(longitude) && <p className="text-[9px] font-mono text-slate-400">GPS: {latitude!.toFixed(5)}, {longitude!.toFixed(5)}</p>}</>}
           </div>
 
           {/* Theme Color Selector */}
