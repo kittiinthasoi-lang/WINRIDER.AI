@@ -987,6 +987,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setActiveServiceId('knight');
     setSelectedService('WIN KNIGHT');
     setCurrentMatchedDriver(null);
+    setShowCustomerRadarModal(false);
     setShowBookingModal(false);
     await calculateDestinationRoute(destinationQuery, fallbackLabel, true);
   };
