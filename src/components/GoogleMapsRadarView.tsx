@@ -315,6 +315,21 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
     setPanTrigger((value) => value + 1);
   };
 
+  const navigateToEntity = (entity: MapRadarEntity) => {
+    if (audioEnabled) playTactileBlip(1200);
+    if (onNavigateToEntity) {
+      onNavigateToEntity(entity);
+      return;
+    }
+
+    const origin = userLat !== null && userLng !== null
+      ? `${userLat},${userLng}`
+      : '';
+    const destination = `${entity.lat},${entity.lng}`;
+    const url = `https://www.google.com/maps/dir/?api=1&${origin ? `origin=${encodeURIComponent(origin)}&` : ''}destination=${encodeURIComponent(destination)}&travelmode=two_wheeler`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="relative w-full overflow-hidden rounded-3xl border-2 border-cyan-500/50 bg-[#060D1E] shadow-2xl">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-[#0A1633]/95 px-4 py-3 font-mono">
@@ -435,7 +450,7 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
               </div>
               <button type="button" onClick={() => setSelectedEntity(null)} className="rounded-full bg-white/10 p-2 text-white"><X className="h-4 w-4" /></button>
             </div>
-            <button type="button" onClick={() => onNavigateToEntity?.(selectedEntity)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 py-2.5 text-xs font-black text-slate-950"><Navigation className="h-4 w-4" />นำทางไปสถานที่นี้</button>
+            <button type="button" onClick={() => navigateToEntity(selectedEntity)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 py-2.5 text-xs font-black text-slate-950"><Navigation className="h-4 w-4" />นำทางไปสถานที่นี้</button>
           </div>
         )}
       </div>
