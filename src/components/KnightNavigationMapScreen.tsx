@@ -997,7 +997,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
         </div>
       ) : navDisplayMode === 'google_maps' ? (
         <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">
-          {activeJob?.pickupCoord && activeJob?.dropoffCoord && (driverLegPhase === 'to_pickup' || (driverLegPhase === 'to_destination' && selectedDestination.lat && selectedDestination.lng)) ? <GoogleMapsNavigationScreen
+          {activeJob?.pickupCoord && (driverLegPhase === 'to_pickup' ? Boolean(activeJob?.dropoffCoord) : Boolean(selectedDestination.lat && selectedDestination.lng)) ? <GoogleMapsNavigationScreen
             role="driver"
             initialPhase={driverLegPhase === 'to_pickup' ? 'approaching' : 'in_transit'}
             driverName={activeVehicle?.name || 'พี่วินอัศวิน'}
