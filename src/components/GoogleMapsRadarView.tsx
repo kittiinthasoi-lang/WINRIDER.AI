@@ -83,9 +83,51 @@ function MapViewController({ center, zoom, trigger }: { center: { lat: number; l
   return null;
 }
 
-const entityIcon = (entity: MapRadarEntity, className = 'w-4 h-4') =>
-  entity.type === 'merchant' ? <Store className={className} /> : <Building2 className={className} />;
+const PLACE_GROUP_STYLES: Record
+  'shop' | 'transport' | 'faith' | 'community',
+  { label: string; emoji: string; markerClass: string; badgeClass: string; Icon: React.ComponentType<{ className?: string }> }
+> = {
+  shop: {
+    label: 'ร้านค้าและบริการ',
+    emoji: '🏪',
+    markerClass: 'border-purple-400 bg-purple-950 text-purple-200',
+    badgeClass: 'border-purple-400/50 bg-purple-500/20 text-purple-300',
+    Icon: Store,
+  },
+  transport: {
+    label: 'ขนส่งสาธารณะ',
+    emoji: '🚉',
+    markerClass: 'border-sky-400 bg-sky-950 text-sky-200',
+    badgeClass: 'border-sky-400/50 bg-sky-500/20 text-sky-300',
+    Icon: TrainFront,
+  },
+  faith: {
+    label: 'ศาสนสถาน',
+    emoji: '☸️',
+    markerClass: 'border-amber-400 bg-amber-950 text-amber-200',
+    badgeClass: 'border-amber-400/50 bg-amber-500/20 text-amber-300',
+    Icon: Landmark,
+  },
+  community: {
+    label: 'ชุมชนและสถานที่สำคัญ',
+    emoji: '🏫',
+    markerClass: 'border-emerald-400 bg-emerald-950 text-emerald-200',
+    badgeClass: 'border-emerald-400/50 bg-emerald-500/20 text-emerald-300',
+    Icon: Users,
+  },
+};
 
+const getEntityGroupStyle = (entity: MapRadarEntity) =>
+  entity.placeGroup ? PLACE_GROUP_STYLES[entity.placeGroup] : undefined;
+
+const entityIcon = (entity: MapRadarEntity, className = 'w-4 h-4') => {
+  const groupStyle = getEntityGroupStyle(entity);
+  if (groupStyle) {
+    const Icon = groupStyle.Icon;
+    return <Icon className={className} />;
+  }
+  return entity.type === 'merchant' ? <Store className={className} /> : <Building2 className={className} />;
+};
 export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
   targetPerspective = 'customer',
   venueName,
