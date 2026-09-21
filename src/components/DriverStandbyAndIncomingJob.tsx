@@ -265,7 +265,7 @@ distanceKm: pending.distanceKm,
       }
     };
     refresh();
-    const timer = window.setInterval(refresh, 5000);
+    const timer = window.setInterval(refresh, 8000);
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [isOnDuty, activeIncomingJob, currentActiveTrip, activeVehicle, lastDeclinedJobId]);
 
@@ -295,7 +295,7 @@ distanceKm: pending.distanceKm,
       }
     };
     void recover();
-    const timer = window.setInterval(recover, 5000);
+    const timer = window.setInterval(recover, 10000);
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [isOnDuty, currentActiveTrip, activeVehicle]);
 
