@@ -29,6 +29,7 @@ import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
+import { PersonalNavigationScreen } from './PersonalNavigationScreen';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { ReligiousNotificationsModal } from './ReligiousNotificationsModal';
 import { ProfileQuickActions } from './ProfileQuickActions';
@@ -208,8 +209,8 @@ interface PassengerAppViewProps {
   onOpenEmergencyCenter?: () => void;
   onNavigateToMarket?: () => void;
   onAddNewCustomerItem?: (item: any) => void;
-  activeTab?: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile';
-  onTabChange?: (tab: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile') => void;
+  activeTab?: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile' | 'navigation';
+  onTabChange?: (tab: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile' | 'navigation') => void;
   currentUserSession?: UserSession | null;
   onToggleDriverPersona?: (targetPersona: 'driver' | 'customer') => void;
 }
@@ -2248,6 +2249,11 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   </button>
                 </div>
               </div>
+            )}
+
+            {/* PERSONAL NAVIGATION TAB: usable without an order */}
+            {activeTab === 'navigation' && (
+              <PersonalNavigationScreen role="customer" audioEnabled={audioEnabled} />
             )}
 
             {/* 5. PROFILE TAB */}
