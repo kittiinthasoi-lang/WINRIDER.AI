@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { getAuth } from 'firebase/auth';
 import { FlashSaleItem } from '../types';
 import { NeonProfileAvatar } from './NeonProfileAvatar';
 import { SovereignTiersModal } from './SovereignTiersModal';
@@ -137,6 +138,35 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
       if (saved) setMerchantProfileData(saved);
     }).catch((error) => console.warn('Unable to load merchant profile:', error));
   }, [canEdit]);
+
+  React.useEffect(() => {
+    if (!canEdit) return;
+    void (async () => {
+      try {
+        const user = getAuth().currentUser;
+        if (!user) return;
+        const response = await fetch('/api/shop/profile-content', { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
+        const payload = await response.json() as { products?: StoreCatalogProduct[] };
+        if (response.ok && Array.isArray(payload.products)) setStoreProducts(payload.products as StoreCatalogProduct[]);
+      } catch (error) {
+        console.warn('Unable to load merchant storefront content:', error);
+      }
+    })();
+  }, [canEdit]);
+
+  const persistMerchantProducts = async (products: StoreCatalogProduct[]) => {
+    try {
+      const user = getAuth().currentUser;
+      if (!user) return;
+      await fetch('/api/shop/profile-content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ products }),
+      });
+    } catch (error) {
+      console.warn('Unable to persist merchant storefront content:', error);
+    }
+  };
 
   const currentMerchantTier = useMemo(() => getMerchantTier(merchantLevel), [merchantLevel]);
   const merchantDifficultyMetrics = useMemo(() => getLevelDifficultyMetrics(merchantLevel), [merchantLevel]);
@@ -378,7 +408,9 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
       aiVerified: !!newProdAiVerified
     };
 
-    setStoreProducts(prev => [newProd, ...prev]);
+    const nextProducts = [newProd, ...storeProducts];
+    setStoreProducts(nextProducts);
+    void persistMerchantProducts(nextProducts);
 
     if (newProdIsFlash) {
       setFlashSales(prev => [{
