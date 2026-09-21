@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { emitQuestMetric } from '../services/questService';
 import { getAuth } from 'firebase/auth';
 import {
   Building2, ChevronRight, Clock3, ExternalLink, Loader2, MapPin, Navigation,
@@ -136,6 +137,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
   const openProfile = (profile: ShopProfile) => {
     if (audioEnabled) window.dispatchEvent(new CustomEvent('winrider:tactile_blip', { detail: { frequency: 780 } }));
     setSelectedProfile(profile);
+      void emitQuestMetric('citizen.shop_profile_view', 1);
   };
 
   const callProfile = (phone: string) => {
