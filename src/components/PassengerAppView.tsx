@@ -933,7 +933,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     }
   };
 
-  const calculateDestinationRoute = async (destinationQuery: string, fallbackLabel: string) => {
+  const calculateDestinationRoute = async (destinationQuery: string, fallbackLabel: string, openMatchingAfterCalculation = false) => {
     setIsCalculatingDestination(true);
     setBookingError(null);
     setDestinationEtaMinutes(null);
@@ -963,7 +963,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       setTripDistanceKm(distanceKm);
       setDestinationEtaMinutes(route.etaMinutes ?? null);
       setDestinationFareEstimate(fare);
-      setShowBookingModal(true);
+      if (openMatchingAfterCalculation) {
+        setShowBookingModal(false);
+        setShowDriverMatchingModal(true);
+      } else {
+        setShowBookingModal(true);
+      }
       if (audioEnabled) {
         playTactileBlip(900);
         speakThaiText('ระยะทางจริงประมาณ ' + distanceKm.toFixed(1) + ' กิโลเมตร ค่าโดยสารประมาณ ' + fare + ' บาท');
@@ -974,6 +979,16 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       setBookingError(reason.startsWith('GPS_') ? 'ต้องอนุญาตตำแหน่ง GPS เพื่อคำนวณระยะทางและค่าโดยสารจริง' : 'ไม่สามารถคำนวณเส้นทางจริงของปลายทางนี้ได้ กรุณาลองใหม่อีกครั้ง');
       setShowBookingModal(false);
     } finally { setIsCalculatingDestination(false); }
+  };
+
+  const handleSelectRadarDestination = async (entity: { name: string; categoryLabel?: string; placeGroup?: string; address?: string }) => {
+    const destinationQuery = [entity.name, entity.categoryLabel, entity.address].filter(Boolean).join(' ');
+    const fallbackLabel = entity.address ? `${entity.name} (${entity.address})` : entity.name;
+    setActiveServiceId('knight');
+    setSelectedService('WIN KNIGHT');
+    setCurrentMatchedDriver(null);
+    setShowBookingModal(false);
+    await calculateDestinationRoute(destinationQuery, fallbackLabel, true);
   };
 
   const handleSelectLifestylePlace = (place: LifestylePlace) => {
@@ -3607,6 +3622,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
               targetPerspective="passenger"
               radiusKm={2.5}
               audioEnabled={audioEnabled}
+              onSelectDestinationForRide={handleSelectRadarDestination}
               onBackToHome={() => setShowCustomerRadarModal(false)}
             />
           </div>
