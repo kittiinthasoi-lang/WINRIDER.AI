@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { getAuth } from 'firebase/auth';
-import { APIProvider, AdvancedMarker, Map, useMap } from '@vis.gl/react-google-maps';
 import {
   Building2,
   Clock,
+  Landmark,
   Layers,
   LocateFixed,
   MapPin,
@@ -11,6 +9,8 @@ import {
   Radio,
   Star,
   Store,
+  TrainFront,
+  Users,
   X,
 } from 'lucide-react';
 import { playRadarScan, playTactileBlip } from '../utils/audio';
