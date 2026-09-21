@@ -57,3 +57,14 @@ export async function claimQuest(questId: string, rewardXp: number, metricKey: s
 
   return { alreadyClaimed: false };
 }
+
+
+export function emitQuestMetric(metricKey: string, amount = 1) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('winrider:quest-metric', { detail: { metricKey, amount } }));
+  }
+  return recordQuestMetric({ metricKey, amount }).catch(error => {
+    console.warn('Quest metric persistence failed:', error);
+    return null;
+  });
+}
