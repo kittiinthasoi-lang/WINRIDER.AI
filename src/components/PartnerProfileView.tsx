@@ -152,7 +152,6 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   useEffect(() => {
     if (!canEdit) return;
     loadProfileCustomization('partner').then((saved) => {
-      void emitQuestMetric('partner.profile_ready', 1);
       if (saved) setPartnerCustomizations(prev => ({ ...prev, [selectedPartner.id]: saved }));
     }).catch((error) => console.warn('Unable to load partner profile:', error));
   }, [canEdit, selectedPartner.id]);
