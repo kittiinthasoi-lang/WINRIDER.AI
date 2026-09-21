@@ -403,8 +403,8 @@ export async function advanceLiveOrderStep(
   const updatedOrder = payload.order as LiveRideOrder;
   if (newStatus === 'completed') {
     void emitQuestMetric('driver.completed_trip', 1);
-    if (updatedOrder.routeEta || updatedOrder.distanceKm) void emitQuestMetric('driver.routed_trip', 1);
-    if (updatedOrder.serviceType === 'spirit' || updatedOrder.serviceType === 'family' || updatedOrder.serviceType === 'pet' || updatedOrder.serviceType === 'express') void emitQuestMetric('driver.special_service', 1);
+    if (Number.isFinite(updatedOrder.distanceKm) && Number.isFinite(updatedOrder.estMinutes)) void emitQuestMetric('driver.routed_trip', 1);
+    if (['spirit', 'family', 'pet', 'express'].includes(String(updatedOrder.serviceId).toLowerCase())) void emitQuestMetric('driver.special_service', 1);
   }
   const orders = getLocalLiveOrders().filter((order) => order.id !== orderId);
   orders.unshift(updatedOrder);
