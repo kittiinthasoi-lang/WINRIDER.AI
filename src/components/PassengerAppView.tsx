@@ -2318,7 +2318,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           UID: <strong className="text-cyan-300">{auth.currentUser?.uid || currentUserSession?.id || '—'}</strong>
                         </p>
                         {passengerProfileData.locationEnabled && Number.isFinite(passengerProfileData.latitude) && Number.isFinite(passengerProfileData.longitude) && (
-                          <p className="text-[10px] text-emerald-300 font-mono mt-1 flex items-center gap-1"><MapPin className="w-3 h-3" />{passengerProfileData.locationLabel || 'ตำแหน่งปัจจุบัน'} • {passengerProfileData.latitude!.toFixed(5)}, {passengerProfileData.longitude!.toFixed(5)}</p>
+                          <p className="text-[10px] text-emerald-300 font-mono mt-1 flex items-center gap-1"><MapPin className="w-3 h-3" />{passengerProfileData.locationLabel || 'ตำแหน่งปัจจุบัน'}</p>
                         )}
                       </div>
                     </div>
