@@ -42,8 +42,8 @@ export async function getWalletMe(role?: 'citizen' | 'knight' | 'merchant' | 'pa
       balanceSatang: 0,
       balance: 0.0,
       systemPromptPay: {
-        configured: true,
-        promptPayId: '0899999999',
+        configured: false,
+        promptPayId: '',
         accountName: 'WINRIDER.AI SYSTEM WALLET',
       },
       submissions: [],
