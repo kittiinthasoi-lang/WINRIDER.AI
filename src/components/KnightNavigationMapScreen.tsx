@@ -417,8 +417,9 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
     if (!Number.isFinite(destination.lat) || !Number.isFinite(destination.lng)) return;
     setDestinationInputError('');
     setSelectedDestination(destination);
+    setLiveRoute(null);
+    setCurrentRouteStepIndex(0);
     setShowDestinationPicker(false);
-    void handleCalculateRoute(destination);
   };
 
   const handleOpenDestinationPicker = () => {
@@ -1011,6 +1012,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             dropoffCoords={driverLegPhase === 'to_destination' && selectedDestination.lat && selectedDestination.lng ? { lat: selectedDestination.lat, lng: selectedDestination.lng } : activeJob.dropoffCoord}
             fareBaht={activeJob.netFare || activeJob.baseFare || 0}
             audioEnabled={audioEnabled}
+            onRouteUpdate={setLiveRoute}
             onArrivedAtPickup={() => {
               if (audioEnabled) playTactileBlip(950);
               setDriverLegPhase('to_destination');
