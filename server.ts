@@ -2275,6 +2275,37 @@ app.get("/api/knights/:driverUserId/location", async (req, res) => {
   }
 });
 
+app.get("/api/admin/ops/overview", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Admin access required" });
+  try {
+    const [ridesSnap, sosSnap, knightsSnap] = await Promise.all([
+      ordersDb.collection("rides").orderBy("createdAt", "desc").limit(200).get(),
+      ordersDb.collection("sosIncidents").where("status", "in", ["open", "acknowledged"]).limit(100).get(),
+      ordersDb.collection("knights").where("isOnline", "==", true).limit(300).get(),
+    ]);
+    const rides = ridesSnap.docs.map((doc) => doc.data() as any);
+    const activeStatuses = new Set(["pending", "accepted", "arriving", "picked_up", "in_progress"]);
+    return res.json({
+      generatedAt: new Date().toISOString(),
+      activeRides: rides.filter((ride) => activeStatuses.has(String(ride.status))).length,
+      pendingDispatch: rides.filter((ride) => String(ride.status) === "pending").length,
+      onlineKnights: knightsSnap.docs.filter((doc) => {
+        const data = doc.data() || {};
+        const heartbeat = Date.parse(String(data.dispatchHeartbeatAt || ""));
+        return Number.isFinite(heartbeat) && Date.now() - heartbeat <= 120000;
+      }).length,
+      openSosIncidents: sosSnap.size,
+      sosIncidents: sosSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).slice(0, 100),
+      recentRides: rides.slice(0, 50),
+    });
+  } catch (error: any) {
+    console.error("[Admin Ops Overview]", error?.message);
+    return res.status(503).json({ error: "Operations overview unavailable" });
+  }
+});
+
 app.get("/api/orders", async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
