@@ -108,7 +108,7 @@ export const ReligiousNotificationsModal: React.FC<ReligiousNotificationsModalPr
 
   useEffect(() => {
     if (!isOpen || typeof localStorage === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ faiths, kinds, city, country } satisfies SavedPreferences));
+    const preferences = { faiths, kinds, city, country } satisfies SavedPreferences;\n    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));\n    void saveAccountPreference('faith_sacred_calendar', preferences).catch(() => { /* local cache remains available */ });
   }, [isOpen, faiths, kinds, city, country]);
 
   const showPrayerTimes = kinds.includes('prayer') && (faiths.includes('all') || faiths.includes('islam'));
