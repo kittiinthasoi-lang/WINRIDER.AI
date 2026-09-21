@@ -6,6 +6,20 @@ import { useRealGeolocation } from '../hooks/useRealGeolocation';
 interface Props { audioEnabled: boolean; onOpenWinBuddy?: () => void; }
 interface EmergencyPlace { id: string; name: string; type: string; address: string; phone: string; mapsUrl: string; openNow: boolean | null; distanceKm: number | null; etaMinutes: number | null; }
 
+const EMERGENCY_SCAN_TTL_MS = 5 * 60 * 1000;
+const EMERGENCY_SCAN_MIN_MOVE_KM = 0.5;
+let emergencyScanCache: { latitude: number; longitude: number; fetchedAt: number; places: EmergencyPlace[] } | null = null;
+
+const canReuseEmergencyScan = (latitude: number, longitude: number) => {
+  if (!emergencyScanCache) return false;
+  const age = Date.now() - emergencyScanCache.fetchedAt;
+  const movedKm = Math.hypot(
+    (latitude - emergencyScanCache.latitude) * 111,
+    (longitude - emergencyScanCache.longitude) * 111 * Math.cos((latitude * Math.PI) / 180),
+  );
+  return age < EMERGENCY_SCAN_TTL_MS && movedKm < EMERGENCY_SCAN_MIN_MOVE_KM;
+};
+
 const labels: Record<string, string> = { hospital: 'โรงพยาบาล', fire_station: 'สถานีดับเพลิง', police: 'สถานีตำรวจ' };
 const iconFor = (type: string) => type === 'fire_station' ? Flame : type === 'police' ? ShieldAlert : Hospital;
 
@@ -18,6 +32,11 @@ export const HospitalCommandCenter: React.FC<Props> = () => {
 
   useEffect(() => {
     if (!geo.isRealGps || geo.latitude === null || geo.longitude === null) return;
+    if (canReuseEmergencyScan(geo.latitude, geo.longitude)) {
+      setPlaces(emergencyScanCache?.places || []);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       setLoading(true); setError('');
@@ -27,7 +46,11 @@ export const HospitalCommandCenter: React.FC<Props> = () => {
         const response = await fetch('/api/emergency/nearby', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` }, body: JSON.stringify({ latitude: geo.latitude, longitude: geo.longitude }) });
         const payload = await response.json() as { places?: EmergencyPlace[]; error?: string };
         if (!response.ok) throw new Error(payload.error || 'โหลดศูนย์ฉุกเฉินไม่สำเร็จ');
-        if (!cancelled) setPlaces(payload.places || []);
+        if (!cancelled) {
+          const nextPlaces = payload.places || [];
+          setPlaces(nextPlaces);
+          emergencyScanCache = { latitude: geo.latitude as number, longitude: geo.longitude as number, fetchedAt: Date.now(), places: nextPlaces };
+        }
       } catch (cause) { if (!cancelled) { setPlaces([]); setError(cause instanceof Error ? cause.message : 'โหลดศูนย์ฉุกเฉินไม่สำเร็จ'); } }
       finally { if (!cancelled) setLoading(false); }
     })();

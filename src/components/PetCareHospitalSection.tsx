@@ -19,6 +19,20 @@ type FilterType = 'all' | 'open_now' | 'emergency_24h';
 
 const calculatePetFare = (distanceKm: number) => 15 + Math.round(Math.max(0, distanceKm - 1) * 7.5) + 5;
 
+const PETCARE_SCAN_TTL_MS = 5 * 60 * 1000;
+const PETCARE_SCAN_MIN_MOVE_KM = 0.5;
+let petCareScanCache: { latitude: number; longitude: number; fetchedAt: number; data: NearbyPetCareResponse } | null = null;
+
+const canReusePetCareScan = (latitude: number, longitude: number) => {
+  if (!petCareScanCache) return false;
+  const age = Date.now() - petCareScanCache.fetchedAt;
+  const movedKm = Math.hypot(
+    (latitude - petCareScanCache.latitude) * 111,
+    (longitude - petCareScanCache.longitude) * 111 * Math.cos((latitude * Math.PI) / 180),
+  );
+  return age < PETCARE_SCAN_TTL_MS && movedKm < PETCARE_SCAN_MIN_MOVE_KM;
+};
+
 export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
   audioEnabled, onSelectHospitalForBooking, onBackToMain,
 }) => {
@@ -31,8 +45,14 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
   const [fetchedAt, setFetchedAt] = useState('');
   const [showEmergencyTips, setShowEmergencyTips] = useState(false);
 
-  const loadNearbyPlaces = useCallback(async () => {
+  const loadNearbyPlaces = useCallback(async (force = false) => {
     if (!geo.isRealGps) return;
+    if (!force && geo.latitude !== null && geo.longitude !== null && canReusePetCareScan(geo.latitude, geo.longitude)) {
+      setPlaces(petCareScanCache?.data.places || []);
+      setSource(petCareScanCache?.data.source || 'Google Maps Platform');
+      setFetchedAt(petCareScanCache?.data.fetchedAt || new Date().toISOString());
+      return;
+    }
     setLoading(true);
     setErrorMessage('');
     try {
@@ -51,6 +71,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
       setPlaces(Array.isArray(data.places) ? data.places : []);
       setSource(data.source || 'Google Maps Platform');
       setFetchedAt(data.fetchedAt || new Date().toISOString());
+      petCareScanCache = { latitude: geo.latitude as number, longitude: geo.longitude as number, fetchedAt: Date.now(), data };
     } catch (error) {
       setPlaces([]);
       setErrorMessage(error instanceof Error ? error.message : 'โหลดข้อมูลจริงไม่สำเร็จ');
@@ -106,7 +127,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
             <button type="button" onClick={geo.refreshLocation} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white">
               <Crosshair className="mr-1 inline h-4 w-4" /> ขอพิกัดใหม่
             </button>
-            <button type="button" disabled={!geo.isRealGps || loading} onClick={() => void loadNearbyPlaces()} className="rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-40">
+            <button type="button" disabled={!geo.isRealGps || loading} onClick={() => void loadNearbyPlaces(true)} className="rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-40">
               <RefreshCw className={`mr-1 inline h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> โหลดข้อมูลใหม่
             </button>
           </div>

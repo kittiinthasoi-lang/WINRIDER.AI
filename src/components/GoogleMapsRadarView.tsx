@@ -22,6 +22,20 @@ import { RADAR_PLACE_GROUPS, RadarPlaceGroup, selectRadarPlaces } from '../utils
 
 const GOOGLE_MAPS_API_KEY = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
 
+const RADAR_SCAN_TTL_MS = 2 * 60 * 1000;
+const RADAR_SCAN_MIN_MOVE_KM = 0.3;
+let radarScanCache: { latitude: number; longitude: number; fetchedAt: number; entities: MapRadarEntity[] } | null = null;
+
+const canReuseRadarScan = (latitude: number, longitude: number) => {
+  if (!radarScanCache) return false;
+  const age = Date.now() - radarScanCache.fetchedAt;
+  const movedKm = Math.hypot(
+    (latitude - radarScanCache.latitude) * 111,
+    (longitude - radarScanCache.longitude) * 111 * Math.cos((latitude * Math.PI) / 180),
+  );
+  return age < RADAR_SCAN_TTL_MS && movedKm < RADAR_SCAN_MIN_MOVE_KM;
+};
+
 export type RadarPerspective = 'customer' | 'driver' | 'merchant' | 'partner';
 
 export interface MapRadarEntity {
@@ -167,6 +181,12 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
       setSelectedEntity(null);
       return;
     }
+    if (userLat === null || userLng === null) return;
+    if (canReuseRadarScan(userLat, userLng)) {
+      setEntities(radarScanCache?.entities || []);
+      setEntitiesLoading(false);
+      return;
+    }
 
     let cancelled = false;
     void (async () => {
@@ -249,7 +269,11 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
           });
         }
 
-        if (!cancelled) setEntities([...winEntities, ...googleEntities]);
+        if (!cancelled) {
+          const nextEntities = [...winEntities, ...googleEntities];
+          setEntities(nextEntities);
+          radarScanCache = { latitude: userLat, longitude: userLng, fetchedAt: Date.now(), entities: nextEntities };
+        }
       } catch (error) {
         if (!cancelled) {
           setEntities([]);
