@@ -37,8 +37,8 @@ export type MainTabType = 'home' | 'dreamRide' | 'ride' | 'shop' | 'modes' | 'ga
 
 interface MobileBottomNavBarProps {
   activeMode: AppMode;
-  activePassengerTab: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile';
-  onSelectPassengerTab: (tab: 'home' | 'dreamRide' | 'ride' | 'shop' | 'profile') => void;
+  activePassengerTab: 'home' | 'dreamRide' | 'petCare' | 'ride' | 'shop' | 'profile' | 'navigation';
+  onSelectPassengerTab: (tab: 'home' | 'dreamRide' | 'ride' | 'shop' | 'profile' | 'navigation') => void;
   activeDriverTab?: DriverTabType;
   onSelectDriverTab?: (tab: DriverTabType) => void;
   onSelectMode: (mode: AppMode) => void;
@@ -225,6 +225,17 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
         setIsModesDrawerOpen(false);
         onSelectMode('passenger');
         onSelectPassengerTab('ride');
+      }
+    },
+    { 
+      id: 'navigation',
+      label: 'นำทาง GPS',
+      icon: <Navigation className="w-5 h-5" />,
+      badge: 'GPS',
+      onClick: () => {
+        setIsModesDrawerOpen(false);
+        onSelectMode('passenger');
+        onSelectPassengerTab('navigation');
       }
     },
     { 
