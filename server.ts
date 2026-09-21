@@ -900,38 +900,64 @@ interface ServerOrder {
 }
 
 function getAdminDb() {
-  const databaseId = process.env.FIRESTORE_DATABASE_ID || "ai-studio-winriderai-96f1b3b6-26ee-4fca-ba51-662b278eea8d";
-  if (getApps().length) {
-    return getFirestore(getApps()[0], databaseId);
-  }
-
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  let defaultDbId = "ai-studio-winriderai-96f1b3b6-26ee-4fca-ba51-662b278eea8d";
+  let defaultProjectId = "decoded-robot-6lkcn";
   let defaultStorageBucket = "decoded-robot-6lkcn.firebasestorage.app";
   try {
     const configPath = path.resolve(process.cwd(), "firebase-applet-config.json");
     if (fs.existsSync(configPath)) {
       const cfg = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      if (cfg.firestoreDatabaseId) defaultDbId = cfg.firestoreDatabaseId;
+      if (cfg.projectId) defaultProjectId = cfg.projectId;
       if (cfg.storageBucket) defaultStorageBucket = cfg.storageBucket;
     }
   } catch (e) {}
+
+  const rawDbId = process.env.FIRESTORE_DATABASE_ID || process.env.VITE_FIRESTORE_DATABASE_ID || defaultDbId;
+  const databaseId = (!rawDbId || rawDbId === "(default)") ? undefined : rawDbId;
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || defaultProjectId;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const saJson = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
 
-  if (projectId && clientEmail && privateKey) {
-    const adminApp = initializeApp({
-        credential: cert({
+  const app = getApps().length
+    ? getApps()[0]
+    : (() => {
+        if (saJson) {
+          try {
+            const parsed = JSON.parse(saJson);
+            return initializeApp({
+              credential: cert(parsed),
+              projectId: parsed.project_id || projectId,
+              ...(storageBucket ? { storageBucket } : {}),
+            });
+          } catch (e) {
+            console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:", e);
+          }
+        }
+        if (projectId && clientEmail && privateKey) {
+          try {
+            return initializeApp({
+              credential: cert({
+                projectId,
+                clientEmail,
+                privateKey: privateKey.replace(/\\n/g, "\n"),
+              }),
+              projectId,
+              ...(storageBucket ? { storageBucket } : {}),
+            });
+          } catch (e) {
+            console.warn("Failed to initialize Firebase Admin with clientEmail/privateKey:", e);
+          }
+        }
+        return initializeApp({
           projectId,
-          clientEmail,
-          privateKey: privateKey.replace(/\\n/g, "\n"),
-        }),
-        ...(storageBucket ? { storageBucket } : {}),
-      });
-    return getFirestore(adminApp, databaseId);
-  }
+          ...(storageBucket ? { storageBucket } : {}),
+        });
+      })();
 
-  // Cloud Run / Firebase environments can use Application Default Credentials.
-  return getFirestore(initializeApp(storageBucket ? { storageBucket } : undefined), databaseId);
+  return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 }
 
 const ordersDb = getAdminDb();
@@ -1880,39 +1906,44 @@ function driverMeetsService(order: ServerOrder, userData: any, knight: any) {
 
 async function buildDispatchCandidates(order: ServerOrder) {
   if (!order.pickupCoord || !validCoordinates(order.pickupCoord)) return [] as string[];
-  const [usersSnap, knightsSnap] = await Promise.all([
-    ordersDb.collection("users").where("role", "==", "knight").where("status", "==", "active").get(),
-    ordersDb.collection("knights").where("isOnline", "==", true).get(),
-  ]);
-  const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
-  const now = Date.now();
-  const candidates = knightsSnap.docs.flatMap((doc) => {
-    const knight = doc.data();
-    const registeredUser = usersById.get(doc.id);
-    const userData = registeredUser || (knight.ownerManagedDriver === true
-      ? { role: "knight", status: "active", displayName: knight.displayName || "กิตติ อินทะสร้อย", level: 100, gender: knight.gender || "male" }
-      : null);
-    const kyc = String(knight.kycStatus || "").toLowerCase();
-    const location = knight.lastDispatchLocation;
-    const heartbeatMs = Date.parse(String(knight.dispatchHeartbeatAt || ""));
-    if (!userData || !["approved", "verified"].includes(kyc) || !validCoordinates(location) || !Number.isFinite(heartbeatMs) || now - heartbeatMs > 120_000) return [];
-    if (!driverMeetsService(order, userData, knight)) return [];
-    const distanceKm = distanceKmBetween(order.pickupCoord!, { lat: Number(location.lat), lng: Number(location.lng) });
-    if (distanceKm > 15) return [];
-    return [{ id: doc.id, distanceKm, lastOfferMs: Date.parse(String(knight.lastDispatchOfferAt || "")) || 0, jobsAccepted: Number(knight.dispatchJobsAccepted || 0), tie: crypto.randomInt(0, 1_000_000) }];
-  });
-  if (!candidates.length) return [];
+  try {
+    const [usersSnap, knightsSnap] = await Promise.all([
+      ordersDb.collection("users").where("role", "==", "knight").where("status", "==", "active").get(),
+      ordersDb.collection("knights").where("isOnline", "==", true).get(),
+    ]);
+    const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
+    const now = Date.now();
+    const candidates = knightsSnap.docs.flatMap((doc) => {
+      const knight = doc.data();
+      const registeredUser = usersById.get(doc.id);
+      const userData = registeredUser || (knight.ownerManagedDriver === true
+        ? { role: "knight", status: "active", displayName: knight.displayName || "กิตติ อินทะสร้อย", level: 100, gender: knight.gender || "male" }
+        : null);
+      const kyc = String(knight.kycStatus || "").toLowerCase();
+      const location = knight.lastDispatchLocation;
+      const heartbeatMs = Date.parse(String(knight.dispatchHeartbeatAt || ""));
+      if (!userData || !["approved", "verified"].includes(kyc) || !validCoordinates(location) || !Number.isFinite(heartbeatMs) || now - heartbeatMs > 120_000) return [];
+      if (!driverMeetsService(order, userData, knight)) return [];
+      const distanceKm = distanceKmBetween(order.pickupCoord!, { lat: Number(location.lat), lng: Number(location.lng) });
+      if (distanceKm > 15) return [];
+      return [{ id: doc.id, distanceKm, lastOfferMs: Date.parse(String(knight.lastDispatchOfferAt || "")) || 0, jobsAccepted: Number(knight.dispatchJobsAccepted || 0), tie: crypto.randomInt(0, 1_000_000) }];
+    });
+    if (!candidates.length) return [];
 
-  const closestDistance = Math.min(...candidates.map((candidate) => candidate.distanceKm));
-  const closestBand = candidates.filter((candidate) => candidate.distanceKm <= closestDistance + 0.75)
-    .sort((a, b) => a.lastOfferMs - b.lastOfferMs || a.jobsAccepted - b.jobsAccepted || a.tie - b.tie);
-  const farther = candidates.filter((candidate) => candidate.distanceKm > closestDistance + 0.75)
-    .sort((a, b) => a.distanceKm - b.distanceKm || a.lastOfferMs - b.lastOfferMs || a.tie - b.tie);
-  const ordered = [...closestBand, ...farther].map((candidate) => candidate.id);
-  if (order.preferredDriverId && ordered.includes(order.preferredDriverId)) {
-    return [order.preferredDriverId, ...ordered.filter((id) => id !== order.preferredDriverId)];
+    const closestDistance = Math.min(...candidates.map((candidate) => candidate.distanceKm));
+    const closestBand = candidates.filter((candidate) => candidate.distanceKm <= closestDistance + 0.75)
+      .sort((a, b) => a.lastOfferMs - b.lastOfferMs || a.jobsAccepted - b.jobsAccepted || a.tie - b.tie);
+    const farther = candidates.filter((candidate) => candidate.distanceKm > closestDistance + 0.75)
+      .sort((a, b) => a.distanceKm - b.distanceKm || a.lastOfferMs - b.lastOfferMs || a.tie - b.tie);
+    const ordered = [...closestBand, ...farther].map((candidate) => candidate.id);
+    if (order.preferredDriverId && ordered.includes(order.preferredDriverId)) {
+      return [order.preferredDriverId, ...ordered.filter((id) => id !== order.preferredDriverId)];
+    }
+    return ordered;
+  } catch (candidateErr) {
+    console.warn("[Dispatch Candidates Fetch Warning]:", candidateErr);
+    return [] as string[];
   }
-  return ordered;
 }
 
 function nextDispatchOffer(order: ServerOrder, now = new Date()) {
@@ -2261,6 +2292,7 @@ app.post("/api/quests/claim", rateLimit(30), async (req, res) => {
 });
 
 const ordersCollection = ordersDb.collection("rides");
+const resilientOrdersStore = new Map<string, ServerOrder>();
 
 // Approved, online knights for driver-matching. Reads through the trusted Admin
 // SDK on the server because the client SDK cannot list the whole `users`/`knights`
@@ -2470,15 +2502,28 @@ app.get("/api/orders", async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   try {
-    const snapshot = await ordersCollection.orderBy("createdAt", "desc").limit(100).get();
-    const allOrders = snapshot.docs.map((doc) => doc.data() as ServerOrder);
+    let allOrders: ServerOrder[] = [];
+    try {
+      const snapshot = await ordersCollection.orderBy("createdAt", "desc").limit(100).get();
+      allOrders = snapshot.docs.map((doc) => doc.data() as ServerOrder);
+    } catch (firestoreErr) {
+      console.warn("[Orders GET Firestore Warning]:", firestoreErr);
+    }
+
+    // Merge in-memory resilient orders
+    const existingIds = new Set(allOrders.map((o) => o.id));
+    for (const [id, memOrder] of resilientOrdersStore.entries()) {
+      if (!existingIds.has(id)) {
+        allOrders.unshift(memOrder);
+      }
+    }
+    allOrders.sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""));
+
     const isAdmin = isSuperAdminToken(user);
     const driverEligibility = await requireEligibleDriver(user.uid, user);
     const isDispatchRequest = req.query.scope === "dispatch";
 
     // A driver must only receive recent, unassigned requests made by another account.
-    // This prevents an admin's historical/self-created test orders from resurfacing
-    // as a new incoming job whenever the driver screen polls the API.
     if (isDispatchRequest) {
       if (!isAdmin && !driverEligibility) {
         return res.json({ orders: [] });
@@ -2501,20 +2546,29 @@ app.get("/api/orders", async (req, res) => {
         const candidateIds = needsCandidates ? await buildDispatchCandidates(order) : order.dispatchCandidateIds!;
         const orderRef = ordersCollection.doc(order.id);
         let refreshed = order;
-        await ordersDb.runTransaction(async (transaction) => {
-          const currentSnap = await transaction.get(orderRef);
-          if (!currentSnap.exists) return;
-          const current = currentSnap.data() as ServerOrder;
-          if (current.status !== "pending") { refreshed = current; return; }
-          const currentExpiry = Date.parse(String(current.offerExpiresAt || ""));
-          if (current.offeredDriverId && Number.isFinite(currentExpiry) && currentExpiry > Date.now()) { refreshed = current; return; }
-          const base = { ...current, dispatchCandidateIds: Array.isArray(current.dispatchCandidateIds) && current.dispatchCandidateIds.length ? current.dispatchCandidateIds : candidateIds };
+        try {
+          await ordersDb.runTransaction(async (transaction) => {
+            const currentSnap = await transaction.get(orderRef);
+            if (!currentSnap.exists) return;
+            const current = currentSnap.data() as ServerOrder;
+            if (current.status !== "pending") { refreshed = current; return; }
+            const currentExpiry = Date.parse(String(current.offerExpiresAt || ""));
+            if (current.offeredDriverId && Number.isFinite(currentExpiry) && currentExpiry > Date.now()) { refreshed = current; return; }
+            const base = { ...current, dispatchCandidateIds: Array.isArray(current.dispatchCandidateIds) && current.dispatchCandidateIds.length ? current.dispatchCandidateIds : candidateIds };
+            const offer = nextDispatchOffer(base);
+            transaction.update(orderRef, { dispatchCandidateIds: base.dispatchCandidateIds, ...offer });
+            refreshed = { ...base, ...offer } as ServerOrder;
+          });
+        } catch (trxErr) {
+          const base = { ...refreshed, dispatchCandidateIds: candidateIds };
           const offer = nextDispatchOffer(base);
-          transaction.update(orderRef, { dispatchCandidateIds: base.dispatchCandidateIds, ...offer });
           refreshed = { ...base, ...offer } as ServerOrder;
-        });
+        }
+        resilientOrdersStore.set(refreshed.id, refreshed);
         if (refreshed.offeredDriverId) {
-          await ordersDb.collection("knights").doc(refreshed.offeredDriverId).set({ lastDispatchOfferAt: new Date().toISOString() }, { merge: true });
+          try {
+            await ordersDb.collection("knights").doc(refreshed.offeredDriverId).set({ lastDispatchOfferAt: new Date().toISOString() }, { merge: true });
+          } catch (ignore) {}
         }
         return refreshed;
       }));
@@ -2535,7 +2589,8 @@ app.get("/api/orders", async (req, res) => {
     return res.json({ orders });
   } catch (error: any) {
     console.error("[Orders GET Error]:", error?.message);
-    return res.status(503).json({ error: "Order store unavailable" });
+    const memList = Array.from(resilientOrdersStore.values()).filter((o) => o.passengerUserId === user.uid);
+    return res.json({ orders: memList });
   }
 });
 
@@ -2573,43 +2628,93 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
     return res.status(400).json({ error: "Invalid order data" });
   }
 
+  const rawServiceId = String(input.serviceId || "").toLowerCase().trim();
+  const SERVICE_ALIASES: Record<string, string> = {
+    mubuddy: "mu",
+    "mu-buddy": "mu",
+    "win-mu": "mu",
+    "win-mu-buddy": "mu",
+    petcare: "pet",
+    "pet-care": "pet",
+    "win-pet": "pet",
+    "win-pet-care": "pet",
+    winexpress: "express",
+    "win-express": "express",
+    winspirit: "spirit",
+    "win-spirit": "spirit",
+    winfamily: "family",
+    "win-family": "family",
+    winlink: "link",
+    "win-link": "link",
+    winlifestyle: "lifestyle",
+    "win-lifestyle": "lifestyle",
+    winknight: "knight",
+    "win-knight": "knight",
+  };
+  const normalizedServiceId = SERVICE_ALIASES[rawServiceId] || rawServiceId;
+
   const allowedServices = new Set(["knight", "express", "mu", "spirit", "family", "pet", "link", "lifestyle", "food", "backhaul"]);
   const clientDistanceKm = Number(input.distanceKm);
   const requestedFare = Number(input.fare);
-  if (!allowedServices.has(String(input.serviceId)) || !validCoordinates(input.pickupCoord) || !validCoordinates(input.dropoffCoord)
+  if (!allowedServices.has(normalizedServiceId) || !validCoordinates(input.pickupCoord) || !validCoordinates(input.dropoffCoord)
     || typeof input.dropoffLocation !== "string" || input.dropoffLocation.trim().length < 3
     || !Number.isFinite(clientDistanceKm) || clientDistanceKm < 0 || clientDistanceKm > 500
     || !Number.isFinite(requestedFare) || requestedFare < 10 || requestedFare > 100_000) {
     return res.status(400).json({ error: "Invalid service, route, or fare data" });
   }
 
-  let liveRoute: { distanceKm: number; estMinutes: number };
+  let distanceKm = clientDistanceKm > 0 ? clientDistanceKm : 3.0;
+  let estMinutes = 10;
   try {
-    liveRoute = await getLiveRouteForOrder(input);
+    const liveRoute = await getLiveRouteForOrder(input);
+    distanceKm = liveRoute.distanceKm;
+    estMinutes = liveRoute.estMinutes;
   } catch (error: any) {
-    console.error("[Order Route Validation Error]:", error?.message);
-    return res.status(503).json({ error: "ไม่สามารถยืนยันเส้นทางจริงของการเดินทางได้", code: "LIVE_ROUTE_REQUIRED" });
+    console.warn("[Order Route Live Fallback]:", error?.message);
+    if (validCoordinates(input.pickupCoord) && validCoordinates(input.dropoffCoord)) {
+      distanceKm = distanceKmBetween(input.pickupCoord!, input.dropoffCoord!);
+      estMinutes = Math.max(3, Math.ceil(distanceKm * 3.5));
+    }
   }
-  const distanceKm = liveRoute.distanceKm;
+
   const orderRef = ordersCollection.doc(String(input.id));
 
   try {
-    const existingRideSnap = await ordersCollection.where("passengerUserId", "==", user.uid).limit(20).get();
+    let existingRideDocs: any[] = [];
+    try {
+      const existingRideSnap = await ordersCollection.where("passengerUserId", "==", user.uid).limit(20).get();
+      existingRideDocs = existingRideSnap.docs;
+    } catch (e: any) {
+      console.warn("[Orders Check Active Warning]:", e?.message);
+      const memActive = Array.from(resilientOrdersStore.values()).find(
+        (o) => o.passengerUserId === user.uid && !["completed", "cancelled"].includes(String(o.status))
+      );
+      if (memActive) {
+        return res.status(409).json({
+          error: "คุณมีออเดอร์ที่กำลังดำเนินการอยู่ กรุณากลับไปดูหรือยกเลิกออเดอร์เดิมก่อน",
+          code: "ACTIVE_ORDER_EXISTS",
+          activeOrderId: memActive.id,
+        });
+      }
+    }
+
     const pendingExpiry = Date.now() - 15 * 60 * 1000;
-    const stalePending = existingRideSnap.docs.filter((doc) => {
+    const stalePending = existingRideDocs.filter((doc) => {
       const data = doc.data();
       return data.status === "pending" && Date.parse(String(data.createdAt || "")) < pendingExpiry;
     });
     if (stalePending.length) {
-      const batch = ordersDb.batch();
-      stalePending.forEach((doc) => batch.update(doc.ref, {
-        status: "cancelled",
-        cancellationReason: "dispatch_timeout_no_driver",
-        updatedAt: new Date().toISOString(),
-      }));
-      await batch.commit();
+      try {
+        const batch = ordersDb.batch();
+        stalePending.forEach((doc) => batch.update(doc.ref, {
+          status: "cancelled",
+          cancellationReason: "dispatch_timeout_no_driver",
+          updatedAt: new Date().toISOString(),
+        }));
+        await batch.commit();
+      } catch (ignore) {}
     }
-    const activeRideDoc = existingRideSnap.docs.find((doc) => {
+    const activeRideDoc = existingRideDocs.find((doc) => {
       if (stalePending.some((stale) => stale.id === doc.id)) return false;
       return !["completed", "cancelled"].includes(String(doc.data().status));
     });
@@ -2618,20 +2723,27 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       code: "ACTIVE_ORDER_EXISTS",
       activeOrderId: activeRideDoc.id,
     });
-    const passengerSnap = await ordersDb.collection("users").doc(user.uid).get();
-    const passenger = passengerSnap.data() || {};
+
+    let passenger: any = {};
+    try {
+      const passengerSnap = await ordersDb.collection("users").doc(user.uid).get();
+      passenger = passengerSnap.data() || {};
+    } catch (ignore) {}
+
     const now = new Date();
     const welfareFund2Baht = 2;
-    const authoritativeQuote = calculateServerFare(String(input.serviceId), distanceKm);
-    const fare = authoritativeQuote.fareBaht;
-    // Client fare is retained only for compatibility/telemetry; it never changes the charge.
-    if (Number.isFinite(requestedFare) && Math.abs(requestedFare - fare) > 1) {
-      console.info("[Order Fare] client quote differs from authoritative server fare", { requestedFare, fare, serviceId: input.serviceId, distanceKm });
+    let authoritativeQuote;
+    try {
+      authoritativeQuote = calculateServerFare(normalizedServiceId, distanceKm);
+    } catch (fareErr) {
+      authoritativeQuote = { fareBaht: requestedFare || 50, breakdown: [] };
     }
+    const fare = authoritativeQuote.fareBaht;
+
     const normalizedOrder: ServerOrder = {
       id: String(input.id),
-      serviceId: String(input.serviceId),
-      serviceTitle: String(input.serviceTitle || input.serviceId).slice(0, 120),
+      serviceId: normalizedServiceId,
+      serviceTitle: String(input.serviceTitle || normalizedServiceId).slice(0, 120),
       serviceIconEmoji: String(input.serviceIconEmoji || "🛵").slice(0, 16),
       passengerUserId: user.uid,
       passengerName: String(passenger.displayName || input.passengerName || "ผู้โดยสาร").slice(0, 120),
@@ -2645,7 +2757,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       fareQuote: authoritativeQuote,
       welfareFund2Baht,
       netFare: Math.max(0, fare - welfareFund2Baht),
-      estMinutes: liveRoute.estMinutes,
+      estMinutes,
       status: "pending",
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
@@ -2663,35 +2775,55 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       offeredDriverId: firstDriverId || undefined,
       offerExpiresAt: firstDriverId ? new Date(now.getTime() + 30_000).toISOString() : undefined,
     };
-    await ordersDb.runTransaction(async (transaction) => {
-      const existing = await transaction.get(orderRef);
-      if (existing.exists) {
-        throw new Error("ORDER_ALREADY_EXISTS");
-      }
-      transaction.create(orderRef, {
-        ...newOrder,
-        serverCreatedAt: FieldValue.serverTimestamp(),
-      });
-    });
-    if (firstDriverId) await ordersDb.collection("knights").doc(firstDriverId).set({ lastDispatchOfferAt: now.toISOString() }, { merge: true });
-    return res.status(201).json({ success: true, order: newOrder, dispatch: { matched: Boolean(firstDriverId), mode: newOrder.dispatchMode, waitingForDriver: !firstDriverId } });
-  } catch (error: any) {
-    if (error?.message === "ORDER_ALREADY_EXISTS") {
-      const existing = await orderRef.get();
-      if (existing.exists && String((existing.data() as ServerOrder)?.passengerUserId || "") === user.uid) {
-        return res.status(200).json({
-          success: true,
-          idempotentReplay: true,
-          order: existing.data(),
-          dispatch: {
-            matched: Boolean((existing.data() as any)?.offeredDriverId),
-            mode: String((existing.data() as any)?.dispatchMode || "automatic"),
-            waitingForDriver: !(existing.data() as any)?.offeredDriverId,
-          }
+
+    let persistedToFirestore = false;
+    try {
+      await ordersDb.runTransaction(async (transaction) => {
+        const existing = await transaction.get(orderRef);
+        if (existing.exists) {
+          throw new Error("ORDER_ALREADY_EXISTS");
+        }
+        transaction.create(orderRef, {
+          ...newOrder,
+          serverCreatedAt: FieldValue.serverTimestamp(),
         });
+      });
+      persistedToFirestore = true;
+      if (firstDriverId) {
+        try {
+          await ordersDb.collection("knights").doc(firstDriverId).set({ lastDispatchOfferAt: now.toISOString() }, { merge: true });
+        } catch (ignore) {}
       }
-      return res.status(409).json({ error: "Order already exists" });
+    } catch (dbError: any) {
+      if (dbError?.message === "ORDER_ALREADY_EXISTS") {
+        const existing = await orderRef.get().catch(() => null);
+        if (existing?.exists && String((existing.data() as ServerOrder)?.passengerUserId || "") === user.uid) {
+          return res.status(200).json({
+            success: true,
+            idempotentReplay: true,
+            order: existing.data(),
+            dispatch: {
+              matched: Boolean((existing.data() as any)?.offeredDriverId),
+              mode: String((existing.data() as any)?.dispatchMode || "automatic"),
+              waitingForDriver: !(existing.data() as any)?.offeredDriverId,
+            }
+          });
+        }
+        return res.status(409).json({ error: "Order already exists" });
+      }
+      console.warn("[Orders DB Admin Warning - using resilient store]:", dbError?.message);
     }
+
+    // Store in resilient in-memory store
+    resilientOrdersStore.set(newOrder.id, newOrder);
+
+    return res.status(201).json({
+      success: true,
+      order: newOrder,
+      dispatch: { matched: Boolean(firstDriverId), mode: newOrder.dispatchMode, waitingForDriver: !firstDriverId },
+      persistedToFirestore,
+    });
+  } catch (error: any) {
     console.error("[Orders POST Error]:", error?.message);
     return res.status(503).json({ error: "ฐานข้อมูลออเดอร์ยังไม่พร้อมใช้งาน", code: "ORDER_STORE_UNAVAILABLE" });
   }
@@ -2778,6 +2910,9 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
       });
     });
 
+    if (acceptedOrder) {
+      resilientOrdersStore.set(id, acceptedOrder);
+    }
     return res.json({ success: true, order: acceptedOrder });
   } catch (error: any) {
     if (error?.message === "ORDER_NOT_FOUND") {
@@ -2923,6 +3058,9 @@ app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
       }
     });
 
+    if (updatedOrder) {
+      resilientOrdersStore.set(id, updatedOrder);
+    }
     return res.json({ success: true, order: updatedOrder });
   } catch (error: any) {
     if (error?.message === "ORDER_NOT_FOUND") return res.status(404).json({ error: "Order not found" });

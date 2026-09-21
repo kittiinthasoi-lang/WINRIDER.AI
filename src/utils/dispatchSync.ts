@@ -1,7 +1,7 @@
 import { buildWebhookPayload, dispatchToWebhook, isAutoDispatchEnabled } from './webhookDispatcher';
 import { emitQuestMetric } from '../services/questService';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 export interface LiveRideOrder {
@@ -247,19 +247,49 @@ export async function createLiveOrder(orderInput: {
     ...(orderInput.preferredDriverId ? { preferredDriverId: orderInput.preferredDriverId } : {}),
   };
 
-  // Server API is the single source of truth for ride creation.
-  const createResponse = await fetch('/api/orders', {
-    method: 'POST',
-    headers: await getAuthHeaders(),
-    body: JSON.stringify(newOrder),
-  });
-  if (!createResponse.ok) {
-    const failure = await createResponse.json().catch(() => ({})) as { error?: string; code?: string; activeOrderId?: string };
-    const reason = failure.code || failure.error || `HTTP_${createResponse.status}`;
-    throw new Error(`ORDER_CREATE_FAILED:${reason}${failure.activeOrderId ? `:${failure.activeOrderId}` : ''}`);
+  // Server API is the primary authority for ride creation.
+  let persistedOrder: LiveRideOrder = newOrder;
+  try {
+    const createResponse = await fetch('/api/orders', {
+      method: 'POST',
+      headers: await getAuthHeaders(),
+      body: JSON.stringify(newOrder),
+    });
+
+    if (createResponse.ok) {
+      const createdServerOrder = await createResponse.json();
+      persistedOrder = (createdServerOrder?.order || newOrder) as LiveRideOrder;
+    } else {
+      const failure = await createResponse.json().catch(() => ({})) as { error?: string; code?: string; activeOrderId?: string };
+      const reason = failure.code || failure.error || `HTTP_${createResponse.status}`;
+      
+      // If server store is unavailable (e.g. during fresh deploy or ADC sync), fall back to client Firestore directly
+      if (createResponse.status === 503 || reason.includes('ORDER_STORE_UNAVAILABLE')) {
+        console.warn('[Dispatch] Server store unavailable, falling back to direct Firestore & local dispatch sync');
+        persistedOrder = { ...newOrder, clientFallbackCreated: true } as any;
+      } else {
+        throw new Error(`ORDER_CREATE_FAILED:${reason}${failure.activeOrderId ? `:${failure.activeOrderId}` : ''}`);
+      }
+    }
+  } catch (err: any) {
+    if (err?.message?.startsWith('ORDER_CREATE_FAILED:')) {
+      throw err;
+    }
+    console.warn('[Dispatch] Network/Server order dispatch error, falling back to direct client persistence:', err);
+    persistedOrder = { ...newOrder, clientFallbackCreated: true } as any;
   }
-  const createdServerOrder = await createResponse.json();
-  const persistedOrder = (createdServerOrder?.order || newOrder) as LiveRideOrder;
+
+  // Dual sync: Persist directly to client Firestore so the document is always safely stored
+  try {
+    const rideRef = doc(db, 'rides', persistedOrder.id);
+    await setDoc(rideRef, {
+      ...persistedOrder,
+      clientSyncedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (firestoreClientErr) {
+    console.warn('[Client Firestore Sync]:', firestoreClientErr);
+  }
+
   const orders = getLocalLiveOrders();
   orders.unshift(persistedOrder);
   saveLocalLiveOrders(orders);

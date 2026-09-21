@@ -16,7 +16,8 @@ const firebaseConfig = {
   appId: metaEnv.VITE_FIREBASE_APP_ID || fallbackConfig.appId,
 };
 
-const databaseId = metaEnv.VITE_FIREBASE_DATABASE_ID || fallbackConfig.firestoreDatabaseId;
+const rawDbId = metaEnv.VITE_FIREBASE_DATABASE_ID || metaEnv.VITE_FIRESTORE_DATABASE_ID || fallbackConfig.firestoreDatabaseId;
+const databaseId = (!rawDbId || rawDbId === '(default)') ? undefined : rawDbId;
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 

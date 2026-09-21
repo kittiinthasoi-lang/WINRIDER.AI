@@ -1316,9 +1316,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 aria-label="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป"
               >
                 <img 
-                  src="/images/voice_command.jpg" 
+                  src="/images/voice_command.jpg?v=2" 
                   alt="สั่งการด้วยเสียง AI" 
-                  className="w-5 h-5 rounded-md object-cover animate-pulse group-hover:scale-110 transition-transform shadow-sm"
+                  className="w-6 h-6 rounded-md object-cover animate-pulse group-hover:scale-110 transition-transform shadow-sm"
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src = '/images/voice-command-header.svg';
                   }}
@@ -1339,9 +1339,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 aria-label="เปิดศูนย์แจ้งเตือนศาสนาและวันสำคัญ"
               >
                 <img 
-                  src="/images/faith_religion.jpg" 
+                  src="/images/faith_religion.jpg?v=2" 
                   alt="ศูนย์แจ้งเตือนศาสนาและวันสำคัญ" 
-                  className="w-5 h-5 rounded-md object-cover group-hover:scale-110 transition-transform shadow-sm"
+                  className="w-6 h-6 rounded-md object-cover group-hover:scale-110 transition-transform shadow-sm"
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src = '/images/religious-faith-header.svg';
                   }}

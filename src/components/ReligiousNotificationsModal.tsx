@@ -187,7 +187,7 @@ export const ReligiousNotificationsModal: React.FC<ReligiousNotificationsModalPr
   };
 
   const testNotification = () => {
-    sendBrowserNotification('🪷 WINRIDER.AI • Faith & Sacred Calendar', {
+    sendBrowserNotification('☸️ WINRIDER.AI • Faith & Sacred Calendar', {
       body: 'ระบบพร้อมแจ้งเตือนวันสำคัญ ศาสนกิจ และเวลาละหมาดตามการตั้งค่าของคุณ',
       tag: 'faith-sacred-calendar-test',
     });
@@ -204,7 +204,14 @@ export const ReligiousNotificationsModal: React.FC<ReligiousNotificationsModalPr
 
         <header className="border-b border-white/10 p-5 sm:p-7">
           <div className="flex items-center gap-3 pr-10">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-2xl">🪷</div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-300/10 overflow-hidden shadow-sm">
+              <img 
+                src="/images/faith_religion.jpg?v=2" 
+                alt="Faith & Sacred" 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer"
+              />
+            </div>
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">Faith & Sacred Calendar</div>
               <h2 id="faith-calendar-title" className="text-xl font-black sm:text-2xl">ศูนย์แจ้งเตือนศาสนาและวันสำคัญ</h2>
