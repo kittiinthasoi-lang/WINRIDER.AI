@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getAuth } from 'firebase/auth';
 import { 
   PartnerProfile, 
   PartnerCategory, 
@@ -154,6 +155,37 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
     }).catch((error) => console.warn('Unable to load partner profile:', error));
   }, [canEdit, selectedPartner.id]);
   
+  useEffect(() => {
+    if (!canEdit) return;
+    void (async () => {
+      try {
+        const user = getAuth().currentUser;
+        if (!user) return;
+        const response = await fetch('/api/shop/profile-content', { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
+        const payload = await response.json() as { promotions?: PartnerPromotion[] };
+        if (response.ok && Array.isArray(payload.promotions)) {
+          setOwnerPromotions(prev => ({ ...prev, [selectedPartner.id]: payload.promotions || [] }));
+        }
+      } catch (error) {
+        console.warn('Unable to load partner storefront content:', error);
+      }
+    })();
+  }, [canEdit, selectedPartner.id]);
+
+  const persistPartnerPromotions = async (promotions: PartnerPromotion[]) => {
+    try {
+      const user = getAuth().currentUser;
+      if (!user) return;
+      await fetch('/api/shop/profile-content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ promotions }),
+      });
+    } catch (error) {
+      console.warn('Unable to persist partner storefront content:', error);
+    }
+  };
+
   const [incomingCustomers] = useState<{ id: string; name: string; riderName: string; etaMin: number; x: number; y: number; vehicle: string }[]>([]);
 
   // Combined promotions list (sample + owner created)
@@ -216,10 +248,12 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
       validUntil: 'ตลอด 30 วัน',
       badge: newPromoBadge || 'Special Perk'
     };
+    const nextPromotions = [newPr, ...(ownerPromotions[selectedPartner.id] || [])];
     setOwnerPromotions(prev => ({
       ...prev,
-      [selectedPartner.id]: [newPr, ...(prev[selectedPartner.id] || [])]
+      [selectedPartner.id]: nextPromotions
     }));
+    void persistPartnerPromotions(nextPromotions);
     setNewPromoTitle('');
     setNewPromoDiscount('');
     setNewPromoCondition('');
