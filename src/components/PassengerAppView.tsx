@@ -951,7 +951,29 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   };
 
   const handleSelectLifestylePlace = (place: LifestylePlace) => {
-    void calculateDestinationRoute(place.name + ' (' + place.area + ')', place.name + ' (' + place.area + ')');
+    const destination = place.name + ' (' + place.area + ')';
+    setActiveServiceId('lifestyle');
+    setSelectedService('WIN Lifestyle');
+    setSelectedDestination(destination);
+    setShowBookingModal(false);
+    setShowDriverMatchingModal(true);
+    if (audioEnabled) {
+      playTactileBlip(950);
+      speakThaiText('เลือกสถานที่แล้ว กรุณากดเริ่มจับคู่เพื่อค้นหาพี่วินสำหรับปลายทางนี้');
+    }
+  };
+
+  const handleSelectWinAlertEvent = (event: { title: string; venueName: string; venueArea?: string }) => {
+    const destination = event.venueName + (event.venueArea ? ' ' + event.venueArea : '');
+    setActiveServiceId('knight');
+    setSelectedService('WIN KNIGHT • Win Alert');
+    setSelectedDestination(destination);
+    setShowBookingModal(false);
+    setShowDriverMatchingModal(true);
+    if (audioEnabled) {
+      playTactileBlip(1000);
+      speakThaiText('เลือกกิจกรรมแล้ว กรุณากดเริ่มจับคู่เพื่อค้นหาพี่วินไปยังสถานที่จริง');
+    }
   };
   const handleConfirmRide = async () => {
     if (!currentUserSession?.id) {
@@ -1571,14 +1593,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 {/* PROACTIVE WIN-ALERT EVENT CARDS (Mall Sales, Pop-up Markets, Concerts, Festivals) */}
                 <WinAlertEventsCard
                   audioEnabled={audioEnabled}
-                  onBookEventRide={(event) => {
-                    if (audioEnabled) playTactileBlip(1000);
-                    setSelectedService('WIN KNIGHT (Special Event Dispatch)');
-                    void calculateDestinationRoute(
-                      event.venueName + (event.venueArea ? ' ' + event.venueArea : ''),
-                      event.venueName
-                    );
-                  }}
+                  onBookEventRide={handleSelectWinAlertEvent}
                 />
 
                 {/* DESTINATION CAROUSEL & GOOGLE MAPS REAL LOCATIONS RANDOMIZER */}
