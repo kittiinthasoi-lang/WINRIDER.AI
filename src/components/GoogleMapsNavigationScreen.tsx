@@ -3,7 +3,7 @@
 
 declare const google: any;
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   APIProvider,
   Map,
@@ -164,56 +164,67 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
     return null;
   }, [gpsState.latitude, gpsState.longitude, phase, pickupCoords]);
 
-  // Active calculated route
+  // Active calculated route. Recalculate from real GPS periodically or after meaningful movement,
+  // rather than on every GPS tick, so live navigation stays current without request bursts.
   const [liveRoute, setLiveRoute] = useState<ComputedLiveRoute | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState<boolean>(true);
+  const lastRouteRequestRef = useRef<{ lat: number; lng: number; at: number; phase: NavigationPhase; destLat: number; destLng: number } | null>(null);
 
-  // Calculate real route between points
+  // Calculate a real route from the Knight's current GPS to the active waypoint.
+  // Refresh on meaningful movement or after 10s so ETA/traffic stays current without
+  // firing a Routes API request for every GPS update.
   useEffect(() => {
     let isCancelled = false;
 
     async function loadRoute() {
-      const hasDriverPosition = Boolean(driverPos && driverPos.lat && driverPos.lng);
+      const hasDriverPosition = Boolean(driverPos && Number.isFinite(driverPos.lat) && Number.isFinite(driverPos.lng));
       const destination = phase === 'approaching' ? pickupCoords : dropoffCoords;
-      if (!hasDriverPosition || !destination.lat || !destination.lng) {
+      if (!hasDriverPosition || !Number.isFinite(destination.lat) || !Number.isFinite(destination.lng) || destination.lat === 0 && destination.lng === 0) {
         setLiveRoute(null);
         setIsLoadingRoute(false);
         return;
       }
+
+      const previous = lastRouteRequestRef.current;
+      const movedMeters = previous && previous.phase === phase && previous.destLat === destination.lat && previous.destLng === destination.lng
+        ? Math.hypot((driverPos!.lat - previous.lat) * 111_000, (driverPos!.lng - previous.lng) * 111_000 * Math.cos((driverPos!.lat * Math.PI) / 180))
+        : Number.POSITIVE_INFINITY;
+      const ageMs = previous ? Date.now() - previous.at : Number.POSITIVE_INFINITY;
+      if (previous && previous.phase === phase && previous.destLat === destination.lat && previous.destLng === destination.lng && movedMeters < 75 && ageMs < 10_000) {
+        return;
+      }
+
+      lastRouteRequestRef.current = {
+        lat: driverPos!.lat,
+        lng: driverPos!.lng,
+        at: Date.now(),
+        phase,
+        destLat: destination.lat,
+        destLng: destination.lng
+      };
       setIsLoadingRoute(true);
       try {
-        let originPt = { latitude: driverPos!.lat, longitude: driverPos!.lng };
-        let destPt = { latitude: pickupCoords.lat, longitude: pickupCoords.lng, name: pickupAddress };
-
-        if (phase === 'in_transit') {
-          originPt = { latitude: driverPos!.lat, longitude: driverPos!.lng };
-          destPt = { latitude: dropoffCoords.lat, longitude: dropoffCoords.lng, name: dropoffAddress };
-        }
+        const destPt = phase === 'approaching'
+          ? { latitude: pickupCoords.lat, longitude: pickupCoords.lng, name: pickupAddress }
+          : { latitude: dropoffCoords.lat, longitude: dropoffCoords.lng, name: dropoffAddress };
 
         const res = await computeLiveRoute({
-          origin: originPt,
+          origin: { latitude: driverPos!.lat, longitude: driverPos!.lng },
           destination: destPt,
           travelMode: 'TWO_WHEELER',
           routingPreference: 'TRAFFIC_AWARE'
         });
 
-        if (!isCancelled) {
-          setLiveRoute(res);
-        }
+        if (!isCancelled) setLiveRoute(res);
       } catch (err) {
         console.warn('Routes calculation error:', err);
       } finally {
-        if (!isCancelled) {
-          setIsLoadingRoute(false);
-        }
+        if (!isCancelled) setIsLoadingRoute(false);
       }
     }
 
-    loadRoute();
-
-    return () => {
-      isCancelled = true;
-    };
+    void loadRoute();
+    return () => { isCancelled = true; };
   }, [phase, driverPos?.lat, driverPos?.lng, pickupCoords.lat, pickupCoords.lng, dropoffCoords.lat, dropoffCoords.lng, pickupAddress, dropoffAddress]);
 
   // Launch Real Google Maps Turn-by-Turn Navigation on device
@@ -465,7 +476,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
             <div className="flex items-baseline gap-2.5">
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-black text-emerald-400 tracking-tight">
-                  {phase === 'approaching' ? '2-3' : liveRoute?.totalDurationMinutes || '8'}
+                  {liveRoute?.totalDurationMinutes ?? (isLoadingRoute ? '…' : '—')}
                 </span>
                 <span className="text-xs font-bold text-emerald-300">นาที</span>
               </div>
@@ -473,7 +484,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
               <div className="flex items-center gap-1.5 text-xs text-slate-300">
                 <span>•</span>
                 <span className="font-bold text-white">
-                  {phase === 'approaching' ? '350 ม.' : `${liveRoute?.totalDistanceKm || '2.4'} กม.`}
+                  {liveRoute?.totalDistanceKm || (isLoadingRoute ? 'กำลังคำนวณ' : '—')}
                 </span>
                 <span>•</span>
                 <span className="text-slate-400 text-[11px]">
