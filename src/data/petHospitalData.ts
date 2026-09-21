@@ -25,8 +25,6 @@ export interface NearbyPetCareResponse {
 }
 
 export const WIN_PET_CARE_REQUIREMENTS = {
-  minDriverLevel: 10,
-  minDriverRank: 'Bronze Knight (อัศวินทองแดง) ขึ้นไป',
   equipmentRequired: [
     'กล่องใส่สัตว์เลี้ยง WIN-Pet Climate Pod',
     'สายรัดนิรภัย Pet Safety Harness',
@@ -34,7 +32,7 @@ export const WIN_PET_CARE_REQUIREMENTS = {
     'ผ่านการอบรมปฐมพยาบาลสัตว์เลี้ยงเบื้องต้น',
   ],
   serviceHighlights: [
-    'พี่วินผู้รับงาน WIN-Pet Care ต้องมี Level 10 ขึ้นไป',
+    'พี่วินผู้รับงาน WIN-Pet Care ต้องผ่านการคัดเลือกและการอบรมโดยแอดมิน พร้อมใช้อุปกรณ์ขนส่งสัตว์เลี้ยงตามมาตรฐาน',
     'ต้องติดตั้งอุปกรณ์ขนส่งสัตว์เลี้ยงที่ผ่านการตรวจสอบ',
     'ระยะทางและเวลาเดินทางต้องมาจาก Google Routes ตาม GPS ปัจจุบัน',
   ],
