@@ -25,7 +25,7 @@ import {
 
 export interface QuestItem {
   id: string;
-  role: 'driver' | 'citizen' | 'merchant';
+  role: 'driver' | 'citizen' | 'merchant' | 'partner';
   category: 'daily' | 'weekly' | 'epic';
   title: string;
   desc: string;
@@ -36,278 +36,99 @@ export interface QuestItem {
   isClaimed: boolean;
   iconEmoji: string;
   tag: string;
+  metricKey?: string;
 }
 
 interface SovereignQuestCenterProps {
-  initialRole?: 'driver' | 'citizen' | 'merchant';
+  initialRole?: 'driver' | 'citizen' | 'merchant' | 'partner';
   driverLevel?: number;
   citizenLevel?: number;
   merchantLevel?: number;
+  partnerLevel?: number;
   audioEnabled: boolean;
   onGainDriverXp?: (amount: number, reason: string) => void;
   onGainCitizenXp?: (amount: number, reason: string) => void;
   onGainMerchantXp?: (amount: number, reason: string) => void;
+  onGainPartnerXp?: (amount: number, reason: string) => void;
   onRewardBonusCash?: (amount: number) => void;
 }
 
+export const QUEST_SEASON_ID = '2026-S3';
+
+const makeQuest = (
+  id: string,
+  role: QuestItem['role'],
+  category: QuestItem['category'],
+  title: string,
+  desc: string,
+  xpReward: number,
+  totalRequired: number,
+  iconEmoji: string,
+  tag: string,
+  metricKey: string,
+  bonusReward?: string,
+): QuestItem => ({
+  id, role, category, title, desc, xpReward, bonusReward,
+  progress: 0, totalRequired, isClaimed: false, iconEmoji, tag, metricKey,
+});
+
+/**
+ * ภารกิจซีซันใหม่ 2026-S3
+ * ทุกบัญชีใหม่เริ่มจาก 0 และชุดภารกิจไม่ใช้ข้อมูล/ความคืบหน้าจากซีซันเก่า
+ * metricKey ถูกออกแบบให้ผูกกับ event จริงของแอปต่อไป
+ */
 export const INITIAL_QUESTS: QuestItem[] = [
-  // --- DRIVER QUESTS (พี่วิน) ---
-  {
-    id: 'DQ-DRV-1',
-    role: 'driver',
-    category: 'daily',
-    title: 'วิ่งส่งผู้โดยสารครบ 5 เที่ยว',
-    desc: 'ให้บริการรับส่งผู้โดยสารในเขตพื้นที่ด้วยความสุภาพและปลอดภัย',
-    xpReward: 250,
-    bonusReward: '+฿30 โบนัสค่าน้ำมัน',
-    progress: 3,
-    totalRequired: 5,
-    isClaimed: false,
-    iconEmoji: '🛵',
-    tag: 'Daily Rush'
-  },
-  {
-    id: 'DQ-DRV-2',
-    role: 'driver',
-    category: 'daily',
-    title: 'สวมชุดเกราะ & หมวก Smart HUD เต็มยศ',
-    desc: 'เปิดระบบไฟส่องสว่างเรืองแสงและเชื่อมต่อระบบเสียงแจ้งเตือน HUD',
-    xpReward: 200,
-    bonusReward: 'ปลดล็อกสกินไฟนีออน',
-    progress: 1,
-    totalRequired: 1,
-    isClaimed: false,
-    iconEmoji: '🛡️',
-    tag: 'Armor Ready'
-  },
-  {
-    id: 'DQ-DRV-3',
-    role: 'driver',
-    category: 'daily',
-    title: 'วิ่งช่วงเวลาเร่งด่วนเช้า-เย็น (Rush Hour)',
-    desc: 'ช่วยระบายการจราจรติดขัดช่วง 07:00-09:00 หรือ 17:00-19:00',
-    xpReward: 180,
-    bonusReward: '+฿20 ค่ารอบพิเศษ',
-    progress: 2,
-    totalRequired: 2,
-    isClaimed: false,
-    iconEmoji: '⚡',
-    tag: 'Rush Hour'
-  },
-  {
-    id: 'DQ-DRV-4',
-    role: 'driver',
-    category: 'daily',
-    title: 'ให้บริการพิเศษ (WIN Spirit / MU BUDDY / WIN-Pet)',
-    desc: 'พาผู้สูงอายุไปทำศาสนกิจ, ทริปสายมู 9 วัด หรือพาสัตว์เลี้ยงไปหาหมอ',
-    xpReward: 300,
-    bonusReward: 'คะแนนเครดิต +10 แต้ม',
-    progress: 1,
-    totalRequired: 1,
-    isClaimed: false,
-    iconEmoji: '🪷',
-    tag: 'Special Care'
-  },
-  {
-    id: 'WQ-DRV-1',
-    role: 'driver',
-    category: 'weekly',
-    title: 'สะสมเที่ยววิ่ง 35 เที่ยวต่อสัปดาห์',
-    desc: 'สร้างรายได้มั่นคงและปลดหนี้ค่าชุดเกราะ 4 บาทต่อเที่ยวตามนโยบายอธิปไตย',
-    xpReward: 1200,
-    bonusReward: '+฿200 โบนัสสวัสดิการ',
-    progress: 24,
-    totalRequired: 35,
-    isClaimed: false,
-    iconEmoji: '🏆',
-    tag: 'Weekly Master'
-  },
-  {
-    id: 'WQ-DRV-2',
-    role: 'driver',
-    category: 'weekly',
-    title: 'ได้รับคะแนนรีวิว 5 ดาวต่อเนื่อง 10 เที่ยว',
-    desc: 'รักษามาตรฐานการขับขี่นุ่มนวลและไม่ปฏิเสธผู้โดยสาร',
-    xpReward: 600,
-    bonusReward: 'ตราสัญลักษณ์ 5-Star Knight',
-    progress: 8,
-    totalRequired: 10,
-    isClaimed: false,
-    iconEmoji: '⭐',
-    tag: '5-Star Streak'
-  },
-  {
-    id: 'EQ-DRV-1',
-    role: 'driver',
-    category: 'epic',
-    title: 'ฮีโร่ลุยน้ำท่วม & ลุยฝน (Flood Hero)',
-    desc: 'วิ่งงานช่วงฝนตกหนักด้วย Touring Adventure หรือรถที่พร้อมลุยน้ำท่วม',
-    xpReward: 2000,
-    bonusReward: 'ฉายา Sovereign Rain Conqueror',
-    progress: 2,
-    totalRequired: 3,
-    isClaimed: false,
-    iconEmoji: '🌧️',
-    tag: 'Epic Challenge'
-  },
+  // KNIGHT — งานจริง, ความปลอดภัย, GPS, บริการพิเศษ
+  makeQuest('S3-KN-D01','driver','daily','เช็กความพร้อมก่อนออกงาน','เปิด Garage ตรวจรถหลักและยืนยันว่ารถพร้อมรับงานก่อนเริ่มกะ',60,1,'🛵','Garage Ready','driver.preflight'),
+  makeQuest('S3-KN-D02','driver','daily','เปิดโหมดพร้อมรับงาน','เปิดโหมดออนไลน์/พร้อมรับงานและอยู่ในพื้นที่ให้บริการ',80,1,'🟢','Ready to Ride','driver.online'),
+  makeQuest('S3-KN-D03','driver','daily','ส่งผู้โดยสารถึงปลายทาง','ทำทริปผู้โดยสารที่จบสถานะ COMPLETED ผ่าน Dispatch Engine',180,3,'📍','Real Trip','driver.completed_trip'),
+  makeQuest('S3-KN-D04','driver','daily','ส่งงานตรงตามเส้นทางจริง','จบทริปที่มี GPS/Route ETA ถูกบันทึกจากระบบนำทาง',140,2,'🧭','Live Navigation','driver.routed_trip'),
+  makeQuest('S3-KN-W01','driver','weekly','รักษาความสม่ำเสมอ 5 วัน','เปิดงานและทำงานผ่านระบบอย่างน้อย 5 วันในสัปดาห์',500,5,'📅','5-Day Knight','driver.active_days'),
+  makeQuest('S3-KN-W02','driver','weekly','ผู้พิทักษ์บริการเฉพาะทาง','จบทริป WIN Spirit, WIN Family, WIN Pet Care หรือ WIN Express ตามเงื่อนไขบริการ',700,3,'🛡️','Special Service','driver.special_service'),
+  makeQuest('S3-KN-E01','driver','epic','Knight ที่ระบบไว้ใจ','สะสมทริปสำเร็จ 50 เที่ยว พร้อมไม่มีการยกเลิกจากฝั่ง Knight',1600,50,'🏆','Trusted Knight','driver.trusted_completed_trip'),
 
-  // --- CITIZEN QUESTS (ลูกค้า / ผู้โดยสาร) ---
-  {
-    id: 'DQ-CTZ-1',
-    role: 'citizen',
-    category: 'daily',
-    title: 'เรียกใช้บริการ WINRIDER 1 ทริป',
-    desc: 'เดินทางสะดวกรวดเร็ว ประหยัดเวลา หลบหลีกรถติดด้วยพี่วินมืออาชีพ',
-    xpReward: 150,
-    bonusReward: 'คูปองส่วนลด 10฿ ทริปถัดไป',
-    progress: 1,
-    totalRequired: 1,
-    isClaimed: false,
-    iconEmoji: '🛵',
-    tag: 'Daily Commute'
-  },
-  {
-    id: 'DQ-CTZ-2',
-    role: 'citizen',
-    category: 'daily',
-    title: 'สั่งการเรียกรถด้วยเสียง AI Voice Assistant',
-    desc: 'ทดลองสั่งงานภาษาไทย เช่น "เลือกรถประหยัดสุด" หรือ "พาคุณตาไปละหมาด"',
-    xpReward: 120,
-    bonusReward: 'เครดิตการเงินพลเมือง +5',
-    progress: 1,
-    totalRequired: 1,
-    isClaimed: false,
-    iconEmoji: '🎙️',
-    tag: 'Voice AI'
-  },
-  {
-    id: 'DQ-CTZ-3',
-    role: 'citizen',
-    category: 'daily',
-    title: 'ให้คะแนนรีวิวและทิปพี่วิน',
-    desc: 'ส่งเสริมกำลังใจพี่วินอัศวินผู้พิทักษ์ซอยแคบ',
-    xpReward: 100,
-    bonusReward: 'เหรียญสะสมเกียรติยศ',
-    progress: 1,
-    totalRequired: 1,
-    isClaimed: false,
-    iconEmoji: '💖',
-    tag: 'Good Karma'
-  },
-  {
-    id: 'WQ-CTZ-1',
-    role: 'citizen',
-    category: 'weekly',
-    title: 'ใช้บริการ WIN Spirit พาญาติผู้ใหญ่ทำศาสนกิจ',
-    desc: 'พาคุณตาไปละหมาดมัสยิด หรือพาคุณยายไปทำบุญตักบาตรที่วัด',
-    xpReward: 400,
-    bonusReward: 'ส่วนลด 20% ทริปครอบครัว',
-    progress: 1,
-    totalRequired: 1,
-    isClaimed: false,
-    iconEmoji: '🕌',
-    tag: 'Family Spirit'
-  },
-  {
-    id: 'WQ-CTZ-2',
-    role: 'citizen',
-    category: 'weekly',
-    title: 'อุดหนุนสินค้าในตลาดชุมชน C2C ของพี่วิน',
-    desc: 'สั่งอาหารโฮมเมด งานคราฟต์ หรือของดีประจำถิ่นฝั่งธนบุรี',
-    xpReward: 350,
-    bonusReward: 'แต้มสะสม WIN Coins 50 แต้ม',
-    progress: 2,
-    totalRequired: 3,
-    isClaimed: false,
-    iconEmoji: '🍱',
-    tag: 'C2C Support'
-  },
-  {
-    id: 'EQ-CTZ-1',
-    role: 'citizen',
-    category: 'epic',
-    title: 'ทริปสายมู 9 วัดกับ WIN MU BUDDY',
-    desc: 'เดินทางสักการะสิ่งศักดิ์สิทธิ์ครบ 9 แห่งพร้อมเปิดบทสวดมนต์ AI',
-    xpReward: 1500,
-    bonusReward: 'ผ้ายันต์ดิจิทัลคุ้มครองดวงชะตา',
-    progress: 5,
-    totalRequired: 9,
-    isClaimed: false,
-    iconEmoji: '🪷',
-    tag: 'Sacred Explorer'
-  },
+  // CITIZEN — เรียกรถ, Shop, Street Market, Win Alert, ความปลอดภัย
+  makeQuest('S3-CT-D01','citizen','daily','เดินทางด้วย WINRIDER','จบทริปที่เรียกผ่านแอปอย่างน้อย 1 เที่ยว',100,1,'🛵','Ride with WIN','citizen.completed_trip'),
+  makeQuest('S3-CT-D02','citizen','daily','ใช้ Win Alert','เปิด Win Alert แล้วดูเส้นทาง/ค่าโดยสารจริงก่อนจองอย่างน้อย 1 รายการ',80,1,'⚡','Win Alert','citizen.win_alert_preview'),
+  makeQuest('S3-CT-D03','citizen','daily','ค้นหา WIN Shop','เข้า WIN Shop และเปิดดูร้านค้าหรือพาร์ทเนอร์อย่างน้อย 1 โปรไฟล์',60,1,'🛍️','Shop Explorer','citizen.shop_profile_view'),
+  makeQuest('S3-CT-D04','citizen','daily','สนับสนุน WIN Street Market','เปิดดูสินค้าประชาชนหรือบันทึกรายการที่สนใจอย่างน้อย 1 รายการ',60,1,'🏘️','Street Market','citizen.street_market_view'),
+  makeQuest('S3-CT-W01','citizen','weekly','ผู้ใช้บริการรอบด้าน','ใช้ฟีเจอร์หลัก 3 หมวด: เรียกรถ, WIN Shop/Street Market และแผนที่/สถานที่',350,3,'🧩','App Explorer','citizen.feature_categories'),
+  makeQuest('S3-CT-W02','citizen','weekly','นักเดินทางมีวินัย','จบทริป 5 เที่ยวและให้คะแนนหลังการเดินทางครบ',450,5,'⭐','Ride & Rate','citizen.rated_completed_trip'),
+  makeQuest('S3-CT-E01','citizen','epic','พลเมือง WINRIDER ตัวจริง','จบทริป 20 เที่ยว + ใช้ WIN Shop/Street Market อย่างน้อย 5 ครั้ง',1400,25,'🌟','WIN Citizen','citizen.engagement_score'),
 
-  // --- MERCHANT QUESTS (ร้านค้าพันธมิตร) ---
-  {
-    id: 'DQ-MCH-1',
-    role: 'merchant',
-    category: 'daily',
-    title: 'เตรียมออเดอร์เสร็จไวใน 10 นาที',
-    desc: 'ช่วยให้พี่วินรับของได้ทันใจ ผู้โดยสารได้รับอาหารร้อนๆ ตรงเวลา',
-    xpReward: 150,
-    bonusReward: 'อันดับร้านแนะนำบนแผนที่ 3D',
-    progress: 4,
-    totalRequired: 5,
-    isClaimed: false,
-    iconEmoji: '⏱️',
-    tag: 'Speed Chef'
-  },
-  {
-    id: 'DQ-MCH-2',
-    role: 'merchant',
-    category: 'daily',
-    title: 'จัดโปรโมชั่น Flash Sale ประจำวัน 1 รายการ',
-    desc: 'กระตุ้นยอดขายช่วงบ่ายและดึงดูดลูกค้าละแวกใกล้เคียง',
-    xpReward: 200,
-    bonusReward: 'เพิ่มการมองเห็นร้าน +30%',
-    progress: 1,
-    totalRequired: 1,
-    isClaimed: false,
-    iconEmoji: '🔥',
-    tag: 'Flash Promo'
-  },
-  {
-    id: 'WQ-MCH-1',
-    role: 'merchant',
-    category: 'weekly',
-    title: 'ยอดขายทะลุ 50 ออเดอร์ผ่าน WIN Hub',
-    desc: 'ขยายธุรกิจร่วมกับเครือข่ายอัศวินจักรวรรดิ WINRIDER GP 0%',
-    xpReward: 800,
-    bonusReward: 'วงเงินหมุนเวียนดอกเบี้ย 0% +฿50,000',
-    progress: 38,
-    totalRequired: 50,
-    isClaimed: false,
-    iconEmoji: '📈',
-    tag: 'Sales Champion'
-  },
-  {
-    id: 'EQ-MCH-1',
-    role: 'merchant',
-    category: 'epic',
-    title: 'ได้รับตราสัญลักษณ์ร้านอร่อย 5 ดาวมาตรฐานจักรวรรดิ',
-    desc: 'รักษาคะแนนรีวิวความอร่อยและความสะอาดเกิน 4.9 ดาว 100 บิลต่อเนื่อง',
-    xpReward: 1800,
-    bonusReward: 'ป้าย Golden Sovereign Michelin บนแผนที่',
-    progress: 78,
-    totalRequired: 100,
-    isClaimed: false,
-    iconEmoji: '👑',
-    tag: 'Empire Michelin'
-  }
+  // MERCHANT — หน้าร้าน, สินค้า, โปรโมชั่น, Dispatch, ออเดอร์
+  makeQuest('S3-ME-D01','merchant','daily','อัปเดตหน้าร้านให้พร้อมขาย','ตรวจ/อัปเดตโปรไฟล์ร้าน เวลาเปิด และข้อมูลติดต่อให้ครบ',80,1,'🏪','Store Ready','merchant.storefront_ready'),
+  makeQuest('S3-ME-D02','merchant','daily','ลงสินค้าให้ลูกค้าเห็น','มีการเพิ่มหรืออัปเดตสินค้าอย่างน้อย 1 รายการใน WIN Shop',100,1,'📦','Catalog Active','merchant.catalog_update'),
+  makeQuest('S3-ME-D03','merchant','daily','ทำโปรโมชันวันนี้','สร้างหรือเปิดใช้งานโปรโมชั่น 1 รายการ',100,1,'🏷️','Promotion','merchant.promotion_publish'),
+  makeQuest('S3-ME-D04','merchant','daily','เตรียมออเดอร์ให้พี่วิน','ทำออเดอร์ผ่านสถานะพร้อมรับสินค้า/จัดส่งตามระบบ',140,3,'🛵','Dispatch Ready','merchant.dispatch_ready'),
+  makeQuest('S3-ME-W01','merchant','weekly','ร้านค้าสม่ำเสมอ','อัปเดตหน้าร้านหรือสินค้าอย่างน้อย 5 วันในสัปดาห์',450,5,'📅','Store Streak','merchant.active_days'),
+  makeQuest('S3-ME-W02','merchant','weekly','สร้างประสบการณ์ลูกค้า','ปิดออเดอร์สำเร็จ 20 รายการโดยไม่ยกเลิกจากฝั่งร้าน',650,20,'🤝','Customer Care','merchant.completed_orders'),
+  makeQuest('S3-ME-E01','merchant','epic','ร้านค้าพร้อมเติบโตกับ WIN','มีหน้าร้านสมบูรณ์ + สินค้า 20 รายการ + ออเดอร์สำเร็จ 100 รายการ',1800,121,'👑','WIN Merchant','merchant.store_growth'),
+
+  // PARTNER — บริการ, สิทธิประโยชน์, นัดหมาย, การเชื่อมต่อ WIN
+  makeQuest('S3-PA-D01','partner','daily','เปิดโปรไฟล์พาร์ทเนอร์ให้พร้อม','ตรวจข้อมูลองค์กร บริการ ที่อยู่ และเวลาทำการให้ครบ',80,1,'🏢','Partner Ready','partner.profile_ready'),
+  makeQuest('S3-PA-D02','partner','daily','เผยแพร่บริการ','เพิ่มหรืออัปเดตบริการอย่างน้อย 1 รายการในโปรไฟล์',100,1,'🤝','Service Active','partner.service_update'),
+  makeQuest('S3-PA-D03','partner','daily','ประกาศสิทธิพิเศษ','สร้างหรืออัปเดตโปรโมชั่น/สิทธิพิเศษ 1 รายการ',100,1,'🎁','Partner Offer','partner.offer_publish'),
+  makeQuest('S3-PA-D04','partner','daily','รับการเชื่อมต่อจากลูกค้า','มีการเปิดดูโปรไฟล์บริการหรือเริ่มคำขอจากลูกค้าอย่างน้อย 1 ครั้ง',120,1,'📲','Customer Connect','partner.customer_connect'),
+  makeQuest('S3-PA-W01','partner','weekly','พาร์ทเนอร์พร้อมให้บริการ','อัปเดตข้อมูลบริการอย่างน้อย 5 วันในสัปดาห์',450,5,'📅','Partner Streak','partner.active_days'),
+  makeQuest('S3-PA-W02','partner','weekly','สร้างเครือข่ายบริการ','ได้รับคำขอ/การจอง/การเชื่อมต่อสำเร็จ 15 ครั้งผ่าน WIN',650,15,'🌐','WIN Network','partner.completed_connections'),
+  makeQuest('S3-PA-E01','partner','epic','Partner ที่เชื่อมต่อจริง','มีบริการที่เผยแพร่ + สิทธิพิเศษ + การเชื่อมต่อสำเร็จ 50 ครั้ง',1800,52,'🏆','WIN Partner','partner.network_growth'),
 ];
+
 
 export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
   initialRole = 'driver',
   driverLevel = 100,
   citizenLevel = 91,
-  merchantLevel = 75,
+  merchantLevel = 1,
+  partnerLevel = 1,
   audioEnabled,
   onGainDriverXp,
   onGainCitizenXp,
   onGainMerchantXp,
   onRewardBonusCash
 }) => {
-  const [activeRole, setActiveRole] = useState<'driver' | 'citizen' | 'merchant'>(initialRole);
+  const [activeRole, setActiveRole] = useState<'driver' | 'citizen' | 'merchant' | 'partner'>(initialRole);
   const [activeCategory, setActiveCategory] = useState<'all' | 'daily' | 'weekly' | 'epic'>('all');
   const [quests, setQuests] = useState<QuestItem[]>(INITIAL_QUESTS);
   const [claimedToast, setClaimedToast] = useState<string | null>(null);
@@ -338,6 +159,8 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
     setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, isClaimed: true } : q));
 
     // Award XP based on role
+    if (quest.isClaimed) return;
+
     if (quest.role === 'driver' && onGainDriverXp) {
       onGainDriverXp(quest.xpReward, `สำเร็จภารกิจ: ${quest.title}`);
     } else if (quest.role === 'citizen' && onGainCitizenXp) {
@@ -392,7 +215,8 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
           {[
             { id: 'driver' as const, label: 'ภารกิจพี่วิน (KNIGHT)', icon: '🛵', level: driverLevel },
             { id: 'citizen' as const, label: 'ภารกิจลูกค้า (CITIZEN)', icon: '🦥', level: citizenLevel },
-            { id: 'merchant' as const, label: 'ภารกิจร้านค้า (STORE)', icon: '🏬', level: merchantLevel }
+            { id: 'merchant' as const, label: 'ภารกิจร้านค้า (STORE)', icon: '🏬', level: merchantLevel },
+            { id: 'partner' as const, label: 'ภารกิจพาร์ทเนอร์ (PARTNER)', icon: '🏢', level: partnerLevel }
           ].map(r => (
             <button
               key={r.id}
