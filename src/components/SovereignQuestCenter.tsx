@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { auth } from '../firebase';
+import { loadQuestState, recordQuestMetric, claimQuest as persistClaimQuest } from '../services/questService';
 import { playTactileBlip, playLevelUpFanfare, playRadarScan } from '../utils/audio';
 import confetti from 'canvas-confetti';
 import {
@@ -134,7 +136,30 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
     INITIAL_QUESTS.map(q => ({ ...q, progress: 0, isClaimed: false }))
   );
 
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      try {
+        const state = await loadQuestState(user.uid);
+        if (cancelled) return;
+        const progress = (state.progress || {}) as Record<string, number>;
+        const claimed = new Set<string>((state.claimed || []) as string[]);
+        setQuests(INITIAL_QUESTS.map(q => ({
+          ...q,
+          progress: Math.min(q.totalRequired, Number(progress[q.metricKey || '']) || 0),
+          isClaimed: claimed.has(q.id),
+        })));
+      } catch (error) {
+        console.warn('Unable to load quest state:', error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [initialRole]);
+
   const updateQuestMetric = React.useCallback((metricKey: string, amount = 1) => {
+    void recordQuestMetric({ metricKey, amount });
     setQuests(prev => prev.map(q => {
       if (q.metricKey !== metricKey || q.isClaimed) return q;
       return { ...q, progress: Math.min(q.totalRequired, q.progress + Math.max(0, amount)) };
@@ -185,6 +210,7 @@ export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
     // Update local state and publish the real completion event for persistence hooks.
     setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, isClaimed: true } : q));
     emitQuestMetric(`quest.claimed.${quest.id}`, 1);
+    void persistClaimQuest(quest.id, quest.xpReward, quest.metricKey || '', quest.totalRequired).catch(error => console.warn('Quest claim persistence failed:', error));
 
     // Award XP based on role
     if (quest.role === 'driver' && onGainDriverXp) {
