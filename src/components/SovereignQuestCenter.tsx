@@ -118,8 +118,8 @@ export const INITIAL_QUESTS: QuestItem[] = [
 
 export const SovereignQuestCenter: React.FC<SovereignQuestCenterProps> = ({
   initialRole = 'driver',
-  driverLevel = 100,
-  citizenLevel = 91,
+  driverLevel = 1,
+  citizenLevel = 1,
   merchantLevel = 1,
   partnerLevel = 1,
   audioEnabled,
