@@ -1783,6 +1783,7 @@ app.get("/api/knights/settings", rateLimit(30), async (req, res) => {
       vehicles: Array.isArray(knight.vehicles) ? knight.vehicles.slice(0, 50) : [],
       activeVehicleId: typeof knight.activeVehicleId === "string" ? knight.activeVehicleId : null,
       equippedSuitId: typeof knight.equippedSuitId === "string" ? knight.equippedSuitId : null,
+      isOnline: knight.isOnline === true,
     });
   } catch (error: any) {
     console.error("[Knight Settings GET Error]:", error?.message);
