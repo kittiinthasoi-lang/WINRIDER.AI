@@ -442,6 +442,17 @@ export async function fetchMyOrders(): Promise<LiveRideOrder[]> {
 }
 
 /**
+ * ออเดอร์ที่ผู้ใช้คนนี้เป็น "ผู้โดยสาร" เท่านั้น
+ * (server ส่งออเดอร์ทั้งหมดให้แอดมิน และส่งงาน pending ทั้งหมดให้พี่วิน
+ * จึงต้องกรองที่หน้าจอผู้โดยสารเอง)
+ */
+export async function fetchMyPassengerOrders(): Promise<LiveRideOrder[]> {
+  const uid = getAuth().currentUser?.uid;
+  if (!uid) return [];
+  const orders = await fetchMyOrders();
+  return orders.filter((order) => order.passengerUserId === uid);
+}
+/**
  * 4. Trip completed with receipt & fund breakdown
  */
 export async function completeLiveOrder(
