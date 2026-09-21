@@ -945,15 +945,21 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
             {/* -1. GPS NAVIGATION MAP TAB (หน้าจอแผนที่ระหว่างพี่วินไปหาลูกค้าหรือเป้าหมาย) */}
             {activeDriverTab === 'navigation' && (
               <div className="space-y-4">
-                <KnightNavigationMapScreen
+                                <DriverStandbyAndIncomingJob
+                  mode="navigation"
+                  isOnDuty={isOnDuty}
+                  onToggleDuty={(duty) => setIsOnDuty(duty)}
                   activeVehicle={activeVehicle}
                   driverLevel={driverLevel}
+                  driverCreditScore={driverCreditScore}
                   audioEnabled={audioEnabled}
-                  onClose={() => setActiveDriverTab('jobs')}
-                  onGainXp={(amount: number, reason: string) => handleGainDriverXp(amount, reason)}
-                  onCompleteTrip={(job) => {
-                    handleGainDriverXp(job.xpReward, `ส่งผู้โดยสารสำเร็จ: ${job.customerName}`);
-                    setBalance(prev => prev + job.netFare);
+                  onAcceptJob={(job: IncomingJobData) => {
+                    // Job accepted
+                  }}
+                  onExitNavigation={() => setActiveDriverTab('jobs')}
+                  onGainXp={(amount, reason) => handleGainDriverXp(amount, reason)}
+                  onAddEarnings={(amount) => {
+                    setBalance(prev => prev + amount);
                     setRidesPaid(prev => Math.min(prev + 1, totalRidesDebt));
                   }}
                 />
