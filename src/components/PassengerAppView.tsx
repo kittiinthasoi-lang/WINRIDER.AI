@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 import { auth, db } from '../firebase';
 import { emitQuestMetric } from '../services/questService';
 import { createSosIncident } from '../services/sosIncidentService';
@@ -1593,7 +1594,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   alt="ศูนย์แจ้งเตือนศาสนาและวันสำคัญ" 
                   className="w-6 h-6 rounded-md object-cover group-hover:scale-110 transition-transform shadow-sm"
                   onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = '/images/religious-faith-header.svg';
+                    (e.currentTarget as HTMLImageElement).src = WIN_IMAGES.faith.header;
                   }}
                   referrerPolicy="no-referrer"
                 />
