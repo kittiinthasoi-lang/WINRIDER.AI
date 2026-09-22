@@ -1075,18 +1075,40 @@ app.post("/api/admin/public-data/import-tat", rateLimit(5), async (req, res) => 
   }
 });
 
+app.get("/api/public-data/discovery", rateLimit(30), async (req, res) => {
+  const query = String(req.query.query || "").trim().toLowerCase();
+  const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
+  const kinds: PublicDataKind[] = ["events", "attractions", "restaurants", "accommodations", "souvenirs"];
+  try {
+    const data: Record<string, any[]> = {};
+    for (const kind of kinds) {
+      const collection = kind === "events" ? "winAlertEvents" : "publicDataRecords";
+      const snapshot = await ordersDb.collection(collection).where("kind", "==", kind).where("sourceDriven", "==", true).limit(500).get();
+      data[kind] = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((record: any) => record.publicVisible === true)
+        .filter((record: any) => !query || [record.name, record.title, record.category, record.address, record.province, record.district]
+          .some((value) => String(value || "").toLowerCase().includes(query)))
+        .slice(0, limit);
+    }
+    return res.json({ source: "WINRIDER.AI • Direct Public Source", sourceDriven: true, data });
+  } catch (error) {
+    console.error("[Public Data Discovery]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ data: {}, error: "โหลดข้อมูลสาธารณะไม่สำเร็จ" });
+  }
+});
+
 app.get("/api/public-data/places", rateLimit(30), async (req, res) => {
   const kind = String(req.query.kind || "attractions").trim() as PublicDataKind;
   const query = String(req.query.query || "").trim().toLowerCase();
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
   if (!["attractions","restaurants","accommodations","souvenirs"].includes(kind)) return res.status(400).json({ records: [] });
   try {
-    const snapshot = await ordersDb.collection("publicDataRecords").where("kind", "==", kind).where("adminApproved", "==", true).limit(500).get();
+    const snapshot = await ordersDb.collection("publicDataRecords").where("kind", "==", kind).where("sourceDriven", "==", true).limit(500).get();
     const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
       .filter((record: any) => Number.isFinite(Number(record.latitude)) && Number.isFinite(Number(record.longitude)))
       .filter((record: any) => !query || [record.name, record.category, record.address, record.province, record.district].some((value) => String(value || "").toLowerCase().includes(query)))
       .slice(0, limit);
-    return res.json({ records, source: "WINRIDER.AI • Admin Verified TAT Public Data" });
+    return res.json({ records, source: "WINRIDER.AI • Direct TAT Public Data" });
   } catch (error) {
     console.error("[Public Data Places]", error instanceof Error ? error.message : error);
     return res.status(503).json({ records: [] });
