@@ -465,25 +465,38 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
   }
 });
 
-app.post("/api/places/resolve-routes", rateLimit(0), async (req, res) => {
-  return res.status(503).json({ error: "ROUTES_API_DISABLED", code: "ROUTES_API_DISABLED_RESOLVE", routes: [] });
+app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolve-routes"]), async (req, res) => {
+  // ROUTES API DISABLED: resolve destinations with Places API only and calculate
+  // a local straight-line estimate. No request is sent to routes.googleapis.com.
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
+
   const latitude = Number(req.body?.latitude);
   const longitude = Number(req.body?.longitude);
   const requestedPlaces = Array.isArray(req.body?.places) ? req.body.places.slice(0, 20) : [];
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+      latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
     return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง", routes: [] });
   }
+
   const places = requestedPlaces
     .map((item: any) => ({ key: String(item?.key || "").trim(), query: String(item?.query || "").trim() }))
     .filter((item: { key: string; query: string }) => item.key && item.query);
-  if (places.length === 0) return res.status(400).json({ error: "ไม่มีสถานที่สำหรับคำนวณเส้นทาง", routes: [] });
+  if (places.length === 0) return res.status(400).json({ error: "ไม่มีสถานที่", routes: [] });
 
   const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
   if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
     return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY", routes: [] });
   }
+
+  const earthRadiusKm = 6371;
+  const distanceKm = (lat: number, lng: number) => {
+    const dLat = (lat - latitude) * Math.PI / 180;
+    const dLng = (lng - longitude) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(latitude * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
 
   try {
     const resolved = await Promise.all(places.map(async (item: { key: string; query: string }) => {
@@ -507,43 +520,35 @@ app.post("/api/places/resolve-routes", rateLimit(0), async (req, res) => {
       const data = await response.json() as { places?: any[] };
       const place = data.places?.[0];
       if (!place?.id || !Number.isFinite(place?.location?.latitude) || !Number.isFinite(place?.location?.longitude)) return null;
-      return { ...item, place };
-    }));
-    const found = resolved.filter(Boolean) as Array<{ key: string; query: string; place: any }>;
-    if (found.length === 0) return res.json({ routes: [], source: "Google Places API (New) + Google Routes API" });
 
-    const matrixResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } })),
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!matrixResponse.ok) return res.status(502).json({ error: "คำนวณระยะทางจริงจาก Google Routes ไม่สำเร็จ", routes: [] });
-    const matrix = await matrixResponse.json() as any[];
-    const routeByDestination = new Map(matrix
-      .filter((item) => item?.condition === "ROUTE_EXISTS" && Number.isFinite(item?.distanceMeters))
-      .map((item) => [Number(item.destinationIndex), item]));
-
-    const routes = found.flatMap((item, index) => {
-      const route = routeByDestination.get(index);
-      if (!route) return [];
-      const durationSeconds = Number.parseFloat(String(route.duration || "0").replace("s", ""));
-      return [{
+      const km = distanceKm(Number(place.location.latitude), Number(place.location.longitude));
+      return {
         key: item.key,
-        placeId: String(item.place.id),
-        name: String(item.place.displayName?.text || item.query),
-        address: String(item.place.formattedAddress || ""),
-        latitude: Number(item.place.location.latitude),
-        longitude: Number(item.place.location.longitude),
-        distanceKm: Math.round((Number(route.distanceMeters) / 1000) * 10) / 10,
-        etaMinutes: Number.isFinite(durationSeconds) ? Math.max(1, Math.ceil(durationSeconds / 60)) : null,
-        googleMapsUri: String(item.place.googleMapsUri || ""),
-      }];
-    }).sort((a, b) => a.distanceKm - b.distanceKm);
-    return res.json({ routes, source: "Google Places API (New) + Google Routes API", fetchedAt: new Date().toISOString() });
+        placeId: String(place.id),
+        name: String(place.displayName?.text || item.query),
+        address: String(place.formattedAddress || ""),
+        latitude: Number(place.location.latitude),
+        longitude: Number(place.location.longitude),
+        distanceKm: Number(km.toFixed(2)),
+        // ETA is deliberately an estimate, not a Routes API result.
+        etaMinutes: Math.max(1, Math.round(km / 0.35)),
+        distanceSource: "straight_line_estimate",
+        etaSource: "estimated",
+        googleMapsUri: String(place.googleMapsUri || ""),
+      };
+    }));
+
+    return res.json({
+      routes: resolved.filter(Boolean),
+      source: "Google Places API (New) + local straight-line estimate",
+      routesApi: "disabled",
+      warning: "ระยะทางและเวลาเป็นค่าประมาณจากพิกัด ไม่ใช่เส้นทางถนนจริง",
+    });
   } catch (error) {
-    console.error("[Resolve Place Routes]", error instanceof Error ? error.message : error);
-    return res.status(502).json({ error: "เชื่อมต่อข้อมูลสถานที่และเส้นทางจริงไม่ได้", routes: [] });
+    console.error("[Places Resolve]", error instanceof Error ? error.message : error);
+    return res.status(502).json({ error: "ค้นหาสถานที่จาก Google Places ไม่สำเร็จ", routes: [] });
   }
 });
-
 app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
