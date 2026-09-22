@@ -300,16 +300,7 @@ export const REAL_SERVICE_PRESETS = [
 ];
 
 // Customer Names Pool
-const THAI_CUSTOMERS = [
-  { name: 'คุณณิชา รัตนเวช', gender: 'female' as const, avatar: '👩‍💼', phone: '089-445-1234' },
-  { name: 'คุณธนภัทร สุขสมบูรณ์', gender: 'male' as const, avatar: '👨‍💼', phone: '081-772-8899' },
-  { name: 'คุณแพรวา สายบุญ', gender: 'female' as const, avatar: '🧘‍♀️', phone: '095-223-8899' },
-  { name: 'คุณลุงฮาซัน & คุณตาอิบราฮิม', gender: 'male' as const, avatar: '🧓', phone: '081-998-3344' },
-  { name: 'คุณหมอทราย (คลินิกรักษาสัตว์)', gender: 'female' as const, avatar: '👩‍⚕️', phone: '083-112-9900' },
-  { name: 'คุณกวิน สตาร์ทอัพเทค', gender: 'male' as const, avatar: '🧑‍💻', phone: '092-334-5566' },
-  { name: 'น้องพิมพ์ใจ นักศึกษาจุฬาฯ', gender: 'female' as const, avatar: '👩‍🎓', phone: '084-556-7890' },
-  { name: 'เชฟมานะ ร้านอาหารโฮมเมด', gender: 'male' as const, avatar: '👨‍🍳', phone: '086-771-4567' }
-];
+// Customer identity/contact data is never simulated. Real customer details come from authenticated trip records.
 
 /**
  * Calculates straight line distance (Haversine formula in KM)
