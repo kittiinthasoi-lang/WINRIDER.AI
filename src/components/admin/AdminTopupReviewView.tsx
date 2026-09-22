@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { WIN_IMAGES } from '../../data/imageRegistry';
 import { Check, ImageOff, Loader2, RefreshCw, X } from 'lucide-react';
 import { auth } from '../../firebase';
 
@@ -49,7 +50,7 @@ export const AdminTopupReviewView: React.FC = () => {
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-3">
         <img 
-          src="/images/admin/topup-review.svg" 
+          src={WIN_IMAGES.admin.topupReview} 
           alt="ตรวจสลิปเติมเงิน" 
           className="w-10 h-10 rounded-2xl object-cover ring-1 ring-emerald-400/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]" 
         />
