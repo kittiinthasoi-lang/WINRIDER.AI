@@ -52,7 +52,7 @@ React 19 + Vite
 - **Backend:** Node.js 20+, Express 4
 - **Database/Auth:** Firebase / Firestore / Firebase Authentication
 - **Serverless:** Firebase Functions
-- **Maps:** OSM/coordinate fallback in FREE-ONLY mode; Google Routes/Places/Dynamic Maps are hard-disabled
+- **Maps:** Google Places/Routes are called server-side with API-key protection, request caching/throttling, and configurable daily application safety caps; Google Maps is opened externally for turn-by-turn navigation
 - **AI:** Google GenAI
 - **Charts/UI:** Recharts, Lucide React, Motion
 - **PWA:** vite-plugin-pwa
@@ -72,7 +72,7 @@ WINRIDER.AI/
 │   ├── data/             # domain/reference data
 │   └── types/            # TypeScript types
 ├── functions/             # Firebase Functions
-├── server.ts              # Express application/server (FREE-ONLY external API lock)
+├── server.ts              # Express application/server + Google Maps cost guard
 ├── scripts/               # build/generation scripts
 ├── public/                # static assets
 ├── package.json
@@ -160,6 +160,18 @@ support
 ## AI
 
 `server.ts` มี WIN Buddy AI ซึ่งใช้ Google GenAI เมื่อมี `GEMINI_API_KEY` และมี local response engine สำหรับกรณีที่ AI provider ไม่พร้อม
+
+## Google Maps Cost Control
+
+WINRIDER.AI ใช้ **REAL GOOGLE + COST CONTROL** แทน FREE-ONLY lock:
+
+- GOOGLE_MAPS_API_KEY อยู่ฝั่ง server เท่านั้น ไม่ส่งไป browser
+- Google Places/Routes ถูกเรียกผ่าน backend proxy
+- Client มี cache + in-flight deduplication + burst throttling
+- Server มี daily application safety caps ที่ปรับได้ด้วย GOOGLE_PLACES_DAILY_HARD_LIMIT และ GOOGLE_ROUTES_DAILY_HARD_LIMIT
+- ค่าเริ่มต้นของ safety cap คือ 250 Google calls ต่อ API type ต่อ server instance ต่อวัน
+- Production ควรตั้ง **Google Cloud quota limit** เพิ่มอีกชั้น เพราะเป็น project-wide hard cap ที่ป้องกันค่าใช้จ่ายได้จริง
+- Budget alert ใช้สำหรับแจ้งเตือน ไม่ใช่ hard spending cap
 
 ## Maps
 
