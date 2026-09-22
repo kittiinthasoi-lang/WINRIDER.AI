@@ -8,7 +8,7 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
-import { calculateServerFare } from "./src/core/serverFare";
+import { calculateAppFare } from "./src/core/serverFare";
 
 dotenv.config();
 
@@ -804,6 +804,7 @@ interface ServerOrder {
   dropoffLocation: string;
   distanceKm: number;
   fare: number;
+  fareAddons?: { expressBoxBaht?: number; dreamRideBaht?: number; amenitiesBaht?: number; serviceAddonBaht?: number };
   welfareFund2Baht: number;
   netFare: number;
   estMinutes: number;
@@ -2642,7 +2643,11 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
     const welfareFund2Baht = 2;
     let authoritativeQuote;
     try {
-      authoritativeQuote = calculateServerFare(normalizedServiceId, distanceKm);
+      const requestedAddons = input.fareAddons || {};
+      authoritativeQuote = calculateAppFare(normalizedServiceId, distanceKm, {
+        ...requestedAddons,
+        expressBoxBaht: normalizedServiceId === 'express' ? 5 : requestedAddons.expressBoxBaht,
+      });
     } catch (fareErr) {
       return res.status(400).json({ error: "Unable to calculate authoritative fare", code: "FARE_CALCULATION_FAILED" });
     }
@@ -2665,8 +2670,9 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       fareQuote: authoritativeQuote,
       distanceSource: estimate.distanceSource,
       etaSource: estimate.etaSource,
-      fareBasis: "straight_line_estimate",
+      fareBasis: "WINRIDER_APP_FARE_RULE",
       welfareFund2Baht,
+      fareAddons: authoritativeQuote.addons,
       netFare: Math.max(0, fare - welfareFund2Baht),
       estMinutes,
       status: "pending",
