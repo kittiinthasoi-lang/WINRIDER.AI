@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { 
   ShieldAlert, 
+  ShieldCheck,
   FileCheck2, 
   Users, 
   Coins, 

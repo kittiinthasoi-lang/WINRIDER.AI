@@ -42,5 +42,5 @@
     "vite-plugin-pwa": "^1.3.0",
     "jsqr": "^1.4.0"
   },
-  "devDependencies": { "@types/jsqr": "^1.4.0" }
+  "devDependencies": {}
 }

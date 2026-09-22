@@ -58,6 +58,8 @@ export interface LiveRideOrder {
   dispatchMode?: 'preferred' | 'automatic';
   expressPackagePhotoUrl?: string;
   expressAiCertificateId?: string;
+  fareQuote?: any;
+  fareBasis?: string;
 }
 
 type OrderEventCallback = (order: LiveRideOrder, eventType: 'created' | 'accepted' | 'step_changed' | 'completed') => void;

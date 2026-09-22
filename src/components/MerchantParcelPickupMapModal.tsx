@@ -85,6 +85,22 @@ export const MerchantParcelPickupMapModal: React.FC<MerchantParcelPickupMapModal
     setTimeout(() => setCallToast(null), 3500);
   };
 
+  const handleScanBarcode = (parcelId: string) => {
+    if (scannedParcels.includes(parcelId)) return;
+    setScannedParcels(prev => [...prev, parcelId]);
+    onGainMerchantXp(100, `สแกนบาร์โค้ดส่งมอบพัสดุ ${parcelId}`);
+    if (audioEnabled) playTactileBlip(1200);
+  };
+
+  const handleCompleteAllHandover = () => {
+    if (parcels.length === 0) return;
+    const allIds = parcels.map(p => p.id);
+    setScannedParcels(allIds);
+    onGainMerchantXp(300, 'ยืนยันส่งมอบพัสดุครบทั้งหมด');
+    if (audioEnabled) playTactileBlip(1400);
+    setCurrentStep(4);
+  };
+
 
   if (!isOpen) return null;
   if (parcels.length === 0) {

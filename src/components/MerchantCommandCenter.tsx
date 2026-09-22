@@ -121,6 +121,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   }, [canEdit, initialPerspective]);
 
   const [knightsAvailable] = useState(0);
+  const [workingCapitalAvailable, setWorkingCapitalAvailable] = useState<number>(0);
   const [merchantLevel, setMerchantLevel] = useState(() => 1);
   const [merchantNextXp, setMerchantNextXp] = useState(() => calculateLevelMaxXp(1, 'merchant'));
   const [merchantXp, setMerchantXp] = useState(0);

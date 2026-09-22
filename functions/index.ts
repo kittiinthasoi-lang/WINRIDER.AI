@@ -462,7 +462,6 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
       knightFeeSatang: feeResult.knightFeeSatang,
       equipmentFeeSatang: feeResult.equipmentFeeSatang,
       knightPayoutSatang: feeResult.netKnightEarningsSatang + tipSatang,
-      fareSatang,
       totalDebitSatang,
       totalCreditSatang,
       balanced: true,

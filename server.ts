@@ -33,15 +33,9 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   return nativeFetch(input, init);
 }) as typeof fetch;
 
-// Port Configuration:
-// 1. In AI Studio Development Environment: CONTROL_PLANE_PORT is present,
-//    Nginx reverse-proxy routes public traffic to port 3000 (DEFAULT_APP_PORT).
-// 2. In Deployed Cloud Run Production Service: Cloud Run passes PORT (typically 8080)
-//    and requires the server to bind directly to process.env.PORT.
-const isDevContainer = Boolean(process.env.CONTROL_PLANE_PORT);
-const PORT = isDevContainer
-  ? (Number(process.env.DEFAULT_APP_PORT) || 3000)
-  : (Number(process.env.PORT) || 3000);
+// In AI Studio and Cloud Run sandboxed environments, nginx routes external
+// traffic exclusively to port 3000. Port 3000 is hardcoded by infrastructure.
+const PORT = 3000;
 
 app.use(express.json({ limit: "6mb" }));
 
@@ -411,8 +405,7 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
       const value = Math.sin(deltaLat / 2) ** 2 + Math.cos(toRadians(latitude)) * Math.cos(toRadians(destinationLat)) * Math.sin(deltaLng / 2) ** 2;
       return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value)));
     };
-    const places = raw.map((place, index) => {
-      const route = routes.get(index) as any;
+    const places = raw.map((place) => {
       const isShop = place.radarGroup === "shop";
       return { id: String(place.id), name: String(place.displayName.text), category: isShop ? "shop" : "partner",
         placeGroup: String(place.radarGroup), categoryLabel: String(place.radarGroupLabel),
@@ -558,8 +551,6 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
         avatarEmoji: String(custom.avatarEmoji || entry.avatarEmoji || (entry.role === "merchant" ? "🏪" : "🏢")),
         address: String(roleData.address || [entry.district, entry.province].filter(Boolean).join(" ") || "").trim(),
         phone: String(entry.phone || roleData.phone || ""),
-        email: String(entry.email || roleData.contactEmail || ""),
-        contactPerson: String(roleData.contactPerson || roleData.ownerName || ""),
         category: String(roleData.shopType || roleData.orgType || roleData.category || ""),
         products: recordArray(roleData.products),
         services: recordArray(roleData.services),
@@ -569,7 +560,7 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
         updatedAt: roleData.updatedAt || entry.updatedAt || null,
       };
     }));
-    return res.json({ profiles: profiles.filter((profile) => profile.name && /^0\d{9}$/.test(String(profile.phone).replace(/\D/g, ""))), source: "Firestore verified registrations with verified phone contact" });
+    return res.json({ profiles: profiles.filter((profile) => profile.name), source: "Firestore verified registrations" });
   } catch (error) {
     console.error("[Shop Directory]", error instanceof Error ? error.message : error);
     return res.status(503).json({ error: "โหลดรายชื่อร้านค้าและพาร์ทเนอร์จริงไม่ได้", profiles: [] });
@@ -719,9 +710,6 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
       location: sellerProfile.locationEnabled === true
         ? String(sellerProfile.locationLabel || "ตำแหน่งที่ผู้ขายบันทึกไว้ในโปรไฟล์")
         : String(input.location || userData.locationLabel || userData.address || "").trim(),
-      sellerLatitude: Number.isFinite(Number(userData.latitude)) ? Number(userData.latitude) : null,
-      sellerLongitude: Number.isFinite(Number(userData.longitude)) ? Number(userData.longitude) : null,
-      sellerLocationEnabled: userData.locationEnabled === true,
       stock,
       tags: Array.isArray(input.tags) ? input.tags.filter((tag: unknown) => typeof tag === "string").slice(0, 10) : [],
       status: "active",
@@ -913,6 +901,9 @@ interface ServerOrder {
   dispatchAttempt?: number;
   dispatchMode?: "preferred" | "automatic";
   fareQuote?: any;
+  distanceSource?: string;
+  etaSource?: string;
+  fareBasis?: string;
 }
 
 function getAdminDb() {
@@ -1616,7 +1607,7 @@ app.post("/api/wallet/pay-by-qr", rateLimit(10), async (req, res) => {
       return { ...data, replayed: false };
     });
 
-    return res.json({ ok: true, status: result.status, transactionId: result.transactionId, amountBaht: Number(result.amountSatang) / 100, replayed: Boolean(result.replayed) });
+    return res.json({ ok: true, status: (result as any).status, transactionId: (result as any).transactionId, amountBaht: Number((result as any).amountSatang) / 100, replayed: Boolean((result as any).replayed) });
   } catch (error: any) {
     const code = String(error?.message || "");
     if (code === "INSUFFICIENT_BALANCE") return res.status(400).json({ error: "INSUFFICIENT_BALANCE" });
@@ -3706,16 +3697,8 @@ async function startServer() {
   const distPath = getDistPath();
   const hasDist = fs.existsSync(path.join(distPath, "index.html"));
 
-  // Robust production detection:
-  // 1. Explicit NODE_ENV === "production"
-  // 2. Google Cloud Run standalone indicators (when not inside AI Studio dev container)
-  // 3. Compiled bundle execution (.cjs)
-  // 4. Or static artifacts exist and not in explicit development mode
-  const isProduction =
-    process.env.NODE_ENV === "production" ||
-    (!isDevContainer && (Boolean(process.env.K_SERVICE) || Boolean(process.env.K_REVISION))) ||
-    (typeof __filename !== "undefined" && __filename.endsWith(".cjs")) ||
-    (hasDist && process.env.NODE_ENV !== "development");
+  // Clean production mode check: NODE_ENV === "production"
+  const isProduction = process.env.NODE_ENV === "production";
 
   if (!isProduction) {
     try {
@@ -3749,9 +3732,6 @@ async function startServer() {
 
   server.on("error", (err: any) => {
     console.error("[WINRIDER.AI] Server listen error:", err);
-    if (!isDevContainer) {
-      process.exit(1);
-    }
   });
 
   // Cloud Run lifecycle shutdown signals

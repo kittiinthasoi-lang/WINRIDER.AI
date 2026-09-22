@@ -48,7 +48,7 @@ export const ARLiveCameraNavigation: React.FC<ARLiveCameraNavigationProps> = ({
   const rotation=targetBearing!==null&&heading!==null?((targetBearing-heading+540)%360)-180:0;
   useEffect(()=>{advanced.current=false;},[target?.lat,target?.lng,maneuver]);
   useEffect(()=>{if(liveDistance!==null&&liveDistance<=8&&!advanced.current&&onAdvanceTripStep){advanced.current=true;onAdvanceTripStep();}},[liveDistance,onAdvanceTripStep]);
-  const speak=()=>{if(muted)return;const d=liveDistance===null?'':`อีกประมาณ ${Math.max(0,Math.round(liveDistance))} เมตร `;const text=`${d}${voiceInstruction||'เดินทางต่อไปตามเส้นทาง'}`;if(text===lastSpoken)return;setLastSpoken(text);speakThaiText(text,voicePersona,1.05);};
+  const speak=()=>{if(muted)return;const d=liveDistance===null?'':`อีกประมาณ ${Math.max(0,Math.round(liveDistance))} เมตร `;const text=`${d}${voiceInstruction||'เดินทางต่อไปตามเส้นทาง'}`;if(text===lastSpoken)return;setLastSpoken(text);speakThaiText(text,(voicePersona as AIVoicePersona)||'fah_sai',1.05);};
   const maneuverLabel=/u.?turn|กลับรถ/i.test(maneuver)?'กลับรถ':/left|ซ้าย/i.test(maneuver)?'เลี้ยวซ้าย':/right|ขวา/i.test(maneuver)?'เลี้ยวขวา':/arrived|ถึง/i.test(maneuver)?'ถึงจุดหมาย':'ตรงไป';
 
   return <div className="relative w-full min-h-[560px] overflow-hidden rounded-3xl border-2 border-cyan-400/60 bg-black shadow-[0_0_50px_rgba(0,210,255,0.3)]">
