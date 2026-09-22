@@ -567,7 +567,7 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
         updatedAt: roleData.updatedAt || entry.updatedAt || null,
       };
     }));
-    return res.json({ profiles: profiles.filter((profile) => profile.name), source: "Firestore verified registrations" });
+    return res.json({ profiles: profiles.filter((profile) => profile.name && /^0\d{9}$/.test(String(profile.phone).replace(/\D/g, ""))), source: "Firestore verified registrations with verified phone contact" });
   } catch (error) {
     console.error("[Shop Directory]", error instanceof Error ? error.message : error);
     return res.status(503).json({ error: "โหลดรายชื่อร้านค้าและพาร์ทเนอร์จริงไม่ได้", profiles: [] });
