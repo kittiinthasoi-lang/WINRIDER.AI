@@ -703,8 +703,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       imageUrl: '/images/pillar_petcare.jpg',
       badge: '24H VET CARE',
       bgGlow: 'from-emerald-400/25 to-transparent',
-      eta: 'คำนวณจาก GPS',
-      priceEstimate: 'คำนวณตามเส้นทางจริง',
+      eta: 'ประมาณการจาก GPS',
+      priceEstimate: 'คำนวณจากระยะทางประมาณการ',
       iconEmoji: '🐾 🐶',
       actionText: '🐾 กดเข้าศูนย์ รพ.สัตว์ 24 ชม.',
       actionGradient: 'from-emerald-400 to-teal-500',
@@ -974,7 +974,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     } catch (error) {
       console.error('Destination route preview failed:', error);
       const reason = error instanceof Error ? error.message : '';
-      setBookingError(reason.startsWith('GPS_') ? 'ต้องอนุญาตตำแหน่ง GPS เพื่อคำนวณระยะทางและค่าโดยสารจริง' : 'ไม่สามารถคำนวณเส้นทางจริงของปลายทางนี้ได้ กรุณาลองใหม่อีกครั้ง');
+      setBookingError(reason.startsWith('GPS_') ? 'ต้องอนุญาตตำแหน่ง GPS เพื่อคำนวณระยะทางและค่าโดยสารประมาณการ' : 'ไม่สามารถค้นหาพิกัดปลายทางนี้ได้ กรุณาลองใหม่อีกครั้ง');
       setShowBookingModal(false);
     } finally { setIsCalculatingDestination(false); }
   };
@@ -1098,7 +1098,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       const message = reason.startsWith('GPS_')
         ? 'ไม่สามารถอ่านตำแหน่ง GPS ได้ กรุณาอนุญาต Location แล้วลองใหม่'
         : reason === 'DESTINATION_NOT_RESOLVED'
-          ? 'ค้นหาปลายทางหรือคำนวณเส้นทางจริงไม่ได้ โปรดตรวจ GOOGLE_MAPS_API_KEY และเปิด Places API (New) กับ Routes API'
+          ? 'ค้นหาปลายทางไม่ได้ โปรดตรวจ GOOGLE_MAPS_API_KEY และการตั้งค่า Places API (New)'
           : reason === 'PICKUP_LOCATION_NOT_RESOLVED'
             ? 'ค้นหาจุดรับจริงไม่ได้ กรุณาระบุชื่อสถานที่และพื้นที่ให้ชัดเจน'
             : reason.includes('ACTIVE_ORDER_EXISTS')
