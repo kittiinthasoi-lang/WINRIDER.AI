@@ -626,6 +626,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [preMatchingServiceId, setPreMatchingServiceId] = useState<string>('express');
   const [preMatchingData, setPreMatchingData] = useState<SpecializedPreMatchingData | null>(null);
   const [serviceAddonFee, setServiceAddonFee] = useState<number>(0);
+  const [showExpressAiVerifier, setShowExpressAiVerifier] = useState(false);
+  const [expressAiVerification, setExpressAiVerification] = useState<AIVerificationResult | null>(null);
   const [showPhotoVerificationModal, setShowPhotoVerificationModal] = useState(false);
   const [photoVerificationType, setPhotoVerificationType] = useState<'express_delivery' | 'family_arrival'>('express_delivery');
 
@@ -872,8 +874,16 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       return;
     }
 
-    // Specialized services pre-matching modal intercept (Express, Mu, Lifestyle, Spirit, Family, Link)
-    if (['express', 'mu', 'lifestyle', 'spirit', 'family', 'link'].includes(svc.id)) {
+    // WIN Express is gated by a real package photo + WIN-AI Vision certificate before dispatch.
+    if (svc.id === 'express') {
+      setExpressAiVerification(null);
+      setShowExpressAiVerifier(true);
+      if (audioEnabled) speakThaiText('ก่อนเรียกพี่วิน WIN Express กรุณาถ่ายรูปพัสดุจริงให้ WIN-AI ตรวจสอบก่อนค่ะ');
+      return;
+    }
+
+    // Specialized services pre-matching modal intercept (Mu, Lifestyle, Spirit, Family, Link)
+    if (['mu', 'lifestyle', 'spirit', 'family', 'link'].includes(svc.id)) {
       setPreMatchingServiceId(svc.id);
       setShowPreMatchingModal(true);
       if (audioEnabled) {
@@ -893,6 +903,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   };
 
   const handlePreMatchingSubmit = (data: SpecializedPreMatchingData, addonFee: number) => {
+    if (data.serviceId === 'express' && !expressAiVerification?.isVerified) {
+      setShowExpressAiVerifier(true);
+      return;
+    }
+    if (data.serviceId === 'express' && expressAiVerification?.isVerified) {
+      data = { ...data, express: { ...data.express!, packagePhotoUrl: expressAiVerification.imageUrl, aiCertificateId: expressAiVerification.certificateId } } as SpecializedPreMatchingData;
+    }
     setPreMatchingData(data);
     setServiceAddonFee(addonFee);
     const submittedDestination = data.family?.destinationSpecificPoint || data.express?.destinationAddress;
@@ -1104,6 +1121,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         estMinutes: resolvedDestination.etaMinutes || undefined,
         customerGender,
         preferredDriverId: currentMatchedDriver?.id,
+        ...(activeServiceId === 'express' && expressAiVerification?.isVerified ? { expressPackagePhotoUrl: expressAiVerification.imageUrl, expressAiCertificateId: expressAiVerification.certificateId } : {}),
       });
       setActiveLiveOrder(liveOrder);
       setBookingConfirmed(true);
@@ -3777,6 +3795,26 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             setShowDriverMatchingModal(true);
           }}
         />
+      )}
+
+      {showExpressAiVerifier && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 bg-black/85 backdrop-blur-md">
+          <div className="w-full max-w-2xl max-h-[94vh] overflow-y-auto">
+            <AIProductPhotoVerifier
+              audioEnabled={audioEnabled}
+              initialItemName="WIN Express พัสดุ"
+              initialCategory="พัสดุ / สิ่งของสำหรับจัดส่ง"
+              onVerificationComplete={(result) => {
+                if (!result.isVerified) return;
+                setExpressAiVerification(result);
+                setShowExpressAiVerifier(false);
+                setPreMatchingServiceId('express');
+                setShowPreMatchingModal(true);
+                if (audioEnabled) speakThaiText('ตรวจสอบพัสดุผ่านแล้ว กรุณากรอกข้อมูลผู้รับและปลายทางเพื่อเรียกพี่วินค่ะ');
+              }}
+            />
+          </div>
+        </div>
       )}
 
       {/* SERVICE PHOTO VERIFICATION MODAL (ตรวจรูปส่งพัสดุ / ส่งเด็กถึงที่หมาย) */}
