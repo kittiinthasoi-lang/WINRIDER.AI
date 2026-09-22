@@ -278,7 +278,7 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
 
           {/* Bottom HUD Metrics */}
           <div className="flex items-center justify-between text-[9px] font-mono text-cyan-300/80 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-cyan-500/30">
-            <span>SYMMETRY: 99.8%</span>
+            <span>SYMMETRY: NOT MEASURED</span>
             <span>LIVENESS: NOT VERIFIED</span>
             <span>AI: SERVER VERIFIED</span>
           </div>
@@ -324,7 +324,7 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
             </div>
             <div className="p-2 rounded-xl bg-black/40 border border-white/10">
               <span className="text-slate-400 block">Liveness Test:</span>
-              <strong className="text-emerald-300">ผ่านการทดสอบ 100%</strong>
+              <strong className="text-emerald-300">ยังไม่ยืนยันจากภาพเดียว</strong>
             </div>
             <div className="p-2 rounded-xl bg-black/40 border border-white/10">
               <span className="text-slate-400 block">ความสมมาตร:</span>
