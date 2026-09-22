@@ -37,7 +37,7 @@ export interface LiveRouteStep {
 
 export interface ComputedLiveRoute {
   success: boolean;
-  source: 'google_routes_api_live' | 'unavailable';
+  source: 'unavailable';
   provider: string;
   totalDistanceMeters: number;
   totalDurationSeconds: number;
