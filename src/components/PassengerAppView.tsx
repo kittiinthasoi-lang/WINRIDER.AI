@@ -33,6 +33,7 @@ import { RealGpsMapModal } from './RealGpsMapModal';
 import { PersonalNavigationScreen } from './PersonalNavigationScreen';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { loadProfileCustomization } from '../services/profileService';
+import { calculateAppFare } from '../core/serverFare';
 import { ReligiousNotificationsModal } from './ReligiousNotificationsModal';
 import { ProfileQuickActions } from './ProfileQuickActions';
 import { CyberGraphic, DreamRideVehicleImage } from './CyberGraphic';
@@ -608,7 +609,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     return calculateAmenitiesSummary(customAmenities);
   }, [customAmenities]);
 
-  const baseFare = 15.0; // คำนวณค่าโดยสารตามระยะทางเริ่มต้น 15 บาท
+  const baseFare = 15.0;
   const distanceFare = useMemo(() => {
     if (tripDistanceKm <= 1.0) return 0;
     return Math.round((tripDistanceKm - 1.0) * 7.5);
@@ -631,9 +632,14 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const totalCalculatedFare = useMemo(() => {
     const dreamRideAddon = selectedDreamRide.priceAddon;
     const amenitiesAddon = amenitiesSummary.totalPrice;
-    const customerProtectionFund = 5.0; // กองทุนคุ้มครองผู้โดยสาร 5 บาท (4 รายการ)
-    return baseFare + distanceFare + expressBoxFee + dreamRideAddon + amenitiesAddon + customerProtectionFund + serviceAddonFee;
-  }, [baseFare, distanceFare, expressBoxFee, selectedDreamRide.priceAddon, amenitiesSummary.totalPrice, serviceAddonFee]);
+    const quote = calculateAppFare(activeServiceId || 'knight', tripDistanceKm, {
+      expressBoxBaht: expressBoxFee,
+      dreamRideBaht: dreamRideAddon,
+      amenitiesBaht: amenitiesAddon,
+      serviceAddonBaht: serviceAddonFee,
+    });
+    return quote.fareBaht;
+  }, [activeServiceId, tripDistanceKm, expressBoxFee, selectedDreamRide.priceAddon, amenitiesSummary.totalPrice, serviceAddonFee]);
 
   // C2C Marketplace state
   const [c2cItems, setC2cItems] = useState<Array<{ id: string; name: string; price: number; rating: number; sales: number; tag: string; icon: string; imageUrl?: string; condition?: string; description?: string; aiVerified?: boolean; sellerUid?: string }>>([]);
@@ -956,8 +962,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       const route = payload.routes?.[0];
       if (!response.ok || !route || !Number.isFinite(route.distanceKm)) throw new Error('DESTINATION_ESTIMATE_UNAVAILABLE');
       const distanceKm = Number(route.distanceKm);
-      const distanceFare = distanceKm <= 1 ? 0 : Math.round((distanceKm - 1) * 7.5);
-      const fare = 15 + distanceFare + expressBoxFee + selectedDreamRide.priceAddon + amenitiesSummary.totalPrice + 5 + serviceAddonFee;
+      const fareQuote = calculateAppFare(activeServiceId || 'knight', distanceKm, {
+        expressBoxBaht: expressBoxFee,
+        dreamRideBaht: selectedDreamRide.priceAddon,
+        amenitiesBaht: amenitiesSummary.totalPrice,
+        serviceAddonBaht: serviceAddonFee,
+      });
+      const fare = fareQuote.fareBaht;
       setSelectedDestination(route.address || fallbackLabel);
       setTripDistanceKm(distanceKm);
       setDestinationEtaMinutes(route.etaMinutes ?? null);
@@ -1064,8 +1075,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       const resolvedDestination = destinationPayload.routes?.[0];
       if (!destinationResponse.ok || !resolvedDestination) throw new Error('DESTINATION_NOT_RESOLVED');
       const resolvedDistanceKm = resolvedDestination.distanceKm;
-      const resolvedDistanceFare = resolvedDistanceKm <= 1 ? 0 : Math.round((resolvedDistanceKm - 1) * 7.5);
-      const resolvedFare = 15 + resolvedDistanceFare + expressBoxFee + selectedDreamRide.priceAddon + amenitiesSummary.totalPrice + 5 + serviceAddonFee;
+      const resolvedFareQuote = calculateAppFare(activeServiceId || 'knight', resolvedDistanceKm, {
+        expressBoxBaht: expressBoxFee,
+        dreamRideBaht: selectedDreamRide.priceAddon,
+        amenitiesBaht: amenitiesSummary.totalPrice,
+        serviceAddonBaht: serviceAddonFee,
+      });
+      const resolvedFare = resolvedFareQuote.fareBaht;
       if (audioEnabled) playRadarScan();
       const pName = currentUserSession.name || passengerProfileData.displayName;
       const pPhone = currentUserSession.phone || '';
@@ -1082,6 +1098,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         dropoffLocation: resolvedDestination.address || selectedDestination,
         distanceKm: resolvedDistanceKm,
         fare: resolvedFare,
+        fareAddons: resolvedFareQuote.addons,
         pickupCoord,
         dropoffCoord: { lat: resolvedDestination.latitude, lng: resolvedDestination.longitude },
         estMinutes: resolvedDestination.etaMinutes || undefined,
