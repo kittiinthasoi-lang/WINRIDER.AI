@@ -37,11 +37,11 @@ const RATE_LIMITS: Record<string, number> = {
   "/api/orders/:id/accept": 10,
   "/api/orders/:id/step": 30,
   "/api/orders/:id/location": 120,
-  "/api/routes/compute": 0,
+  "/api/routes/compute": 12,
   "/api/pet-care/nearby": 20,
   "/api/emergency/nearby": 20,
   "/api/radar/nearby-places": 20,
-  "/api/places/resolve-routes": 0,
+  "/api/places/resolve-routes": 12,
   "/api/shop/directory": 30,
   "/api/shop/listings": 20,
   "/api/shop/profile-content": 20,
@@ -119,7 +119,7 @@ app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]),
     return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY สำหรับข้อมูลสถานที่จริง", places: [] });
   }
   try {
-    const placesResponse = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+    const placesResponse = await googleFetch("places", "https://places.googleapis.com/v1/places:searchNearby", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -244,7 +244,7 @@ app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]
   const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
   if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY", places: [] });
   try {
-    const placesResponse = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+    const placesResponse = await googleFetch("places", "https://places.googleapis.com/v1/places:searchNearby", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": "places.id,places.displayName,places.primaryType,places.formattedAddress,places.location,places.nationalPhoneNumber,places.googleMapsUri,places.currentOpeningHours.openNow" },
@@ -333,7 +333,7 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
     ] as const;
     const fieldMask = "places.id,places.displayName,places.primaryType,places.formattedAddress,places.location,places.rating,places.currentOpeningHours.openNow,places.googleMapsUri";
     const groupResults = await Promise.all(searchGroups.map(async (group) => {
-      const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+      const response = await googleFetch("places", "https://places.googleapis.com/v1/places:searchNearby", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fieldMask },
         body: JSON.stringify({
@@ -418,7 +418,7 @@ app.post("/api/places/resolve-routes", rateLimit(20), async (req, res) => {
       const key = String(item?.key || "").trim();
       const query = String(item?.query || "").trim();
       if (!key || !query) continue;
-      const placeResponse = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      const placeResponse = await googleFetch("places", "https://places.googleapis.com/v1/places:searchText", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -432,7 +432,7 @@ app.post("/api/places/resolve-routes", rateLimit(20), async (req, res) => {
       const place = placePayload?.places?.[0];
       if (!place?.location) continue;
       const destination = { lat: Number(place.location.latitude), lng: Number(place.location.longitude) };
-      const routeResponse = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      const routeResponse = await googleFetch("routes", "https://routes.googleapis.com/directions/v2:computeRoutes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1316,6 +1316,32 @@ function getAdminDb() {
 }
 
 const ordersDb = getAdminDb();
+
+type GoogleApiKind = "places" | "routes";
+const GOOGLE_DAILY_HARD_LIMITS: Record<GoogleApiKind, number> = {
+  places: Math.max(1, Number(process.env.GOOGLE_PLACES_DAILY_HARD_LIMIT || 250)),
+  routes: Math.max(1, Number(process.env.GOOGLE_ROUTES_DAILY_HARD_LIMIT || 250)),
+};
+const googleDailyUsage = new Map<string, { day: string; count: number }>();
+
+function consumeGoogleDailyQuota(kind: GoogleApiKind): boolean {
+  const day = new Date().toISOString().slice(0, 10);
+  const key = kind;
+  const current = googleDailyUsage.get(key);
+  const bucket = !current || current.day !== day ? { day, count: 0 } : current;
+  if (bucket.count >= GOOGLE_DAILY_HARD_LIMITS[kind]) return false;
+  bucket.count += 1;
+  googleDailyUsage.set(key, bucket);
+  return true;
+}
+
+async function googleFetch(kind: GoogleApiKind, url: string, init: RequestInit): Promise<Response> {
+  if (!consumeGoogleDailyQuota(kind)) {
+    throw new Error(`GOOGLE_${kind.toUpperCase()}_DAILY_HARD_LIMIT_REACHED`);
+  }
+  return fetch(url, init);
+}
+
 const adminAuth = getAuth();
 
 function isSuperAdminToken(user: any) {
@@ -3999,7 +4025,7 @@ app.post("/api/routes/compute", rateLimit(20), async (req, res) => {
   }
   const supportedMode = ["DRIVE", "TWO_WHEELER", "WALK", "BICYCLE", "TRANSIT"].includes(travelMode) ? travelMode : "TWO_WHEELER";
   try {
-    const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+    const response = await googleFetch("routes", "https://routes.googleapis.com/directions/v2:computeRoutes", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
