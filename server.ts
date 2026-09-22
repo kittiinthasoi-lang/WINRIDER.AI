@@ -174,7 +174,7 @@ app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]),
           reviewsCount: Number.isFinite(place.userRatingCount) ? Number(place.userRatingCount) : 0,
           openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
           openHours: Array.isArray(place.regularOpeningHours?.weekdayDescriptions) ? place.regularOpeningHours.weekdayDescriptions : [],
-          is24Hours: false, googleMapsUri: String(place.googleMapsUri || ""), routeSource: null,
+          is24Hours: false, googleMapsUri: String(place.googleMapsUri || ""), routeSource: "straight_line_estimate",
         };
       }).sort((a, b) => a.distanceKm - b.distanceKm);
     return res.json({ places, source: "Google Places API (New) + local straight-line estimate", origin: { latitude, longitude }, fetchedAt: new Date().toISOString() });
