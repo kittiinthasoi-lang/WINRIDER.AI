@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 import { getAuth } from 'firebase/auth';
 import { 
   Radio, 
@@ -758,7 +759,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
               <div className="relative flex flex-col items-center animate-levitate">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00D2FF] via-blue-600 to-emerald-400 text-slate-950 flex items-center justify-center shadow-[0_0_30px_#00D2FF] ring-4 ring-cyan-400/60 overflow-hidden">
                   <img
-                    src={activeVehicle.imageUrl || '/images/ride_sport.jpg'}
+                    src={activeVehicle.imageUrl || WIN_IMAGES.vehicles.sport}
                     alt={activeVehicle.name}
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
