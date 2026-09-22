@@ -574,7 +574,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
               }`}
             >
               <img
-                src=WIN_IMAGES.profiles.passengerFemale
+                src={WIN_IMAGES.profiles.passengerFemale}
                 alt="Female"
                 className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm"
                 referrerPolicy="no-referrer"
@@ -590,7 +590,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
               }`}
             >
               <img
-                src=WIN_IMAGES.profiles.passengerMale
+                src={WIN_IMAGES.profiles.passengerMale}
                 alt="Male"
                 className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm"
                 referrerPolicy="no-referrer"
