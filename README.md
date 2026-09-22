@@ -17,6 +17,12 @@ WINRIDER.AI เป็นเว็บแอป Mobility / Super App ที่ร�
 - การ sync ระหว่างหน้าจอใช้ order event และ Firestore/server ตาม implementation ปัจจุบัน
 - ฟังก์ชัน/หน้าจอที่เป็น testing simulator บางส่วนยังอาจมีอยู่ใน repository แต่ไม่ถูกใช้เป็นกลไก dispatch production
 
+## Free Thai Public Data Layer
+
+WINRIDER.AI includes a **WIN Public Data Hub** for carefully selected public Thai datasets. The current production sources include the Tourism Authority of Thailand (TAT) Data Catalog for tourism activities, attractions, restaurants, accommodations, and souvenir shops. Source records are staged as `pending_admin_review` and are **never customer-visible until an administrator verifies them**. The app does not use PredictHQ or Google Places/Routes runtime APIs for this layer.
+
+The Thai government open-data portal `data.go.th` is tracked as an additional source for future curated integrations such as public health, safety, air quality, transport, and city data; datasets are added only when their schema, freshness, license, and relevance are verified.
+
 ## Architecture
 
 ```text
