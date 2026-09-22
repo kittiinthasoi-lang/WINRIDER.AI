@@ -953,7 +953,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       });
       const payload = await response.json() as { routes?: Array<{ latitude: number; longitude: number; address: string; distanceKm: number; etaMinutes: number | null }> };
       const route = payload.routes?.[0];
-      if (!response.ok || !route || !Number.isFinite(route.distanceKm)) throw new Error('DESTINATION_ROUTE_UNAVAILABLE');
+      if (!response.ok || !route || !Number.isFinite(route.distanceKm)) throw new Error('DESTINATION_ESTIMATE_UNAVAILABLE');
       const distanceKm = Number(route.distanceKm);
       const distanceFare = distanceKm <= 1 ? 0 : Math.round((distanceKm - 1) * 7.5);
       const fare = 15 + distanceFare + expressBoxFee + selectedDreamRide.priceAddon + amenitiesSummary.totalPrice + 5 + serviceAddonFee;
