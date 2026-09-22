@@ -621,8 +621,8 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
                 <p className="text-base font-black text-amber-400 font-mono">สวัสดิการ ฿2</p>
               </div>
               <div className="p-3 rounded-2xl bg-black/40 text-center space-y-0.5">
-                <span className="text-[10px] text-slate-400 font-mono">รับประกันสินค้า</span>
-                <p className="text-base font-black text-blue-400 font-mono">AI Verified 100%</p>
+                <span className="text-[10px] text-slate-400 font-mono">ผลตรวจภาพสินค้า</span>
+                <p className="text-base font-black text-blue-400 font-mono">AI Vision ตรวจภาพผ่าน</p>
               </div>
             </div>
           </div>
