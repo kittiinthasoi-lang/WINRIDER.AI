@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { WIN_IMAGES } from '../../data/imageRegistry';
 import { 
   QrCode, 
   Search, 
@@ -145,13 +146,13 @@ export const AdminPaymentProfilesView: React.FC<AdminPaymentProfilesViewProps> =
   const roleBadge = (role: string) => {
     switch (role) {
       case 'knight':
-        return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 text-[10px] font-mono"><img src="/images/avatar_knight.jpg" alt="พี่วิน" className="w-3.5 h-3.5 rounded-full object-cover" /> พี่วิน</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 text-[10px] font-mono"><img src={WIN_IMAGES.profiles.knight} alt="พี่วิน" className="w-3.5 h-3.5 rounded-full object-cover" /> พี่วิน</span>;
       case 'citizen':
-        return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono"><img src="/images/avatar_citizen.jpg" alt="ลูกค้า" className="w-3.5 h-3.5 rounded-full object-cover" /> ลูกค้า</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono"><img src={WIN_IMAGES.profiles.citizen} alt="ลูกค้า" className="w-3.5 h-3.5 rounded-full object-cover" /> ลูกค้า</span>;
       case 'merchant':
-        return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono"><img src="/images/avatar_merchant.jpg" alt="ร้านค้า" className="w-3.5 h-3.5 rounded-full object-cover" /> ร้านค้า</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono"><img src={WIN_IMAGES.profiles.merchant} alt="ร้านค้า" className="w-3.5 h-3.5 rounded-full object-cover" /> ร้านค้า</span>;
       case 'partner':
-        return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-mono"><img src="/images/avatar_partner.jpg" alt="พาร์ทเนอร์" className="w-3.5 h-3.5 rounded-full object-cover" /> พาร์ทเนอร์</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-mono"><img src={WIN_IMAGES.profiles.partner} alt="พาร์ทเนอร์" className="w-3.5 h-3.5 rounded-full object-cover" /> พาร์ทเนอร์</span>;
       default:
         return <span className="text-[10px] text-slate-400">{role}</span>;
     }
@@ -178,7 +179,7 @@ export const AdminPaymentProfilesView: React.FC<AdminPaymentProfilesViewProps> =
         <div>
           <div className="flex items-center gap-2.5">
             <img 
-              src="/images/cyber_coins.jpg" 
+              src={WIN_IMAGES.cyber.coins} 
               alt="PromptPay & Bank QR" 
               className="w-10 h-10 rounded-2xl object-cover ring-1 ring-cyan-400/50 shadow-[0_0_20px_rgba(0,210,255,0.4)]" 
             />
