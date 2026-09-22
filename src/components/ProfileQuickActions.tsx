@@ -57,7 +57,7 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
     </div>
 
     {activeTool && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-3 backdrop-blur-md" onMouseDown={(e) => e.target === e.currentTarget && setActiveTool(null)}>
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-cyan-400/40 bg-[#060D1E] p-4 shadow-[0_0_40px_rgba(0,210,255,0.25)] sm:p-6">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-cyan-400/40 bg-[#060D1E] p-5 shadow-[0_0_40px_rgba(0,210,255,0.25)] sm:p-7">
         <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
           <h2 className="font-black text-white">{actions.find((item) => item.id === activeTool)?.label}</h2>
           <button type="button" onClick={() => setActiveTool(null)} className="rounded-xl border border-white/10 p-2 text-slate-400 hover:text-white" aria-label="ปิด"><X className="h-5 w-5" /></button>
