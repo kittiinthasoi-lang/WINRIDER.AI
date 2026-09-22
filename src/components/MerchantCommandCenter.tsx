@@ -36,7 +36,7 @@ import {
   Award,
   ChevronRight,
   Package,
-  CreditCard,
+
   Banknote,
   QrCode,
   Radio,
@@ -176,10 +176,6 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   const currentMerchantTier = useMemo(() => getMerchantTier(merchantLevel), [merchantLevel]);
   const merchantDifficultyMetrics = useMemo(() => getLevelDifficultyMetrics(merchantLevel), [merchantLevel]);
 
-  // Merchant Financial Credit Score (คะแนนเครดิตทางการเงินร้านค้า)
-  const [merchantCreditScore, setMerchantCreditScore] = useState<number>(0);
-  const [workingCapitalAvailable, setWorkingCapitalAvailable] = useState<number>(0);
-
   // Products catalog state
   const [storeProducts, setStoreProducts] = useState<StoreCatalogProduct[]>(INITIAL_STORE_PRODUCTS);
   React.useEffect(() => {
@@ -229,27 +225,6 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
     phone: customerProfile?.phone || '',
     rating: 0,
     reviewsCount: 0
-  };
-
-  const handleGainMerchantCredit = (points: number, reason: string) => {
-    if (audioEnabled) playTactileBlip(1200);
-    setMerchantCreditScore(prev => Math.min(850, prev + points));
-    setMerchantXpToast(`💳 +${points} คะแนนเครดิตร้านค้า: ${reason}! (รวม: ${Math.min(850, merchantCreditScore + points)}/850)`);
-    confetti({ particleCount: 45, spread: 65, colors: ['#FFD700', '#00D2FF', '#10B981'] });
-    setTimeout(() => setMerchantXpToast(null), 3500);
-  };
-
-  const handleDrawWorkingCapital = (amount: number) => {
-    if (workingCapitalAvailable < amount) {
-      if (audioEnabled) playTactileBlip(400);
-      alert(`⚠️ วงเงินหมุนเวียนคงเหลือไม่เพียงพอ (คงเหลือ ฿${workingCapitalAvailable.toLocaleString()})`);
-      return;
-    }
-    if (audioEnabled) playRadarScan();
-    setWorkingCapitalAvailable(prev => prev - amount);
-    confetti({ particleCount: 50, spread: 75, colors: ['#FFD700', '#00D2FF'] });
-    setMerchantXpToast(`💸 เบิกเงินทุนหมุนเวียนคู่ค้า 0% ดอกเบี้ย: ฿${amount.toLocaleString()} โอนเข้าบัญชีร้านค้าเรียบร้อย!`);
-    setTimeout(() => setMerchantXpToast(null), 4000);
   };
 
   const handleGainMerchantXp = (amount: number, reason: string) => {
@@ -887,7 +862,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
                     {merchantProfileData.bioStatus}
                   </p>
                   <p className="text-xs text-slate-300 font-mono mt-0.5">
-                    รหัสบัญชีร้านค้า: <strong className="text-amber-300">MCH-AURA-ZENCO-001</strong> • วงเงินหมุนเวียน ฿{workingCapitalAvailable.toLocaleString()}
+                    บัญชีร้านค้าเชื่อมกับข้อมูลจริงของผู้ใช้ • ข้อมูลการเงินจะแสดงเมื่อมีข้อมูลที่ยืนยันแล้ว
                   </p>
                 </div>
               </div>
@@ -1191,43 +1166,6 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
                 </div>
               </div>
 
-              {/* Merchant Financial Credit Score Card */}
-              <div className="p-6 rounded-3xl bg-gradient-to-br from-[#0D2447] via-[#091633] to-[#070E22] border-2 border-emerald-500/50 shadow-[0_0_25px_rgba(16,185,129,0.2)] space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                      <CreditCard className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-mono font-bold text-white uppercase">คะแนนเครดิตร้านค้า</h4>
-                      <p className="text-[10px] text-emerald-400 font-mono">AAA Sovereign Credit Score</p>
-                    </div>
-                  </div>
-                  <span className="text-2xl font-black text-emerald-400 font-mono drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]">
-                    {merchantCreditScore}
-                  </span>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-black/50 border border-white/10 space-y-2 text-xs font-mono">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-400">วงเงินทุนหมุนเวียน 0% ดอกเบี้ย:</span>
-                    <span className="text-amber-300 font-bold">฿{workingCapitalAvailable.toLocaleString()}</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-emerald-500 to-cyan-400"
-                      style={{ width: `${(workingCapitalAvailable / 250000) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleDrawWorkingCapital(20000)}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black text-xs shadow-md"
-                >
-                  เบิกเงินทุนหมุนเวียน ฿20,000 (0% ดอกเบี้ย)
-                </button>
-              </div>
             </div>
           </div>
 
