@@ -551,6 +551,18 @@ export async function completeLiveOrder(
   orders[orderIndex] = completedOrder;
   saveLocalLiveOrders(orders);
 
+  // Mirror the authoritative completed order into rides/{id} so the server-side
+  // onTripCompleted trigger can settle the exact fare + tip exactly once.
+  try {
+    await setDoc(doc(db, 'rides', completedOrder.id), {
+      ...completedOrder,
+      updatedAt: new Date().toISOString(),
+      clientSettlementSyncAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (firestoreSyncErr) {
+    console.warn('[Completed Ride Settlement Sync]:', firestoreSyncErr);
+  }
+
   broadcastEvent(completedOrder, 'completed');
 
   // Trigger Webhook for completion
