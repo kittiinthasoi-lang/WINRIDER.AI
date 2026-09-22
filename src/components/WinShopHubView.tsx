@@ -300,7 +300,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
                     <Navigation className="mr-1 inline h-4 w-4" />ปักหมุดเรียกพี่วินไปที่นี่
                   </button>
                 )}
-                {selectedProfile.phone && <button type="button" onClick={() => callProfile(selectedProfile.phone)} className="rounded-xl border border-white/10 bg-white/5 py-3 text-xs font-black text-white"><Phone className="mr-1 inline h-4 w-4 text-emerald-300" />${selectedProfile.role === "merchant" ? "โทรหาร้าน" : "โทรหาพาร์ทเนอร์"}</button>}
+                {selectedProfile.phone && <button type="button" onClick={() => callProfile(selectedProfile.phone)} className="rounded-xl border border-white/10 bg-white/5 py-3 text-xs font-black text-white"><Phone className="mr-1 inline h-4 w-4 text-emerald-300" />{selectedProfile.role === "merchant" ? "โทรหาร้าน" : "โทรหาพาร์ทเนอร์"}</button>}
                 <button type="button" onClick={() => void shareProfile(selectedProfile)} className="rounded-xl border border-white/10 bg-white/5 py-3 text-xs font-black text-white"><ExternalLink className="mr-1 inline h-4 w-4 text-amber-300" />แชร์โปรไฟล์</button>
               </div>
             </div>
