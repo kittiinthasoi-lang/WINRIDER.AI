@@ -1013,6 +1013,34 @@ async function fetchTatDatasetRows(kind: PublicDataKind): Promise<{ rows: any[];
   return { rows, sourceUrl: resource.url };
 }
 
+app.get("/api/admin/win-alert/pending", async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 300);
+  const snapshot = await ordersDb.collection("winAlertEvents").limit(limit).get();
+  const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((record: any) => record.status === "pending_admin_review");
+  return res.json({ records });
+});
+
+app.post("/api/admin/win-alert/review", async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  const id = String(req.body?.id || "").trim();
+  const approved = req.body?.approved === true;
+  if (!id) return res.status(400).json({ error: "ไม่พบรหัสกิจกรรม" });
+  const ref = ordersDb.collection("winAlertEvents").doc(id);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return res.status(404).json({ error: "ไม่พบกิจกรรม" });
+  await ref.set({
+    adminApproved: approved,
+    status: approved ? "approved" : "rejected",
+    reviewedBy: adminUser.uid,
+    reviewedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  dailyEventsCache.clear();
+  return res.json({ ok: true, id, approved });
+});
+
 app.get("/api/admin/public-data/catalog", async (req, res) => {
   const adminUser = await requireSuperAdmin(req, res);
   if (!adminUser) return;
