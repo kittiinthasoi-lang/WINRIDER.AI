@@ -43,43 +43,11 @@ export const LineAuthModal: React.FC<LineAuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Preset Fast LINE Profiles
-  const FAST_LINE_PROFILES = [
-    {
-      id: 'driver_kitti',
-      role: 'driver' as UserRole,
-      roleName: 'พี่วิน / ไรเดอร์ (Knight Driver)',
-      icon: '🛵',
-      displayName: 'พี่กิตติ วินสายฟ้า',
-      lineId: '@kitti_winrider',
-      phone: '089-445-1234',
-      plateNumber: '1กข 7789 กทม.',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
-      description: 'เข้าใช้งานทันทีในฐานะคนขับ พร้อมเปิดเรดาร์รับงาน'
-    },
-    {
-      id: 'passenger_jane',
-      role: 'customer' as UserRole,
-      roleName: 'ผู้โดยสาร (Passenger Citizen)',
-      icon: '👩‍💼',
-      displayName: 'คุณเจน เจนจิรา',
-      lineId: '@janejira_bkk',
-      phone: '081-889-4567',
-      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-      description: 'เข้าใช้งานทันทีในฐานะผู้โดยสาร เรียกรถเดินทางด่วน'
-    },
-    {
-      id: 'merchant_somchai',
-      role: 'merchant' as UserRole,
-      roleName: 'ร้านค้าอาหาร & พัสดุ (Merchant)',
-      icon: '🍜',
-      displayName: 'เฮียชัย ข้าวมันไก่',
-      lineId: '@chaichicken_rice',
-      phone: '085-331-9090',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-      description: 'เข้าใช้งานทันทีในฐานะร้านค้าพันธมิตร ส่งอาหารด่วน'
-    }
-  ];
+  // No demo/preset accounts. Contact details must come from a real authenticated LINE/Firebase account.
+  const FAST_LINE_PROFILES: Array<{
+    id: string; role: UserRole; roleName: string; icon: string; displayName: string;
+    lineId: string; phone: string; plateNumber?: string; avatarUrl: string; description: string;
+  }> = [];
 
   const handleQuickLogin = async (profile: typeof FAST_LINE_PROFILES[0]) => {
     setIsLoading(true);
