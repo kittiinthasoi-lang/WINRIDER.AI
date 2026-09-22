@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 import { KNIGHT_ARMOR_SUITS, ArmorSuit } from '../data/armorSuits';
 import { ArmorLevelTestingLab } from './ArmorLevelTestingLab';
 import { ArmorLevels1to70ShowcaseModal } from './ArmorLevels1to70ShowcaseModal';
@@ -325,7 +326,7 @@ export const ArmorCabinetView: React.FC<ArmorCabinetViewProps> = ({
                       }}
                     >
                       <img
-                        src={activeSuit.imageUrl || '/images/armor_lightning.jpg'}
+                        src={activeSuit.imageUrl || WIN_IMAGES.armor.lightning}
                         alt={activeSuit.name}
                         className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
                         referrerPolicy="no-referrer"
