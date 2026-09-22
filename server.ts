@@ -558,6 +558,8 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
         avatarEmoji: String(custom.avatarEmoji || entry.avatarEmoji || (entry.role === "merchant" ? "🏪" : "🏢")),
         address: String(roleData.address || [entry.district, entry.province].filter(Boolean).join(" ") || "").trim(),
         phone: String(entry.phone || roleData.phone || ""),
+        email: String(entry.email || roleData.contactEmail || ""),
+        contactPerson: String(roleData.contactPerson || roleData.ownerName || ""),
         category: String(roleData.shopType || roleData.orgType || roleData.category || ""),
         products: recordArray(roleData.products),
         services: recordArray(roleData.services),
