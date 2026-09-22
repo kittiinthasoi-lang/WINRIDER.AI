@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { WIN_IMAGES } from '../../data/imageRegistry';
 import { 
   Users, 
   Search, 
@@ -278,10 +279,10 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                           <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
                             <img 
                               src={
-                                u.role === 'knight' ? '/images/avatar_knight.jpg' : 
-                                u.role === 'merchant' ? '/images/avatar_merchant.jpg' : 
-                                u.role === 'partner' ? '/images/avatar_partner.jpg' : 
-                                '/images/avatar_citizen.jpg'
+                                u.role === 'knight' ? WIN_IMAGES.profiles.knight : 
+                                u.role === 'merchant' ? WIN_IMAGES.profiles.merchant : 
+                                u.role === 'partner' ? WIN_IMAGES.profiles.partner : 
+                                WIN_IMAGES.profiles.citizen
                               } 
                               alt={u.displayName}
                               className="w-full h-full object-cover"
@@ -366,10 +367,10 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
               <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-[#00D4FF]/40 overflow-hidden flex-shrink-0">
                 <img 
                   src={
-                    selectedUser.role === 'knight' ? '/images/avatar_knight.jpg' : 
-                    selectedUser.role === 'merchant' ? '/images/avatar_merchant.jpg' : 
-                    selectedUser.role === 'partner' ? '/images/avatar_partner.jpg' : 
-                    '/images/avatar_citizen.jpg'
+                    selectedUser.role === 'knight' ? WIN_IMAGES.profiles.knight : 
+                    selectedUser.role === 'merchant' ? WIN_IMAGES.profiles.merchant : 
+                    selectedUser.role === 'partner' ? WIN_IMAGES.profiles.partner : 
+                    WIN_IMAGES.profiles.citizen
                   } 
                   alt={selectedUser.displayName}
                   className="w-full h-full object-cover"
