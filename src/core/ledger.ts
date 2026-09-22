@@ -44,7 +44,7 @@ export class LedgerEngine {
 
   constructor(initialWallet?: Partial<KnightWalletState>) {
     this.wallet = {
-      uid: initialWallet?.uid || 'KNT-SOVEREIGN-01',
+      uid: initialWallet?.uid || '',
       balance: initialWallet?.balance ?? 0.0,
       pending: initialWallet?.pending ?? 0.0,
       locked: initialWallet?.locked ?? 0.0,
@@ -64,63 +64,9 @@ export class LedgerEngine {
       }
     };
 
-    // ตัวอย่างประวัติธุรกรรมแบบ Double-Entry
-    this.entries = [
-      {
-        id: 'LEDGER-001',
-        txId: 'TX-TRIP-9901',
-        tripId: 'TRIP-9901',
-        debitAccount: 'FARE_REVENUE',
-        creditAccount: 'WALLET_KNIGHT',
-        amount: 45.0,
-        bucket: 'general',
-        description: 'ค่าโดยสารสุทธิจากภารกิจรับส่งผู้โดยสาร BTS หมอชิต',
-        createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-      },
-      {
-        id: 'LEDGER-002',
-        txId: 'TX-DEDUCT-9901-INS',
-        tripId: 'TRIP-9901',
-        debitAccount: 'WALLET_KNIGHT',
-        creditAccount: 'BUCKET_INSURANCE',
-        amount: 1.0,
-        bucket: 'insurance',
-        description: 'สมทบกองทุนคุ้มครองอุบัติเหตุอัศวิน (1 บาท/รอบ)',
-        createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-      },
-      {
-        id: 'LEDGER-003',
-        txId: 'TX-DEDUCT-9901-PEN',
-        tripId: 'TRIP-9901',
-        debitAccount: 'WALLET_KNIGHT',
-        creditAccount: 'BUCKET_PENSION',
-        amount: 1.0,
-        bucket: 'pension',
-        description: 'สะสมเงินออมเพื่ออนาคตอัศวิน (1 บาท/รอบ)',
-        createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-      },
-      {
-        id: 'LEDGER-004',
-        txId: 'TX-DEDUCT-9901-EQP',
-        tripId: 'TRIP-9901',
-        debitAccount: 'WALLET_KNIGHT',
-        creditAccount: 'BUCKET_EQUIPMENT',
-        amount: 1.0,
-        bucket: 'equipment',
-        description: 'ผ่อนชำระชุดเกราะและกล่องอัจฉริยะ (1 บาท/รอบ)',
-        createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-      },
-      {
-        id: 'LEDGER-005',
-        txId: 'TX-TOPUP-9800',
-        debitAccount: 'PROMPTPAY_INFLOW',
-        creditAccount: 'WALLET_KNIGHT',
-        amount: 500.0,
-        bucket: 'general',
-        description: 'เติมเงินผ่านระบบ PromptPay QR สำเร็จ',
-        createdAt: new Date(Date.now() - 86400000).toISOString()
-      }
-    ];
+    // Production ledger starts empty. Only verified persisted transactions may be loaded.
+    this.entries = [];
+
   }
 
   public getWallet(): KnightWalletState {
