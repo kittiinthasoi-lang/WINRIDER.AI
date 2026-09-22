@@ -267,8 +267,8 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
       accountId: citizenId,
       accountType: 'CITIZEN_WALLET',
       direction: 'DEBIT',
-      amountSatang: feeResult.totalCitizenPaySatang,
-      descriptionTh: `หักชำระค่าโดยสารและค่าธรรมเนียมพลเมือง ทริป #${rideId}`
+      amountSatang: feeResult.totalCitizenPaySatang + tipSatang,
+      descriptionTh: `หักชำระค่าโดยสาร ค่าธรรมเนียมพลเมือง และทิป ทริป #${rideId}`
     });
 
     // [CREDIT] ฝั่งอัศวิน: ได้รับรายได้สุทธิหลังหักค่าธรรมเนียมอัศวินและอุปกรณ์
