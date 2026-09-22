@@ -14,6 +14,20 @@ dotenv.config();
 
 const app = express();
 
+// ROUTES API SAFETY LOCK: keep Google Routes API unreachable until a deliberate re-enable.
+// This blocks every server-side request to routes.googleapis.com while leaving other Google APIs intact.
+const nativeFetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const target = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (target.includes("routes.googleapis.com")) {
+    return new Response(JSON.stringify({ error: "ROUTES_API_DISABLED", message: "Google Routes API is disabled for billing safety." }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return nativeFetch(input, init);
+}) as typeof fetch;
+
 // Port Configuration:
 // 1. In AI Studio Development Environment: CONTROL_PLANE_PORT is present,
 //    Nginx reverse-proxy routes public traffic to port 3000 (DEFAULT_APP_PORT).
@@ -39,11 +53,11 @@ const RATE_LIMITS: Record<string, number> = {
   "/api/orders/:id/accept": 10,
   "/api/orders/:id/step": 30,
   "/api/orders/:id/location": 120,
-  "/api/routes/compute": 30,
+  "/api/routes/compute": 0,
   "/api/pet-care/nearby": 20,
   "/api/emergency/nearby": 20,
   "/api/radar/nearby-places": 20,
-  "/api/places/resolve-routes": 20,
+  "/api/places/resolve-routes": 0,
   "/api/shop/directory": 30,
   "/api/shop/listings": 20,
   "/api/shop/profile-content": 20,
@@ -475,7 +489,8 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
   }
 });
 
-app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolve-routes"]), async (req, res) => {
+app.post("/api/places/resolve-routes", rateLimit(0), async (req, res) => {
+  return res.status(503).json({ error: "ROUTES_API_DISABLED", code: "ROUTES_API_DISABLED_RESOLVE", routes: [] });
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const latitude = Number(req.body?.latitude);
@@ -3418,7 +3433,8 @@ Respond concisely in Thai (unless asked otherwise) with clear tactical actions o
 // =========================================================================
 let routesApiRateLimitedUntil = 0;
 
-app.post("/api/routes/compute", rateLimit(30), async (req, res) => {
+app.post("/api/routes/compute", rateLimit(0), async (req, res) => {
+  return res.status(503).json({ error: "ROUTES_API_DISABLED", code: "ROUTES_API_DISABLED_ENDPOINT" });
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   try {
