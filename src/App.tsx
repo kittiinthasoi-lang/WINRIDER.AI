@@ -627,6 +627,7 @@ export default function App() {
                 adminLevel={isOwnerAdmin ? 'super' : claims.adminLevel}
                 adminEmail={firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}
                 onExitAdmin={handleExitAdmin}
+                onSelectOwnerPersona={handleSelectOwnerPersona}
               />
             )}
           </AdminRoute>
