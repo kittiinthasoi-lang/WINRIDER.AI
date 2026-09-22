@@ -1137,6 +1137,7 @@ interface ServerOrder {
   serviceTitle: string;
   serviceIconEmoji: string;
   passengerUserId?: string;
+  passengerRole?: "citizen" | "knight" | "merchant" | "partner";
   passengerName: string;
   passengerPhone: string;
   pickupLocation: string;
@@ -3208,6 +3209,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       serviceTitle: String(input.serviceTitle || normalizedServiceId).slice(0, 120),
       serviceIconEmoji: String(input.serviceIconEmoji || "🛵").slice(0, 16),
       passengerUserId: user.uid,
+      passengerRole: ["citizen", "knight", "merchant", "partner"].includes(String(passenger.role)) ? String(passenger.role) as ServerOrder["passengerRole"] : undefined,
       passengerName: String(passenger.displayName || input.passengerName || "ผู้โดยสาร").slice(0, 120),
       passengerPhone: String(passenger.phone || ""),
       pickupLocation: String(input.pickupLocation || "ตำแหน่ง GPS ปัจจุบัน").slice(0, 300),
