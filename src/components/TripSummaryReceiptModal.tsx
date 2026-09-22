@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { emitQuestMetric } from '../services/questService';
 import {
   Shield,
@@ -19,6 +19,7 @@ import {
 import confetti from 'canvas-confetti';
 import { playTactileBlip, playLevelUpFanfare } from '../utils/audio';
 import { completeLiveOrder, LiveRideOrder } from '../utils/dispatchSync';
+import { generatePromptPayQRDataUrl } from '../utils/promptpay';
 
 interface TripSummaryReceiptModalProps {
   isOpen: boolean;
@@ -42,6 +43,20 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [settledOrder, setSettledOrder] = useState<LiveRideOrder | null>(null);
+  const [realPromptPayQr, setRealPromptPayQr] = useState<string>('');
+
+  useEffect(() => {
+    let alive = true;
+    const phone = String((settledOrder || order)?.driverPhone || '').replace(/[^0-9]/g, '');
+    if (!phone || phone.length < 9) {
+      setRealPromptPayQr('');
+      return () => { alive = false; };
+    }
+    void generatePromptPayQRDataUrl(phone, Number((settledOrder || order)?.fare || 0) > 0 ? Number((settledOrder || order)?.fare || 0) : undefined)
+      .then(url => { if (alive) setRealPromptPayQr(url); })
+      .catch(() => { if (alive) setRealPromptPayQr(''); });
+    return () => { alive = false; };
+  }, [order, settledOrder]);
 
   if (!isOpen || !order || order.status !== 'completed') return null;
 
@@ -274,34 +289,27 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
           </div>
         </div>
 
-        {/* PromptPay QR Code Payment Display */}
+        {/* PromptPay QR Code Payment Display — real QR only */}
         <div className="p-3.5 rounded-2xl bg-black/60 border border-white/10 flex flex-col sm:flex-row items-center gap-3 text-xs">
-          <div className="w-24 h-24 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0 shadow-lg">
-            {/* SVG simulated PromptPay QR pattern */}
-            <div className="w-full h-full border-2 border-slate-900 rounded p-1 flex flex-col justify-between">
-              <div className="flex justify-between">
-                <div className="w-4 h-4 bg-slate-950 border border-white" />
-                <div className="w-4 h-4 bg-slate-950 border border-white" />
-              </div>
-              <div className="flex justify-center items-center font-mono font-black text-[7px] text-slate-950">
-                PROMPTPAY
-              </div>
-              <div className="flex justify-between">
-                <div className="w-4 h-4 bg-slate-950 border border-white" />
-                <div className="w-3 h-3 bg-cyan-600 rounded-full" />
-              </div>
+          {realPromptPayQr ? (
+            <div className="w-24 h-24 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0 shadow-lg">
+              <img src={realPromptPayQr} alt="PromptPay QR จริงของพี่วิน" className="w-full h-full object-contain" />
             </div>
-          </div>
+          ) : (
+            <div className="w-24 h-24 rounded-xl bg-white/5 border border-amber-400/30 flex items-center justify-center shrink-0 text-amber-300 text-[10px] text-center p-2">
+              ไม่มี PromptPay ที่ยืนยันได้
+            </div>
+          )}
           <div className="space-y-1 text-center sm:text-left flex-1">
             <div className="flex items-center justify-center sm:justify-start gap-1 text-cyan-300 font-bold">
               <QrCode className="w-4 h-4" />
-              <span>สแกนจ่ายตรงสู่อัศวิน (PromptPay QR)</span>
+              <span>PromptPay QR จริงเท่านั้น</span>
             </div>
             <p className="text-[11px] text-slate-300">
-              ยอดชำระอัตโนมัติ: <strong className="text-white font-mono text-sm">฿{totalPassengerPaid.toFixed(2)}</strong> (รวมทิป)
+              ยอดชำระ: <strong className="text-white font-mono text-sm">฿{totalPassengerPaid.toFixed(2)}</strong> (รวมทิป)
             </p>
             <p className="text-[10px] text-slate-400">
-              ยอดรับเงินจะถือว่ายืนยันเมื่อ Ledger ของงานระบุสถานะ SETTLED เท่านั้น
+              ระบบไม่สร้าง QR จำลอง และยอดรับเงินถือว่ายืนยันเมื่อ Ledger ระบุสถานะ SETTLED เท่านั้น
             </p>
           </div>
         </div>
