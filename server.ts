@@ -15,23 +15,8 @@ dotenv.config();
 
 const app = express();
 
-// FREE-ONLY MODE: never initialize billable external AI/Maps providers.
-// Keep this enabled for AI Studio Starter Tier / no-billing publishing.
-const FREE_ONLY_MODE = true;
-
-// ROUTES API SAFETY LOCK: keep Google Routes API unreachable until a deliberate re-enable.
-// This blocks every server-side request to routes.googleapis.com while leaving other Google APIs intact.
-const nativeFetch = globalThis.fetch.bind(globalThis);
-globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-  const target = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-  if (target.includes("routes.googleapis.com")) {
-    return new Response(JSON.stringify({ error: "ROUTES_API_DISABLED", message: "Google Routes API is disabled for billing safety." }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-  return nativeFetch(input, init);
-}) as typeof fetch;
+// Google Maps Platform is used server-side only. API credentials remain in server env secrets.
+// The browser never receives GOOGLE_MAPS_API_KEY.
 
 // In AI Studio and Cloud Run sandboxed environments, nginx routes external
 // traffic exclusively to port 3000. Port 3000 is hardcoded by infrastructure.
@@ -99,7 +84,7 @@ setInterval(() => {
 // Lazy initialization of GoogleGenAI
 let aiClient: GoogleGenAI | null = null;
 function getAiClient(): GoogleGenAI | null {
-  if (FREE_ONLY_MODE || !process.env.GEMINI_API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     return null;
   }
   if (!aiClient) {
@@ -117,17 +102,10 @@ function getAiClient(): GoogleGenAI | null {
 
 // Health check endpoints (Cloud Run, Kubernetes, AI Studio probes)
 app.get(["/api/health", "/healthz", "/health"], (_req, res) => {
-  res.json({ status: "ok", empire: "WINRIDER.AI", freeOnly: FREE_ONLY_MODE, timestamp: new Date().toISOString() });
+  res.json({ status: "ok", empire: "WINRIDER.AI", timestamp: new Date().toISOString() });
 });
 
 app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]), async (req, res) => {
-  if (FREE_ONLY_MODE) {
-    return res.status(503).json({
-      error: "FREE_ONLY_MODE",
-      message: "บริการภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย"
-    });
-  }
-
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const latitude = Number(req.body?.latitude);
@@ -257,13 +235,6 @@ app.patch("/api/sos/incidents/:id", rateLimit(30), async (req, res) => {
 });
 
 app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]), async (req, res) => {
-  if (FREE_ONLY_MODE) {
-    return res.status(503).json({
-      error: "FREE_ONLY_MODE",
-      message: "บริการภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย"
-    });
-  }
-
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const latitude = Number(req.body?.latitude), longitude = Number(req.body?.longitude);
@@ -315,13 +286,6 @@ const RADAR_PLACES_CACHE_MS = 2 * 60 * 1000;
 // Searches are split by domain so nearby shops cannot crowd schools, transport
 // or places of worship out of Google's 20-result response window.
 app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-places"]), async (req, res) => {
-  if (FREE_ONLY_MODE) {
-    return res.status(503).json({
-      error: "FREE_ONLY_MODE",
-      message: "บริการภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย"
-    });
-  }
-
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const latitude = Number(req.body?.latitude);
@@ -435,54 +399,81 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
   }
 });
 
-app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolve-routes"]), async (req, res) => {
+app.post("/api/places/resolve-routes", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
   const requestedPlaces = Array.isArray(req.body?.places) ? req.body.places.slice(0, 20) : [];
-  const places = requestedPlaces
-    .map((item: any) => ({ key: String(item?.key || "").trim(), query: String(item?.query || "").trim() }))
-    .filter((item: { key: string; query: string }) => item.key && item.query);
-  if (!places.length) return res.status(400).json({ error: "ไม่มีสถานที่", routes: [] });
-
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !requestedPlaces.length) {
+    return res.status(400).json({ error: "ข้อมูลจุดเริ่มต้นหรือสถานที่ไม่ถูกต้อง", routes: [] });
+  }
+  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
+    return res.status(503).json({ error: "GOOGLE_MAPS_API_KEY_NOT_CONFIGURED", routes: [] });
+  }
   try {
-    const snapshot = await ordersDb.collection("publicDataRecords")
-      .where("adminApproved", "==", true)
-      .limit(500)
-      .get();
-    const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as any));
-
-    const routes = places.map((item: { key: string; query: string }) => {
-      const q = item.query.toLowerCase().replace(" ประเทศไทย", "").trim();
-      const match = records.find((record: any) =>
-        [record.name, record.address, record.province, record.district, record.category]
-          .some((value) => String(value || "").toLowerCase().includes(q))
-      );
-      if (!match) return null;
-      return {
-        key: item.key,
-        placeId: String(match.id),
-        name: String(match.name || item.query),
-        address: String(match.address || ""),
-        latitude: Number(match.latitude),
-        longitude: Number(match.longitude),
-        distanceKm: null,
-        etaMinutes: null,
-        distanceSource: "unavailable_without_real_routing_provider",
-        etaSource: "unavailable_without_real_routing_provider",
-        googleMapsUri: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(String(match.name || "") + " " + String(match.address || "")),
-      };
-    }).filter(Boolean);
-
-    return res.json({
-      routes,
-      source: "WINRIDER.AI • Admin Verified Thai Public Data",
-      routesApi: "disabled",
-      warning: "ยังไม่มีบริการคำนวณเส้นทางถนนแบบชำระเงิน จึงไม่สร้างระยะทาง/ETA ปลอม",
-    });
+    const routes = [];
+    for (const item of requestedPlaces) {
+      const key = String(item?.key || "").trim();
+      const query = String(item?.query || "").trim();
+      if (!key || !query) continue;
+      const placeResponse = await fetch("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri",
+        },
+        body: JSON.stringify({ textQuery: query, maxResultCount: 1, languageCode: "th", regionCode: "TH" }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const placePayload = await placeResponse.json().catch(() => ({})) as any;
+      const place = placePayload?.places?.[0];
+      if (!place?.location) continue;
+      const destination = { lat: Number(place.location.latitude), lng: Number(place.location.longitude) };
+      const routeResponse = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.localizedValues",
+        },
+        body: JSON.stringify({
+          origin: { location: { latLng: { latitude, longitude } } },
+          destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+          travelMode: "TWO_WHEELER",
+          routingPreference: "TRAFFIC_AWARE",
+          computeAlternativeRoutes: false,
+          languageCode: "th-TH",
+          regionCode: "TH",
+          units: "METRIC",
+        }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      const routePayload = await routeResponse.json().catch(() => ({})) as any;
+      const route = routePayload?.routes?.[0];
+      if (!route) continue;
+      const durationMatch = String(route.duration || "").match(/([0-9.]+)s/);
+      const distanceKm = Number(route.distanceMeters) / 1000;
+      routes.push({
+        key,
+        placeId: String(place.id || ""),
+        name: String(place.displayName?.text || query),
+        address: String(place.formattedAddress || ""),
+        latitude: destination.lat,
+        longitude: destination.lng,
+        distanceKm: Number.isFinite(distanceKm) ? Math.round(distanceKm * 100) / 100 : null,
+        etaMinutes: durationMatch ? Math.max(1, Math.ceil(Number(durationMatch[1]) / 60)) : null,
+        googleMapsUri: String(place.googleMapsUri || ""),
+        distanceSource: "Google Routes API",
+        etaSource: "Google Routes API",
+      });
+    }
+    return res.json({ routes, source: "Google Places API (New) + Google Routes API", routesApi: "enabled" });
   } catch (error) {
     console.error("[Places Resolve]", error instanceof Error ? error.message : error);
-    return res.status(503).json({ error: "ค้นหาสถานที่จากข้อมูลสาธารณะไม่สำเร็จ", routes: [] });
+    return res.status(502).json({ error: "GOOGLE_PLACES_OR_ROUTES_UNAVAILABLE", routes: [] });
   }
 });
 app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
@@ -4003,13 +3994,64 @@ Respond concisely in Thai (unless asked otherwise) with clear tactical actions o
 // Source: Google Maps Platform Code Assist
 // Internal Usage Attribution: gmp_mcp_codeassist_v1_aistudio
 // =========================================================================
-app.post("/api/routes/compute", rateLimit(0), async (_req, res) => {
-  return res.status(503).json({
-    success: false,
-    error: "ROUTES_API_DISABLED",
-    code: "ROUTES_API_DISABLED_ENDPOINT",
-    message: "Google Routes API is intentionally disabled. Use Google Places for place resolution or open native Google Maps for road navigation."
-  });
+app.post("/api/routes/compute", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const origin = req.body?.origin;
+  const destination = req.body?.destination;
+  const travelMode = String(req.body?.travelMode || "TWO_WHEELER");
+  if (!validCoordinates(origin) || !validCoordinates(destination)) {
+    return res.status(400).json({ success: false, error: "INVALID_ROUTE_COORDINATES" });
+  }
+  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
+    return res.status(503).json({ success: false, error: "GOOGLE_MAPS_API_KEY_NOT_CONFIGURED" });
+  }
+  const supportedMode = ["DRIVE", "TWO_WHEELER", "WALK", "BICYCLE", "TRANSIT"].includes(travelMode) ? travelMode : "TWO_WHEELER";
+  try {
+    const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "routes.duration,routes.staticDuration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.localizedValues",
+      },
+      body: JSON.stringify({
+        origin: { location: { latLng: { latitude: Number(origin.lat), longitude: Number(origin.lng) } } },
+        destination: { location: { latLng: { latitude: Number(destination.lat), longitude: Number(destination.lng) } } },
+        travelMode: supportedMode,
+        ...(supportedMode === "DRIVE" || supportedMode === "TWO_WHEELER" ? { routingPreference: "TRAFFIC_AWARE" } : {}),
+        computeAlternativeRoutes: false,
+        languageCode: "th-TH",
+        regionCode: "TH",
+        units: "METRIC",
+      }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    const payload = await response.json().catch(() => ({})) as any;
+    if (!response.ok || !payload?.routes?.[0]) {
+      console.error("[Routes Compute]", response.status, payload);
+      return res.status(502).json({ success: false, error: "GOOGLE_ROUTES_UNAVAILABLE" });
+    }
+    const route = payload.routes[0];
+    const durationMatch = String(route.duration || "").match(/([0-9.]+)s/);
+    const staticDurationMatch = String(route.staticDuration || "").match(/([0-9.]+)s/);
+    const distanceKm = Number(route.distanceMeters) / 1000;
+    const etaMinutes = durationMatch ? Math.max(1, Math.ceil(Number(durationMatch[1]) / 60)) : null;
+    const staticEtaMinutes = staticDurationMatch ? Math.max(1, Math.ceil(Number(staticDurationMatch[1]) / 60)) : null;
+    return res.json({
+      success: true,
+      distanceKm: Number.isFinite(distanceKm) ? Math.round(distanceKm * 100) / 100 : null,
+      etaMinutes,
+      staticEtaMinutes,
+      encodedPolyline: String(route.polyline?.encodedPolyline || ""),
+      source: "Google Routes API",
+      travelMode: supportedMode,
+    });
+  } catch (error) {
+    console.error("[Routes Compute]", error instanceof Error ? error.message : error);
+    return res.status(502).json({ success: false, error: "GOOGLE_ROUTES_UNAVAILABLE" });
+  }
 });
 
 // ==========================================
