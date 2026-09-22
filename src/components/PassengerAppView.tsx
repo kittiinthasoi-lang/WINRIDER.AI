@@ -983,91 +983,110 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setBookingError(null);
     setDestinationEtaMinutes(null);
     setDestinationFareEstimate(null);
+    setTripDistanceKm(0);
     setSelectedDestination(fallbackLabel);
     try {
-      const currentPosition = await new Promise<{ lat: number; lng: number }>((resolve) => {
-        if (!navigator.geolocation) {
-          resolve({ lat: 13.736717, lng: 100.523186 });
-          return;
-        }
+      if (!navigator.geolocation) {
+        throw new Error('อุปกรณ์นี้ไม่รองรับ GPS จริง จึงยังคำนวณระยะทางและค่าโดยสารไม่ได้');
+      }
+
+      const currentPosition = await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
           (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-          () => resolve({ lat: 13.736717, lng: 100.523186 }),
-          { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 }
+          (error) => reject(new Error(error.message || 'ไม่สามารถอ่าน GPS จริงได้')),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
         );
       });
 
-      let resolvedDistanceKm: number | null = null;
       let resolvedAddress = fallbackLabel;
+      let resolvedDistanceKm: number | null = null;
       let resolvedEta: number | null = null;
 
-      // 1. Reference destination check (instant, no external dependency)
-      const refMatch = findReferencePlace(destinationQuery) || findReferencePlace(fallbackLabel);
-      if (refMatch && typeof refMatch.lat === 'number' && typeof refMatch.lng === 'number') {
-        resolvedDistanceKm = Math.round(computeHaversineDistanceKm(currentPosition.lat, currentPosition.lng, refMatch.lat, refMatch.lng) * 10) / 10;
-        resolvedAddress = refMatch.address || refMatch.name;
-        resolvedEta = Math.max(3, Math.ceil(resolvedDistanceKm * 3.5));
-      } else {
-        // 2. Supplemental server resolver if online
-        try {
-          const response = await fetch('/api/places/resolve-routes', {
-            method: 'POST',
-            headers: await getAuthHeaders(),
-            body: JSON.stringify({ latitude: currentPosition.lat, longitude: currentPosition.lng, places: [{ key: 'destination-preview', query: destinationQuery + ' ประเทศไทย' }] }),
-          });
-          if (response.ok) {
-            const payload = await response.json() as { routes?: Array<{ latitude: number; longitude: number; address: string; distanceKm: number; etaMinutes: number | null }> };
-            const route = payload.routes?.[0];
-            if (route && Number.isFinite(route.distanceKm)) {
-              resolvedDistanceKm = Number(route.distanceKm);
-              if (route.address) resolvedAddress = route.address;
-              resolvedEta = route.etaMinutes ?? Math.max(3, Math.ceil(resolvedDistanceKm * 3.5));
-            }
+      // Public-data destinations provide the real place identity/coordinates.
+      // Route distance/ETA must come from a real routing provider; never estimate with a multiplier.
+      try {
+        const publicResponse = await fetch('/api/public-data/places?kind=attractions&query=' + encodeURIComponent(destinationQuery) + '&limit=5', {
+          headers: { Accept: 'application/json' }
+        });
+        if (publicResponse.ok) {
+          const publicPayload = await publicResponse.json() as { records?: Array<{ name?: string; address?: string; province?: string; latitude?: number; longitude?: number }> };
+          const publicMatch = publicPayload.records?.[0];
+          if (publicMatch) {
+            resolvedAddress = [publicMatch.name, publicMatch.address, publicMatch.district, publicMatch.province].filter(Boolean).join(' ');
           }
-        } catch {
-          // Graceful handling when route distance is unavailable
         }
+      } catch {
+        // Destination identity remains usable even if the public-data index is temporarily unavailable.
+      }
+
+      // Route service is deliberately unavailable in FREE-ONLY mode unless a real provider is configured.
+      // Do not fabricate distance, ETA, GPS fallback coordinates, or fare.
+      try {
+        const response = await fetch('/api/places/resolve-routes', {
+          method: 'POST',
+          headers: await getAuthHeaders(),
+          body: JSON.stringify({
+            latitude: currentPosition.lat,
+            longitude: currentPosition.lng,
+            places: [{ key: 'destination-preview', query: destinationQuery + ' ประเทศไทย' }]
+          }),
+        });
+        if (response.ok) {
+          const payload = await response.json() as { routes?: Array<{ address?: string; distanceKm?: number; etaMinutes?: number | null }> };
+          const route = payload.routes?.[0];
+          if (route && Number.isFinite(route.distanceKm) && Number(route.distanceKm) > 0) {
+            resolvedDistanceKm = Number(route.distanceKm);
+            resolvedEta = route.etaMinutes ?? null;
+            if (route.address) resolvedAddress = route.address;
+          }
+        }
+      } catch {
+        // No real routing result: keep distance/ETA/fare empty.
       }
 
       setSelectedDestination(resolvedAddress);
-      if (resolvedDistanceKm !== null && resolvedDistanceKm > 0) {
+      if (resolvedDistanceKm !== null) {
         const fareQuote = calculateAppFare(activeServiceId || 'knight', resolvedDistanceKm, {
           expressBoxBaht: expressBoxFee,
           dreamRideBaht: selectedDreamRide.priceAddon,
           amenitiesBaht: amenitiesSummary.totalPrice,
           serviceAddonBaht: serviceAddonFee,
         });
-        const fare = fareQuote.fareBaht;
         setTripDistanceKm(resolvedDistanceKm);
         setDestinationEtaMinutes(resolvedEta);
-        setDestinationFareEstimate(fare);
+        setDestinationFareEstimate(fareQuote.fareBaht);
       } else {
-        setTripDistanceKm(0);
         setDestinationEtaMinutes(null);
         setDestinationFareEstimate(null);
+        setBookingError('พบปลายทางจริงแล้ว แต่ยังไม่มีข้อมูลเส้นทางจริงสำหรับคำนวณค่าโดยสาร จึงไม่แสดงตัวเลขประมาณการ');
       }
-      if (openMatchingAfterCalculation) {
+
+      if (openMatchingAfterCalculation && resolvedDistanceKm !== null) {
         setShowBookingModal(false);
         setShowDriverMatchingModal(true);
       } else {
         setShowBookingModal(true);
       }
+
       if (audioEnabled) {
         playTactileBlip(900);
-        if (resolvedDistanceKm !== null && resolvedDistanceKm > 0) {
+        if (resolvedDistanceKm !== null) {
           const spokenFare = calculateAppFare(activeServiceId || 'knight', resolvedDistanceKm, {
             expressBoxBaht: expressBoxFee,
             dreamRideBaht: selectedDreamRide.priceAddon,
             amenitiesBaht: amenitiesSummary.totalPrice,
             serviceAddonBaht: serviceAddonFee,
           }).fareBaht;
-          speakThaiText(`ระยะทางจริงประมาณ ${resolvedDistanceKm.toFixed(1)} กิโลเมตร ค่าโดยสารประมาณ ${spokenFare} บาท`);
+          speakThaiText('พบปลายทางจริงและคำนวณค่าโดยสารจากข้อมูลเส้นทางจริงแล้ว ' + spokenFare + ' บาท');
         } else {
-          speakThaiText('เลือกสถานที่แล้ว กำลังรอระบุพิกัดเพื่อคำนวณระยะทางและราคา');
+          speakThaiText('พบปลายทางแล้ว แต่ยังไม่มีข้อมูลเส้นทางจริง จึงยังไม่แสดงราคาโดยประมาณ');
         }
       }
     } catch (error) {
-      console.error('Destination route preview fallback used:', error);
+      const message = error instanceof Error ? error.message : 'ไม่สามารถอ่าน GPS จริงได้';
+      setBookingError(message);
+      setShowBookingModal(true);
+      if (audioEnabled) speakThaiText(message);
     } finally {
       setIsCalculatingDestination(false);
     }
