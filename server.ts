@@ -905,6 +905,216 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
   }
 });
 
+
+
+type PublicDataKind = "attractions" | "restaurants" | "accommodations" | "souvenirs" | "events";
+
+const TAT_PUBLIC_DATASETS: Record<PublicDataKind, { slug: string; label: string; description: string }> = {
+  attractions: { slug: "tourist-attraction", label: "แหล่งท่องเที่ยว", description: "สถานที่ท่องเที่ยว พิกัด ที่ตั้ง ช่องทางติดต่อ และเวลาให้บริการ" },
+  restaurants: { slug: "restaurant", label: "ร้านอาหาร", description: "ร้านอาหารและภัตตาคารในประเทศไทย" },
+  accommodations: { slug: "accommodation", label: "ที่พัก", description: "โรงแรม รีสอร์ท โฮมสเตย์ และที่พักประเภทต่าง ๆ" },
+  souvenirs: { slug: "souvenir-shop", label: "ร้านของที่ระลึก", description: "ร้านของฝาก สินค้าชุมชน และของที่ระลึก" },
+  events: { slug: "tourismactivity", label: "กิจกรรมท่องเที่ยว", description: "เทศกาล งานประเพณี และกิจกรรมท่องเที่ยว" },
+};
+
+function normalizePublicRecordValue(item: any, keys: string[]): unknown {
+  for (const key of keys) {
+    const value = key.split(".").reduce((current, part) => current?.[part], item);
+    if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+  }
+  return undefined;
+}
+
+function normalizePublicCoordinate(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && Math.abs(n) <= 180 ? n : null;
+}
+
+function normalizePublicRecord(kind: PublicDataKind, item: any, index: number, sourceUrl: string) {
+  const name = String(normalizePublicRecordValue(item, [
+    "name", "title", "businessName", "placeName", "event_name", "eventName",
+    "ชื่อ", "ชื่อสถานที่", "ชื่อร้าน", "ชื่อกิจกรรม", "ชื่อที่พัก", "ชื่อสถานประกอบการ"
+  ]) || "").trim();
+  if (!name) return null;
+
+  const lat = normalizePublicCoordinate(normalizePublicRecordValue(item, [
+    "latitude", "lat", "location.latitude", "พิกัดละติจูด", "ละติจูด"
+  ]));
+  const lng = normalizePublicCoordinate(normalizePublicRecordValue(item, [
+    "longitude", "lng", "lon", "location.longitude", "พิกัดลองจิจูด", "ลองจิจูด"
+  ]));
+  const address = String(normalizePublicRecordValue(item, [
+    "address", "addressTh", "location", "ที่อยู่", "ที่ตั้ง", "สถานที่ตั้ง"
+  ]) || "").trim();
+  const province = String(normalizePublicRecordValue(item, ["province", "จังหวัด", "provinceName"]) || "").trim();
+  const district = String(normalizePublicRecordValue(item, ["district", "อำเภอ", "districtName"]) || "").trim();
+  const phone = String(normalizePublicRecordValue(item, ["phone", "telephone", "tel", "โทรศัพท์"]) || "").trim();
+  const website = String(normalizePublicRecordValue(item, ["website", "url", "เว็บไซต์"]) || "").trim();
+  const description = String(normalizePublicRecordValue(item, ["description", "detail", "รายละเอียด", "คำอธิบาย"]) || "").trim();
+  const category = String(normalizePublicRecordValue(item, ["category", "type", "ประเภท", "หมวดหมู่"]) || kind).trim();
+  const externalId = String(normalizePublicRecordValue(item, ["id", "_id", "code", "รหัส", "รหัสสถานที่", "รหัสกิจกรรม"]) || ("row-" + index)).trim();
+  const startAt = kind === "events" ? parseThaiOrIsoDate(normalizePublicRecordValue(item, ["startAt", "start", "start_date", "startDate", "วันที่เริ่มต้น", "วันที่เริ่ม"])) : null;
+  const endAt = kind === "events" ? parseThaiOrIsoDate(normalizePublicRecordValue(item, ["endAt", "end", "end_date", "endDate", "วันที่สิ้นสุด", "วันที่สิ้นสุด"])) : null;
+  if (kind === "events" && !startAt) return null;
+
+  const stableId = crypto.createHash("sha256")
+    .update("tat:" + kind + ":" + externalId + ":" + name + ":" + String(lat) + ":" + String(lng))
+    .digest("hex").slice(0, 32);
+
+  return {
+    id: "tat-" + kind + "-" + stableId,
+    kind,
+    name,
+    category,
+    address,
+    province,
+    district,
+    latitude: lat,
+    longitude: lng,
+    phone: phone || undefined,
+    website: website || undefined,
+    description: description || undefined,
+    startAt: startAt || undefined,
+    endAt: endAt || undefined,
+    sourceName: "TAT Data Catalog • Thailand Tourism Authority",
+    sourceUrl,
+    providerRecordId: externalId,
+    adminApproved: false,
+    status: "pending_admin_review",
+    importedAt: new Date().toISOString(),
+  };
+}
+
+async function fetchTatDatasetRows(kind: PublicDataKind): Promise<{ rows: any[]; sourceUrl: string }> {
+  const config = TAT_PUBLIC_DATASETS[kind];
+  const apiUrl = "https://datacatalog.tat.or.th/api/3/action/package_show?id=" + encodeURIComponent(config.slug);
+  const apiResponse = await fetch(apiUrl, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!apiResponse.ok) throw new Error("TAT_CKAN_" + apiResponse.status);
+  const packagePayload = await apiResponse.json();
+  const resources = Array.isArray(packagePayload?.result?.resources) ? packagePayload.result.resources : [];
+  const resource = resources.find((r: any) => String(r?.format || "").toLowerCase() === "json" && typeof r?.url === "string")
+    || resources.find((r: any) => typeof r?.url === "string");
+  if (!resource?.url) throw new Error("TAT_RESOURCE_NOT_FOUND_" + kind);
+
+  const dataResponse = await fetch(resource.url, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!dataResponse.ok) throw new Error("TAT_DATA_" + dataResponse.status);
+  const payload = await dataResponse.json();
+  const rows = Array.isArray(payload) ? payload
+    : Array.isArray(payload?.data) ? payload.data
+    : Array.isArray(payload?.results) ? payload.results
+    : Array.isArray(payload?.records) ? payload.records
+    : [];
+  return { rows, sourceUrl: resource.url };
+}
+
+app.get("/api/admin/public-data/catalog", async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  const snapshot = await ordersDb.collection("publicDataRecords").get();
+  const pending = snapshot.docs.filter((doc) => doc.data()?.status === "pending_admin_review").length;
+  const approved = snapshot.docs.filter((doc) => doc.data()?.adminApproved === true || doc.data()?.status === "approved").length;
+  const byKind = Object.keys(TAT_PUBLIC_DATASETS).reduce((acc, key) => {
+    const kind = key as PublicDataKind;
+    acc[kind] = {
+      ...TAT_PUBLIC_DATASETS[kind],
+      pending: snapshot.docs.filter((doc) => doc.data()?.kind === kind && doc.data()?.status === "pending_admin_review").length,
+      approved: snapshot.docs.filter((doc) => doc.data()?.kind === kind && (doc.data()?.adminApproved === true || doc.data()?.status === "approved")).length,
+    };
+    return acc;
+  }, {} as Record<string, any>);
+  return res.json({ source: "TAT Data Catalog", free: true, license: "Open Data Common", pending, approved, datasets: byKind });
+});
+
+app.post("/api/admin/public-data/import-tat", rateLimit(5), async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  const requested = Array.isArray(req.body?.kinds) ? req.body.kinds : Object.keys(TAT_PUBLIC_DATASETS);
+  const kinds = requested.filter((value: unknown): value is PublicDataKind => typeof value === "string" && value in TAT_PUBLIC_DATASETS);
+  if (!kinds.length) return res.status(400).json({ error: "ไม่พบชุดข้อมูล TAT ที่ต้องการนำเข้า" });
+
+  const results: Record<string, any> = {};
+  for (const kind of kinds) {
+    try {
+      const { rows, sourceUrl } = await fetchTatDatasetRows(kind);
+      const normalized = rows.map((row, index) => normalizePublicRecord(kind, row, index, sourceUrl)).filter(Boolean).slice(0, 10000) as any[];
+      for (let offset = 0; offset < normalized.length; offset += 400) {
+        const batch = ordersDb.batch();
+        for (const record of normalized.slice(offset, offset + 400)) {
+          const ref = ordersDb.collection(kind === "events" ? "winAlertEvents" : "publicDataRecords").doc(record.id);
+          batch.set(ref, {
+            ...record,
+            adminApproved: false,
+            status: "pending_admin_review",
+            importedBy: adminUser.uid,
+            importedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
+        await batch.commit();
+      }
+      results[kind] = { ok: true, sourceRows: rows.length, stagedForReview: normalized.length, sourceUrl };
+    } catch (error) {
+      results[kind] = { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  dailyEventsCache.clear();
+  return res.json({ ok: true, source: "TAT Data Catalog", results });
+});
+
+app.get("/api/admin/public-data/pending", async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 300);
+  const kind = String(req.query.kind || "").trim();
+  let query: FirebaseFirestore.Query = ordersDb.collection("publicDataRecords");
+  if (kind && kind in TAT_PUBLIC_DATASETS) query = query.where("kind", "==", kind);
+  const snapshot = await query.limit(limit).get();
+  const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((record: any) => record.status === "pending_admin_review");
+  return res.json({ records });
+});
+
+app.post("/api/admin/public-data/review", async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  const kind = String(req.body?.kind || "").trim() as PublicDataKind;
+  const id = String(req.body?.id || "").trim();
+  const approved = req.body?.approved === true;
+  if (!id || !["attractions","restaurants","accommodations","souvenirs"].includes(kind)) return res.status(400).json({ error: "รายการตรวจสอบไม่ถูกต้อง" });
+  const ref = ordersDb.collection("publicDataRecords").doc(id);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return res.status(404).json({ error: "ไม่พบรายการข้อมูล" });
+  await ref.set({
+    adminApproved: approved,
+    status: approved ? "approved" : "rejected",
+    reviewedBy: adminUser.uid,
+    reviewedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return res.json({ ok: true, id, approved });
+});
+
+app.get("/api/public-data/places", rateLimit(30), async (req, res) => {
+  const kind = String(req.query.kind || "attractions").trim() as PublicDataKind;
+  const query = String(req.query.query || "").trim().toLowerCase();
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+  if (!["attractions","restaurants","accommodations","souvenirs"].includes(kind)) return res.status(400).json({ records: [] });
+  try {
+    const snapshot = await ordersDb.collection("publicDataRecords").where("kind", "==", kind).where("adminApproved", "==", true).limit(500).get();
+    const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((record: any) => Number.isFinite(Number(record.latitude)) && Number.isFinite(Number(record.longitude)))
+      .filter((record: any) => !query || [record.name, record.category, record.address, record.province, record.district].some((value) => String(value || "").toLowerCase().includes(query)))
+      .slice(0, limit);
+    return res.json({ records, source: "WINRIDER.AI • Admin Verified TAT Public Data" });
+  } catch (error) {
+    console.error("[Public Data Places]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ records: [] });
+  }
+});
+
 // Persistent order store: Firestore is the source of truth across instances/restarts.
 interface ServerOrder {
   id: string;
