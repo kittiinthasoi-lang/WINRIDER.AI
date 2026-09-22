@@ -88,7 +88,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
 
   const handleShareReceipt = () => {
     if (audioEnabled) playTactileBlip(1100);
-    const receiptText = `🛵 WINRIDER.AI SOVEREIGN RECEIPT\nรหัสทริป: ${order.id}\nผู้โดยสาร: ${order.passengerName}\nอัศวิน: ${order.driverName || 'พี่สมศักดิ์ ไนท์สายฟ้า'}\nจุดรับ: ${order.pickupLocation}\nจุดส่ง: ${order.dropoffLocation}\nระยะทาง: ${order.distanceKm.toFixed(1)} กม.\nค่าโดยสารรวม: ฿${grossFare.toFixed(2)}\nหักกองทุนสวัสดิการ 2 บาท: -฿2.00 (สมทบกองทุนรักษาพยาบาลและน้ำมันเครื่อง)\nทิปอัศวิน (100%): ฿${tipAmount.toFixed(2)}\nยอดชำระสุทธิ: ฿${totalPassengerPaid.toFixed(2)}`;
+    const receiptText = `🛵 WINRIDER.AI SOVEREIGN RECEIPT\nรหัสทริป: ${order.id}\nผู้โดยสาร: ${order.passengerName}\nอัศวิน: ${order.driverName || 'ข้อมูลพี่วินไม่พร้อม'}\nจุดรับ: ${order.pickupLocation}\nจุดส่ง: ${order.dropoffLocation}\nระยะทางที่บันทึกในงาน: ${recordedDistanceKm.toFixed(1)} กม.\nค่าโดยสารรวม: ฿${grossFare.toFixed(2)}\nหักกองทุนสวัสดิการ 2 บาท: -฿2.00 (สมทบกองทุนรักษาพยาบาลและน้ำมันเครื่อง)\nทิปอัศวิน (100%): ฿${tipAmount.toFixed(2)}\nยอดชำระสุทธิ: ฿${totalPassengerPaid.toFixed(2)}`;
     navigator.clipboard.writeText(receiptText);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
@@ -174,8 +174,8 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
             </div>
           </div>
           <div className="pt-2 border-t border-white/10 flex justify-between text-[11px] font-mono text-slate-400">
-            <span>ระยะทางจริง: {order.distanceKm.toFixed(1)} กม.</span>
-            <span>เวลาเดินทาง: ~{order.estMinutes || 8} นาที</span>
+            <span>ระยะทางที่บันทึกในงาน: {recordedDistanceKm.toFixed(1)} กม.</span>
+            <span>เวลาโดยประมาณที่บันทึก: ~{recordedEtaMinutes.toFixed(0)} นาที</span>
           </div>
         </div>
 
@@ -199,7 +199,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
             <div className="p-2.5 rounded-xl bg-black/50 border border-amber-400/30 space-y-1 text-[11px]">
               <div className="flex justify-between font-bold text-amber-300 font-mono">
                 <span>หักสมทบ "กองทุนสวัสดิการอัศวิน 2 บาท"</span>
-                <span>-฿2.00</span>
+                <span>-฿{welfareFund.toFixed(2)}</span>
               </div>
               <div className="pl-2 space-y-0.5 text-[10px] text-slate-400">
                 <div className="flex justify-between">
