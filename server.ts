@@ -1084,6 +1084,34 @@ app.post("/api/admin/public-data/review", async (req, res) => {
   return res.json({ ok: true, id, approved });
 });
 
+app.get("/api/public-data/discovery", rateLimit(30), async (req, res) => {
+  const query = String(req.query.query || "").trim().toLowerCase();
+  const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
+  const kinds: PublicDataKind[] = ["events", "attractions", "restaurants", "accommodations", "souvenirs"];
+  try {
+    const result: Record<string, any[]> = {};
+    for (const kind of kinds) {
+      const snapshot = await ordersDb.collection(kind === "events" ? "winAlertEvents" : "publicDataRecords")
+        .where("kind", "==", kind)
+        .limit(300)
+        .get();
+      result[kind] = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((record: any) => record.adminApproved === true && record.status === "approved")
+        .filter((record: any) => !query || [record.name, record.title, record.category, record.address, record.province, record.district]
+          .some((value) => String(value || "").toLowerCase().includes(query)))
+        .slice(0, limit);
+    }
+    return res.json({
+      source: "WINRIDER.AI • Admin Verified Thai Public Data",
+      freePublicData: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("[Public Data Discovery]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ data: {}, error: "โหลดข้อมูลสาธารณะไม่สำเร็จ" });
+  }
+});
+
 app.get("/api/public-data/places", rateLimit(30), async (req, res) => {
   const kind = String(req.query.kind || "attractions").trim() as PublicDataKind;
   const query = String(req.query.query || "").trim().toLowerCase();
