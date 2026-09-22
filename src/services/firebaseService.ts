@@ -91,7 +91,7 @@ export class FirebaseService {
     } catch (err: unknown) {
       console.warn('Google sign-in popup error, using sovereign profile:', err);
       const guestUid = `GOOG-${Date.now()}`;
-      return await this.createUserProfile(guestUid, defaultRole, 'พลเมืองอัศวิน (Google User)', '0812345678', 'google_user@winrider.ai');
+      return await this.createUserProfile(guestUid, defaultRole, 'พลเมืองอัศวิน (Google User)', '', '');
     }
   }
 
