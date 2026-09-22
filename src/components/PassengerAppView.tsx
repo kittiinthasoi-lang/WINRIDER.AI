@@ -690,10 +690,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorName: 'Orange',
       colorHex: '#FF6B00',
       colorGlow: 'rgba(255, 107, 0, 0.8)',
-      desc: 'ส่งด่วนใน 30 นาที ปรับลดค่ากล่องเหลือ 5฿ เพื่อประชาชน พี่วินเลเวล 10+ พร้อมกล่องควบคุมอุณหภูมิและกันกระแทก',
+      desc: 'ส่งด่วนใน 30 นาที ปรับลดค่ากล่องเหลือ 5฿ เพื่อประชาชน พี่วินพี่วินที่ผ่านการอนุมัติจากแอดมิน พร้อมกล่องควบคุมอุณหภูมิและกันกระแทก',
       icon: <Zap className="w-6 h-6 text-orange-400 drop-shadow-[0_0_10px_rgba(255,107,0,0.95)]" />,
       imageUrl: WIN_IMAGES.pillars.express,
-      badge: '+5฿ ค่ากล่อง (LV.10+)',
+      badge: '+5฿ ค่ากล่อง ()',
       bgGlow: 'from-orange-500/25 to-transparent',
       eta: '1-3 นาที',
       priceEstimate: '฿20 - ฿75',
@@ -701,7 +701,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       actionText: '📦 กดส่งพัสดุด่วน 30น.',
       actionGradient: 'from-[#FF6B00] to-amber-500',
       actionTextGlow: 'shadow-[0_0_14px_rgba(255,107,0,0.6)]',
-      infoData: 'ℹ️ ข้อมูล: พี่วิน LV.10+ • ค่ากล่องคุมอุณหภูมิ 5฿'
+      infoData: 'ℹ️ ข้อมูล: พี่วิน  • ค่ากล่องคุมอุณหภูมิ 5฿'
     },
     {
       id: 'pet',
@@ -806,7 +806,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       actionText: '👨‍👩‍👧 กดจองรับส่งเด็ก/ครอบครัว',
       actionGradient: 'from-sky-400 to-blue-600',
       actionTextGlow: 'shadow-[0_0_14px_rgba(56,189,248,0.6)]',
-      infoData: 'ℹ️ ข้อมูล: หมวกกันน็อกเด็ก • GPS สด • อบรม LV.15+'
+      infoData: 'ℹ️ ข้อมูล: หมวกกันน็อกเด็ก • GPS สด • อบรม '
     },
     {
       id: 'link',
@@ -3095,7 +3095,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   {selectedService || 'WIN KNIGHT'}
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
-                  {isExpressService ? 'อัศวินเลเวล 10+ พร้อมกล่อง' : 'อัศวินพร้อมออกปฏิบัติการ'}
+                  {isExpressService ? 'อัศวินพี่วินที่ผ่านการอนุมัติจากแอดมิน พร้อมกล่อง' : 'อัศวินพร้อมออกปฏิบัติการ'}
                 </span>
               </div>
               
