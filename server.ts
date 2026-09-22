@@ -101,7 +101,7 @@ setInterval(() => {
 // Lazy initialization of GoogleGenAI
 let aiClient: GoogleGenAI | null = null;
 function getAiClient(): GoogleGenAI | null {
-  if (!process.env.GEMINI_API_KEY) {
+  if (FREE_ONLY_MODE || !process.env.GEMINI_API_KEY) {
     return null;
   }
   if (!aiClient) {
@@ -123,6 +123,12 @@ app.get(["/api/health", "/healthz", "/health"], (_req, res) => {
 });
 
 app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]), async (req, res) => {
+  if (FREE_ONLY_MODE) {
+    return res.status(503).json({
+      error: "FREE_ONLY_MODE",
+      message: "บริการภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย"
+    });
+  }
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const latitude = Number(req.body?.latitude);
@@ -252,6 +258,12 @@ app.patch("/api/sos/incidents/:id", rateLimit(30), async (req, res) => {
 });
 
 app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]), async (req, res) => {
+  if (FREE_ONLY_MODE) {
+    return res.status(503).json({
+      error: "FREE_ONLY_MODE",
+      message: "บริการภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย"
+    });
+  }
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const latitude = Number(req.body?.latitude), longitude = Number(req.body?.longitude);
@@ -303,6 +315,12 @@ const RADAR_PLACES_CACHE_MS = 2 * 60 * 1000;
 // Searches are split by domain so nearby shops cannot crowd schools, transport
 // or places of worship out of Google's 20-result response window.
 app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-places"]), async (req, res) => {
+  if (FREE_ONLY_MODE) {
+    return res.status(503).json({
+      error: "FREE_ONLY_MODE",
+      message: "บริการภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย"
+    });
+  }
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const latitude = Number(req.body?.latitude);
@@ -418,6 +436,12 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
 });
 
 app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolve-routes"]), async (req, res) => {
+  if (FREE_ONLY_MODE) {
+    return res.status(503).json({
+      error: "FREE_ONLY_MODE",
+      message: "บริการภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย"
+    });
+  }
   // ROUTES API DISABLED: resolve destinations with Places API only and calculate
   // a local straight-line estimate. No request is sent to routes.googleapis.com.
   const user = await requireFirebaseUser(req, res);
