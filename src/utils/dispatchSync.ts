@@ -223,6 +223,8 @@ export async function createLiveOrder(orderInput: {
   dropoffCoord?: { lat: number; lng: number };
   customerGender?: 'female' | 'male';
   preferredDriverId?: string;
+  expressPackagePhotoUrl?: string;
+  expressAiCertificateId?: string;
 }): Promise<LiveRideOrder> {
   // The verified Firebase UID is the only valid owner identifier. A profile or
   // legacy local session ID must never be used as the ride owner.
@@ -261,6 +263,8 @@ export async function createLiveOrder(orderInput: {
     ...(orderInput.dropoffCoord ? { dropoffCoord: orderInput.dropoffCoord } : {}),
     ...(orderInput.customerGender ? { customerGender: orderInput.customerGender } : {}),
     ...(orderInput.preferredDriverId ? { preferredDriverId: orderInput.preferredDriverId } : {}),
+    ...(orderInput.expressPackagePhotoUrl ? { expressPackagePhotoUrl: orderInput.expressPackagePhotoUrl } : {}),
+    ...(orderInput.expressAiCertificateId ? { expressAiCertificateId: orderInput.expressAiCertificateId } : {}),
   };
 
   // Server API is the primary authority for ride creation.
