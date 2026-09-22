@@ -998,7 +998,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                           <p className="text-[10px] text-slate-400 line-clamp-1">{place.highlight}</p>
                           <div className="flex items-center justify-between text-[9px] text-slate-400 font-mono">
                             <span>📍 {place.area}</span>
-                            <span className="text-[#FFD700]">★ {place.rating} • {route ? `${route.distanceKm} กม. • ${route.etaMinutes || '—'} นาที` : 'รอ GPS/เส้นทางจริง'}</span>
+                            <span className="text-[#FFD700]">★ {place.rating} • {route ? `${route.distanceKm} กม. • ${route.etaMinutes || '—'} นาที` : 'รอ GPS/ข้อมูลปลายทาง'}</span>
                           </div>
                         </div>
                       })}
@@ -1117,7 +1117,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                   className="w-full py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-amber-500 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <MapPin className="w-3.5 h-3.5" />
-                  <span>{resolvedRoutes[`prayer:${selectedPrayer.id}`] ? `ปักหมุด • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].distanceKm} กม. • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].etaMinutes || '—'} นาที` : 'กำลังรอ GPS และเส้นทางจริง'}</span>
+                  <span>{resolvedRoutes[`prayer:${selectedPrayer.id}`] ? `ปักหมุด • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].distanceKm} กม. • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].etaMinutes || '—'} นาที` : 'กำลังรอ GPS และข้อมูลปลายทาง'}</span>
                 </button>
               </div>
             )}
