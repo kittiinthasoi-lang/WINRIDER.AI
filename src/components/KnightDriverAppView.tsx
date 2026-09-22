@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 import { emitQuestMetric } from '../services/questService';
 import { Vehicle } from '../types';
 import { KNIGHT_ARMOR_SUITS, ArmorSuit } from '../data/armorSuits';
@@ -72,10 +73,10 @@ import {
   User
 } from 'lucide-react';
 
-const waveBikeImg = '/images/garage_wave.jpg';
-const pcxBikeImg = '/images/garage_pcx.jpg';
-const adventureBikeImg = '/images/garage_adventure.jpg';
-const evBikeImg = '/images/garage_ev.jpg';
+const waveBikeImg = WIN_IMAGES.vehicles.wave;
+const pcxBikeImg = WIN_IMAGES.vehicles.pcx;
+const adventureBikeImg = WIN_IMAGES.vehicles.adventure;
+const evBikeImg = WIN_IMAGES.vehicles.ev;
 
 export type DriverTabType = 'profile' | 'garage' | 'cabinet' | 'armor' | 'armorLab' | 'calculator' | 'installment' | 'wallet' | 'mechanic' | 'jobs' | 'quests' | 'navigation';
 
@@ -615,11 +616,11 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                 <div className="flex items-center gap-2.5">
                   <div className="w-11 h-11 rounded-xl overflow-hidden border border-cyan-400/80 bg-black/60 flex items-center justify-center flex-shrink-0 shadow-[0_0_12px_rgba(0,210,255,0.4)]">
                     <img 
-                      src={activeVehicle.image || '/images/garage_wave.jpg'} 
+                      src={activeVehicle.image || WIN_IMAGES.vehicles.wave} 
                       alt={activeVehicle.name} 
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = WIN_IMAGES.vehicles.wave; }}
                     />
                   </div>
                   <div>
@@ -1061,11 +1062,11 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                     <div className="flex items-center gap-3">
                       <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-cyan-400 bg-black/60 shadow-[0_0_20px_rgba(0,210,255,0.4)] flex-shrink-0">
                         <img 
-                          src={activeVehicle.image || '/images/garage_wave.jpg'} 
+                          src={activeVehicle.image || WIN_IMAGES.vehicles.wave} 
                           alt={activeVehicle.name} 
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = WIN_IMAGES.vehicles.wave; }}
                         />
                       </div>
                       <div>
@@ -1140,11 +1141,11 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                           <div className="flex items-center gap-3">
                             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-cyan-500/50 bg-black/60 flex-shrink-0 shadow-md">
                               <img 
-                                src={v.image || '/images/garage_wave.jpg'} 
+                                src={v.image || WIN_IMAGES.vehicles.wave} 
                                 alt={v.name} 
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"
-                                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).src = WIN_IMAGES.vehicles.wave; }}
                               />
                             </div>
                             <div>
@@ -1602,11 +1603,11 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
               <div className="flex items-center gap-3">
                 <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-cyan-400 bg-black/60 shadow-lg flex-shrink-0">
                   <img 
-                    src={selectedInspectVehicle.image || '/images/garage_wave.jpg'} 
+                    src={selectedInspectVehicle.image || WIN_IMAGES.vehicles.wave} 
                     alt={selectedInspectVehicle.name} 
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = WIN_IMAGES.vehicles.wave; }}
                   />
                 </div>
                 <div>
@@ -1634,11 +1635,11 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
             {/* Real Vehicle Showcase Hero Photo */}
             <div className="w-full h-44 sm:h-52 rounded-2xl overflow-hidden border border-cyan-500/40 relative shadow-inner bg-black/60">
               <img
-                src={selectedInspectVehicle.image || '/images/garage_wave.jpg'}
+                src={selectedInspectVehicle.image || WIN_IMAGES.vehicles.wave}
                 alt={selectedInspectVehicle.name}
                 className="w-full h-full object-cover select-none pointer-events-none transition-transform duration-500 hover:scale-105"
                 referrerPolicy="no-referrer"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = WIN_IMAGES.vehicles.wave; }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0A152E] via-transparent to-transparent pointer-events-none" />
               <div className="absolute bottom-2.5 left-3.5 flex items-center gap-2">
@@ -1786,11 +1787,11 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                           isActive ? 'border-[#00D2FF] ring-2 ring-cyan-400/50 shadow-md' : 'border-white/10 bg-black/40'
                         }`}>
                           <img
-                            src={v.image || '/images/garage_wave.jpg'}
+                            src={v.image || WIN_IMAGES.vehicles.wave}
                             alt={v.name}
                             className="w-full h-full object-cover"
                             referrerPolicy="no-referrer"
-                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/garage_wave.jpg'; }}
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = WIN_IMAGES.vehicles.wave; }}
                           />
                         </div>
                         <div>
