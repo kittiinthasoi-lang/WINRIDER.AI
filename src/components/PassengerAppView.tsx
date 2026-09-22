@@ -997,14 +997,14 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         );
       });
 
-      let resolvedDistanceKm = 3.5;
+      let resolvedDistanceKm: number | null = null;
       let resolvedAddress = fallbackLabel;
-      let resolvedEta: number | null = 10;
+      let resolvedEta: number | null = null;
 
       // 1. Reference destination check (instant, no external dependency)
       const refMatch = findReferencePlace(destinationQuery) || findReferencePlace(fallbackLabel);
-      if (refMatch) {
-        resolvedDistanceKm = refMatch.distanceKm || Math.max(1.0, computeHaversineDistanceKm(currentPosition.lat, currentPosition.lng, refMatch.lat, refMatch.lng));
+      if (refMatch && typeof refMatch.lat === 'number' && typeof refMatch.lng === 'number') {
+        resolvedDistanceKm = Math.round(computeHaversineDistanceKm(currentPosition.lat, currentPosition.lng, refMatch.lat, refMatch.lng) * 10) / 10;
         resolvedAddress = refMatch.address || refMatch.name;
         resolvedEta = Math.max(3, Math.ceil(resolvedDistanceKm * 3.5));
       } else {
@@ -1025,21 +1025,27 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             }
           }
         } catch {
-          // Graceful fallback to default distance
+          // Graceful handling when route distance is unavailable
         }
       }
 
-      const fareQuote = calculateAppFare(activeServiceId || 'knight', resolvedDistanceKm, {
-        expressBoxBaht: expressBoxFee,
-        dreamRideBaht: selectedDreamRide.priceAddon,
-        amenitiesBaht: amenitiesSummary.totalPrice,
-        serviceAddonBaht: serviceAddonFee,
-      });
-      const fare = fareQuote.fareBaht;
       setSelectedDestination(resolvedAddress);
-      setTripDistanceKm(resolvedDistanceKm);
-      setDestinationEtaMinutes(resolvedEta);
-      setDestinationFareEstimate(fare);
+      if (resolvedDistanceKm !== null && resolvedDistanceKm > 0) {
+        const fareQuote = calculateAppFare(activeServiceId || 'knight', resolvedDistanceKm, {
+          expressBoxBaht: expressBoxFee,
+          dreamRideBaht: selectedDreamRide.priceAddon,
+          amenitiesBaht: amenitiesSummary.totalPrice,
+          serviceAddonBaht: serviceAddonFee,
+        });
+        const fare = fareQuote.fareBaht;
+        setTripDistanceKm(resolvedDistanceKm);
+        setDestinationEtaMinutes(resolvedEta);
+        setDestinationFareEstimate(fare);
+      } else {
+        setTripDistanceKm(0);
+        setDestinationEtaMinutes(null);
+        setDestinationFareEstimate(null);
+      }
       if (openMatchingAfterCalculation) {
         setShowBookingModal(false);
         setShowDriverMatchingModal(true);
@@ -1048,7 +1054,17 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       }
       if (audioEnabled) {
         playTactileBlip(900);
-        speakThaiText('ระยะทางโดยประมาณ ' + resolvedDistanceKm.toFixed(1) + ' กิโลเมตร ค่าโดยสารประมาณ ' + fare + ' บาท');
+        if (resolvedDistanceKm !== null && resolvedDistanceKm > 0) {
+          const spokenFare = calculateAppFare(activeServiceId || 'knight', resolvedDistanceKm, {
+            expressBoxBaht: expressBoxFee,
+            dreamRideBaht: selectedDreamRide.priceAddon,
+            amenitiesBaht: amenitiesSummary.totalPrice,
+            serviceAddonBaht: serviceAddonFee,
+          }).fareBaht;
+          speakThaiText(`ระยะทางจริงประมาณ ${resolvedDistanceKm.toFixed(1)} กิโลเมตร ค่าโดยสารประมาณ ${spokenFare} บาท`);
+        } else {
+          speakThaiText('เลือกสถานที่แล้ว กำลังรอระบุพิกัดเพื่อคำนวณระยะทางและราคา');
+        }
       }
     } catch (error) {
       console.error('Destination route preview fallback used:', error);
@@ -1149,16 +1165,16 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         }
       }
 
-      let dropoffCoord = { lat: pickupCoord.lat + 0.02, lng: pickupCoord.lng + 0.02 };
+      let dropoffCoord: { lat: number; lng: number } | undefined = undefined;
       let dropoffLocation = selectedDestination || 'ปลายทางที่ระบุ';
-      let resolvedDistanceKm = tripDistanceKm || 3.5;
+      let resolvedDistanceKm: number | null = tripDistanceKm > 0 ? tripDistanceKm : null;
 
       // Check reference destinations first
       const refDropoff = findReferencePlace(selectedDestination);
-      if (refDropoff) {
+      if (refDropoff && typeof refDropoff.lat === 'number' && typeof refDropoff.lng === 'number') {
         dropoffCoord = { lat: refDropoff.lat, lng: refDropoff.lng };
         dropoffLocation = refDropoff.address || refDropoff.name;
-        resolvedDistanceKm = refDropoff.distanceKm || Math.max(1.0, computeHaversineDistanceKm(pickupCoord.lat, pickupCoord.lng, dropoffCoord.lat, dropoffCoord.lng));
+        resolvedDistanceKm = Math.round(computeHaversineDistanceKm(pickupCoord.lat, pickupCoord.lng, dropoffCoord.lat, dropoffCoord.lng) * 10) / 10;
       } else {
         try {
           const destinationResponse = await fetch('/api/places/resolve-routes', {
@@ -1175,8 +1191,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             }
           }
         } catch {
-          // Graceful fallback to default distance/location
+          // No fallback to fake distance
         }
+      }
+
+      if (resolvedDistanceKm === null || resolvedDistanceKm <= 0) {
+        throw new Error('ไม่สามารถคำนวณระยะทางจริงได้ กรุณาระบุสถานที่ปลายทางหรือเปิด GPS');
       }
 
       const resolvedFareQuote = calculateAppFare(activeServiceId || 'knight', resolvedDistanceKm, {

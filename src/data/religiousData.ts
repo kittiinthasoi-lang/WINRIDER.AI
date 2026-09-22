@@ -8,7 +8,7 @@ export interface ReligiousActivityOption {
   exampleLocations: {
     name: string;
     area: string;
-    distanceKm: number;
+    distanceKm?: number;
     highlight: string;
   }[];
   elderlySupportPerks: string[];

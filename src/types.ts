@@ -215,7 +215,7 @@ export interface LifestylePlace {
   categoryLabel: string;
   icon: string;
   area: string;
-  distanceKm: number;
+  distanceKm?: number;
   rating: number;
   highlight: string;
   recommendedMenu: string;

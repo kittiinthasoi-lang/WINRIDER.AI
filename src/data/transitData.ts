@@ -9,10 +9,10 @@ export interface TransitStation {
   icon: string;
   badge: string;
   color: string;
-  distanceKm: number;
+  distanceKm?: number;
   transferLines: string[];
   winStandCount: number;
-  estimatedFareThb: number;
+  estimatedFareThb?: number;
   highlight: string;
   locationDetails: string;
   popularConnections: string[];

@@ -109,7 +109,8 @@ import {
   LiveRouteStep,
   RouteDestination,
   POPULAR_BANGKOK_DESTINATIONS,
-  searchDestinationsFromGps
+  searchDestinationsFromGps,
+  getExternalGoogleMapsNavUrl
 } from '../services/googleRoutesService';
 import confetti from 'canvas-confetti';
 import {
@@ -732,11 +733,15 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-white font-black text-xs sm:text-sm tracking-wide">
-                  Google Maps: เส้นทางถนนจริงปิดชั่วคราว
+                  ระบบเส้นทางถนน
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-400/40 text-[9px] font-bold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span>{liveRoute?.success ? 'เส้นทางพร้อมใช้งาน' : 'เส้นทางถนนจริงปิดชั่วคราว'}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 ${
+                  liveRoute?.success
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-400/40'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-400/40'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${liveRoute?.success ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+                  <span>{liveRoute?.success ? 'เส้นทางในแอปพร้อมใช้งาน' : 'ยังไม่มีระบบคำนวณเส้นทางถนนในแอป (เปิด Google Maps ภายนอก)'}</span>
                 </span>
               </div>
               <div className="text-[10px] text-cyan-300 flex items-center gap-1.5 mt-0.5">
@@ -820,6 +825,27 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
               <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${isComputingRoute ? 'animate-spin' : ''}`} />
               <span>{isComputingRoute ? 'กำลังคำนวณ...' : '🔄 คำนวณเส้นทาง'}</span>
             </button>
+
+            {/* External Google Maps Navigation Button */}
+            {selectedDestination.lat && selectedDestination.lng && (
+              <a
+                href={
+                  gpsState.latitude && gpsState.longitude
+                    ? getExternalGoogleMapsNavUrl(
+                        { lat: gpsState.latitude, lng: gpsState.longitude },
+                        { lat: selectedDestination.lat, lng: selectedDestination.lng }
+                      )
+                    : getExternalGoogleMapsNavUrl({ lat: selectedDestination.lat, lng: selectedDestination.lng })
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-green-500 hover:brightness-110 text-slate-950 font-black text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                title="เปิด Google Maps ภายนอกเพื่อใช้นำทางจริง"
+              >
+                <Navigation className="w-3.5 h-3.5 text-slate-950" />
+                <span>เปิด Google Maps นำทาง</span>
+              </a>
+            )}
           </div>
         </div>
 

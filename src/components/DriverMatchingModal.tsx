@@ -975,13 +975,12 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
                       {filteredLifestylePlaces.map((place) => {
                         const route = resolvedRoutes[`lifestyle:${place.id}`];
-                        const distKm = route ? route.distanceKm : ((place as any).distanceKm || 3.0);
                         return <div
                           key={place.id}
                           onClick={() => {
                             if (audioEnabled) playTactileBlip(950);
                             if (onSelectLifestylePlace) {
-                              onSelectLifestylePlace({ ...place, distanceKm: distKm });
+                              onSelectLifestylePlace(route ? { ...place, distanceKm: route.distanceKm } : place);
                             }
                           }}
                           className="p-2 rounded-xl bg-black/40 border border-white/10 hover:border-purple-400 hover:bg-purple-900/20 cursor-pointer transition-all space-y-1"
@@ -1107,7 +1106,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                 <button
                   onClick={() => {
                     const route = resolvedRoutes[`prayer:${selectedPrayer.id}`];
-                    const distKm = route ? route.distanceKm : 4.0;
+                    const distKm = route ? route.distanceKm : undefined;
                     if (onSelectReligiousDestination) {
                       onSelectReligiousDestination(selectedPrayer.location, distKm);
                     }
@@ -1116,7 +1115,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                   className="w-full py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-amber-500 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-lg hover:brightness-105 transition-all"
                 >
                   <MapPin className="w-3.5 h-3.5" />
-                  <span>{resolvedRoutes[`prayer:${selectedPrayer.id}`] ? `ปักหมุด • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].distanceKm} กม. • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].etaMinutes || '—'} นาที` : 'ปักหมุดไปสถานที่นี้ & เดินทาง'}</span>
+                  <span>{resolvedRoutes[`prayer:${selectedPrayer.id}`] ? `ปักหมุด • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].distanceKm} กม. • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].etaMinutes || '—'} นาที` : 'ปักหมุดไปสถานที่นี้ (รอคำนวณระยะทางจาก GPS)'}</span>
                 </button>
               </div>
             )}
@@ -1255,11 +1254,11 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
                       {/* One-Click Destination Button */}
                       <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                        <span className="text-[9px] text-slate-400 font-mono">{route ? `✓ ${route.distanceKm} กม.` : `อ้างอิงสถานี ~${st.distanceKm || 3.5} กม.`}</span>
+                        <span className="text-[9px] text-slate-400 font-mono">{route ? `✓ ${route.distanceKm} กม.` : 'รอ GPS คำนวณระยะทาง'}</span>
 
                         <button
                           onClick={() => {
-                            const effectiveDist = route ? route.distanceKm : (st.distanceKm || 3.5);
+                            const effectiveDist = route ? route.distanceKm : undefined;
                             if (audioEnabled) {
                               playTactileBlip(1200);
                               speakThaiText(`ปักหมุดปลายทางไปยัง ${st.name}`);
