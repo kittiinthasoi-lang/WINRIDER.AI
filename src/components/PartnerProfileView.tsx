@@ -101,8 +101,6 @@ const EMPTY_PARTNER_PROFILE: PartnerProfile = {
   walletQrAddress: '',
 };
 
-export const SAMPLE_PARTNERS: PartnerProfile[] = [EMPTY_PARTNER_PROFILE];
-
 export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   audioEnabled = true,
   onOpenWinBuddy,
@@ -111,7 +109,7 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   canEdit = false,
   customerProfile
 }) => {
-  const [selectedPartner, setSelectedPartner] = useState<PartnerProfile>(SAMPLE_PARTNERS[0]);
+  const [selectedPartner, setSelectedPartner] = useState<PartnerProfile>(EMPTY_PARTNER_PROFILE);
   useEffect(() => {
     if (!customerProfile) return;
     setSelectedPartner(prev => ({ ...prev, id: customerProfile.id, name: customerProfile.name, description: customerProfile.description, icon: customerProfile.avatarEmoji, address: customerProfile.address, phone: customerProfile.phone, categoryLabel: customerProfile.category, openHours: customerProfile.openHours || prev.openHours, specialHighlights: customerProfile.highlights, promotionsToday: customerProfile.promotions as PartnerPromotion[], amenities: customerProfile.services }));
@@ -146,16 +144,8 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
   const [newPromoCondition, setNewPromoCondition] = useState<string>('');
   const [newPromoBadge, setNewPromoBadge] = useState<string>('Exclusive Deal');
 
-  // Customization profiles
-  const [partnerCustomizations, setPartnerCustomizations] = useState<Record<string, ProfileCustomizationData>>({
-    'partner-bar-01': {
-      displayName: 'THE KNIGHT ROOFTOP & SPEAKEASY BAR',
-      bioStatus: 'บาร์รูฟท็อปวิวพาโนรามา 360 องศา • ค็อกเทลสูตรพิเศษ • พี่วินจอดส่งถึงลิฟต์ 🍸🌃',
-      avatarEmoji: '🍸',
-      themeColor: '#00D2FF',
-      bannerGlow: 'from-purple-900/60 via-[#070D1E] to-[#0A1A3F]'
-    }
-  });
+  // Persisted profile customization is the only source for owner identity.
+  const [partnerCustomizations, setPartnerCustomizations] = useState<Record<string, ProfileCustomizationData>>({});
 
   useEffect(() => {
     if (!canEdit) return;
@@ -356,29 +346,6 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
           </div>
         </section>
       )}
-
-      {/* Partner Selector Pills */}
-      <section className="p-3 rounded-2xl bg-[#070D1E]/90 border border-white/10 flex items-center justify-between gap-3 overflow-x-auto">
-        <span className="text-xs font-mono text-slate-400 font-bold whitespace-nowrap pl-2">
-          เลือกพาร์ทเนอร์:
-        </span>
-        <div className="flex items-center gap-2">
-          {SAMPLE_PARTNERS.map(p => (
-            <button
-              key={p.id}
-              onClick={() => handleSelectPartner(p)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 border ${
-                selectedPartner.id === p.id
-                  ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(0,210,255,0.4)]'
-                  : 'bg-black/40 text-slate-300 border-white/10 hover:border-white/25 hover:bg-white/5'
-              }`}
-            >
-              <span>{p.icon}</span>
-              <span>{p.name.split(' ')[0]}</span>
-            </button>
-          ))}
-        </div>
-      </section>
 
       {/* Main Profile Header Banner */}
       <section 
