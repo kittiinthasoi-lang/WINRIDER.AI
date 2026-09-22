@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 import { EIGHT_PILLARS } from '../data/bibleData';
 import { PillarItem } from '../types';
 import { playTactileBlip } from '../utils/audio';
@@ -98,7 +99,7 @@ export const EcosystemGovernanceSection: React.FC<Props> = ({ audioEnabled, onOp
                 <div className="flex items-center justify-between">
                   <div className={`w-10 h-10 rounded-xl overflow-hidden border ${isSelected ? 'border-cyan-400 shadow-[0_0_14px_rgba(0,210,255,0.7)]' : 'border-white/15'} bg-black/50 flex-shrink-0`}>
                     <img
-                      src={pillar.imageUrl || '/images/app_logo.jpg'}
+                      src={pillar.imageUrl || WIN_IMAGES.appLogo}
                       alt={pillar.name}
                       className="w-full h-full object-cover transition-transform hover:scale-110"
                       referrerPolicy="no-referrer"
@@ -126,7 +127,7 @@ export const EcosystemGovernanceSection: React.FC<Props> = ({ audioEnabled, onOp
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-xl overflow-hidden border border-cyan-400 shadow-[0_0_16px_rgba(0,210,255,0.5)] flex-shrink-0 bg-black/60">
                 <img
-                  src={selectedPillar.imageUrl || '/images/app_logo.jpg'}
+                  src={selectedPillar.imageUrl || WIN_IMAGES.appLogo}
                   alt={selectedPillar.name}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
