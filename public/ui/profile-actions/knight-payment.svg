@@ -3,7 +3,7 @@
 <rect width="520" height="150" rx="28" fill="#061827"/><rect x="2" y="2" width="516" height="146" rx="26" fill="none" stroke="url(#g)" stroke-width="2"/>
 <circle cx="72" cy="75" r="48" fill="url(#g)" opacity=".12"/><g filter="url(#glow)"><rect x="16" y="25" width="64" height="46" rx="8" fill="none" stroke="url(#g)" stroke-width="4"/><path d="M16 38h64M29 51h20M29 60h12M59 51v17M67 51v17M55 56h16M55 63h16" stroke="url(#g)" stroke-width="4" stroke-linecap="round"/></g>
 <text x="142" y="54" fill="#fff" font-family="Arial,sans-serif" font-size="24" font-weight="900">ตั้งค่ารับเงิน</text>
-<text x="142" y="82" fill="#A7B4CC" font-family="Arial,sans-serif" font-size="15">ช่องทางรับเงินของคุณ</text>
+<text x="142" y="82" fill="#A7B4CC" font-family="Arial,sans-serif" font-size="17">ช่องทางรับเงินของคุณ</text>
 <rect x="142" y="101" width="96" height="24" rx="12" fill="#38BDF8" opacity=".12"/><text x="190" y="118" text-anchor="middle" fill="#38BDF8" font-family="Arial,sans-serif" font-size="10" font-weight="800">KNIGHT PROFILE</text>
 <circle cx="475" cy="75" r="20" fill="#07111F" stroke="#38BDF8" stroke-width="2"/><path d="M468 75h12M475 68l7 7-7 7" stroke="#38BDF8" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
