@@ -99,13 +99,7 @@ export const PendingReviewView: React.FC = () => {
             </div>
           </div>
 
-          {/* Help Contact Box */}
-          <div className="p-3.5 rounded-xl bg-gradient-to-r from-[#00D4FF]/10 to-transparent border border-[#00D4FF]/20 flex items-center gap-3">
-            <PhoneCall className="w-5 h-5 text-[#00D4FF] shrink-0" />
-            <div className="text-xs text-slate-300">
-              หากต้องการเร่งการอนุมัติหรือมีข้อสงสัย กรุณาติดต่อศูนย์อำนวยการจักรวรรดิ <span className="text-[#00D4FF] font-semibold">LINE: @winrider</span> หรือโทร <span className="text-white font-semibold">02-098-7654</span>
-            </div>
-          </div>
+
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
