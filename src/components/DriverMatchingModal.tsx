@@ -1256,7 +1256,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
                       {/* One-Click Destination Button */}
                       <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                        <span className="text-[9px] text-slate-400 font-mono">{route ? '✓ Google Routes ยืนยันเส้นทางแล้ว' : 'กำลังรอ GPS และเส้นทางจริง'}</span>
+                        <span className="text-[9px] text-slate-400 font-mono">{route ? '✓ มีข้อมูลปลายทาง/ระยะทางประมาณการ' : 'กำลังรอ GPS และข้อมูลปลายทาง'}</span>
 
                         <button
                           disabled={!route}
