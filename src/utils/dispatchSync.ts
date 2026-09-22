@@ -3,6 +3,7 @@ import { emitQuestMetric } from '../services/questService';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { calculateAppFare, FareAddons } from '../core/serverFare';
 
 export interface LiveRideOrder {
   id: string;
@@ -216,6 +217,7 @@ export async function createLiveOrder(orderInput: {
   dropoffLocation: string;
   distanceKm: number;
   fare: number;
+  fareAddons?: FareAddons;
   estMinutes?: number;
   pickupCoord: { lat: number; lng: number };
   dropoffCoord?: { lat: number; lng: number };
@@ -228,8 +230,10 @@ export async function createLiveOrder(orderInput: {
   if (!authenticatedUid) throw new Error('AUTHENTICATED_PASSENGER_REQUIRED');
   const now = new Date().toISOString();
   const orderId = `WIN-${crypto.randomUUID()}`;
-  const fare = Number(orderInput.fare);
-  if (!Number.isFinite(fare) || fare <= 0) throw new Error('INVALID_REAL_ORDER_FARE');
+  const distanceKm = Number(orderInput.distanceKm);
+  if (!Number.isFinite(distanceKm) || distanceKm < 0 || distanceKm > 500) throw new Error('INVALID_REAL_ORDER_DISTANCE');
+  const fareQuote = calculateAppFare(orderInput.serviceId, distanceKm, orderInput.fareAddons);
+  const fare = fareQuote.fareBaht;
   const welfareFund2Baht = 2.0;
   const netFare = Math.max(0, fare - welfareFund2Baht);
 
@@ -243,8 +247,10 @@ export async function createLiveOrder(orderInput: {
     passengerPhone: orderInput.passengerPhone,
     pickupLocation: orderInput.pickupLocation,
     dropoffLocation: orderInput.dropoffLocation,
-    distanceKm: orderInput.distanceKm,
+    distanceKm: fareQuote.distanceKm,
     fare,
+    fareQuote,
+    fareBasis: 'WINRIDER_APP_FARE_RULE',
     welfareFund2Baht,
     netFare,
     estMinutes: orderInput.estMinutes || Math.max(5, Math.round(orderInput.distanceKm * 3.5)),
