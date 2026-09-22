@@ -1,12 +1,12 @@
-const commIntercomImg = '/images/shop_comm_intercom.jpg';
-const glovesCarbonImg = '/images/shop_gloves_carbon.jpg';
-const armorKneeguardsImg = '/images/shop_armor_kneeguards.jpg';
-const petPodImg = '/images/shop_pet_pod.jpg';
-const stormShieldJacketImg = '/images/shop_storm_jacket.jpg';
-const phoneMountImg = '/images/shop_phone_mount.jpg';
-const cyberUmbrellaImg = '/images/shop_cyber_umbrella.jpg';
-const spinalExoskeletonImg = '/images/shop_spinal_harness.jpg';
-const temperatureTopBoxImg = '/images/shop_thermal_box.jpg';
+import { WIN_IMAGES } from './imageRegistry';\nconst commIntercomImg = WIN_IMAGES.shop.commIntercom;
+const glovesCarbonImg = WIN_IMAGES.shop.glovesCarbon;
+const armorKneeguardsImg = WIN_IMAGES.shop.armorKneeguards;
+const petPodImg = WIN_IMAGES.shop.petPod;
+const stormShieldJacketImg = WIN_IMAGES.shop.stormJacket;
+const phoneMountImg = WIN_IMAGES.shop.phoneMount;
+const cyberUmbrellaImg = WIN_IMAGES.shop.cyberUmbrella;
+const spinalExoskeletonImg = WIN_IMAGES.shop.spinalHarness;
+const temperatureTopBoxImg = WIN_IMAGES.shop.thermalBox;
 
 export interface WinShopItem {
   id: string;
