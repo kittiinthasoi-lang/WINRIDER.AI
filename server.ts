@@ -2449,21 +2449,11 @@ function hasAnyText(values: unknown, needles: string[]) {
   return needles.some((needle) => haystack.includes(needle.toLowerCase()));
 }
 
-function driverMeetsService(order: ServerOrder, userData: any, knight: any) {
-  // Level is informational only. Eligibility comes from service requirements;
-  // active Knights have already passed mandatory safety/service training at registration.
-  const certifications = knight.certifications || [];
-  const specialties = knight.specialtyTags || [];
-  switch (order.serviceId) {
-    case "express": return knight.hasDeliveryBox === true;
-    case "mu": return !order.customerGender || userData.gender === order.customerGender;
-    case "spirit": return hasAnyText([...certifications, ...specialties], ["spirit", "ผู้สูงอายุ", "ศาสนา", "elder"]);
-    case "family": return hasAnyText([...certifications, ...specialties], ["family", "เด็ก", "ผู้สูงอายุ", "ผู้พิการ", "child", "elder", "disabled"]);
-    case "pet": return hasAnyText([...certifications, ...specialties], ["pet", "สัตว์"]);
-    case "link": return hasAnyText(specialties, ["link", "express", "ขนส่ง", "ส่ง"]);
-    case "lifestyle": return hasAnyText(specialties, ["lifestyle", "คาเฟ่", "ร้านอาหาร", "สตรีทฟู้ด"]);
-    default: return true;
-  }
+function driverMeetsService(_order: ServerOrder, _userData: any, _knight: any) {
+  // Every Knight who appears as an active/verified Knight has already been
+  // reviewed and approved by the admin, including required service training.
+  // Acceptance therefore has no service, level, gender, equipment or specialty gate.
+  return true;
 }
 
 async function buildDispatchCandidates(order: ServerOrder) {
