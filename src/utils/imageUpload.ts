@@ -93,3 +93,11 @@ export async function uploadProductImage(uid: string, file: File): Promise<strin
   await uploadBytes(storageRef, compressedBlob, { contentType: 'image/jpeg' });
   return getDownloadURL(storageRef);
 }
+
+
+export async function uploadServiceCompletionPhoto(uid: string, orderId: string, file: File): Promise<string> {
+  const compressedBlob = await compressImage(file, 1400, 0.78);
+  const storageRef = ref(storage, `service-completion/${uid}/${orderId}-${Date.now()}.jpg`);
+  await uploadBytes(storageRef, compressedBlob, { contentType: 'image/jpeg' });
+  return getDownloadURL(storageRef);
+}
