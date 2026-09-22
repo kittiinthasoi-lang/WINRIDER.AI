@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 import { getAuth } from 'firebase/auth';
 import { MatchedDriver, DreamRideVehicle, LifestylePlace } from '../types';
 import { fetchLiveDrivers } from '../services/liveDriversService';
@@ -573,7 +574,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
               }`}
             >
               <img
-                src="/images/avatar_passenger_female.jpg"
+                src=WIN_IMAGES.profiles.passengerFemale
                 alt="Female"
                 className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm"
                 referrerPolicy="no-referrer"
@@ -589,7 +590,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
               }`}
             >
               <img
-                src="/images/avatar_passenger_male.jpg"
+                src=WIN_IMAGES.profiles.passengerMale
                 alt="Male"
                 className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm"
                 referrerPolicy="no-referrer"
@@ -792,7 +793,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                             <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-slate-900 p-0.5 shadow-md flex-shrink-0">
                               <div className="w-full h-full bg-[#070D1E] rounded-[14px] overflow-hidden flex items-center justify-center">
                                 <img
-                                  src={driver.imageUrl || (driver.gender === 'female' ? '/images/avatar_driver_female.jpg' : '/images/avatar_driver_male.jpg')}
+                                  src={driver.imageUrl || (driver.gender === 'female' ? WIN_IMAGES.profiles.driverFemale : WIN_IMAGES.profiles.driverMale)}
                                   alt={driver.name}
                                   className="w-full h-full object-cover"
                                   referrerPolicy="no-referrer"
@@ -809,7 +810,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                                 <span className="text-[10px] font-mono text-cyan-300">({driver.nickname})</span>
                                 <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 font-bold inline-flex items-center gap-1">
                                   <img
-                                    src={driver.gender === 'female' ? '/images/avatar_driver_female.jpg' : '/images/avatar_driver_male.jpg'}
+                                    src={driver.gender === 'female' ? WIN_IMAGES.profiles.driverFemale : WIN_IMAGES.profiles.driverMale}
                                     alt=""
                                     className="w-3.5 h-3.5 rounded-full object-cover"
                                     referrerPolicy="no-referrer"
@@ -909,7 +910,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 border border-white/20 bg-black/50">
                             <img
-                              src={othDriver.imageUrl || (othDriver.gender === 'female' ? '/images/avatar_driver_female.jpg' : '/images/avatar_driver_male.jpg')}
+                              src={othDriver.imageUrl || (othDriver.gender === 'female' ? WIN_IMAGES.profiles.driverFemale : WIN_IMAGES.profiles.driverMale)}
                               alt={othDriver.name}
                               className="w-full h-full object-cover"
                               referrerPolicy="no-referrer"
