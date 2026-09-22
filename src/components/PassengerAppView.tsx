@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { auth, db } from '../firebase';
-import { } from 'firebase/firestore';
 import { emitQuestMetric } from '../services/questService';
 import { createSosIncident } from '../services/sosIncidentService';
 import { WIN_SHOP_ITEMS, WinShopItem } from '../data/winShopItems';
