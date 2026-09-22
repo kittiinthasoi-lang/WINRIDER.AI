@@ -729,7 +729,7 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
 // Win Alert event discovery uses Thailand's public TAT tourism activity dataset.
 // External source data is imported into Firestore as PENDING_ADMIN_REVIEW only.
 // The customer endpoint below reads approved Firestore records exclusively.
-const TAT_TOURISM_ACTIVITY_JSON_URL = "https://datacatalog.tat.or.th/dataset/458dcb66-2093-4b29-adc7-82284b4c3ae6/resource/fa7a2cd7-0057-4152-a8df-78728515dcfe/download/activity.json";
+const TAT_TOURISM_ACTIVITY_JSON_URL = String(process.env.TAT_TOURISM_ACTIVITY_JSON_URL || "https://datacatalog.tat.or.th/dataset/458dcb66-2093-4b29-adc7-82284b4c3ae6/resource/fa7a2cd7-0057-4152-a8df-78728515dcfe/download/activity.json").trim();
 const TAT_DATASET_PAGE_URL = "https://datacatalog.tat.or.th/dataset/tourismactivity";
 const TAT_DATASET_ID = "458dcb66-2093-4b29-adc7-82284b4c3ae6";
 const dailyEventsCache = new Map<string, { expiresAt: number; value: NearbyEventResult[] }>();
