@@ -726,121 +726,184 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
   }
 });
 
-// Real-world event discovery. PredictHQ remains the source of truth; this route
-// intentionally returns an empty/error state instead of substituting mock events.
-type EventCategory = "sale" | "market" | "concert" | "sports" | "festival" | "community" | "other";
-
-interface NearbyEventResult {
-  id: string;
-  title: string;
-  category: EventCategory;
-  venueName: string;
-  venueArea: string;
-  latitude: number;
-  longitude: number;
-  startAt: string;
-  endAt?: string;
-  description?: string;
-  sourceName: string;
-  providerEventId: string;
-  attendance?: number;
-  rank?: number;
-}
-
+// Win Alert event discovery uses Thailand's public TAT tourism activity dataset.
+// External source data is imported into Firestore as PENDING_ADMIN_REVIEW only.
+// The customer endpoint below reads approved Firestore records exclusively.
+const TAT_TOURISM_ACTIVITY_JSON_URL = "https://datacatalog.tat.or.th/dataset/458dcb66-2093-4b29-adc7-82284b4c3ae6/resource/fa7a2cd7-0057-4152-a8df-78728515dcfe/download/activity.json";
+const TAT_DATASET_PAGE_URL = "https://datacatalog.tat.or.th/dataset/tourismactivity";
+const TAT_DATASET_ID = "458dcb66-2093-4b29-adc7-82284b4c3ae6";
 const dailyEventsCache = new Map<string, { expiresAt: number; value: NearbyEventResult[] }>();
 const EVENT_CACHE_MS = 5 * 60 * 1000;
 
 function classifyRealEvent(category: string, title: string, labels: string[] = []): EventCategory {
-  const searchable = `${category} ${title} ${labels.join(" ")}`.toLowerCase();
-  if (/sale|discount|ลดราคา|clearance|shopping/.test(searchable)) return "sale";
-  if (/market|bazaar|popup|pop-up|ตลาด|fair|expo/.test(searchable)) return "market";
-  if (/concert|music|performing-arts|ดนตรี|คอนเสิร์ต/.test(searchable)) return "concert";
-  if (/sport|football|soccer|basketball|กีฬา|แข่งขัน/.test(searchable)) return "sports";
-  if (/festival|เทศกาล/.test(searchable)) return "festival";
-  if (/community|academic|school|public-holiday|daylight-savings|observance/.test(searchable)) return "community";
+  const normalized = (String(category) + " " + String(title) + " " + labels.join(" ")).toLowerCase();
+  if (/sale|discount|ลดราคา|clearance|shopping/.test(normalized)) return "sale";
+  if (/market|bazaar|popup|pop-up|ตลาด|fair|expo/.test(normalized)) return "market";
+  if (/concert|music|performing-arts|ดนตรี|คอนเสิร์ต/.test(normalized)) return "concert";
+  if (/sport|football|soccer|basketball|กีฬา|แข่งขัน/.test(normalized)) return "sports";
+  if (/festival|เทศกาล/.test(normalized)) return "festival";
+  if (/community|academic|school|public-holiday|observance|ชุมชน/.test(normalized)) return "community";
   return "other";
 }
 
+function firstValue(item: any, keys: string[]): unknown {
+  for (const key of keys) {
+    const value = key.split(".").reduce((current, part) => current?.[part], item);
+    if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+  }
+  return undefined;
+}
+
+function parseThaiOrIsoDate(value: unknown): string | null {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const direct = Date.parse(raw);
+  if (Number.isFinite(direct)) return new Date(direct).toISOString();
+  const match = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if (!match) return null;
+  let year = Number(match[3]);
+  if (year >= 2400) year -= 543;
+  const month = Number(match[2]);
+  const day = Number(match[1]);
+  const parsed = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
+    ? parsed.toISOString()
+    : null;
+}
+
+function normalizeTatCoordinate(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeTatEvent(item: any, index: number) {
+  const title = String(firstValue(item, ["title", "name", "event_name", "eventName", "ชื่อกิจกรรม", "ชื่อเรื่อง"]) || "").trim();
+  const startAt = parseThaiOrIsoDate(firstValue(item, ["startAt", "start", "start_date", "startDate", "วันที่เริ่มต้น", "วันที่เริ่ม"]));
+  const endAt = parseThaiOrIsoDate(firstValue(item, ["endAt", "end", "end_date", "endDate", "วันที่สิ้นสุด", "วันที่สิ้นสุด"]));
+  const venueName = String(firstValue(item, ["venueName", "venue", "location", "place", "สถานที่จัดงาน", "สถานที่"]) || "").trim();
+  const venueArea = String(firstValue(item, ["province", "จังหวัด", "district", "อำเภอ", "area", "region"]) || "").trim();
+  const latitude = normalizeTatCoordinate(firstValue(item, ["latitude", "lat", "location.latitude", "พิกัดละติจูด"]));
+  const longitude = normalizeTatCoordinate(firstValue(item, ["longitude", "lng", "lon", "location.longitude", "พิกัดลองจิจูด"]));
+  const description = String(firstValue(item, ["description", "detail", "รายละเอียด", "คำอธิบาย"]) || "").trim();
+  const categoryRaw = String(firstValue(item, ["category", "type", "ประเภท", "หมวดหมู่"]) || "other").trim();
+  const labelsRaw = firstValue(item, ["tags", "labels", "แท็ก", "keywords"]);
+  const labels = Array.isArray(labelsRaw) ? labelsRaw.map((value) => String(value)) : String(labelsRaw || "").split(/[,|]/).map((value) => value.trim()).filter(Boolean);
+  const externalId = String(firstValue(item, ["id", "_id", "event_id", "eventId", "รหัสกิจกรรม"]) || ("row-" + index)).trim();
+  if (!title || !startAt) return null;
+  const stableId = crypto.createHash("sha256").update(TAT_DATASET_ID + ":" + externalId + ":" + startAt + ":" + title).digest("hex").slice(0, 32);
+  return {
+    id: "tat-" + stableId,
+    title,
+    category: classifyRealEvent(categoryRaw, title, labels),
+    venueName,
+    venueArea,
+    latitude,
+    longitude,
+    startAt,
+    endAt: endAt || undefined,
+    description: description || undefined,
+    sourceName: "TAT Data Catalog • Thailand Tourism Authority",
+    providerEventId: externalId,
+    sourceUrl: TAT_DATASET_PAGE_URL,
+    adminApproved: false,
+    status: "pending_admin_review",
+    importedAt: new Date().toISOString(),
+  };
+}
+
+async function requireSuperAdmin(req: express.Request, res: express.Response) {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return null;
+  if (!isSuperAdminToken(user)) {
+    res.status(403).json({ error: "Admin verification required" });
+    return null;
+  }
+  return user;
+}
+
+// Admin-only import: fetch the free public TAT JSON and stage records for review.
+// Nothing imported here becomes visible to customers until an admin approves it.
+app.post("/api/admin/win-alert/import-tat", rateLimit(5), async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  try {
+    const response = await fetch(TAT_TOURISM_ACTIVITY_JSON_URL, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!response.ok) return res.status(502).json({ error: "ดึงข้อมูลกิจกรรมจาก TAT ไม่สำเร็จ", status: response.status });
+    const payload = await response.json();
+    const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.records) ? payload.records : [];
+    const horizon = Date.now() + 548 * 24 * 60 * 60 * 1000;
+    const normalized = rows.map(normalizeTatEvent).filter(Boolean).filter((event: any) => {
+      const startMs = Date.parse(event.startAt);
+      return Number.isFinite(startMs) && startMs <= horizon;
+    }).slice(0, 5000) as any[];
+
+    const batchLimit = 400;
+    let written = 0;
+    for (let offset = 0; offset < normalized.length; offset += batchLimit) {
+      const batch = ordersDb.batch();
+      for (const event of normalized.slice(offset, offset + batchLimit)) {
+        const ref = ordersDb.collection("winAlertEvents").doc(event.id);
+        batch.set(ref, {
+          ...event,
+          adminApproved: false,
+          status: "pending_admin_review",
+          importedBy: adminUser.uid,
+          importedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      await batch.commit();
+      written += Math.min(batchLimit, normalized.length - offset);
+    }
+    dailyEventsCache.clear();
+    return res.json({ ok: true, source: "TAT Data Catalog", datasetId: TAT_DATASET_ID, sourceUrl: TAT_DATASET_PAGE_URL, fetchedAt: new Date().toISOString(), sourceRows: rows.length, stagedForAdminReview: written, customerVisible: 0 });
+  } catch (error) {
+    console.error("[Win Alert TAT Import]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ error: "นำเข้าข้อมูล TAT ไม่สำเร็จ" });
+  }
+});
+
 app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
-  // Free-only production mode: use only administrator-approved Firestore events.
-  // Paid/third-party event APIs are intentionally not used as a runtime fallback.
   const eventDate = String(req.query.date || "").trim();
   const country = "TH";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
-    return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง", events: [] });
-  }
-
-  const dayStart = new Date(`${eventDate}T00:00:00+07:00`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง", events: [] });
+  const cacheKey = country + ":" + eventDate;
+  const cached = dailyEventsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return res.json({ events: cached.value, source: "WINRIDER.AI • Admin Verified Firestore", fetchedAt: new Date().toISOString(), eventDate, country, cached: true });
+  const dayStart = new Date(eventDate + "T00:00:00+07:00");
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
-  if (Number.isNaN(dayStart.getTime())) {
-    return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง" });
-  }
-
   try {
     const snapshot = await ordersDb.collection("winAlertEvents").get();
     const events = snapshot.docs.flatMap((docSnap): NearbyEventResult[] => {
       const item = docSnap.data() || {};
       const approved = item.adminApproved === true || item.approved === true || item.status === "approved" || item.status === "active";
       if (!approved) return [];
-
-      const startAt = String(item.startAt || item.start || "").trim();
-      const endAt = String(item.endAt || item.end || "").trim();
-      const startMs = Date.parse(startAt);
+      const startAt = parseThaiOrIsoDate(item.startAt || item.start);
+      const endAt = parseThaiOrIsoDate(item.endAt || item.end) || startAt;
+      const startMs = startAt ? Date.parse(startAt) : NaN;
       const endMs = endAt ? Date.parse(endAt) : startMs;
-      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return [];
-      const dayStartMs = dayStart.getTime();
-      const dayEndMs = dayEnd.getTime();
-      if (endMs < dayStartMs || startMs > dayEndMs) return [];
-
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < dayStart.getTime() || startMs > dayEnd.getTime()) return [];
       const latitude = Number(item.latitude ?? item.lat);
       const longitude = Number(item.longitude ?? item.lng ?? item.lon);
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
-
       const id = String(item.id || docSnap.id).trim();
       const title = String(item.title || item.name || "").trim();
       if (!id || !title) return [];
-
       const categoryValue = String(item.category || "other").trim();
       const allowedCategories: EventCategory[] = ["sale","market","concert","sports","festival","community","other"];
-      const category = allowedCategories.includes(categoryValue as EventCategory)
-        ? categoryValue as EventCategory
-        : classifyRealEvent(categoryValue, title, Array.isArray(item.labels) ? item.labels : []);
-
-      return [{
-        id: `admin-event-${id}`,
-        title,
-        category,
-        venueName: String(item.venueName || item.venue || "").trim(),
-        venueArea: String(item.venueArea || item.area || item.province || "").trim(),
-        latitude,
-        longitude,
-        startAt,
-        endAt: endAt || undefined,
-        description: typeof item.description === "string" ? item.description : undefined,
-        sourceName: "WINRIDER.AI • Admin Verified",
-        providerEventId: id,
-        attendance: Number.isFinite(Number(item.attendance)) && Number(item.attendance) > 0 ? Number(item.attendance) : undefined,
-        rank: Number.isFinite(Number(item.rank)) ? Number(item.rank) : undefined,
-      }];
+      const category = allowedCategories.includes(categoryValue as EventCategory) ? categoryValue as EventCategory : classifyRealEvent(categoryValue, title, Array.isArray(item.labels) ? item.labels : []);
+      return [{ id: "admin-event-" + id, title, category, venueName: String(item.venueName || item.venue || "").trim(), venueArea: String(item.venueArea || item.area || item.province || "").trim(), latitude, longitude, startAt, endAt: endAt || undefined, description: typeof item.description === "string" ? item.description : undefined, sourceName: String(item.sourceName || "WINRIDER.AI • Admin Verified"), providerEventId: String(item.providerEventId || id), attendance: Number.isFinite(Number(item.attendance)) && Number(item.attendance) > 0 ? Number(item.attendance) : undefined, rank: Number.isFinite(Number(item.rank)) ? Number(item.rank) : undefined }];
     }).sort((a,b) => Date.parse(a.startAt) - Date.parse(b.startAt));
-
-    dailyEventsCache.set(`${country}:${eventDate}`, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
-    return res.json({
-      events,
-      source: "WINRIDER.AI • Admin Verified Firestore",
-      fetchedAt: new Date().toISOString(),
-      eventDate,
-      country,
-      cached: false,
-    });
+    dailyEventsCache.set(cacheKey, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
+    return res.json({ events, source: "WINRIDER.AI • Admin Verified Firestore", fetchedAt: new Date().toISOString(), eventDate, country, cached: false });
   } catch (error) {
     console.error("[Events API] Firestore read failed:", error instanceof Error ? error.message : error);
-    return res.status(503).json({
-      message: "โหลดกิจกรรมจริงจากฐานข้อมูลไม่สำเร็จ",
-      events: [],
-    });
+    return res.status(503).json({ message: "โหลดกิจกรรมจริงจากฐานข้อมูลไม่สำเร็จ", events: [] });
   }
-});;
+});
 
 // Persistent order store: Firestore is the source of truth across instances/restarts.
 interface ServerOrder {
