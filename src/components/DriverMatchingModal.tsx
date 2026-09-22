@@ -517,7 +517,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
               <span className="text-xs font-bold text-white block">เพศของผู้โดยสาร (Passenger Gender)</span>
               <span className="text-[10px] text-slate-400 font-mono">
                 {serviceId === 'mu' 
-                  ? 'ระบบจะจับคู่อัศวินเพศเดียวกันเลเวล 15+ ให้อัตโนมัติเพื่อความสบายใจ'
+                  ? 'ระบบจะค้นหาพี่วินที่ผ่านการอนุมัติจากแอดมินทุกคน'
                   : 'คัดกรองและปรับสเปกความปลอดภัยตามสรีระผู้โดยสาร'}
               </span>
             </div>
@@ -688,10 +688,10 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                   <h4 className="text-sm font-bold text-white">กำลังสแกนหาพี่วินที่ผ่านเกณฑ์คุณสมบัติ...</h4>
                   <p className="text-xs text-slate-400 font-mono mt-1">
                     {serviceId === 'mu' 
-                      ? `ค้นหาพี่วิน${currentGender === 'female' ? 'สุภาพสตรี' : 'สุภาพบุรุษ'} เลเวล 15+ ชำนาญสายมูและบทสวดมนต์...`
+                      ? `ค้นหาพี่วินที่ผ่านการอนุมัติจากแอดมินสำหรับงาน MU BUDDY...`
                       : serviceId === 'spirit'
-                      ? 'ค้นหาพี่วินเลเวล 20+ ที่ผ่านการอบรมดูแลผู้สูงอายุและบริการพาทำศาสนกิจ...'
-                      : 'ตรวจสอบระดับเลเวล, ใบรับรองการอบรม, และตำแหน่งดาวเทียม CI Capillary Map'}
+                      ? 'ค้นหาพี่วินที่ผ่านการอนุมัติและอบรมสำหรับ WIN SPIRIT...'
+                      : 'ตรวจสอบสถานะออนไลน์และตำแหน่ง GPS ของพี่วินจากระบบจริง'}
                   </p>
                 </div>
 
@@ -711,7 +711,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                     <UserCheck className="w-4 h-4 text-emerald-400" />
                     <span>
                       {serviceId === 'mu' 
-                        ? `แนะนำพี่วิน${currentGender === 'female' ? 'ผู้หญิง' : 'ผู้ชาย'} เลเวล 15+ (${candidateDrivers.length} นาย):`
+                        ? `พี่วินที่พร้อมรับงาน (${candidateDrivers.length} นาย):`
                         : `พบพี่วินตรงตามเงื่อนไข ${candidateDrivers.length} นาย:`}
                     </span>
                   </span>
