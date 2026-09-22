@@ -41,14 +41,26 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
   ]);
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [settledOrder, setSettledOrder] = useState<LiveRideOrder | null>(null);
 
-  if (!isOpen || !order) return null;
+  if (!isOpen || !order || order.status !== 'completed') return null;
 
-  const grossFare = order.fare || 45;
-  const welfareFund = order.welfareFund2Baht || 2.0;
-  const knightBaseTakeHome = Math.max(0, grossFare - welfareFund);
-  const knightTotalPayout = knightBaseTakeHome + tipAmount;
-  const totalPassengerPaid = grossFare + tipAmount;
+  const displayOrder = settledOrder || order;
+  const grossFare = Number(displayOrder.fare);
+  const recordedDistanceKm = Number(displayOrder.distanceKm);
+  const recordedEtaMinutes = Number(displayOrder.estMinutes);
+  const settlementConfirmed = displayOrder.settled === true && displayOrder.settlementStatus === 'SETTLED' && Boolean(displayOrder.ledgerTransactionId);
+  const settlementTipAmount = Number.isFinite(Number(displayOrder.tipSatang)) ? Number(displayOrder.tipSatang) / 100 : tipAmount;
+  const knightFee = Number.isFinite(Number(displayOrder.knightFeeSatang)) ? Number(displayOrder.knightFeeSatang) / 100 : null;
+  const equipmentFee = Number.isFinite(Number(displayOrder.equipmentFeeSatang)) ? Number(displayOrder.equipmentFeeSatang) / 100 : null;
+  const knightTotalPayout = Number.isFinite(Number(displayOrder.knightPayoutSatang))
+    ? Number(displayOrder.knightPayoutSatang) / 100
+    : null;
+  const totalPassengerPaid = Number.isFinite(Number(displayOrder.citizenTotalPaidSatang))
+    ? Number(displayOrder.citizenTotalPaidSatang) / 100
+    : grossFare + tipAmount;
+
+  if (!Number.isFinite(grossFare) || grossFare <= 0 || !Number.isFinite(recordedDistanceKm) || recordedDistanceKm < 0 || !Number.isFinite(recordedEtaMinutes) || recordedEtaMinutes < 0) return null;
 
   const handleSelectTip = (amount: number) => {
     if (audioEnabled) playTactileBlip(950);
@@ -73,11 +85,12 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
     });
 
     setIsSubmitted(true);
-    await completeLiveOrder(order.id, {
+    const completed = await completeLiveOrder(order.id, {
       tipAmount,
       ratingGiven: rating,
       reviewComment: selectedBadges.join(', ')
     });
+    if (completed) setSettledOrder(completed);
     void emitQuestMetric('citizen.rated_completed_trip', 1);
 
     setTimeout(() => {
@@ -184,7 +197,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5 font-mono">
               <Shield className="w-4 h-4 text-[#FFD700]" />
-              <span>การกระจายรายได้ & กองทุนสวัสดิการ 2 บาท</span>
+              <span>การกระจายรายได้ & สถานะบัญชีงาน</span>
             </span>
             <span className="text-[10px] text-slate-400 font-mono">P'Win First Model</span>
           </div>
@@ -195,19 +208,19 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
               <span className="font-mono font-bold text-white">฿{grossFare.toFixed(2)}</span>
             </div>
 
-            {/* Sovereign 2 Baht deduction */}
+            {/* Authoritative settlement deductions */}
             <div className="p-2.5 rounded-xl bg-black/50 border border-amber-400/30 space-y-1 text-[11px]">
               <div className="flex justify-between font-bold text-amber-300 font-mono">
                 <span>หักสมทบ "กองทุนสวัสดิการอัศวิน"</span>
-                <span>-฿{welfareFund.toFixed(2)}</span>
+                <span>{knightFee === null ? 'รอยืนยัน' : `-฿${(knightFee + (equipmentFee || 0)).toFixed(2)}`}</span>
               </div>
               <div className="pl-2 space-y-0.5 text-[10px] text-slate-400">
                 <div className="flex justify-between">
-                  <span>• ฿1.00: กองทุนรักษาพยาบาล & คุ้มครองอุบัติเหตุอัศวิน</span>
+                  <span>• ค่าธรรมเนียม/กองทุนอัศวินจาก Ledger จริง</span>
                   <span className="text-emerald-400 font-mono">✓ หักแล้ว</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>• ฿1.00: กองทุนน้ำมันเครื่อง ยาง และอะไหล่บำรุงรักษา</span>
+                  <span>• ค่าอุปกรณ์จาก Ledger จริง (ถ้ามี)</span>
                   <span className="text-emerald-400 font-mono">✓ หักแล้ว</span>
                 </div>
               </div>
@@ -224,7 +237,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
             <div className="pt-2 border-t border-white/10 flex justify-between items-end">
               <div>
                 <span className="text-[10px] text-slate-400 block font-mono">รายได้สุทธิที่พี่วินได้รับเข้ากระเป๋า:</span>
-                <span className="text-lg font-black text-emerald-400 font-mono">฿{knightTotalPayout.toFixed(2)}</span>
+                <span className="text-lg font-black text-emerald-400 font-mono">{knightTotalPayout === null ? 'รอยืนยัน Ledger' : `฿${knightTotalPayout.toFixed(2)}`}</span>
               </div>
               <div className="text-right">
                 <span className="text-[10px] text-slate-400 block font-mono">ยอดที่ผู้โดยสารชำระ:</span>
@@ -288,7 +301,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
               ยอดชำระอัตโนมัติ: <strong className="text-white font-mono text-sm">฿{totalPassengerPaid.toFixed(2)}</strong> (รวมทิป)
             </p>
             <p className="text-[10px] text-slate-400">
-              เงินโอนเข้าบัญชีพี่วินโดยตรงแบบ Peer-to-Peer ไร้คนกลาง
+              ยอดรับเงินจะถือว่ายืนยันเมื่อ Ledger ของงานระบุสถานะ SETTLED เท่านั้น
             </p>
           </div>
         </div>
