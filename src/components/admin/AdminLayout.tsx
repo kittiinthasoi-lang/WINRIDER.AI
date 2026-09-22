@@ -21,7 +21,8 @@ import {
   UserRound,
   Bike,
   Store,
-  Building2
+  Building2,
+  Database
 } from 'lucide-react';
 import { AdminLevel } from '../../types/admin';
 import { AdminDashboardView } from './AdminDashboardView';
@@ -33,6 +34,7 @@ import { AdminAuditLogsView } from './AdminAuditLogsView';
 import { AdminTopupReviewView } from './AdminTopupReviewView';
 import { AdminSystemHealthView } from './AdminSystemHealthView';
 import { AdminPaymentProfilesView } from './AdminPaymentProfilesView';
+import { AdminPublicDataView } from './AdminPublicDataView';
 
 interface AdminLayoutProps {
   adminLevel: AdminLevel;
@@ -49,9 +51,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onSwitchAdminLevel,
   onSelectOwnerPersona
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
 
-  const tabs: { id: 'dashboard' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
+  const tabs: { id: 'dashboard' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
     { 
       id: 'dashboard', 
       label: 'ภาพรวมระบบ', 
@@ -78,6 +80,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       label: 'ตรวจช่องทางรับเงิน', 
       icon: <img src="/images/admin/payment-profiles.svg" alt="ตรวจช่องทางรับเงิน" className="w-5 h-5 rounded-md object-cover ring-1 ring-cyan-400/50 shadow-sm" />, 
       badge: 'PromptPay' 
+    },
+    { 
+      id: 'public-data', 
+      label: 'ข้อมูลสาธารณะ & Admin Verify', 
+      icon: <Database className="w-5 h-5 text-cyan-300" />,
+      badge: 'FREE'
     },
     { 
       id: 'wallet', 
@@ -255,6 +263,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {activeTab === 'users' && (
           <AdminUsersView adminLevel={adminLevel} />
         )}
+        {activeTab === 'public-data' && <AdminPublicDataView />}
         {activeTab === 'payment-profiles' && (
           <AdminPaymentProfilesView adminLevel={adminLevel} />
         )}
