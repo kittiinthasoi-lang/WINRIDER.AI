@@ -1018,97 +1018,60 @@ app.get("/api/admin/public-data/catalog", async (req, res) => {
   return res.json({ source: "TAT Data Catalog", free: true, license: "Open Data Common", pending, approved, datasets: byKind });
 });
 
+// Public-data synchronization is source-driven. Imported records are published directly from the configured public source.
+// No Admin Verify gate is used for public datasets; source updates are picked up on the next sync.
+// Administrative review remains reserved for WINRIDER-owned/business records, not public-source records.
 app.post("/api/admin/public-data/import-tat", rateLimit(5), async (req, res) => {
-  const adminUser = await requireSuperAdmin(req, res);
-  if (!adminUser) return;
-  const requested = Array.isArray(req.body?.kinds) ? req.body.kinds : Object.keys(TAT_PUBLIC_DATASETS);
-  const kinds = requested.filter((value: unknown): value is PublicDataKind => typeof value === "string" && value in TAT_PUBLIC_DATASETS);
-  if (!kinds.length) return res.status(400).json({ error: "ไม่พบชุดข้อมูล TAT ที่ต้องการนำเข้า" });
-
-  const results: Record<string, any> = {};
-  for (const kind of kinds) {
-    try {
-      const { rows, sourceUrl } = await fetchTatDatasetRows(kind);
-      const normalized = rows.map((row, index) => normalizePublicRecord(kind, row, index, sourceUrl)).filter(Boolean).slice(0, 10000) as any[];
-      for (let offset = 0; offset < normalized.length; offset += 400) {
-        const batch = ordersDb.batch();
-        for (const record of normalized.slice(offset, offset + 400)) {
-          const ref = ordersDb.collection(kind === "events" ? "winAlertEvents" : "publicDataRecords").doc(record.id);
-          batch.set(ref, {
-            ...record,
-            adminApproved: false,
-            status: "pending_admin_review",
-            importedBy: adminUser.uid,
-            importedAt: FieldValue.serverTimestamp(),
-          }, { merge: true });
-        }
-        await batch.commit();
-      }
-      results[kind] = { ok: true, sourceRows: rows.length, stagedForReview: normalized.length, sourceUrl };
-    } catch (error) {
-      results[kind] = { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  if (!(await isAdminUser(user))) return res.status(403).json({ error: "Admin only" });
+  const requestedKind = String(req.body?.kind || "all") as PublicDataKind | "all";
+  const kinds: PublicDataKind[] = requestedKind === "all"
+    ? ["events", "attractions", "restaurants", "accommodations", "souvenirs"]
+    : [requestedKind];
+  if (kinds.some((kind) => !["events", "attractions", "restaurants", "accommodations", "souvenirs"].includes(kind))) {
+    return res.status(400).json({ error: "Invalid public data kind" });
   }
-  dailyEventsCache.clear();
-  return res.json({ ok: true, source: "TAT Data Catalog", results });
-});
 
-app.get("/api/admin/public-data/pending", async (req, res) => {
-  const adminUser = await requireSuperAdmin(req, res);
-  if (!adminUser) return;
-  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 300);
-  const kind = String(req.query.kind || "").trim();
-  let query = ordersDb.collection("publicDataRecords");
-  if (kind && kind in TAT_PUBLIC_DATASETS) query = query.where("kind", "==", kind);
-  const snapshot = await query.limit(limit).get();
-  const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((record: any) => record.status === "pending_admin_review");
-  return res.json({ records });
-});
-
-app.post("/api/admin/public-data/review", async (req, res) => {
-  const adminUser = await requireSuperAdmin(req, res);
-  if (!adminUser) return;
-  const kind = String(req.body?.kind || "").trim() as PublicDataKind;
-  const id = String(req.body?.id || "").trim();
-  const approved = req.body?.approved === true;
-  if (!id || !["attractions","restaurants","accommodations","souvenirs"].includes(kind)) return res.status(400).json({ error: "รายการตรวจสอบไม่ถูกต้อง" });
-  const ref = ordersDb.collection("publicDataRecords").doc(id);
-  const snapshot = await ref.get();
-  if (!snapshot.exists) return res.status(404).json({ error: "ไม่พบรายการข้อมูล" });
-  await ref.set({
-    adminApproved: approved,
-    status: approved ? "approved" : "rejected",
-    reviewedBy: adminUser.uid,
-    reviewedAt: FieldValue.serverTimestamp(),
-  }, { merge: true });
-  return res.json({ ok: true, id, approved });
-});
-
-app.get("/api/public-data/discovery", rateLimit(30), async (req, res) => {
-  const query = String(req.query.query || "").trim().toLowerCase();
-  const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
-  const kinds: PublicDataKind[] = ["events", "attractions", "restaurants", "accommodations", "souvenirs"];
   try {
-    const result: Record<string, any[]> = {};
+    const imported = [];
     for (const kind of kinds) {
-      const snapshot = await ordersDb.collection(kind === "events" ? "winAlertEvents" : "publicDataRecords")
-        .where("kind", "==", kind)
-        .limit(300)
-        .get();
-      result[kind] = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-        .filter((record: any) => record.adminApproved === true && record.status === "approved")
-        .filter((record: any) => !query || [record.name, record.title, record.category, record.address, record.province, record.district]
-          .some((value) => String(value || "").toLowerCase().includes(query)))
-        .slice(0, limit);
+      const rows = await fetchTatDatasetRows(kind);
+      const collectionName = kind === "events" ? "winAlertEvents" : "publicDataRecords";
+      const snapshot = await ordersDb.collection(collectionName).where("source", "==", "TAT Data Catalog").get();
+      const existingIds = new Set(snapshot.docs.map((doc) => doc.id));
+      const incomingIds = new Set<string>();
+      const batch = ordersDb.batch();
+      let count = 0;
+      for (const row of rows) {
+        const record = normalizePublicRecord(row, kind);
+        if (!record?.id) continue;
+        incomingIds.add(record.id);
+        batch.set(ordersDb.collection(collectionName).doc(record.id), {
+          ...record,
+          source: "TAT Data Catalog",
+          sourceKind: kind,
+          sourceDriven: true,
+          publicVisible: true,
+          adminApproved: true,
+          status: "active",
+          lastSourceSyncAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+        count++;
+      }
+      // Remove records that disappeared from the source so the app mirrors the source.
+      for (const staleId of existingIds) {
+        if (!incomingIds.has(staleId)) batch.delete(ordersDb.collection(collectionName).doc(staleId));
+      }
+      await batch.commit();
+      imported.push({ kind, count, removed: Math.max(0, existingIds.size - incomingIds.size) });
     }
-    return res.json({
-      source: "WINRIDER.AI • Admin Verified Thai Public Data",
-      freePublicData: true,
-      data: result,
-    });
+    dailyEventsCache.clear();
+    return res.json({ success: true, source: "TAT Data Catalog", sourceDriven: true, publicVisible: true, imported });
   } catch (error) {
-    console.error("[Public Data Discovery]", error instanceof Error ? error.message : error);
-    return res.status(503).json({ data: {}, error: "โหลดข้อมูลสาธารณะไม่สำเร็จ" });
+    console.error("[TAT Public Data Sync]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ error: "ไม่สามารถซิงก์ข้อมูลจากแหล่งต้นทางได้" });
   }
 });
 
