@@ -67,6 +67,20 @@ export const AdminPublicDataView:React.FC = () => {
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
       {DATASETS.map(([kind,label,description])=><button key={kind} onClick={()=>void importData(kind)} disabled={!!importing} className="rounded-2xl border border-slate-800 bg-[#0A1633] p-4 text-left hover:border-cyan-400/40 disabled:opacity-50"><div className="flex items-center gap-2 text-sm font-black text-white"><Database className="h-4 w-4 text-cyan-300"/>{label}</div><p className="mt-2 text-[10px] leading-4 text-slate-400">{description}</p><span className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold text-cyan-300"><Download className="h-3 w-3"/>นำเข้าเพื่อรอตรวจ</span></button>)}
     </div>
+    <section className="rounded-3xl border border-slate-800 bg-[#0A1633] p-5">
+      <div className="mb-3 flex items-center gap-2"><Database className="h-4 w-4 text-cyan-300"/><h2 className="text-sm font-black text-white">แหล่งข้อมูลสาธารณะที่คัดแล้ว</h2></div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-3">
+          <div className="text-xs font-black text-cyan-200">TAT Data Catalog</div>
+          <p className="mt-1 text-[10px] leading-4 text-slate-400">กิจกรรม แหล่งท่องเที่ยว ร้านอาหาร ที่พัก และร้านของที่ระลึก • Open Data Common • ไม่มีการจำกัดการเข้าถึงข้อมูล</p>
+        </div>
+        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-3">
+          <div className="text-xs font-black text-emerald-200">data.go.th / Open Government Data</div>
+          <p className="mt-1 text-[10px] leading-4 text-slate-400">แหล่งข้อมูลภาครัฐสำหรับต่อยอดสุขภาพ ความปลอดภัย อากาศ การเดินทาง และเมือง โดยจะนำเข้าเฉพาะชุดที่ผ่านการคัดเลือกและ Admin Verify ก่อนใช้งานจริง</p>
+        </div>
+      </div>
+    </section>
+
     <section className="rounded-3xl border border-amber-400/20 bg-[#0A1633] p-5">
       <div className="mb-4 flex items-center justify-between"><div><h2 className="flex items-center gap-2 text-sm font-black text-white"><ShieldCheck className="h-5 w-5 text-amber-300"/>คิว Admin Verify</h2><p className="text-[10px] text-slate-500">ไม่อนุมัติ = ไม่แสดงในแอป</p></div><span className="rounded-full bg-amber-400/10 px-2 py-1 text-[10px] font-mono font-bold text-amber-300">{pending.length} รายการ</span></div>
       {pending.length===0?<div className="rounded-2xl border border-dashed border-slate-700 p-8 text-center text-xs text-slate-500">ไม่มีข้อมูลรอตรวจ</div>:<div className="space-y-2">{pending.slice(0,100).map(record=><div key={record.id} className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="truncate text-xs font-black text-white">{record.title||record.name||'ไม่มีชื่อ'}</div><div className="mt-1 flex flex-wrap items-center gap-2 text-[9px] text-slate-400"><span>{record.kind||'events'}</span>{record.province&&<span>• {record.province}</span>}{record.category&&<span>• {record.category}</span>}{record.startAt&&<span className="inline-flex items-center gap-1"><CalendarDays className="h-3 w-3"/>{new Date(record.startAt).toLocaleDateString('th-TH')}</span>}{record.latitude!=null&&record.longitude!=null&&<span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3"/>มีพิกัด</span>}</div>{record.address&&<div className="mt-1 truncate text-[9px] text-slate-500">{record.address}</div>}</div><div className="flex shrink-0 gap-2"><button onClick={()=>void review(record,false)} className="flex items-center gap-1 rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-[10px] font-bold text-rose-300"><XCircle className="h-3.5 w-3.5"/>ไม่อนุมัติ</button><button onClick={()=>void review(record,true)} className="flex items-center gap-1 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-[10px] font-bold text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5"/>อนุมัติ</button></div></div>)}</div>}
