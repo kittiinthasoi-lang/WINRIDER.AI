@@ -63,7 +63,7 @@ export const MerchantParcelPickupMapModal: React.FC<MerchantParcelPickupMapModal
   onGainMerchantXp
 }) => {
   const [parcels, setParcels] = useState<ParcelItem[]>(INITIAL_PARCELS);
-  const [selectedParcelId, setSelectedParcelId] = useState<string>(INITIAL_PARCELS[0].id);
+  const [selectedParcelId, setSelectedParcelId] = useState<string>('');
   const [currentStep, setCurrentStep] = useState<number>(3); // 1: Broadcast, 2: Matched, 3: En route, 4: Arrived & Handover
   const [mapMode, setMapMode] = useState<'3d_sat' | 'vector_radar' | 'capillary'>('3d_sat');
   const [elevation3D, setElevation3D] = useState<number>(40); // 0m to 150m (3D Floating Height / Altitude)
@@ -134,9 +134,27 @@ export const MerchantParcelPickupMapModal: React.FC<MerchantParcelPickupMapModal
     if (audioEnabled) playLevelUpFanfare();
     setScannedParcels(parcels.map(p => p.id));
     setCurrentStep(4);
-    onGainMerchantXp(300, "อัศวินรับพัสดุครบทั้ง 3 รายการเรียบร้อย เดินทางสู่ปลายทางทันที!");
+    onGainMerchantXp(300, "อัศวินรับพัสดุครบตามรายการจริงแล้ว");
     confetti({ particleCount: 80, spread: 90, colors: ['#00D2FF', '#FFD700', '#10B981', '#FFFFFF'] });
   };
+
+  if (!isOpen) return null;
+  if (parcels.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+        <div className="w-full max-w-lg rounded-3xl border border-cyan-400/25 bg-[#071126] p-6 text-white shadow-2xl">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-mono font-black tracking-widest text-cyan-300">WINRIDER DISPATCH</div>
+              <h2 className="mt-1 text-xl font-black">ยังไม่มีพัสดุจริงรอรับ</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-400">หน้านี้จะแสดงเฉพาะพัสดุที่สร้างจากคำสั่งซื้อจริงและมีข้อมูลการจัดส่งจริงจากระบบ Dispatch</p>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-slate-200">ปิด</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto">
@@ -154,11 +172,11 @@ export const MerchantParcelPickupMapModal: React.FC<MerchantParcelPickupMapModal
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                   LIVE FLEET DISPATCH RADAR
                 </span>
-                <span className="text-[10px] text-amber-300 font-mono">ร้านออร่าเซนโก้ (Aura Zenco)</span>
+                <span className="text-[10px] text-amber-300 font-mono">ร้านค้าของคุณ</span>
               </div>
               <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
                 <span>แผนที่ติดตามพี่วินมารับพัสดุหน้าร้าน</span>
-                <span className="text-xs font-mono text-[#00D2FF]">(3 อัศวินกำลังมุ่งหน้ามา)</span>
+                <span className="text-xs font-mono text-[#00D2FF]">(รอข้อมูล Dispatch จริง)</span>
               </h2>
             </div>
           </div>
@@ -387,15 +405,15 @@ export const MerchantParcelPickupMapModal: React.FC<MerchantParcelPickupMapModal
               <div className="relative z-10 grid grid-cols-3 gap-2 text-center text-xs font-mono bg-black/70 p-2.5 rounded-2xl border border-white/10 backdrop-blur-md">
                 <div>
                   <span className="text-[9px] text-slate-400 block">อัศวินที่กำลังมา:</span>
-                  <span className="text-white font-bold">3 นาย (พร้อมกล่องท้าย)</span>
+                  <span className="text-white font-bold">ข้อมูลจะอัปเดตเมื่อมีอัศวินจริง</span>
                 </div>
                 <div>
                   <span className="text-[9px] text-slate-400 block">เวลาถึงเร็วสุด:</span>
-                  <span className="text-cyan-300 font-bold">2 นาที (พี่วินเดชา)</span>
+                  <span className="text-cyan-300 font-bold">รอข้อมูล ETA จริง</span>
                 </div>
                 <div>
                   <span className="text-[9px] text-slate-400 block">สถานะสแกนบาร์โค้ด:</span>
-                  <span className="text-amber-400 font-bold">{scannedParcels.length}/3 กล่อง</span>
+                  <span className="text-amber-400 font-bold">{scannedParcels.length}/{parcels.length} กล่อง</span>
                 </div>
               </div>
             </div>
