@@ -106,7 +106,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
             <div>
               <p className="text-[10px] font-bold uppercase text-amber-300">WIN-Pet Care • Live Nearby Search</p>
               <h3 className="text-base font-black text-white">โรงพยาบาลและคลินิกรักษาสัตว์ใกล้ตำแหน่งปัจจุบัน</h3>
-              <p className="mt-1 text-xs text-slate-300">รายชื่อจาก Google Places และระยะทางถนนจริงจาก Google Routes</p>
+              <p className="mt-1 text-xs text-slate-300">รายชื่อจาก Google Places • ระยะเส้นตรงโดยประมาณ (Google Routes ปิดชั่วคราว)</p>
             </div>
           </div>
           <button type="button" onClick={() => setShowEmergencyTips((value) => !value)} className="rounded-xl border border-rose-500/40 bg-rose-500/15 px-3 py-2 text-xs font-bold text-rose-200">
@@ -156,7 +156,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
         ))}
       </div>
 
-      {loading && <div className="rounded-2xl border border-amber-400/20 bg-black/30 p-8 text-center text-sm text-amber-200"><Loader2 className="mx-auto mb-2 h-7 w-7 animate-spin" />กำลังค้นหาสถานพยาบาลและคำนวณเส้นทางจริง…</div>}
+      {loading && <div className="rounded-2xl border border-amber-400/20 bg-black/30 p-8 text-center text-sm text-amber-200"><Loader2 className="mx-auto mb-2 h-7 w-7 animate-spin" />กำลังค้นหาสถานพยาบาลจาก Google Places…</div>}
       {!loading && errorMessage && <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-100"><AlertCircle className="mr-2 inline h-5 w-5" />{errorMessage}<p className="mt-1 text-xs text-slate-400">ระบบจะไม่แสดงรายชื่อหรือระยะทางจำลองแทนข้อมูลจริง</p></div>}
       {!loading && geo.isRealGps && !errorMessage && places.length === 0 && <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-slate-300">ไม่พบสถานพยาบาลสัตว์ในรัศมี 15 กิโลเมตรจากตำแหน่งปัจจุบัน</div>}
 
@@ -192,7 +192,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
                   {hospital.googleMapsUri && <a href={hospital.googleMapsUri} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-white/10 px-3 py-2 text-xs text-white"><ExternalLink className="mr-1 inline h-4 w-4 text-cyan-300" />แผนที่</a>}
                 </div>
                 <button type="button" disabled={!routeReady} onClick={() => { if (audioEnabled) playTactileBlip(1000); onSelectHospitalForBooking(hospital); }} className="rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 px-3.5 py-2 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">
-                  <Dog className="mr-1 inline h-4 w-4" />{fare !== null ? `เรียกพี่วิน • ประมาณ ฿${fare}` : 'รอข้อมูลเส้นทาง'} <ChevronRight className="inline h-4 w-4" />
+                  <Dog className="mr-1 inline h-4 w-4" />{fare !== null ? `เรียกพี่วิน • ประมาณ ฿${fare}` : 'รอข้อมูลระยะทาง'} <ChevronRight className="inline h-4 w-4" />
                 </button>
               </div>
             </article>
