@@ -256,12 +256,12 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base sm:text-lg font-black text-white">ตั้งค่าช่องทางรับเงิน (WIN Wallet / PromptPay)</h3>
+              <h3 className="text-lg sm:text-xl font-black text-white">ตั้งค่าช่องทางรับเงิน (WIN Wallet / PromptPay)</h3>
               <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-cyan-300 font-mono font-bold">
                 0% GP Direct P2P
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-sm text-slate-400">
               สำหรับ {roleLabel} • รับเงินตรงเข้าบัญชีคุณ ไร้ตัวกลาง
             </p>
           </div>
