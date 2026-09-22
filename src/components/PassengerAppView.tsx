@@ -1013,8 +1013,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         // Destination identity remains usable even if the public-data index is temporarily unavailable.
       }
 
-      // Route service is deliberately unavailable in FREE-ONLY mode unless a real provider is configured.
-      // Do not fabricate distance, ETA, GPS fallback coordinates, or fare.
+      // Route service uses the real server-side Google Places/Routes provider when configured.
+      // Cost control is enforced by the shared cache/throttle guard; never fabricate distance, ETA, GPS fallback coordinates, or fare.
       try {
         const response = await fetch('/api/places/resolve-routes', {
           method: 'POST',
