@@ -1,18 +1,5 @@
-import React, { useState } from 'react';
-import { 
-  Compass, 
-  Navigation, 
-  MapPin, 
-  Crosshair, 
-  ExternalLink, 
-  X, 
-  Gauge, 
-  Satellite, 
-  Layers, 
-  CheckCircle2, 
-  AlertCircle,
-  Globe
-} from 'lucide-react';
+import React from 'react';
+import { AlertCircle, Compass, ExternalLink, MapPin, Navigation, Satellite, X } from 'lucide-react';
 import { useRealGeolocation, calculateHaversineDistanceKm } from '../hooks/useRealGeolocation';
 import { playTactileBlip } from '../utils/audio';
 
@@ -24,206 +11,103 @@ interface RealGpsMapModalProps {
   audioEnabled?: boolean;
 }
 
+/**
+ * External-navigation reference only.
+ * No Google Maps, Mapbox, OpenStreetMap or other embedded map is rendered here.
+ * WINRIDER.AI shows real GPS/destination details and hands navigation to an external app.
+ */
 export const RealGpsMapModal: React.FC<RealGpsMapModalProps> = ({
   isOpen,
   onClose,
-  destinationTitle = 'อาคาร Exchange Tower อโศก',
-  destinationCoords = { latitude: 13.7360, longitude: 100.5608 },
+  destinationTitle = 'ปลายทาง',
+  destinationCoords,
   audioEnabled = true,
 }) => {
   const geo = useRealGeolocation(true);
-  const [provider, setProvider] = useState<'google_maps' | 'mapbox'>('google_maps');
-  const [mapStyle, setMapStyle] = useState<'standard' | 'dark' | 'satellite'>('dark');
-
   if (!isOpen) return null;
 
-  const currentLat = geo.latitude;
-  const currentLon = geo.longitude;
-  const hasRealPosition = geo.isRealGps && currentLat !== null && currentLon !== null;
-  const distanceToDest = hasRealPosition
-    ? calculateHaversineDistanceKm(currentLat, currentLon, destinationCoords.latitude, destinationCoords.longitude)
+  const hasRealPosition = geo.isRealGps && geo.latitude !== null && geo.longitude !== null;
+  const hasDestination = Number.isFinite(destinationCoords?.latitude) && Number.isFinite(destinationCoords?.longitude);
+  const distanceToDest = hasRealPosition && hasDestination
+    ? calculateHaversineDistanceKm(geo.latitude!, geo.longitude!, destinationCoords!.latitude, destinationCoords!.longitude)
     : null;
 
-  const googleMapsNavUrl = hasRealPosition ? `https://www.google.com/maps/dir/?api=1&origin=${currentLat},${currentLon}&destination=${destinationCoords.latitude},${destinationCoords.longitude}&travelmode=two_wheeler` : '';
+  const googleMapsNavUrl = hasDestination
+    ? `https://www.google.com/maps/dir/?api=1&destination=${destinationCoords!.latitude},${destinationCoords!.longitude}${hasRealPosition ? `&origin=${geo.latitude},${geo.longitude}` : ''}&travelmode=two_wheeler`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinationTitle)}`;
 
-  const googleEmbedUrl = hasRealPosition ? `https://maps.google.com/maps?q=${currentLat},${currentLon}&hl=th&z=16&output=embed` : '';
-
-  // Mapbox Vector / OpenStreetMap embed coordinates bounding box
-  const delta = 0.008;
-  const osmUrl = hasRealPosition ? `https://www.openstreetmap.org/export/embed.html?bbox=${currentLon - delta}%2C${currentLat - delta}%2C${currentLon + delta}%2C${currentLat + delta}&layer=mapnik&marker=${currentLat}%2C${currentLon}` : '';
+  const openExternalMaps = () => {
+    if (audioEnabled) playTactileBlip(1000);
+    window.open(googleMapsNavUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-2xl bg-gradient-to-b from-slate-900 via-slate-950 to-black border border-cyan-500/30 rounded-3xl shadow-[0_0_50px_rgba(0,210,255,0.25)] text-slate-100 flex flex-col h-[88vh] max-h-[720px] overflow-hidden">
-        {/* Header */}
-        <div className="p-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-cyan-300">
-              <Compass className="w-5 h-5 animate-spin-slow" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 backdrop-blur-md">
+      <div className="relative flex h-auto max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-cyan-500/30 bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-100 shadow-[0_0_50px_rgba(0,210,255,0.2)]">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/5 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-400 bg-cyan-500/20 text-cyan-300">
+              <Compass className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-cyan-400 font-bold uppercase">
-                  GPS LIVE SATELLITE TELEMETRY
-                </span>
-                {geo.isRealGps ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-mono">
-                    <Satellite className="w-3 h-3 text-emerald-400" />
-                    <span>REAL GPS LOCK (±{geo.accuracy ? Math.round(geo.accuracy) : 5}m)</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400 text-amber-300 font-mono">
-                    <AlertCircle className="w-3 h-3" />
-                    <span>WAITING FOR REAL GPS</span>
-                  </span>
-                )}
+              <div className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase text-cyan-400">
+                <Satellite className="h-3.5 w-3.5" /> GPS REFERENCE
+                {hasRealPosition ? <span className="text-emerald-300">REAL GPS LOCK</span> : <span className="text-amber-300">WAITING FOR GPS</span>}
               </div>
-              <h3 className="text-sm font-bold text-white mt-0.5">
-                พิกัดตำแหน่งจริง & นำทางเลี้ยวต่อเลี้ยว
-              </h3>
+              <h3 className="mt-0.5 text-sm font-bold text-white">ข้อมูลตำแหน่งและปลายทาง</h3>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            {/* Map Provider Switcher */}
-            <div className="flex items-center bg-black/60 p-0.5 rounded-xl border border-white/10 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(800);
-                  setProvider('google_maps');
-                }}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-                  provider === 'google_maps'
-                    ? 'bg-amber-400 text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <span>Google Maps</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (audioEnabled) playTactileBlip(800);
-                  setProvider('mapbox');
-                }}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-                  provider === 'mapbox'
-                    ? 'bg-cyan-400 text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Globe className="w-3 h-3" />
-                <span>Mapbox</span>
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                geo.refreshLocation();
-                if (audioEnabled) playTactileBlip(900);
-              }}
-              className="p-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 text-xs font-mono flex items-center gap-1 transition-all active:scale-95"
-              title="ดึงพิกัดปัจจุบันอีกครั้ง"
-            >
-              <Crosshair className="w-4 h-4" />
-              <span className="hidden sm:inline">Refresh GPS</span>
-            </button>
-
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all active:scale-95"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          <button type="button" onClick={onClose} className="rounded-xl bg-white/5 p-2 text-slate-400 hover:bg-white/10 hover:text-white">
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        {/* Telemetry Dashboard Strip */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-3 bg-slate-950/70 border-b border-white/10 text-center font-mono">
-          <div className="p-2 rounded-xl bg-white/5 border border-white/5">
-            <div className="text-[10px] text-slate-400">LATITUDE</div>
-            <div className="text-xs font-bold text-cyan-300">{currentLat?.toFixed(6) || '—'}</div>
-          </div>
-          <div className="p-2 rounded-xl bg-white/5 border border-white/5">
-            <div className="text-[10px] text-slate-400">LONGITUDE</div>
-            <div className="text-xs font-bold text-cyan-300">{currentLon?.toFixed(6) || '—'}</div>
-          </div>
-          <div className="p-2 rounded-xl bg-white/5 border border-white/5">
-            <div className="text-[10px] text-slate-400">DISTANCE TO DEST</div>
-            <div className="text-xs font-bold text-amber-300">{distanceToDest !== null ? `${distanceToDest} km` : '—'}</div>
-          </div>
-          <div className="hidden sm:block p-2 rounded-xl bg-white/5 border border-white/5">
-            <div className="text-[10px] text-slate-400">CURRENT SPEED</div>
-            <div className="text-xs font-bold text-emerald-300">
-              {geo.speed ? `${(geo.speed * 3.6).toFixed(1)} km/h` : '0.0 km/h'}
+        <div className="space-y-3 p-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="flex items-start gap-3">
+              <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase text-slate-500">ปลายทาง</p>
+                <p className="mt-1 text-base font-black text-white">{destinationTitle}</p>
+                {hasDestination && <p className="mt-1 font-mono text-[10px] text-slate-400">{destinationCoords!.latitude.toFixed(6)}, {destinationCoords!.longitude.toFixed(6)}</p>}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Live Map Frame Container */}
-        <div className="relative flex-1 bg-slate-900 overflow-hidden">
-          {!hasRealPosition ? (
-            <div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-300">อนุญาตตำแหน่งปัจจุบันเพื่อเปิดแผนที่จริง ระบบจะไม่ใช้ตำแหน่งจำลองแทน</div>
-          ) : provider === 'google_maps' ? (
-            <iframe
-              title="Google Maps Live View"
-              src={googleEmbedUrl}
-              className="w-full h-full border-none"
-            />
-          ) : (
-            <iframe
-              title="Mapbox Vector Map"
-              src={osmUrl}
-              className="w-full h-full border-none filter invert-90 contrast-125 hue-rotate-180 brightness-95"
-            />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
+              <p className="text-[10px] text-slate-500">GPS ปัจจุบัน</p>
+              <p className="mt-1 font-mono text-xs text-cyan-300">{hasRealPosition ? `${geo.latitude!.toFixed(6)}, ${geo.longitude!.toFixed(6)}` : 'ยังไม่มี GPS จริง'}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
+              <p className="text-[10px] text-slate-500">ระยะเส้นตรงอ้างอิง</p>
+              <p className="mt-1 text-xs font-bold text-amber-300">{distanceToDest !== null ? `${distanceToDest} กม.` : 'ไม่พร้อมใช้งาน'}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
+              <p className="text-[10px] text-slate-500">การนำทาง</p>
+              <p className="mt-1 text-xs font-bold text-emerald-300">ภายนอกแอป</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-xs text-slate-300">
+            <p className="font-bold text-cyan-200">ไม่มีแผนที่ฝังใน WINRIDER.AI</p>
+            <p className="mt-1">หน้านี้แสดงเฉพาะข้อมูลอ้างอิงจาก GPS จริงและรายละเอียดปลายทาง ส่วนเส้นทาง, Traffic, ETA และ turn-by-turn จะทำงานในแอปแผนที่ภายนอกเมื่อคุณกดนำทาง</p>
+          </div>
+
+          {!hasDestination && (
+            <div className="flex items-center gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-200">
+              <AlertCircle className="h-4 w-4 shrink-0" /> ไม่มีพิกัดปลายทาง จึงเปิด Google Maps ด้วยชื่อสถานที่แทน
+            </div>
           )}
 
-          {/* Overlay Coordinates Marker Pin HUD */}
-          <div className="absolute top-4 left-4 p-3 rounded-2xl bg-black/85 backdrop-blur-md border border-cyan-400/40 shadow-xl max-w-[280px]">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300 mb-1">
-              <MapPin className="w-4 h-4 text-cyan-400 animate-bounce" />
-              <span>{provider === 'google_maps' ? 'ตำแหน่งดาวเทียม Google Maps' : 'ตำแหน่งดาวเทียม Mapbox'}</span>
-            </div>
-            <div className="text-[11px] text-slate-300">
-              {geo.isRealGps ? 'สัญญาณดาวเทียมตรวจพบตำแหน่งจริง' : 'กำลังรอตำแหน่ง GPS จริง'}
-            </div>
-            <div className="text-[10px] text-slate-400 font-mono mt-1">
-              จุดหมาย: <span className="text-amber-300 font-bold">{destinationTitle}</span>
-            </div>
-          </div>
-
-          {/* Quick External Navigation Floating Action Button */}
-          <div className="absolute bottom-4 right-4 flex items-center gap-2">
-            {hasRealPosition && <a
-              href={googleMapsNavUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(1000);
-              }}
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs shadow-[0_0_25px_rgba(16,185,129,0.4)] flex items-center gap-2 transition-all active:scale-95"
-            >
-              <Navigation className="w-4 h-4" />
-              <span>นำทางจริง (มอเตอร์ไซค์)</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>}
-          </div>
+          <button type="button" onClick={openExternalMaps} className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-black text-slate-950 hover:bg-emerald-400">
+            <Navigation className="mr-2 inline h-4 w-4" /> เปิดการนำทางภายนอก <ExternalLink className="ml-2 inline h-4 w-4" />
+          </button>
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-3 border-t border-white/10 bg-slate-950 flex items-center justify-between">
-          <div className="text-xs text-slate-400">
-            ระบบอัปเดตตำแหน่งอัตโนมัติแบบความแม่นยำสูง (High-Accuracy GPS)
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold transition-all active:scale-95"
-          >
-            ปิดแผนที่
-          </button>
+        <div className="flex items-center justify-between border-t border-white/10 bg-slate-950 p-3">
+          <span className="text-[10px] text-slate-500">ไม่ใช้ Google Routes / Traffic / Navigation API ในแอป</span>
+          <button type="button" onClick={onClose} className="rounded-xl bg-white/10 px-5 py-2 text-xs font-semibold text-slate-200 hover:bg-white/20">ปิด</button>
         </div>
       </div>
     </div>
