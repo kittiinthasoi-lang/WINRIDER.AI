@@ -969,7 +969,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       }
       if (audioEnabled) {
         playTactileBlip(900);
-        speakThaiText('ระยะทางจริงประมาณ ' + distanceKm.toFixed(1) + ' กิโลเมตร ค่าโดยสารประมาณ ' + fare + ' บาท');
+        speakThaiText('ระยะทางโดยประมาณ ' + distanceKm.toFixed(1) + ' กิโลเมตร ค่าโดยสารประมาณ ' + fare + ' บาท');
       }
     } catch (error) {
       console.error('Destination route preview failed:', error);
