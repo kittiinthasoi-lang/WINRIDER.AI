@@ -350,7 +350,6 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
 
     // Give merchant XP and credit points
     handleGainMerchantXp(80, `ได้รับคำสั่งซื้อใหม่ ${orderId}`);
-    handleGainMerchantCredit(5, `ลูกค้าสั่งซื้อสำเร็จ ${orderId}`);
 
     setCart([]);
     setShowCartModal(false);
@@ -420,7 +419,6 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
     setShowAddProductModal(false);
 
     handleGainMerchantXp(180, "ลงของขายสินค้าใหม่สำเร็จ ✨");
-    handleGainMerchantCredit(10, "ขยายแคตตาล็อกสินค้าหน้าร้าน");
     if (audioEnabled) playTactileBlip(1200);
     confetti({ particleCount: 60, spread: 75, colors: ['#00D2FF', '#FFD700', '#10B981'] });
   };
@@ -831,10 +829,6 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
                     <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 shadow-[0_0_10px_rgba(255,215,0,0.3)] flex items-center gap-1">
                       <span>{currentMerchantTier.badge}</span>
                       <span>{currentMerchantTier.title}</span>
-                    </span>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.25)]">
-                      <CreditCard className="w-3 h-3" />
-                      เครดิตร้านค้า: {merchantCreditScore}/850
                     </span>
                     <button
                       onClick={() => {
