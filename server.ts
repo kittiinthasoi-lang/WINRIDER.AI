@@ -764,6 +764,12 @@ function classifyRealEvent(category: string, title: string, labels: string[] = [
 }
 
 app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
+  if (FREE_ONLY_MODE) {
+    return res.status(503).json({
+      message: "บริการอีเวนต์ภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย",
+      events: []
+    });
+  }
   const eventDate = String(req.query.date || "");
   const country = "TH";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
