@@ -1897,13 +1897,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   </div>
                 </div>
 
+                <PublicDataDiscoveryCard />
+
                 {/* PROACTIVE WIN-ALERT EVENT CARDS (Mall Sales, Pop-up Markets, Concerts, Festivals) */}
                 <WinAlertEventsCard
                   audioEnabled={audioEnabled}
                   onBookEventRide={handleSelectWinAlertEvent}
                 />
-
-                <PublicDataDiscoveryCard />
 
                 {/* DESTINATION CAROUSEL — PLACE DATA ONLY */}
                 <div className="space-y-2 pt-2">
