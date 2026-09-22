@@ -197,7 +197,7 @@ export const PersonalNavigationScreen: React.FC<PersonalNavigationScreenProps> =
       ) : (
         <div className="rounded-2xl border border-white/10 bg-black/30 p-5 text-center text-xs text-slate-400">
           <Navigation className="w-7 h-7 mx-auto mb-2 text-cyan-300" />
-          {destination ? 'กำลังรอ GPS จริงเพื่อเริ่มนำทาง…' : 'เลือกปลายทางเพื่อเริ่มคำนวณเส้นทางจริง'}
+          {destination ? 'GPS พร้อมแล้ว • เปิด Google Maps เพื่อรับเส้นทางถนนจริง' : 'เลือกปลายทางเพื่อค้นหาพิกัดจริง'}
         </div>
       )}
     </div>
