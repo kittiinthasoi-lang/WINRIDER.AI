@@ -173,7 +173,7 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
           <div>
             <div className="flex flex-wrap items-center gap-2"><h3 id="daily-events-title" className="text-base font-black text-white">Win Alert เราไปส่งได้นะ</h3><span className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-300">ทั่วประเทศไทย</span></div>
             <p className="mt-1 text-sm text-slate-300">{formatDay(eventDate)}</p>
-            <p className="mt-1 text-sm text-slate-400">กดสถานที่เพื่อให้ระบบขอ GPS ปัจจุบัน ค้นหาปลายทาง คำนวณเส้นทางจริง ระยะทางจริง + ETA จริง และค่าโดยสารจากระยะทางจริงก่อนเข้าสู่การจอง</p>
+            <p className="mt-1 text-sm text-slate-400">กดสถานที่เพื่อให้ระบบขอ GPS ปัจจุบันและค้นหาปลายทาง พร้อมแสดงระยะทาง/เวลาแบบประมาณการก่อนเข้าสู่การจอง (เส้นทางถนนจริงปิดชั่วคราว)</p>
           </div>
         </div>
         <button type="button" onClick={() => void loadEvents()} disabled={loading} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 text-sm font-bold text-cyan-200 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />อัปเดตวันนี้</button>
