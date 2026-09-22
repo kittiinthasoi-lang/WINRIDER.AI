@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, MapPin, Navigation, Radio } from 'lucide-react';
+import { ExternalLink, MapPin, Navigation, Radio, ShieldAlert, Siren, Stethoscope, PawPrint, Flame, HeartPulse } from 'lucide-react';
 import { playTactileBlip } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 
@@ -43,47 +43,60 @@ interface GoogleMapsRadarViewProps {
   onBackToHome?: () => void;
 }
 
+type Scan = { label: string; query: string; icon: React.ReactNode; note: string };
+
 /**
- * Free-first radar reference.
- * The radar no longer creates or displays synthetic people, drivers, merchants,
- * or customers. Verified live entities can be supplied by the dispatch layer;
- * navigation is opened in an external maps application.
+ * Free-first radar reference. No map provider is embedded.
+ * Radar categories are real-world search targets; selecting one opens the
+ * corresponding Google Maps search externally so Google can show current local results.
  */
 export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
   venueName,
   venueCategory,
   radiusKm = 5,
-  height = '420px',
+  height = '560px',
   audioEnabled = true,
   onBackToHome,
 }) => {
   const { gpsState } = useRealtimeGps(true);
   const hasGps = Number.isFinite(gpsState.latitude) && Number.isFinite(gpsState.longitude) && Boolean(gpsState.latitude && gpsState.longitude);
-  const url = hasGps
-    ? `https://www.google.com/maps/search/?api=1&query=${gpsState.latitude},${gpsState.longitude}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueName || 'ประเทศไทย')}`;
+  const origin = hasGps ? `${gpsState.latitude},${gpsState.longitude}` : venueName || 'ประเทศไทย';
+  const makeUrl = (query: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${query} near ${origin}`)}`;
+  const open = (url: string) => { if (audioEnabled) playTactileBlip(900); window.open(url, '_blank', 'noopener,noreferrer'); };
 
-  const openMaps = () => {
-    if (audioEnabled) playTactileBlip(900);
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
+  const scans: Scan[] = [
+    { label: 'โรงพยาบาล / คลินิกคน', query: 'โรงพยาบาล คลินิก', icon: <Stethoscope className="h-4 w-4" />, note: 'ค้นหาสถานพยาบาลใกล้ตำแหน่งจริง' },
+    { label: 'WIN PETCARE / สัตว์เลี้ยง', query: 'โรงพยาบาลสัตว์ คลินิกสัตว์', icon: <PawPrint className="h-4 w-4" />, note: 'ค้นหาสถานพยาบาลสัตว์ใกล้ตำแหน่งจริง' },
+    { label: 'ดับเพลิง / กู้ภัย', query: 'สถานีดับเพลิง กู้ภัย', icon: <Flame className="h-4 w-4" />, note: 'ค้นหาหน่วยฉุกเฉินใกล้ตำแหน่งจริง' },
+    { label: 'สถานีตำรวจ', query: 'สถานีตำรวจ', icon: <ShieldAlert className="h-4 w-4" />, note: 'ค้นหาสถานีตำรวจใกล้ตำแหน่งจริง' },
+    { label: 'ศูนย์พยาบาล / ฉุกเฉิน', query: 'ศูนย์พยาบาล ศูนย์ฉุกเฉิน', icon: <HeartPulse className="h-4 w-4" />, note: 'ค้นหาศูนย์พยาบาลและฉุกเฉินใกล้ตำแหน่งจริง' },
+    { label: 'ศูนย์กู้ชีพ', query: 'ศูนย์กู้ชีพ รถพยาบาล', icon: <Siren className="h-4 w-4" />, note: 'ค้นหาบริการกู้ชีพใกล้ตำแหน่งจริง' },
+  ];
 
   return (
-    <div className="relative w-full overflow-hidden rounded-3xl border border-cyan-500/30 bg-[#07111f] text-white" style={{height}}>
+    <div className="relative w-full overflow-hidden rounded-3xl border border-cyan-500/30 bg-[#07111f] text-white" style={{ height }}>
       <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-4">
-        <div><div className="flex items-center gap-2 text-[10px] font-black text-cyan-300"><Radio className="h-4 w-4" /> RADAR อ้างอิงตำแหน่ง</div><div className="mt-1 text-sm font-black">{venueName || 'ตำแหน่งปัจจุบัน'}</div>{venueCategory && <div className="text-[10px] text-slate-500">{venueCategory} • รัศมี {radiusKm} กม.</div>}</div>
+        <div><div className="flex items-center gap-2 text-[10px] font-black text-cyan-300"><Radio className="h-4 w-4" /> RADAR / สแกนสถานที่จริง</div><div className="mt-1 text-sm font-black">{venueName || 'ตำแหน่งปัจจุบัน'}</div>{venueCategory && <div className="text-[10px] text-slate-500">{venueCategory} • รัศมีอ้างอิง {radiusKm} กม.</div>}</div>
         {onBackToHome && <button onClick={onBackToHome} className="rounded-xl border border-white/10 px-3 py-2 text-[10px]">กลับ</button>}
       </div>
-      <div className="flex h-[calc(100%-73px)] items-center justify-center bg-[radial-gradient(circle_at_center,rgba(34,211,238,.14),transparent_55%)] p-6">
-        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-black/30 p-6 text-center backdrop-blur">
-          <MapPin className="mx-auto h-12 w-12 text-cyan-300" />
-          <p className="mt-3 text-lg font-black">ตำแหน่งอ้างอิง</p>
-          <p className="mt-1 text-[10px] text-slate-400">แสดงเฉพาะตำแหน่งจริงที่ได้รับจาก GPS/ระบบ dispatch ที่ผ่านการยืนยัน</p>
-          {hasGps && <p className="mt-3 font-mono text-[10px] text-slate-500">{gpsState.latitude!.toFixed(6)}, {gpsState.longitude!.toFixed(6)}</p>}
-          <p className="mt-4 text-[10px] text-slate-500">ไม่มีรายชื่อพี่วิน ลูกค้า ร้านค้า หรือพาร์ทเนอร์จำลอง และไม่มี Google Maps JavaScript API ฝังในหน้านี้</p>
-          <button onClick={openMaps} className="mt-5 w-full rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-black text-slate-950"><ExternalLink className="mr-2 inline h-4 w-4" />เปิดตำแหน่งใน Google Maps</button>
-          <button onClick={openMaps} className="mt-2 w-full rounded-2xl border border-white/10 px-4 py-3 text-xs font-black"><Navigation className="mr-2 inline h-4 w-4" />นำทางภายนอก</button>
+      <div className="h-[calc(100%-73px)] overflow-y-auto p-4">
+        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-3 text-[10px] text-slate-300">
+          <MapPin className="mr-1 inline h-3.5 w-3.5 text-cyan-300" />
+          {hasGps ? <>GPS จริงพร้อมใช้งาน • {gpsState.latitude!.toFixed(6)}, {gpsState.longitude!.toFixed(6)}</> : <>กำลังรอ GPS จริง — เมื่ออนุญาตตำแหน่งแล้วจะแนบพิกัดให้การค้นหา</>}
         </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {scans.map((scan) => (
+            <button key={scan.label} type="button" onClick={() => open(makeUrl(scan.query))} className="rounded-2xl border border-white/10 bg-black/20 p-3 text-left transition hover:border-cyan-400/40 hover:bg-cyan-500/5">
+              <div className="flex items-center gap-2 text-xs font-black text-white">{scan.icon}<span>{scan.label}</span></div>
+              <p className="mt-1 text-[9px] leading-4 text-slate-500">{scan.note}</p>
+              <span className="mt-2 inline-flex items-center gap-1 text-[9px] font-bold text-cyan-300"><ExternalLink className="h-3 w-3" />ดูผลใกล้ตำแหน่งใน Google Maps</span>
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3 text-[9px] leading-4 text-slate-500">
+          หน้าจอ RADAR นี้ไม่ฝังแผนที่จาก provider อื่นและไม่ใช้ Google Maps JavaScript API ใน browser. รายชื่อ/ตำแหน่งล่าสุดของ Google จะแสดงเมื่อเปิดผลการค้นหาภายนอกตามคำค้นที่เลือก.
+        </div>
+        <button type="button" onClick={() => open(hasGps ? `https://www.google.com/maps/search/?api=1&query=${gpsState.latitude},${gpsState.longitude}` : makeUrl('สถานที่สำคัญ'))} className="mt-3 w-full rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-black text-slate-950"><Navigation className="mr-2 inline h-4 w-4" />เปิดตำแหน่งใน Google Maps</button>
       </div>
     </div>
   );
