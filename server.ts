@@ -1438,9 +1438,11 @@ app.post("/api/ai/test-ping", rateLimit(10), async (_req, res) => {
 app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim();
-  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim();
-  return res.json({ configured: true, promptPayId, accountName });
+  const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "").trim();
+  const bankName = String(process.env.ADMIN_BANK_NAME || "").trim();
+  const bankAccountNumber = String(process.env.ADMIN_BANK_ACCOUNT_NUMBER || "").replace(/[^0-9]/g, "");
+  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
+  return res.json({ configured: Boolean(bankAccountNumber || promptPayId), promptPayId, bankName, bankAccountNumber, accountName, topupMethod: bankAccountNumber ? "bank_account" : "promptpay" });
 });
 
 const WALLET_ROLE_PREFIX: Record<string, string> = {
@@ -1653,8 +1655,10 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
       // index or fetch fallback
     }
 
-    const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim();
-    const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim();
+    const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "").trim();
+    const bankName = String(process.env.ADMIN_BANK_NAME || "").trim();
+    const bankAccountNumber = String(process.env.ADMIN_BANK_ACCOUNT_NUMBER || "").replace(/[^0-9]/g, "");
+    const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
 
     return res.json({
       userId: user.uid,
@@ -1662,7 +1666,7 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
       role: walletIdentity.role,
       balanceSatang,
       balance: balanceSatang / 100,
-      systemPromptPay: { configured: true, promptPayId, accountName },
+      systemPromptPay: { configured: Boolean(bankAccountNumber || promptPayId), promptPayId, accountName, bankName, bankAccountNumber },
       submissions,
       withdrawals
     });
@@ -1675,9 +1679,11 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
       balanceSatang: 0,
       balance: 0.0,
       systemPromptPay: {
-        configured: Boolean(process.env.ADMIN_PROMPTPAY_ID),
+        configured: Boolean(process.env.ADMIN_BANK_ACCOUNT_NUMBER || process.env.ADMIN_PROMPTPAY_ID),
         promptPayId: String(process.env.ADMIN_PROMPTPAY_ID || "").trim(),
-        accountName: String(process.env.ADMIN_BANK_ACCOUNT_NAME || "WINRIDER.AI SYSTEM WALLET").trim()
+        bankName: String(process.env.ADMIN_BANK_NAME || "").trim(),
+        bankAccountNumber: String(process.env.ADMIN_BANK_ACCOUNT_NUMBER || "").replace(/[^0-9]/g, ""),
+        accountName: String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim()
       },
       submissions: [],
       withdrawals: []
