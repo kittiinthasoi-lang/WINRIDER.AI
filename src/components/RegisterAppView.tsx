@@ -1406,9 +1406,9 @@ export const RegisterAppView: React.FC<RegisterAppViewProps> = ({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-black text-white">ลงทะเบียนและยืนยันตัวตนด้วย AI สำเร็จ!</h3>
+                  <h3 className="text-xl font-black text-white">ลงทะเบียนและตรวจภาพใบหน้าด้วย AI สำเร็จ!</h3>
                   <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
-                    AI VERIFIED: 99.8%
+                    AI PHOTO CHECK
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 font-mono">
