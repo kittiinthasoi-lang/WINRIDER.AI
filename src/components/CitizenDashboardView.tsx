@@ -353,18 +353,18 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
               <div className="flex items-center gap-2">
                 <Bike className="w-4 h-4 text-[#00D4FF]" />
-                <span className="text-xs font-bold text-white">{activeTrip.knightName}</span>
+                <span className="text-xs font-bold text-white">{activeTrip.driverName || 'กำลังค้นหาพี่วิน'}</span>
               </div>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono">
                 {activeTrip.status}
               </span>
             </div>
             <p className="text-[11px] text-gray-300">
-              กำลังเดินทางมารับที่: {activeTrip.originName}
+              กำลังเดินทางมารับที่: {activeTrip.pickupLocation}
             </p>
             <div className="flex items-center justify-between pt-1 text-xs">
               <span className="text-gray-400">ประมาณการเวลา:</span>
-              <span className="font-bold text-[#00D4FF]">3-5 นาที</span>
+              <span className="font-bold text-[#00D4FF]">{activeTrip.estMinutes > 0 ? `${activeTrip.estMinutes} นาที` : 'กำลังคำนวณ'}</span>
             </div>
           </motion.div>
         )}
