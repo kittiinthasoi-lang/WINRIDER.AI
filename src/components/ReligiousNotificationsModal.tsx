@@ -207,7 +207,7 @@ export const ReligiousNotificationsModal: React.FC<ReligiousNotificationsModalPr
           <div className="flex items-center gap-3 pr-10">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-300/10 overflow-hidden shadow-sm">
               <img 
-                src="/images/faith_religion.jpg?v=2" 
+                src={WIN_IMAGES.faith.religion} 
                 alt="Faith & Sacred" 
                 className="w-full h-full object-cover" 
                 referrerPolicy="no-referrer"
