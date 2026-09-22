@@ -221,6 +221,12 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
     return;
   }
 
+  const tipSatang = Math.round(Number(afterData.tipAmount || 0) * 100);
+  if (!Number.isInteger(tipSatang) || tipSatang < 0 || tipSatang > 1000000) {
+    console.warn(`[onTripCompleted] Ride ${rideId} has invalid tipAmount: ${afterData.tipAmount}`);
+    return;
+  }
+
   const currentDateKey = getBangkokDateString();
 
   // รัน Firestore Transaction แบบอะตอมิกทั้งหมด
@@ -273,6 +279,17 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
       amountSatang: feeResult.netKnightEarningsSatang,
       descriptionTh: `รับค่าโดยสารสุทธิ ทริป #${rideId}`
     });
+
+    // [CREDIT] ทิปเข้าพี่วิน 100% โดยไม่หักค่าธรรมเนียม
+    if (tipSatang > 0) {
+      ledgerLegs.push({
+        accountId: knightId,
+        accountType: 'KNIGHT_WALLET',
+        direction: 'CREDIT',
+        amountSatang: tipSatang,
+        descriptionTh: `ทิปพี่วิน 100% ทริป #${rideId}`
+      });
+    }
 
     // [CREDIT] เข้าถังระบบ (System Platform Pool)
     if (feeResult.combinedBuckets.system > 0) {
@@ -377,7 +394,7 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
     const currentKnightBalance = Number(knightWalletData.balanceSatang || 0);
     const currentKnightLocked = Number(knightWalletData.lockedSatang || 0);
     const currentKnightPension = Number(knightWalletData.buckets?.pension || 0);
-    const newKnightBalance = currentKnightBalance + feeResult.netKnightEarningsSatang;
+    const newKnightBalance = currentKnightBalance + feeResult.netKnightEarningsSatang + tipSatang;
 
     transaction.set(
       knightWalletRef,
@@ -437,6 +454,13 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
       referenceId: rideId,
       citizenId,
       knightId,
+      fareSatang: feeResult.fareSatang,
+      tipSatang,
+      citizenFeeSatang: feeResult.citizenFeeSatang,
+      citizenTotalPaidSatang: feeResult.totalCitizenPaySatang + tipSatang,
+      knightFeeSatang: feeResult.knightFeeSatang,
+      equipmentFeeSatang: feeResult.equipmentFeeSatang,
+      knightPayoutSatang: feeResult.netKnightEarningsSatang + tipSatang,
       fareSatang,
       totalDebitSatang,
       totalCreditSatang,
@@ -468,6 +492,14 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
     transaction.update(rideRef, {
       settled: true,
       ledgerTransactionId: ledgerRef.id,
+      settlementStatus: "SETTLED",
+      fareSatang: feeResult.fareSatang,
+      tipSatang,
+      citizenFeeSatang: feeResult.citizenFeeSatang,
+      citizenTotalPaidSatang: feeResult.totalCitizenPaySatang + tipSatang,
+      knightFeeSatang: feeResult.knightFeeSatang,
+      equipmentFeeSatang: feeResult.equipmentFeeSatang,
+      knightPayoutSatang: feeResult.netKnightEarningsSatang + tipSatang,
       feeSettledAt: FieldValue.serverTimestamp()
     });
   });
