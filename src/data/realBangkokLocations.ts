@@ -258,9 +258,7 @@ export function calculateHaversineKm(lat1: number, lon1: number, lat2: number, l
     Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const straightKm = R * c;
-  // Multiply by road tortuosity factor (~1.35x for Bangkok's dense soi network)
-  return Math.max(1.1, Number((straightKm * 1.35).toFixed(1)));
+  return Number((R * c).toFixed(2));
 }
 
 /**
