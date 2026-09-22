@@ -1,4 +1,5 @@
-import React from 'react';\nimport { WIN_IMAGES } from '../data/imageRegistry';
+import React from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 
 export interface CyberGraphicProps {
   emoji?: string;
