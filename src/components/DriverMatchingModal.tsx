@@ -378,14 +378,14 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
       setRoutesError('');
       try {
         const user = getAuth().currentUser;
-        if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนคำนวณระยะทางจริง');
+        if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนคำนวณระยะทางประมาณการ');
         const response = await fetch('/api/places/resolve-routes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
           body: JSON.stringify({ latitude: geo.latitude, longitude: geo.longitude, places: activeRouteRequests }),
         });
         const payload = await response.json() as { routes?: Array<{ key: string; distanceKm: number; etaMinutes: number | null; address: string }>; error?: string };
-        if (!response.ok) throw new Error(payload.error || 'คำนวณระยะทางจริงไม่สำเร็จ');
+        if (!response.ok) throw new Error(payload.error || 'คำนวณระยะทางประมาณการไม่สำเร็จ');
         if (!cancelled) {
           setResolvedRoutes(Object.fromEntries((payload.routes || []).map((route) => [route.key, route])));
         }
@@ -1238,7 +1238,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                         </div>
 
                         <div className="text-right font-mono flex-shrink-0">
-                          <span className="text-xs font-bold text-[#FFD700] block">{routeFare !== null ? `ประมาณ ฿${routeFare}` : 'รอเส้นทางจริง'}</span>
+                          <span className="text-xs font-bold text-[#FFD700] block">{routeFare !== null ? `ประมาณ ฿${routeFare}` : 'รอข้อมูลระยะทาง'}</span>
                           <span className="text-[9px] text-emerald-400">{route ? `ประมาณ ${route.distanceKm} กม. • ประมาณ ${route.etaMinutes || '—'} นาที` : 'ยังไม่มีข้อมูลระยะทาง'}</span>
                         </div>
                       </div>
