@@ -144,10 +144,40 @@ export async function searchDestinationsFromGps(params: {
       const dist = calculateDistanceKm(params.latitude, params.longitude, place.lat, place.lng);
       localMatches.push({
         ...place,
-        distanceKm: dist,
-        etaMinutes: Math.max(3, Math.ceil(dist * 3.5)),
+        distanceKm: undefined,
+        etaMinutes: null,
       });
     }
+  }
+
+  // 2. Admin-verified public Thai destinations (TAT). No fake coordinates or fares are created here.
+  try {
+    const response = await fetch('/api/public-data/places?kind=attractions&query=' + encodeURIComponent(params.query) + '&limit=20', {
+      headers: { Accept: 'application/json' }
+    });
+    if (response.ok) {
+      const payload = await response.json() as { records?: Array<{ id:string; name:string; category?:string; address?:string; province?:string; district?:string; latitude:number; longitude:number }> };
+      for (const record of payload.records || []) {
+        if (!Number.isFinite(record.latitude) || !Number.isFinite(record.longitude)) continue;
+        if (!localMatches.some((lm) => Math.abs(lm.lat - record.latitude) < 0.001 && Math.abs(lm.lng - record.longitude) < 0.001)) {
+          localMatches.push({
+            id: String(record.id),
+            name: String(record.name),
+            nameEn: '',
+            category: String(record.category || 'แหล่งท่องเที่ยว'),
+            lat: Number(record.latitude),
+            lng: Number(record.longitude),
+            address: [record.address, record.district, record.province].filter(Boolean).join(' '),
+            landmark: '',
+            placeId: String(record.id),
+            distanceKm: undefined,
+            etaMinutes: null,
+          });
+        }
+      }
+    }
+  } catch {
+    // Public-data service is optional; never fabricate a destination when it is unavailable.
   }
 
   // 2. Optionally attempt authenticated server-side places search for expanded coverage
