@@ -1571,7 +1571,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 aria-label="สั่งการด้วยเสียงลูกค้าเพื่อใช้งานแอป"
               >
                 <img 
-                  src="/images/voice_command.jpg?v=2" 
+                  src={WIN_IMAGES.cyber.voice} 
                   alt="สั่งการด้วยเสียง AI" 
                   className="w-6 h-6 rounded-md object-cover animate-pulse group-hover:scale-110 transition-transform shadow-sm"
                   onError={(e) => {
@@ -1594,7 +1594,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                 aria-label="เปิดศูนย์แจ้งเตือนศาสนาและวันสำคัญ"
               >
                 <img 
-                  src="/images/faith_religion.jpg?v=2" 
+                  src={WIN_IMAGES.faith.religion} 
                   alt="ศูนย์แจ้งเตือนศาสนาและวันสำคัญ" 
                   className="w-6 h-6 rounded-md object-cover group-hover:scale-110 transition-transform shadow-sm"
                   onError={(e) => {
