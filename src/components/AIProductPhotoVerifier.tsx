@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { playTactileBlip, playLevelUpFanfare, playRadarScan } from '../utils/audio';
 import confetti from 'canvas-confetti';
+import { getAuth } from 'firebase/auth';
+import { uploadProductImage } from '../utils/imageUpload';
 
 export interface AIVerificationResult {
   isVerified: boolean;
@@ -81,63 +83,65 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
     setVerificationResult(null);
   };
 
-  const handleStartAIVerification = () => {
+  const handleStartAIVerification = async () => {
     if (!selectedImage) {
       alert('กรุณาถ่ายรูปหรืออัปโหลดรูปภาพสินค้าก่อนเริ่มการตรวจสอบด้วย AI');
+      return;
+    }
+    const user = getAuth().currentUser;
+    if (!user) {
+      alert('กรุณาเข้าสู่ระบบก่อนตรวจสอบสินค้า');
       return;
     }
 
     if (audioEnabled) playRadarScan();
     setIsScanning(true);
-    setScanProgress(10);
-    setScanStepLabel('กำลังเชื่อมต่อเครือข่าย AI Vision Guard Neural Engine...');
+    setScanProgress(15);
+    setScanStepLabel('กำลังส่งภาพสินค้าจริงให้ WIN-AI Vision ตรวจสอบ...');
 
-    const steps = [
-      { p: 25, label: 'กำลังสแกนโครงสร้างพิกเซลและแสงสะท้อนของวัตถุจริง (Real Photo Check)...' },
-      { p: 50, label: 'ตรวจจับหมวดหมู่, สภาพสินค้า, และคัดกรองสินค้าต้องห้าม (Safety Screening)...' },
-      { p: 75, label: 'เปรียบเทียบมาตรฐานราคาตลาดและประเมินเกรดคุณภาพ (Quality Grading)...' },
-      { p: 100, label: 'อนุมัติการตรวจสอบและประทับตรารับรอง AI Verified Badge ✨' }
-    ];
-
-    let currentStep = 0;
-    const interval = setInterval(() => {
-      if (currentStep < steps.length) {
-        setScanProgress(steps[currentStep].p);
-        setScanStepLabel(steps[currentStep].label);
-        if (audioEnabled) playTactileBlip(800 + currentStep * 150);
-        currentStep++;
-      } else {
-        clearInterval(interval);
-        setIsScanning(false);
-
-        // Generate verified result
-        const certificateId = `WIN-AI-CERT-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 900 + 100)}`;
-        const matchedSample = SAMPLE_ITEMS.find(s => s.img === selectedImage);
-        
-        const result: AIVerificationResult = {
-          isVerified: true,
-          certificateId,
-          imageUrl: selectedImage,
-          imageIcon: selectedEmoji,
-          detectedTitle: matchedSample?.name || initialItemName || 'สินค้าคุณภาพผ่านการตรวจรับรอง',
-          detectedCategory: matchedSample?.category || initialCategory || 'ของใช้ & สินค้าทั่วไป',
-          detectedCondition: matchedSample?.cond || 'ผ่านการตรวจสภาพเรียบร้อย',
-          qualityScore: Number((98.5 + Math.random() * 1.4).toFixed(1)),
-          authenticityScore: Number((99.0 + Math.random() * 0.9).toFixed(1)),
-          safetyPassed: true,
-          fairPriceRange: matchedSample 
-            ? { min: matchedSample.priceMin, max: matchedSample.priceMax }
-            : { min: 80, max: 250 },
-          tags: matchedSample?.tags || ['AI Verified', 'ผ่านการตรวจสอบ', 'พร้อมจัดส่ง'],
-          aiAnalysisNotes: 'ภาพถ่ายวัตถุจริงชัดเจน ไม่มีรอยแก้ไขปลอมแปลง ปราศจากสารอันตราย พร้อมสำหรับการลงขายในระบบ WIN Street Market'
-        };
-
-        setVerificationResult(result);
-        if (audioEnabled) playLevelUpFanfare();
-        confetti({ particleCount: 50, spread: 70, colors: ['#00D2FF', '#FFD700', '#10B981'] });
-        onVerificationComplete(result);
+    try {
+      const response = await fetch('/api/ai/product-photo-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({
+          imageDataUrl: selectedImage,
+          itemName: initialItemName,
+          category: initialCategory
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.result) {
+        throw new Error(payload.error || 'AI ตรวจสอบสินค้าไม่สำเร็จ');
       }
-    }, 600);
+
+      setScanProgress(100);
+      setScanStepLabel('WIN-AI Vision ตรวจสอบภาพจริงเสร็จแล้ว');
+      let storedImageUrl = selectedImage;
+      try {
+        const responseBlob = await fetch(selectedImage);
+        const blob = await responseBlob.blob();
+        const file = new File([blob], `product-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+        storedImageUrl = await uploadProductImage(user.uid, file);
+      } catch (uploadError) {
+        console.warn('Product image storage upload failed:', uploadError);
+        throw new Error('ไม่สามารถบันทึกรูปสินค้าเข้าสู่คลังรูปภาพได้ จึงยังไม่อนุญาตให้ลงขาย');
+      }
+
+      const result: AIVerificationResult = {
+        ...payload.result,
+        imageUrl: storedImageUrl,
+        imageIcon: '📸'
+      };
+      setVerificationResult(result);
+      if (audioEnabled) playLevelUpFanfare();
+      onVerificationComplete(result);
+    } catch (error: any) {
+      setVerificationResult(null);
+      setScanStepLabel(String(error?.message || 'ตรวจสอบสินค้าไม่สำเร็จ'));
+      alert(String(error?.message || 'WIN-AI ไม่สามารถตรวจสอบสินค้าได้ กรุณาลองใหม่'));
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   return (
@@ -156,7 +160,7 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
               </span>
             </h4>
             <p className="text-[10px] text-slate-400 font-mono">
-              ระบบตรวจสอบความถูกต้อง ภาพถ่ายจริง และป้องกันสินค้าปลอมแปลง 100%
+              ระบบวิเคราะห์ภาพสินค้าจริงด้วย WIN-AI Vision • ผล AI ไม่ใช่การรับประกันความแท้ 100%
             </p>
           </div>
         </div>
