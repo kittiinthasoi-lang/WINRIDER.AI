@@ -1097,6 +1097,38 @@ async function generateWithGemini(contents: any, config: any) {
   throw lastError || new Error("ALL_MODELS_FAILED");
 }
 
+app.post("/api/ai/face-photo-verify", rateLimit(10), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const image = decodeImageDataUrl(req.body?.imageDataUrl);
+  if (!image) return res.status(400).json({ error: "รูปใบหน้าต้องเป็น JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB", errorCode: "INVALID_IMAGE" });
+  const ai = getAiClient();
+  if (!ai) return res.status(503).json({ error: "WIN-AI Vision ยังไม่ได้ตั้งค่า GEMINI_API_KEY", errorCode: "MISSING_API_KEY" });
+  try {
+    const response = await generateWithGemini([{ role: "user", parts: [
+      { text: "ตรวจภาพสำหรับการลงทะเบียนผู้ใช้เท่านั้น ห้ามอ้างว่าเป็นการยืนยันตัวบุคคลหรือ liveness จากภาพเดียว ตอบ JSON: {faceVisible:boolean, qualityScore:number, notes:string}. faceVisible ต้อง true เฉพาะเมื่อเห็นใบหน้ามนุษย์ชัดเจน; qualityScore 0-100 คือคุณภาพภาพเท่านั้น" },
+      { inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") } }
+    ]}], { responseMimeType: "application/json", temperature: 0, maxOutputTokens: 300 });
+    const parsed = JSON.parse(response.text.trim());
+    const qualityScore = Math.max(0, Math.min(100, Number(parsed.qualityScore) || 0));
+    const faceVisible = parsed.faceVisible === true;
+    const faceHash = crypto.createHash("sha256").update(image.buffer).digest("hex");
+    const certificateId = faceVisible && qualityScore >= 60 ? "WIN-FACE-" + crypto.randomBytes(10).toString("hex").toUpperCase() : "";
+    if (certificateId) await ordersDb.collection("ai_verification_certificates").doc(certificateId).set({
+      certificateId, userId: user.uid, kind: "face_photo_quality", verified: true, imageHash: faceHash,
+      model: response.model, createdAt: FieldValue.serverTimestamp()
+    });
+    return res.json({ result: {
+      faceVisible, qualityScore, faceHash, certificateId,
+      livenessPassed: false,
+      notes: String(parsed.notes || "ตรวจภาพใบหน้าด้วย AI สำเร็จ แต่ไม่ได้ยืนยัน liveness หรือ identity จากภาพเดียว")
+    }, model: response.model, userId: user.uid });
+  } catch (error: any) {
+    const classified = classifyGeminiError(error);
+    return res.status(classified.errorCode === "TIMEOUT" ? 504 : 503).json({ error: classified.message, errorCode: classified.errorCode, canRetry: true });
+  }
+});
+
 app.post("/api/ai/product-photo-verify", rateLimit(10), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
