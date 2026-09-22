@@ -46,7 +46,7 @@ React 19 + Vite
 - **Backend:** Node.js 20+, Express 4
 - **Database/Auth:** Firebase / Firestore / Firebase Authentication
 - **Serverless:** Firebase Functions
-- **Maps:** Google Maps / Google Maps Platform Routes API
+- **Maps:** Google Maps / Google Maps Platform (Routes API currently disabled for billing safety)
 - **AI:** Google GenAI
 - **Charts/UI:** Recharts, Lucide React, Motion
 - **PWA:** vite-plugin-pwa
