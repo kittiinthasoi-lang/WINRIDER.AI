@@ -125,7 +125,7 @@ export function buildWebhookPayload(params: {
     new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
     params.serviceTitle,
     params.passengerName,
-    params.passengerPhone || '08X-XXX-XXXX',
+    params.passengerPhone || '',
     params.pickupLocation,
     params.dropoffLocation,
     params.distanceKm.toFixed(1),
