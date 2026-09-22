@@ -11,8 +11,8 @@ interface PersonalNavigationScreenProps {
 }
 
 /**
- * Personal/free navigation shared by customers and Knights.
- * It is intentionally independent from an order: GPS -> destination search -> Routes API.
+ * Personal/free destination lookup shared by customers and Knights.
+ * Uses GPS + Google Places for destination resolution; road routing is unavailable while Routes API is disabled.
  */
 export const PersonalNavigationScreen: React.FC<PersonalNavigationScreenProps> = ({
   role,
