@@ -364,7 +364,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
         }
       }
     } catch (e) {
-      console.warn('Google Routes API compute error:', e);
+      console.warn('Navigation route calculation unavailable:', e);
     } finally {
       setIsComputingRoute(false);
     }
@@ -716,7 +716,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
       </div>
 
       {/* ========================================================================= */}
-      {/* 1.5 GOOGLE MAPS ROUTES API (NEW) - LIVE NAVIGATION COMMAND DECK */}
+      {/* 1.5 NAVIGATION STATUS - GOOGLE ROUTES API TEMPORARILY DISABLED */}
       {/* Source: Google Maps Platform Code Assist (gmp_mcp_codeassist_v1_aistudio) */}
       {/* ========================================================================= */}
       <div className="w-full bg-[#0A1633]/95 border border-cyan-500/40 rounded-2xl p-3 shadow-[0_0_25px_rgba(0,210,255,0.15)] backdrop-blur-md font-mono">
