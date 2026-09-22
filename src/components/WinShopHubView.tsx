@@ -167,7 +167,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
               </div>
               <h2 className="text-2xl font-black tracking-tight text-white">ร้านค้า • พาร์ทเนอร์ • WIN Street Market</h2>
               <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-300">
-                ศูนย์รวมโปรไฟล์ธุรกิจในระบบ WIN และสินค้าที่ประชาชนลงขายเอง — เรียงร้านค้าที่มีเส้นทางจริงใกล้คุณก่อน
+                ศูนย์รวมโปรไฟล์ธุรกิจในระบบ WIN และสินค้าที่ประชาชนลงขายเอง — เรียงตามระยะเส้นตรงโดยประมาณจากตำแหน่งคุณก่อน
               </p>
             </div>
             {onBackToMain && <button type="button" onClick={onBackToMain} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black text-white hover:bg-white/10">← กลับหน้าหลัก</button>}
@@ -206,7 +206,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
                   className="w-full rounded-xl border border-white/10 bg-[#050C1B] py-3 pl-10 pr-3 text-sm text-white outline-none focus:border-cyan-400" />
               </label>
               <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-mono text-slate-400">
-                {geo.isRealGps ? '📍 ใช้เส้นทางจริงจากตำแหน่งคุณ' : '📍 เปิดตำแหน่งเพื่อเรียงตามระยะทางจริง'}
+                {geo.isRealGps ? '📍 ใช้ระยะเส้นตรงโดยประมาณจากตำแหน่งคุณ' : '📍 เปิดตำแหน่งเพื่อเรียงตามระยะทางโดยประมาณ'}
               </div>
             </div>
           </section>
