@@ -100,8 +100,12 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
     setLoading(true);
     setErrorMessage('');
     try {
-      const params = new URLSearchParams({ date: today, country: 'TH' });
-      const response = await fetch(`/api/events/daily?${params.toString()}`, { headers: { Accept: 'application/json' } });
+      const apiUrl = `/api/events/daily?date=${encodeURIComponent(today)}&country=TH`;
+      const response = await fetch(apiUrl, { headers: { Accept: 'application/json' } });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('เซิร์ฟเวอร์ Win Alert ไม่ได้ส่งข้อมูล JSON');
+      }
       const data = await response.json() as NearbyEventsResponse & { message?: string };
       if (!response.ok) throw new Error(data.message || 'โหลด Win Alert ประจำวันไม่สำเร็จ');
       const realEvents = Array.isArray(data.events) ? data.events : [];
