@@ -465,7 +465,7 @@ export const WinAiAssistantPanel: React.FC<Props> = ({ mode: propMode, onModeCha
                 )}
 
                 {/* Text Content */}
-                <div className="text-sm leading-relaxed whitespace-pre-wrap select-text">
+                <div className="text-[15px] sm:text-base leading-relaxed whitespace-pre-wrap select-text">
                   {msg.text}
                 </div>
 
