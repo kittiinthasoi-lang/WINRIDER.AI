@@ -65,6 +65,7 @@ export interface StoreCatalogProduct {
   originalPrice: number;
   discountBadge?: string;
   imageIcon: string;
+  imageUrl?: string;
   description: string;
   stock: number;
   soldCount: number;
@@ -386,7 +387,8 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
       price: parseFloat(newProdPrice) || 199,
       originalPrice: parseFloat(newProdOrigPrice) || (parseFloat(newProdPrice) * 1.3),
       discountBadge: newProdOrigPrice ? `ลด ${Math.round((1 - (parseFloat(newProdPrice) / parseFloat(newProdOrigPrice))) * 100)}%` : undefined,
-      imageIcon: newProdAiVerified?.imageIcon || '🎁',
+      imageIcon: newProdAiVerified?.imageIcon || '📸',
+      imageUrl: newProdAiVerified?.imageUrl,
       description: newProdDesc || 'สินค้าคุณภาพดี การันตีมาตรฐานโดยร้านค้าพันธมิตร',
       stock: parseInt(newProdStock) || 20,
       soldCount: 0,
@@ -1088,7 +1090,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
                     <div key={sale.id} className="p-4 rounded-2xl bg-[#060D1E] border border-cyan-500/30 space-y-3">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2.5">
-                          <CyberGraphic emoji={sale.imageIcon} size="md" rounded="rounded-xl" className="w-10 h-10" />
+                          {sale.imageUrl ? <img src={sale.imageUrl} alt={sale.title} className="w-10 h-10 rounded-xl object-cover border border-white/10" /> : <CyberGraphic emoji={sale.imageIcon} size="md" rounded="rounded-xl" className="w-10 h-10" />}
                           <div>
                             <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/5 text-cyan-300 border border-white/10">
                               {sale.category}
@@ -1200,7 +1202,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
                   {cart.map(item => (
                     <div key={item.product.id} className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5">
-                        <CyberGraphic emoji={item.product.imageIcon} size="md" rounded="rounded-xl" className="w-10 h-10" />
+                        {item.product.imageUrl ? <img src={item.product.imageUrl} alt={item.product.title} className="w-10 h-10 rounded-xl object-cover border border-white/10" /> : <CyberGraphic emoji={item.product.imageIcon} size="md" rounded="rounded-xl" className="w-10 h-10" />}
                         <div>
                           <h5 className="text-xs font-bold text-white line-clamp-1">{item.product.title}</h5>
                           <p className="text-xs text-amber-400 font-mono font-bold">฿{item.product.price.toLocaleString()}</p>
