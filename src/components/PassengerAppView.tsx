@@ -671,7 +671,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(0, 210, 255, 0.8)',
       desc: 'อัศวินประจำตัวพร้อมพาหนะที่คุณเลือก ทั่วกรุงเทพฯ เริ่มต้น 15฿ ปลอดภัย 100%',
       icon: <Shield className="w-6 h-6 text-[#00D2FF] drop-shadow-[0_0_10px_rgba(0,210,255,0.95)]" />,
-      imageUrl: '/images/pillar_knight.jpg',
+      imageUrl: WIN_IMAGES.pillars.knight,
       badge: 'เริ่ม 15฿',
       bgGlow: 'from-[#00D2FF]/25 to-transparent',
       eta: '2-3 นาที',
@@ -692,7 +692,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(255, 107, 0, 0.8)',
       desc: 'ส่งด่วนใน 30 นาที ปรับลดค่ากล่องเหลือ 5฿ เพื่อประชาชน พี่วินเลเวล 10+ พร้อมกล่องควบคุมอุณหภูมิและกันกระแทก',
       icon: <Zap className="w-6 h-6 text-orange-400 drop-shadow-[0_0_10px_rgba(255,107,0,0.95)]" />,
-      imageUrl: '/images/pillar_express.jpg',
+      imageUrl: WIN_IMAGES.pillars.express,
       badge: '+5฿ ค่ากล่อง (LV.10+)',
       bgGlow: 'from-orange-500/25 to-transparent',
       eta: '1-3 นาที',
@@ -713,7 +713,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(16, 185, 129, 0.8)',
       desc: 'เบาะนิรภัยสำหรับสัตว์เลี้ยง ส่งตรงโรงพยาบาลสัตว์และคลินิกฉุกเฉิน 24 ชม. ตลอดวัน',
       icon: <Dog className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.95)]" />,
-      imageUrl: '/images/pillar_petcare.jpg',
+      imageUrl: WIN_IMAGES.pillars.petcare,
       badge: '24H VET CARE',
       bgGlow: 'from-emerald-400/25 to-transparent',
       eta: 'ประมาณการจาก GPS',
@@ -734,7 +734,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(168, 85, 247, 0.8)',
       desc: 'ระบบแนะนำและจับคู่พี่วินผู้หญิงที่เหมาะสม เลเวล 15+ พร้อมเส้นทางสายมูและบทสวด (ชายจับคู่ชาย หรือเลือกเองพร้อมระบบขอความสมัครใจ)',
       icon: <Sparkles className="w-6 h-6 text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.95)]" />,
-      imageUrl: '/images/pillar_mubuddy.jpg',
+      imageUrl: WIN_IMAGES.pillars.mubuddy,
       badge: 'พี่วินหญิง LV.15+ (ชายคู่ชาย)',
       bgGlow: 'from-purple-500/25 to-transparent',
       eta: '4-8 นาที',
@@ -755,7 +755,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(236, 72, 153, 0.8)',
       desc: 'แนะนำร้านอาหารเด็ด คาเฟ่ ผับบาร์ ร้านนั่งชิว คาเฟ่หมาแมว และจุดเช็คอินยอดนิยม พร้อมบริการถ่ายรูป',
       icon: <Coffee className="w-6 h-6 text-pink-400 drop-shadow-[0_0_10px_rgba(236,72,153,0.95)]" />,
-      imageUrl: '/images/pillar_lifestyle.jpg',
+      imageUrl: WIN_IMAGES.pillars.lifestyle,
       badge: 'CAFE & BAR GUIDE',
       bgGlow: 'from-pink-500/25 to-transparent',
       eta: '2-4 นาที',
@@ -776,7 +776,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(250, 204, 21, 0.8)',
       desc: 'คัดกรองพี่วินเลเวล 20+ อบรมดูแลผู้สูงอายุ พาไปทำศาสนกิจทุกศาสนา (มัสยิด, วัด, โบสถ์, ศาลเจ้า) พร้อมรอรับกลับ',
       icon: <Heart className="w-6 h-6 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.95)]" />,
-      imageUrl: '/images/pillar_spirit.jpg',
+      imageUrl: WIN_IMAGES.pillars.spirit,
       badge: 'อบรมพิเศษ LV.20+ (ทุกศาสนา)',
       bgGlow: 'from-yellow-400/25 to-transparent',
       eta: '3-5 นาที',
@@ -797,7 +797,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(56, 189, 248, 0.8)',
       desc: 'พี่วินเลเวล 15+ ผ่านการอบรมดูแลเด็ก รับส่งไปโรงเรียน หมวกกันน็อกเด็ก พร้อมติดตาม GPS สด',
       icon: <Users className="w-6 h-6 text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.95)]" />,
-      imageUrl: '/images/pillar_family.jpg',
+      imageUrl: WIN_IMAGES.pillars.family,
       badge: 'อบรมดูแลเด็ก LV.15+',
       bgGlow: 'from-sky-400/25 to-transparent',
       eta: '3-5 นาที',
@@ -818,7 +818,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorGlow: 'rgba(132, 204, 22, 0.8)',
       desc: 'พี่วินช่วยจองตั๋วคอนเสิร์ต กีฬา อีเวนต์ ต่อคิวรับบัตรจริง & เชื่อมต่อสถานีรถไฟฟ้า BTS/MRT ทุกสาย รถไฟ รถเมล์ เรือ ทั่วกรุงเทพฯ',
       icon: <Share2 className="w-6 h-6 text-lime-400 drop-shadow-[0_0_10px_rgba(132,204,22,0.95)]" />,
-      imageUrl: '/images/pillar_link.jpg',
+      imageUrl: WIN_IMAGES.pillars.link,
       badge: 'จองตั๋วคอนเสิร์ต/กีฬา & BTS/MRT',
       bgGlow: 'from-lime-400/25 to-transparent',
       eta: '2-3 นาที',
@@ -1571,7 +1571,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   alt="สั่งการด้วยเสียง AI" 
                   className="w-6 h-6 rounded-md object-cover animate-pulse group-hover:scale-110 transition-transform shadow-sm"
                   onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = '/images/voice-command-header.svg';
+                    (e.currentTarget as HTMLImageElement).src = WIN_IMAGES.cyber.voiceHeader;
                   }}
                   referrerPolicy="no-referrer"
                 />
@@ -2428,7 +2428,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                                     referrerPolicy="no-referrer"
                                     onError={(e) => {
                                       e.currentTarget.onerror = null;
-                                      e.currentTarget.src = '/images/shop_comm_intercom.jpg';
+                                      e.currentTarget.src = WIN_IMAGES.shop.commIntercom;
                                     }}
                                   />
                                 ) : (
@@ -2491,7 +2491,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                                     referrerPolicy="no-referrer"
                                     onError={(e) => {
                                       e.currentTarget.onerror = null;
-                                      e.currentTarget.src = '/images/cyber_coins.jpg';
+                                      e.currentTarget.src = WIN_IMAGES.cyber.coins;
                                     }}
                                   />
                                 ) : (
@@ -3764,7 +3764,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
-                        e.currentTarget.src = '/images/shop_comm_intercom.jpg';
+                        e.currentTarget.src = WIN_IMAGES.shop.commIntercom;
                       }}
                     />
                   ) : (
@@ -3794,7 +3794,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   referrerPolicy="no-referrer"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = '/images/shop_comm_intercom.jpg';
+                    e.currentTarget.src = WIN_IMAGES.shop.commIntercom;
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0A1428] via-transparent to-black/20 pointer-events-none" />
