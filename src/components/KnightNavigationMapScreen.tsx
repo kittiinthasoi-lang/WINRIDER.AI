@@ -371,7 +371,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   };
 
   // Search a real destination by name/address using the Knight's current GPS.
-  // Results come from Google Places (New); the selected result is then routed by Google Routes API.
+  // Results come from Google Places (New); road routing is opened separately in Google Maps while Routes API is disabled.
   const handleSearchDestination = async () => {
     const query = destinationSearchQuery.trim();
     if (query.length < 2) {
