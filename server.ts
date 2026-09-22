@@ -762,16 +762,12 @@ function classifyRealEvent(category: string, title: string, labels: string[] = [
 }
 
 app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
-  if (FREE_ONLY_MODE) {
-    return res.status(503).json({
-      error: "FREE_ONLY_MODE",
-      message: "บริการภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย"
-    });
-  }
-  const eventDate = String(req.query.date || "");
+  // Free-only production mode: use only administrator-approved Firestore events.
+  // Paid/third-party event APIs are intentionally not used as a runtime fallback.
+  const eventDate = String(req.query.date || "").trim();
   const country = "TH";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
-    return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง" });
+    return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง", events: [] });
   }
 
   const dayStart = new Date(`${eventDate}T00:00:00+07:00`);
@@ -780,85 +776,71 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
     return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง" });
   }
 
-  const accessToken = process.env.PREDICTHQ_ACCESS_TOKEN?.trim();
-  if (!accessToken) {
+  try {
+    const snapshot = await ordersDb.collection("winAlertEvents").get();
+    const events = snapshot.docs.flatMap((docSnap): NearbyEventResult[] => {
+      const item = docSnap.data() || {};
+      const approved = item.adminApproved === true || item.approved === true || item.status === "approved" || item.status === "active";
+      if (!approved) return [];
+
+      const startAt = String(item.startAt || item.start || "").trim();
+      const endAt = String(item.endAt || item.end || "").trim();
+      const startMs = Date.parse(startAt);
+      const endMs = endAt ? Date.parse(endAt) : startMs;
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return [];
+      const dayStartMs = dayStart.getTime();
+      const dayEndMs = dayEnd.getTime();
+      if (endMs < dayStartMs || startMs > dayEndMs) return [];
+
+      const latitude = Number(item.latitude ?? item.lat);
+      const longitude = Number(item.longitude ?? item.lng ?? item.lon);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
+
+      const id = String(item.id || docSnap.id).trim();
+      const title = String(item.title || item.name || "").trim();
+      if (!id || !title) return [];
+
+      const categoryValue = String(item.category || "other").trim();
+      const allowedCategories: EventCategory[] = ["sale","market","concert","sports","festival","community","other"];
+      const category = allowedCategories.includes(categoryValue as EventCategory)
+        ? categoryValue as EventCategory
+        : classifyRealEvent(categoryValue, title, Array.isArray(item.labels) ? item.labels : []);
+
+      return [{
+        id: `admin-event-${id}`,
+        title,
+        category,
+        venueName: String(item.venueName || item.venue || "").trim(),
+        venueArea: String(item.venueArea || item.area || item.province || "").trim(),
+        latitude,
+        longitude,
+        startAt,
+        endAt: endAt || undefined,
+        description: typeof item.description === "string" ? item.description : undefined,
+        sourceName: "WINRIDER.AI • Admin Verified",
+        providerEventId: id,
+        attendance: Number.isFinite(Number(item.attendance)) && Number(item.attendance) > 0 ? Number(item.attendance) : undefined,
+        rank: Number.isFinite(Number(item.rank)) ? Number(item.rank) : undefined,
+      }];
+    }).sort((a,b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+
+    dailyEventsCache.set(`${country}:${eventDate}`, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
+    return res.json({
+      events,
+      source: "WINRIDER.AI • Admin Verified Firestore",
+      fetchedAt: new Date().toISOString(),
+      eventDate,
+      country,
+      cached: false,
+    });
+  } catch (error) {
+    console.error("[Events API] Firestore read failed:", error instanceof Error ? error.message : error);
     return res.status(503).json({
-      message: "ยังไม่ได้เชื่อม PREDICTHQ_ACCESS_TOKEN สำหรับข้อมูลอีเวนต์จริง",
+      message: "โหลดกิจกรรมจริงจากฐานข้อมูลไม่สำเร็จ",
       events: [],
     });
   }
-
-  const cacheKey = `${country}:${eventDate}`;
-  const cached = dailyEventsCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return res.json({ events: cached.value, source: "PredictHQ Events API", fetchedAt: new Date().toISOString(), eventDate, country, cached: true });
-  }
-
-  const params = new URLSearchParams({
-    country,
-    "active.gte": dayStart.toISOString(),
-    "active.lte": dayEnd.toISOString(),
-    "active.tz": "Asia/Bangkok",
-    category: "concerts,sports,festivals,community,expos,performing-arts",
-    sort: "start",
-    limit: "100",
-  });
-
-  try {
-    const providerResponse = await fetch(`https://api.predicthq.com/v1/events/?${params.toString()}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(12_000),
-    });
-
-    if (!providerResponse.ok) {
-      const providerStatus = providerResponse.status;
-      console.error(`[Events API] PredictHQ returned ${providerStatus}`);
-      return res.status(502).json({ message: "ผู้ให้บริการข้อมูลอีเวนต์จริงไม่พร้อมใช้งาน", events: [] });
-    }
-
-    const payload = await providerResponse.json() as { results?: any[] };
-    const events = (Array.isArray(payload.results) ? payload.results : []).flatMap((item): NearbyEventResult[] => {
-      const coordinates = Array.isArray(item.location) ? item.location : [];
-      const eventLongitude = Number(coordinates[0]);
-      const eventLatitude = Number(coordinates[1]);
-      if (!item.id || !item.title || !item.start || !Number.isFinite(eventLatitude) || !Number.isFinite(eventLongitude)) return [];
-
-      const venueEntity = Array.isArray(item.entities)
-        ? item.entities.find((entity: any) => entity?.type === "venue")
-        : undefined;
-      const venueName = String(venueEntity?.name || item.geo?.address?.formatted_address || "สถานที่ตามพิกัดผู้จัดงาน");
-      const venueArea = String(item.geo?.address?.locality || item.geo?.address?.region || item.country || "");
-      const attendance = Number(item.phq_attendance);
-      const rank = Number(item.rank);
-
-      return [{
-        id: `predicthq-${item.id}`,
-        title: String(item.title),
-        category: classifyRealEvent(String(item.category || ""), String(item.title), Array.isArray(item.labels) ? item.labels : []),
-        venueName,
-        venueArea,
-        latitude: eventLatitude,
-        longitude: eventLongitude,
-        startAt: String(item.start),
-        endAt: item.end ? String(item.end) : undefined,
-        description: typeof item.description === "string" ? item.description : undefined,
-        sourceName: "PredictHQ Events API",
-        providerEventId: String(item.id),
-        attendance: Number.isFinite(attendance) && attendance > 0 ? attendance : undefined,
-        rank: Number.isFinite(rank) ? rank : undefined,
-      }];
-    }).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt) || (b.rank || 0) - (a.rank || 0));
-
-    dailyEventsCache.set(cacheKey, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
-    return res.json({ events, source: "PredictHQ Events API", fetchedAt: new Date().toISOString(), eventDate, country, cached: false });
-  } catch (error) {
-    console.error("[Events API] Fetch failed:", error instanceof Error ? error.message : error);
-    return res.status(502).json({ message: "เชื่อมต่อผู้ให้บริการข้อมูลอีเวนต์จริงไม่ได้", events: [] });
-  }
-});
+});;
 
 // Persistent order store: Firestore is the source of truth across instances/restarts.
 interface ServerOrder {
