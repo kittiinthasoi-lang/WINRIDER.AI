@@ -24,6 +24,7 @@ import {
   PaymentProfile 
 } from '../services/paymentProfileService';
 import { PaymentReceiverSettingsPanel } from './PaymentReceiverSettingsPanel';
+import { WinQrScanner } from './WinQrScanner';
 
 interface WinScanAndPayModalProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ export const WinScanAndPayModal: React.FC<WinScanAndPayModalProps> = ({
   const [realQrDataUrl, setRealQrDataUrl] = useState<string>('');
   const [qrViewMode, setQrViewMode] = useState<'promptpay' | 'bank_slip'>('promptpay');
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
 
   // Load verified payment profile for this merchant/partner
   useEffect(() => {
@@ -138,6 +140,15 @@ export const WinScanAndPayModal: React.FC<WinScanAndPayModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowQrScanner(true)}
+          className="w-full py-2.5 rounded-2xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-black text-xs flex items-center justify-center gap-2"
+        >
+          <QrCode className="w-4 h-4" />
+          เปิดกล้องสแกน QR จริง
+        </button>
 
         {/* LOADING STATE */}
         {loading && (
@@ -378,6 +389,17 @@ export const WinScanAndPayModal: React.FC<WinScanAndPayModalProps> = ({
           </button>
         </div>
       </div>
+
+      {showQrScanner && (
+        <WinQrScanner
+          onClose={() => setShowQrScanner(false)}
+          onVerified={({ verification }) => {
+            if (verification?.ok && verification?.owner?.accountName) {
+              // Keep the display modal open; verified owner data is shown by the scanner.
+            }
+          }}
+        />
+      )}
 
       {/* NESTED SETTINGS MODAL */}
       {showSettingsModal && (
