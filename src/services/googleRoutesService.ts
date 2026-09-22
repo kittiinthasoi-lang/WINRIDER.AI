@@ -283,123 +283,23 @@ export function mapGoogleManeuverToArType(maneuverStr?: string, instructionsText
 /**
  * Requests real-time route from server proxy (Google Maps Platform Routes API)
  */
-export async function computeLiveRoute(params: {
+export async function computeLiveRoute(_params: {
   origin: { latitude: number; longitude: number };
   destination: { latitude: number; longitude: number; name?: string; address?: string };
   travelMode?: 'TWO_WHEELER' | 'DRIVE' | 'BICYCLE' | 'WALK';
   routingPreference?: 'TRAFFIC_AWARE' | 'TRAFFIC_AWARE_OPTIMAL' | 'REGULAR';
 }): Promise<ComputedLiveRoute> {
-  let json: any = null;
-  try {
-    const token = await auth.currentUser?.getIdToken();
-    if (!token) throw new Error('Authentication required for live routing');
-    const response = await fetch('/api/routes/compute', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        origin: params.origin,
-        destination: params.destination,
-        travelMode: params.travelMode || 'TWO_WHEELER',
-        routingPreference: params.routingPreference || 'TRAFFIC_AWARE',
-        languageCode: 'th-TH'
-      })
-    });
-
-    if (response.ok) {
-      json = await response.json();
-    }
-  } catch (_fetchErr) {
-    // Gracefully handle network or server error
-  }
-
-  const rawRoute = json?.route;
-
-  if (rawRoute) {
-    const distMeters = rawRoute.distanceMeters || (rawRoute.legs && rawRoute.legs[0]?.distanceMeters) || 3500;
-    let durationSec = 300;
-    if (typeof rawRoute.duration === 'string') {
-      durationSec = parseInt(rawRoute.duration.replace('s', ''), 10) || 300;
-    } else if (rawRoute.legs && rawRoute.legs[0]?.duration) {
-      durationSec = parseInt(rawRoute.legs[0].duration.replace('s', ''), 10) || 300;
-    }
-
-    // Parse Legs & Steps
-    const rawSteps = (rawRoute.legs && rawRoute.legs[0]?.steps) || [];
-    const parsedSteps: LiveRouteStep[] = rawSteps.map((s: any, idx: number) => {
-      const instr = s.navigationInstruction?.instructions || `มุ่งหน้าไปตามเส้นทาง (ช่วงที่ ${idx + 1})`;
-      const rawManeuver = s.navigationInstruction?.maneuver || 'STRAIGHT';
-      const maneuverType = mapGoogleManeuverToArType(rawManeuver, instr);
-
-      let stepSec = 60;
-      if (typeof s.staticDuration === 'string') {
-        stepSec = parseInt(s.staticDuration.replace('s', ''), 10) || 60;
-      }
-
-      const startLat = s.startLocation?.latLng?.latitude || params.origin.latitude;
-      const startLng = s.startLocation?.latLng?.longitude || params.origin.longitude;
-      const endLat = s.endLocation?.latLng?.latitude || params.destination.latitude;
-      const endLng = s.endLocation?.latLng?.longitude || params.destination.longitude;
-
-      return {
-        stepIndex: idx,
-        instructions: instr,
-        maneuver: maneuverType,
-        rawManeuver,
-        distanceMeters: s.distanceMeters || 250,
-        durationSeconds: stepSec,
-        startLocation: { lat: startLat, lng: startLng },
-        endLocation: { lat: endLat, lng: endLng },
-        polylinePoints: s.polyline?.encodedPolyline ? decodeGooglePolyline(s.polyline.encodedPolyline) : undefined
-      };
-    });
-
-    // Decode master route polyline
-    let polylineCoords: Array<{ lat: number; lng: number }> = [];
-    if (rawRoute.polyline?.encodedPolyline) {
-      polylineCoords = decodeGooglePolyline(rawRoute.polyline.encodedPolyline);
-    }
-
-    // Fallback coords if no polyline
-    if (polylineCoords.length === 0) {
-      polylineCoords = [
-        { lat: params.origin.latitude, lng: params.origin.longitude },
-        { lat: (params.origin.latitude + params.destination.latitude) / 2, lng: (params.origin.longitude + params.destination.longitude) / 2 },
-        { lat: params.destination.latitude, lng: params.destination.longitude }
-      ];
-    }
-
-    const totalDistKm = (distMeters / 1000).toFixed(1);
-    const totalMin = Math.max(1, Math.round(durationSec / 60));
-
-    return {
-      success: true,
-      source: json?.source || 'google_routes_api_live',
-      provider: json?.provider || 'Google Maps Platform Routes API',
-      totalDistanceMeters: distMeters,
-      totalDurationSeconds: durationSec,
-      totalDistanceKm: `${totalDistKm} กม.`,
-      totalDurationMinutes: totalMin,
-      formattedEta: `${totalMin} นาที`,
-      routeDescription: rawRoute.description || `เส้นทางเร็วที่สุด (${travelModeToString(params.travelMode || 'TWO_WHEELER')})`,
-      steps: parsedSteps,
-      polylineCoordinates: polylineCoords,
-      timestamp: json?.timestamp || new Date().toISOString()
-    };
-  }
-
+  // Google Routes API is intentionally disabled for billing safety.
   return {
     success: false,
     source: 'unavailable',
-    provider: 'Google Maps Platform Routes API',
+    provider: 'Google Routes API (disabled)',
     totalDistanceMeters: 0,
     totalDurationSeconds: 0,
     totalDistanceKm: '',
     totalDurationMinutes: 0,
     formattedEta: '',
-    routeDescription: 'ไม่สามารถโหลดเส้นทางจริงได้ กรุณาตรวจสอบ API และการเชื่อมต่อ',
+    routeDescription: 'การคำนวณเส้นทางจริงถูกปิดชั่วคราวเพื่อความปลอดภัยด้านค่าใช้บริการ',
     steps: [],
     polylineCoordinates: [],
     timestamp: new Date().toISOString()
