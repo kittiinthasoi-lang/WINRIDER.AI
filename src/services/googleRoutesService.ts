@@ -251,7 +251,7 @@ export function decodeGooglePolyline(encoded: string): Array<{ lat: number; lng:
 }
 
 /**
- * Maps Google Routes API Maneuver string or Thai instruction to our ARManeuverType
+ * Maps a route-provider maneuver string or Thai instruction to our ARManeuverType
  */
 export function mapGoogleManeuverToArType(maneuverStr?: string, instructionsText?: string): ARManeuverType {
   const m = (maneuverStr || '').toUpperCase();
@@ -293,7 +293,7 @@ export async function computeLiveRoute(_params: {
   return {
     success: false,
     source: 'unavailable',
-    provider: 'Google Routes API (disabled)',
+    provider: 'Road routing unavailable (Google Routes API disabled)',
     totalDistanceMeters: 0,
     totalDurationSeconds: 0,
     totalDistanceKm: '',
