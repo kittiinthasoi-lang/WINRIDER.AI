@@ -12,6 +12,13 @@ const CACHE_TTL_MS = 30_000;
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 12;
 
+// Routes API is intentionally disabled while billing is investigated.
+// Keep this client-side lock aligned with the server-side safety lock.
+const ROUTES_DISABLED_PATHS = new Set([
+  '/api/routes/compute',
+  '/api/places/resolve-routes',
+]);
+
 const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<Response>>();
 const windowCounts = new Map<string, { startedAt: number; count: number }>();
@@ -45,6 +52,13 @@ export function installGoogleMapsCostGuard(): void {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     let pathname = '';
     try { pathname = new URL(url, window.location.origin).pathname; } catch { return originalFetch(input, init); }
+
+    if (ROUTES_DISABLED_PATHS.has(pathname)) {
+      return new Response(JSON.stringify({ error: 'ROUTES_API_DISABLED' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!GOOGLE_BACKED_PATHS.has(pathname)) return originalFetch(input, init);
 
