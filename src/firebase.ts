@@ -4,6 +4,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import fallbackConfig from '../firebase-applet-config.json';
+import { installGoogleMapsCostGuard } from './services/googleMapsCostGuard';
 
 const metaEnv = typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env : {};
 
@@ -28,8 +29,11 @@ export const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Test connection softly
+// Prevent accidental Google Maps/Places/Routes request loops in the browser.
+// This is an optimization/safety layer; Cloud billing quotas remain authoritative.
 if (typeof window !== 'undefined') {
+  installGoogleMapsCostGuard();
+
   getDocFromServer(doc(db, '_connection_test', 'ping')).catch((err) => {
     // Non-blocking connectivity test
     if (err?.message?.includes('the client is offline')) {
