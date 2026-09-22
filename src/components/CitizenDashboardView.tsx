@@ -23,7 +23,8 @@ import {
 import { defaultMapProvider, defaultNotifyProvider } from '../adapters/defaultProviders';
 import { globalFeeEngine, FeeBreakdown } from '../core/feeEngine';
 import { calculateBaseFareBaht } from '../core/serverFare';
-import { TripStateMachine, TripModel } from '../core/tripStateMachine';
+import { createLiveOrder, fetchMyPassengerOrders, LiveRideOrder } from '../utils/dispatchSync';
+import { getAuth } from 'firebase/auth';
 
 interface CitizenDashboardViewProps {
   userName?: string;
@@ -43,7 +44,7 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
   );
 
   const [isSearchingKnight, setIsSearchingKnight] = useState<boolean>(false);
-  const [activeTrip, setActiveTrip] = useState<TripModel | null>(null);
+  const [activeTrip, setActiveTrip] = useState<LiveRideOrder | null>(null);
 
   // 8 Pillars definition
   const pillars = [
@@ -64,44 +65,90 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
     setFeeBreakdown(calc);
   }, [selectedPillar, estimatedDistance]);
 
-  const handleRequestTrip = () => {
+  const handleRequestTrip = async () => {
+    if (isSearchingKnight || activeTrip) return;
+    const user = getAuth().currentUser;
+    if (!user) {
+      window.alert('กรุณาเข้าสู่ระบบก่อนเรียกรถ');
+      return;
+    }
     setIsSearchingKnight(true);
     defaultNotifyProvider.playAlertSound('mission_incoming');
-
-    setTimeout(() => {
-      setIsSearchingKnight(false);
-      const newTrip = TripStateMachine.createNewTrip({
-        id: `TRIP-CTZ-${Date.now().toString().slice(-4)}`,
-        pillar: selectedPillar as TripModel['pillar'],
-        citizenId: 'CITIZEN-01',
-        citizenName: userName,
-        citizenPhone: '',
-        knightId: '',
-        knightName: 'พี่วินที่ระบบจับคู่จริง',
-        originName: pickupText,
-        destinationName: dropoffText,
-        distanceKm: estimatedDistance,
-        fare: feeBreakdown.citizenTotalFare,
-        feeBreakdown: {
-          baseFare: feeBreakdown.baseFare,
-          platformFee: feeBreakdown.citizenPlatformFee,
-          knightNet: feeBreakdown.knightNetEarnings,
-          deductionsTotal: feeBreakdown.knightDeductions.totalDeduction
-        },
-        proofPhotos: {}
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
       });
-
-      const accepted = TripStateMachine.transition(
-        newTrip,
-        'ACCEPTED',
-        'KNT-01',
-        'knight',
-        'อัศวินในรัศมีตอบรับภารกิจ'
-      );
-      setActiveTrip(accepted);
+      const pickupCoord = { lat: position.coords.latitude, lng: position.coords.longitude };
+      const token = await user.getIdToken();
+      const resolveResponse = await fetch('/api/places/resolve-routes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          latitude: pickupCoord.lat,
+          longitude: pickupCoord.lng,
+          places: [{ key: 'home-destination', query: `${dropoffText} ประเทศไทย` }],
+        }),
+      });
+      const resolved = await resolveResponse.json().catch(() => ({})) as any;
+      const route = resolved?.routes?.[0];
+      if (!resolveResponse.ok || !route || !Number.isFinite(Number(route.distanceKm)) || !Number.isFinite(Number(route.latitude)) || !Number.isFinite(Number(route.longitude))) {
+        throw new Error('REAL_ROUTE_REQUIRED');
+      }
+      const serviceMap: Record<string, string> = {
+        WIN_KNIGHT: 'knight',
+        WIN_EXPRESS: 'express',
+        WIN_PETCARE: 'pet',
+        WIN_MU_BUDDY: 'mu',
+        WIN_LIFESTYLE: 'lifestyle',
+        WIN_SPIRIT: 'spirit',
+        WIN_FAMILY: 'family',
+        WIN_LINK: 'link',
+      };
+      const serviceId = serviceMap[selectedPillar] || 'knight';
+      const liveOrder = await createLiveOrder({
+        serviceId,
+        serviceTitle: pillars.find((pillar) => pillar.id === selectedPillar)?.name || 'WIN KNIGHT',
+        serviceIconEmoji: '🛵',
+        passengerUserId: user.uid,
+        passengerName: userName,
+        passengerPhone: '',
+        pickupLocation: 'ตำแหน่งปัจจุบันจาก GPS',
+        dropoffLocation: route.address || route.name || dropoffText,
+        distanceKm: Number(route.distanceKm),
+        fare: 0,
+        pickupCoord,
+        dropoffCoord: { lat: Number(route.latitude), lng: Number(route.longitude) },
+        estMinutes: Number.isFinite(Number(route.etaMinutes)) ? Number(route.etaMinutes) : undefined,
+      });
+      setActiveTrip(liveOrder);
       defaultNotifyProvider.playAlertSound('mission_accepted');
-    }, 2500);
+    } catch (error) {
+      console.error('[Citizen Dashboard] Real dispatch failed:', error);
+      window.alert(error instanceof Error && error.message === 'REAL_ROUTE_REQUIRED'
+        ? 'ยังคำนวณเส้นทางจริงไม่ได้ กรุณาตรวจปลายทางและ Google Maps API ก่อนเรียกรถ'
+        : 'สร้างงานจริงไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsSearchingKnight(false);
+    }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const orders = await fetchMyPassengerOrders();
+        if (cancelled) return;
+        const active = orders.find((order) => !['completed', 'cancelled'].includes(order.status));
+        setActiveTrip(active || null);
+      } catch {
+        // Keep current UI state; the server remains authoritative.
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(refresh, 8000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-[#0A1633] text-white flex flex-col font-thai max-w-md mx-auto pb-20">
