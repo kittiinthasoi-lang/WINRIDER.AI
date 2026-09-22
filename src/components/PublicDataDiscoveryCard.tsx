@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Hotel, MapPin, RefreshCw, Search, ShoppingBag, Utensils, Landmark } from 'lucide-react';
+import { buildGoogleMapsSearchUrl } from '../services/googleMapsExternal';
 
 type Kind = 'events' | 'attractions' | 'restaurants' | 'accommodations' | 'souvenirs';
 type RecordItem = { id: string; name?: string; title?: string; category?: string; address?: string; province?: string; startAt?: string; endAt?: string; latitude?: number; longitude?: number };
@@ -62,7 +63,7 @@ export const PublicDataDiscoveryCard: React.FC<Props> = ({ enabled = false }) =>
           {item.category && <div className="mt-1 text-[9px] text-cyan-300">{item.category}</div>}
           {item.address && <div className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{item.address}{item.province ? ` • ${item.province}` : ''}</div>}
           {item.startAt && <div className="mt-1 text-[9px] text-amber-300">{new Date(item.startAt).toLocaleDateString('th-TH')}{item.endAt ? ` – ${new Date(item.endAt).toLocaleDateString('th-TH')}` : ''}</div>}
-          {Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude)) && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${item.name || item.title || ''} ${item.address || ''}`)}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[9px] font-bold text-cyan-300"><MapPin className="h-3 w-3" />เปิด Google Maps ภายนอก</a>}
+          {Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude)) && <a href={buildGoogleMapsSearchUrl(`${item.name || item.title || ''} ${item.address || ''}`, { latitude: Number(item.latitude), longitude: Number(item.longitude) })} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[9px] font-bold text-cyan-300"><MapPin className="h-3 w-3" />เปิด Google Maps ภายนอก</a>}
         </article>)}
       </div>
     </section>
