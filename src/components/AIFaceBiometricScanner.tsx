@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, RefreshCw, CheckCircle2, ShieldCheck, Sparkles, Scan, AlertCircle, Zap, UserCheck, X } from 'lucide-react';
 import { playTactileBlip, playRadarScan, playNfcSyncSound } from '../utils/audio';
+import { getAuth } from 'firebase/auth';
+import { uploadProfileImage } from '../utils/imageUpload';
 
 export interface BiometricScanResult {
   faceImageUrl: string;
@@ -85,70 +87,59 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
     setCameraActive(false);
   };
 
-  // Trigger Scanning Sequence
-  const handleStartScan = () => {
+  // Real scan: capture camera frame -> WIN-AI Vision -> persist actual photo.
+  const handleStartScan = async () => {
+    if (!cameraActive || !videoRef.current || !canvasRef.current) {
+      setCameraError('ต้องเปิดกล้องจริงก่อนเริ่มตรวจใบหน้า');
+      return;
+    }
+    const user = getAuth().currentUser;
+    if (!user) {
+      setCameraError('กรุณาเข้าสู่ระบบก่อนตรวจใบหน้า');
+      return;
+    }
     if (audioEnabled) playRadarScan();
-    setScanStage('aligning');
-    setScanProgress(15);
-    setLivenessPrompt('ตรวจจับใบหน้า... กรุณามองตรงนิ่งๆ');
-
-    setTimeout(() => {
-      if (audioEnabled) playTactileBlip(900);
-      setScanStage('liveness');
-      setScanProgress(45);
-      setLivenessPrompt('Liveness Test: กรุณากะพริบตา 1 ครั้ง หรือเอียงศีรษะเล็กน้อย');
-
-      setTimeout(() => {
-        if (audioEnabled) playTactileBlip(1100);
-        setScanStage('analyzing');
-        setScanProgress(80);
-        setLivenessPrompt('กำลังวิเคราะห์โครงข่ายชีวมิติ 128 จุด (Biometric Deep Mesh)...');
-
-        // Capture photo from video or generate realistic biometric avatar
-        let photoUrl = '';
-        if (cameraActive && videoRef.current && canvasRef.current) {
-          const video = videoRef.current;
-          const canvas = canvasRef.current;
-          canvas.width = video.videoWidth || 400;
-          canvas.height = video.videoHeight || 400;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            photoUrl = canvas.toDataURL('image/jpeg', 0.85);
-          }
-        }
-        
-        // Fallback photo based on role if no camera
-        if (!photoUrl) {
-          const roleAvatars = {
-            driver: '/avatars/knight.jpg',
-            customer: '/avatars/citizen.jpg',
-            merchant: '/avatars/merchant.jpg',
-            partner: '/avatars/partner.jpg'
-          };
-          photoUrl = roleAvatars[role] || '/images/app_logo.jpg';
-        }
-
-        setCapturedPhoto(photoUrl);
-
-        setTimeout(() => {
-          if (audioEnabled) playNfcSyncSound();
-          const score = 99.4 + +(Math.random() * 0.5).toFixed(1);
-          const randHex = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-          const hash = `SOV-FACE-${randHex.toUpperCase()}`;
-          
-          setBiometricData({
-            score,
-            hash,
-            symmetry: '99.8%',
-            pupilDist: '63.2mm'
-          });
-          setScanProgress(100);
-          setScanStage('completed');
-          setLivenessPrompt('ยืนยันตัวตนสำเร็จ! โครงข่ายชีวมิติผ่านเกณฑ์ 100%');
-        }, 1200);
-      }, 1400);
-    }, 1200);
+    setScanStage('analyzing');
+    setScanProgress(30);
+    setLivenessPrompt('กำลังส่งภาพจากกล้องจริงให้ WIN-AI Vision ตรวจสอบ…');
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 640;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('CANVAS_UNAVAILABLE');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const photoUrl = canvas.toDataURL('image/jpeg', 0.88);
+      const response = await fetch('/api/ai/face-photo-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ imageDataUrl: photoUrl, role }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.result?.faceVisible) throw new Error(payload.error || 'ไม่พบใบหน้าที่ชัดเจนจากภาพจริง');
+      setScanProgress(75);
+      setLivenessPrompt('AI ตรวจภาพใบหน้าจริงสำเร็จ กำลังบันทึกรูปโปรไฟล์…');
+      const blob = await (await fetch(photoUrl)).blob();
+      const storedUrl = await uploadProfileImage(user.uid, role, new File([blob], `face-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+      const face = payload.result;
+      setCapturedPhoto(storedUrl);
+      setBiometricData({
+        score: Number(face.qualityScore) || 0,
+        hash: String(face.faceHash || ''),
+        symmetry: 'ไม่ประเมินจากภาพเดียว',
+        pupilDist: 'ไม่ประเมินจากภาพเดียว'
+      });
+      setScanProgress(100);
+      setScanStage('completed');
+      setLivenessPrompt(face.livenessPassed ? 'ตรวจสอบสำเร็จ' : 'ตรวจภาพสำเร็จ • ยังไม่ได้ยืนยัน Liveness จากภาพเดียว');
+      if (audioEnabled) playNfcSyncSound();
+    } catch (error: any) {
+      setScanStage('idle');
+      setScanProgress(0);
+      setLivenessPrompt(String(error?.message || 'ตรวจใบหน้าไม่สำเร็จ'));
+      setCameraError(String(error?.message || 'ตรวจใบหน้าไม่สำเร็จ'));
+    }
   };
 
   const handleConfirmResult = () => {
@@ -159,7 +150,7 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
       faceImageUrl: capturedPhoto,
       biometricScore: biometricData.score,
       faceHash: biometricData.hash,
-      livenessPassed: true,
+      livenessPassed: false,
       scanTimestamp: new Date().toISOString()
     });
   };
@@ -188,12 +179,12 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
-                SOVEREIGN AI FACE ID
+                AI FACE PHOTO CHECK
               </span>
-              <span className="text-[10px] font-mono text-slate-400">LIVENESS TEST 2.0</span>
+              <span className="text-[10px] font-mono text-slate-400">PHOTO QUALITY CHECK</span>
             </div>
             <h3 className="text-base sm:text-lg font-black text-white">
-              แสกนใบหน้ายืนยันตัวตนด้วย AI (ชีวมิติอธิปไตย)
+              ตรวจภาพใบหน้าจริงด้วย AI
             </h3>
           </div>
         </div>
@@ -280,7 +271,7 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
             {scanStage === 'completed' && (
               <div className="absolute inset-0 bg-emerald-950/60 backdrop-blur-xs flex flex-col items-center justify-center text-emerald-300 space-y-2 rounded-[45%]">
                 <CheckCircle2 className="w-14 h-14 text-emerald-400 drop-shadow-[0_0_20px_#10B981]" />
-                <span className="text-xs font-mono font-black">BIOMETRIC MATCH</span>
+                <span className="text-xs font-mono font-black">FACE PHOTO VERIFIED</span>
               </div>
             )}
           </div>
@@ -288,8 +279,8 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
           {/* Bottom HUD Metrics */}
           <div className="flex items-center justify-between text-[9px] font-mono text-cyan-300/80 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-cyan-500/30">
             <span>SYMMETRY: 99.8%</span>
-            <span>LIVENESS: PASS</span>
-            <span>SEC_LEVEL: 2฿ SOVEREIGN</span>
+            <span>LIVENESS: NOT VERIFIED</span>
+            <span>AI: SERVER VERIFIED</span>
           </div>
         </div>
       </div>
@@ -319,10 +310,10 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              ใบรับรองการแสกนหน้าสำเร็จ (AI Biometric Verified)
+              ผลตรวจภาพใบหน้าจริงโดย AI
             </span>
             <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-              ความถูกต้อง {biometricData.score}%
+              คุณภาพภาพ {biometricData.score}%
             </span>
           </div>
 
