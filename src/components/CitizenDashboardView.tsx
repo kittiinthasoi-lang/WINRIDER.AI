@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { defaultMapProvider, defaultNotifyProvider } from '../adapters/defaultProviders';
 import { globalFeeEngine, FeeBreakdown } from '../core/feeEngine';
+import { calculateBaseFareBaht } from '../core/serverFare';
 import { TripStateMachine, TripModel } from '../core/tripStateMachine';
 
 interface CitizenDashboardViewProps {
@@ -58,7 +59,7 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
 
   // Recalculate fees on pillar change
   useEffect(() => {
-    const baseFare = 35 + estimatedDistance * 10;
+    const baseFare = calculateBaseFareBaht(estimatedDistance);
     const calc = globalFeeEngine.calculateTripFees(baseFare, selectedPillar);
     setFeeBreakdown(calc);
   }, [selectedPillar, estimatedDistance]);
