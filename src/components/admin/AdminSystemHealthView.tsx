@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { WIN_IMAGES } from '../../data/imageRegistry';
 import { AlertTriangle, CheckCircle2, CircleX, ExternalLink, HelpCircle, Info, Loader2, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { auth } from '../../firebase';
 
@@ -79,7 +80,7 @@ export const AdminSystemHealthView: React.FC = () => {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <img
-            src="/images/admin/system-health.svg"
+            src={WIN_IMAGES.admin.systemHealth}
             alt="System Health"
             className="w-10 h-10 rounded-2xl object-cover ring-1 ring-cyan-400/50 shadow-sm"
           />
