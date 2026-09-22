@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { WIN_IMAGES } from '../../data/imageRegistry';
 import { 
   ShieldAlert, 
   ShieldCheck,
@@ -57,28 +58,28 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     { 
       id: 'dashboard', 
       label: 'ภาพรวมระบบ', 
-      icon: <img src="/images/admin/admin-overview.svg" alt="ภาพรวม" className="w-5 h-5 rounded-md object-cover ring-1 ring-cyan-400/50 shadow-sm" /> 
+      icon: <img src={WIN_IMAGES.admin.overview} alt="ภาพรวม" className="w-5 h-5 rounded-md object-cover ring-1 ring-cyan-400/50 shadow-sm" /> 
     },
     { 
       id: 'health', 
       label: 'System Health', 
-      icon: <img src="/images/admin/system-health.svg" alt="System Health" className="w-5 h-5 rounded-md object-cover ring-1 ring-emerald-400/50 shadow-sm" /> 
+      icon: <img src={WIN_IMAGES.admin.systemHealth} alt="System Health" className="w-5 h-5 rounded-md object-cover ring-1 ring-emerald-400/50 shadow-sm" /> 
     },
     { 
       id: 'kyc', 
       label: 'ตรวจเอกสาร KYC', 
-      icon: <img src="/images/admin/kyc-review.svg" alt="ตรวจเอกสาร KYC" className="w-5 h-5 rounded-md object-cover ring-1 ring-amber-400/50 shadow-sm" />, 
+      icon: <img src={WIN_IMAGES.admin.kycReview} alt="ตรวจเอกสาร KYC" className="w-5 h-5 rounded-md object-cover ring-1 ring-amber-400/50 shadow-sm" />, 
       badge: '5 รอตรวจ' 
     },
     { 
       id: 'users', 
       label: 'จัดการผู้ใช้งาน', 
-      icon: <img src="/images/admin/users-management.svg" alt="จัดการผู้ใช้งาน" className="w-5 h-5 rounded-md object-cover ring-1 ring-blue-400/50 shadow-sm" /> 
+      icon: <img src={WIN_IMAGES.admin.usersManagement} alt="จัดการผู้ใช้งาน" className="w-5 h-5 rounded-md object-cover ring-1 ring-blue-400/50 shadow-sm" /> 
     },
     { 
       id: 'payment-profiles', 
       label: 'ตรวจช่องทางรับเงิน', 
-      icon: <img src="/images/admin/payment-profiles.svg" alt="ตรวจช่องทางรับเงิน" className="w-5 h-5 rounded-md object-cover ring-1 ring-cyan-400/50 shadow-sm" />, 
+      icon: <img src={WIN_IMAGES.admin.paymentProfiles} alt="ตรวจช่องทางรับเงิน" className="w-5 h-5 rounded-md object-cover ring-1 ring-cyan-400/50 shadow-sm" />, 
       badge: 'PromptPay' 
     },
     { 
@@ -90,22 +91,22 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     { 
       id: 'wallet', 
       label: 'กองทุน 5 ถัง & Ledger', 
-      icon: <img src="/images/admin/wallet-ledger.svg" alt="กองทุน 5 ถัง" className="w-5 h-5 rounded-md object-cover ring-1 ring-[#FFD700]/50 shadow-sm" /> 
+      icon: <img src={WIN_IMAGES.admin.walletLedger} alt="กองทุน 5 ถัง" className="w-5 h-5 rounded-md object-cover ring-1 ring-[#FFD700]/50 shadow-sm" /> 
     },
     { 
       id: 'topups', 
       label: 'อนุมัติสลิปเติมเงิน', 
-      icon: <img src="/images/admin/topup-review.svg" alt="อนุมัติสลิปเติมเงิน" className="w-5 h-5 rounded-md object-cover ring-1 ring-emerald-400/50 shadow-sm" /> 
+      icon: <img src={WIN_IMAGES.admin.topupReview} alt="อนุมัติสลิปเติมเงิน" className="w-5 h-5 rounded-md object-cover ring-1 ring-emerald-400/50 shadow-sm" /> 
     },
     { 
       id: 'fees', 
       label: 'กฎค่าธรรมเนียม & GP', 
-      icon: <img src="/images/admin/fee-rules.svg" alt="กฎค่าธรรมเนียม" className="w-5 h-5 rounded-md object-cover ring-1 ring-indigo-400/50 shadow-sm" /> 
+      icon: <img src={WIN_IMAGES.admin.feeRules} alt="กฎค่าธรรมเนียม" className="w-5 h-5 rounded-md object-cover ring-1 ring-indigo-400/50 shadow-sm" /> 
     },
     { 
       id: 'audit', 
       label: 'บันทึก Audit Logs', 
-      icon: <img src="/images/admin/audit-logs.svg" alt="บันทึก Audit Logs" className="w-5 h-5 rounded-md object-cover ring-1 ring-purple-400/50 shadow-sm" /> 
+      icon: <img src={WIN_IMAGES.admin.auditLogs} alt="บันทึก Audit Logs" className="w-5 h-5 rounded-md object-cover ring-1 ring-purple-400/50 shadow-sm" /> 
     },
   ];
 
