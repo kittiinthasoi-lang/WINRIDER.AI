@@ -119,10 +119,10 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
     setPerspective(canEdit && initialPerspective === 'owner' ? 'owner' : 'customer');
   }, [canEdit, initialPerspective]);
 
-  const [knightsAvailable, setKnightsAvailable] = useState(14);
-  const [merchantLevel, setMerchantLevel] = useState(75);
-  const [merchantNextXp, setMerchantNextXp] = useState(() => calculateLevelMaxXp(75, 'merchant'));
-  const [merchantXp, setMerchantXp] = useState(() => Math.round(calculateLevelMaxXp(75, 'merchant') * 0.58));
+  const [knightsAvailable] = useState(0);
+  const [merchantLevel, setMerchantLevel] = useState(() => 1);
+  const [merchantNextXp, setMerchantNextXp] = useState(() => calculateLevelMaxXp(1, 'merchant'));
+  const [merchantXp, setMerchantXp] = useState(0);
   const [merchantXpToast, setMerchantXpToast] = useState<string | null>(null);
   const [showTiersModal, setShowTiersModal] = useState<boolean>(false);
   const [tiersModalInitialRole, setTiersModalInitialRole] = useState<'knight' | 'citizen' | 'merchant'>('merchant');
@@ -130,8 +130,8 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   const [showPickupMapModal, setShowPickupMapModal] = useState<boolean>(false);
   const [showProfileCustomizerModal, setShowProfileCustomizerModal] = useState<boolean>(false);
   const [merchantProfileData, setMerchantProfileData] = useState<ProfileCustomizationData>({
-    displayName: 'ร้านออร่าเซนโก้ (Aura Zenco)',
-    bioStatus: 'ของฝากงานฝีมือคุณภาพ • กาแฟสด • ส่งด่วนทันใจผ่านอัศวิน 🏪✨',
+    displayName: 'ยังไม่ได้ตั้งชื่อร้านค้า',
+    bioStatus: '',
     avatarEmoji: '🏪',
     themeColor: '#FFD700',
     bannerGlow: 'from-[#0D1E3A] via-[#09152B] to-[#060D1E]'
@@ -178,7 +178,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
 
   // Merchant Financial Credit Score (คะแนนเครดิตทางการเงินร้านค้า)
   const [merchantCreditScore, setMerchantCreditScore] = useState<number>(0);
-  const [workingCapitalAvailable, setWorkingCapitalAvailable] = useState<number>(250000);
+  const [workingCapitalAvailable, setWorkingCapitalAvailable] = useState<number>(0);
 
   // Products catalog state
   const [storeProducts, setStoreProducts] = useState<StoreCatalogProduct[]>(INITIAL_STORE_PRODUCTS);
@@ -859,7 +859,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
                     </span>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.25)]">
                       <CreditCard className="w-3 h-3" />
-                      เครดิตร้านค้า: {merchantCreditScore}/850 (AAA)
+                      เครดิตร้านค้า: {merchantCreditScore}/850
                     </span>
                     <button
                       onClick={() => {
@@ -949,7 +949,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
 
               <div className="flex items-center justify-between text-[10px] text-slate-400">
                 <span>ขาดอีก {(merchantNextXp - merchantXp).toLocaleString()} XP ถึงเลเวล {merchantLevel + 1}</span>
-                <span className="text-amber-300 font-bold">อัตราทดร้านค้า x21.0 • สิทธิพิเศษคอมมิชชั่น 0% ตลอดชีพ</span>
+                <span className="text-amber-300 font-bold">ข้อมูลสิทธิพิเศษจะแสดงเมื่อมีข้อมูลจริงจากระบบ</span>
               </div>
             </div>
           </div>
