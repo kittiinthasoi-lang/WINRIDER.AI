@@ -873,6 +873,8 @@ interface ServerOrder {
   dispatchAttempt?: number;
   dispatchMode?: "preferred" | "automatic";
   fareQuote?: any;
+  expressPackagePhotoUrl?: string;
+  expressAiCertificateId?: string;
 }
 
 function getAdminDb() {
@@ -1148,10 +1150,19 @@ app.post("/api/ai/product-photo-verify", rateLimit(10), async (req, res) => {
     const confidence = Math.max(0, Math.min(100, Number(parsed.confidenceScore) || 0));
     const quality = Math.max(0, Math.min(100, Number(parsed.qualityScore) || 0));
     const isVerified = parsed.isProductVisible === true && parsed.safetyPassed === true && confidence >= 70 && quality >= 60;
+    const certificateId = isVerified ? `WIN-AI-${crypto.randomBytes(10).toString("hex").toUpperCase()}` : "";
+    if (isVerified) {
+      await ordersDb.collection("ai_verification_certificates").doc(certificateId).set({
+        certificateId, userId: user.uid, kind: "product", verified: true,
+        imageHash: crypto.createHash("sha256").update(image.buffer).digest("hex"),
+        model: response.model, detectedTitle: String(parsed.detectedTitle || itemName || "สินค้าจากภาพ"),
+        createdAt: FieldValue.serverTimestamp()
+      });
+    }
     return res.json({
       result: {
         isVerified,
-        certificateId: isVerified ? `WIN-AI-${Date.now().toString(36).toUpperCase()}` : "",
+        certificateId,
         detectedTitle: String(parsed.detectedTitle || itemName || "สินค้าจากภาพ"),
         detectedCategory: String(parsed.detectedCategory || category || "สินค้าทั่วไป"),
         detectedCondition: String(parsed.detectedCondition || "ไม่สามารถยืนยันสภาพจากภาพได้"),
@@ -2820,6 +2831,19 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
   };
   const normalizedServiceId = SERVICE_ALIASES[rawServiceId] || rawServiceId;
 
+  if (normalizedServiceId === "express") {
+    const photoUrl = String(input.expressPackagePhotoUrl || "").trim();
+    const certificateId = String(input.expressAiCertificateId || "").trim();
+    if (!photoUrl || !/^WIN-AI-[A-F0-9]{20}$/.test(certificateId)) {
+      return res.status(422).json({ error: "WIN_EXPRESS_REQUIRES_AI_PACKAGE_PHOTO", code: "EXPRESS_AI_PHOTO_REQUIRED" });
+    }
+    const certificateSnap = await ordersDb.collection("ai_verification_certificates").doc(certificateId).get();
+    const certificate = certificateSnap.data() || {};
+    if (!certificateSnap.exists || certificate.userId !== user.uid || certificate.kind !== "product" || certificate.verified !== true) {
+      return res.status(422).json({ error: "WIN_EXPRESS_AI_CERTIFICATE_INVALID", code: "EXPRESS_AI_CERTIFICATE_INVALID" });
+    }
+  }
+
   const allowedServices = new Set(["knight", "express", "mu", "spirit", "family", "pet", "link", "lifestyle", "food", "backhaul"]);
   const clientDistanceKm = Number(input.distanceKm);
   const requestedFare = Number(input.fare);
@@ -2929,6 +2953,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       ...(input.customerGender === "female" || input.customerGender === "male" ? { customerGender: input.customerGender } : {}),
       ...(typeof input.preferredDriverId === "string" && input.preferredDriverId ? { preferredDriverId: input.preferredDriverId } : {}),
       dispatchMode: input.preferredDriverId ? "preferred" : "automatic",
+      ...(normalizedServiceId === "express" ? { expressPackagePhotoUrl: String(input.expressPackagePhotoUrl), expressAiCertificateId: String(input.expressAiCertificateId) } : {}),
     };
     const candidateIds = await buildDispatchCandidates(normalizedOrder);
     const firstDriverId = candidateIds[0] || null;
