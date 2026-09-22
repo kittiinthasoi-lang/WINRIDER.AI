@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { auth } from '../firebase';
+import React, { useEffect, useState, useMemo } from 'react';
+import { auth, db } from '../firebase';
+import { collection, getDocs, query, where, orderBy, limit, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { emitQuestMetric } from '../services/questService';
 import { createSosIncident } from '../services/sosIncidentService';
 import { WIN_SHOP_ITEMS, WinShopItem } from '../data/winShopItems';
@@ -32,6 +33,7 @@ import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { PersonalNavigationScreen } from './PersonalNavigationScreen';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
+import { loadProfileCustomization } from '../services/profileService';
 import { ReligiousNotificationsModal } from './ReligiousNotificationsModal';
 import { ProfileQuickActions } from './ProfileQuickActions';
 import { CyberGraphic, DreamRideVehicleImage } from './CyberGraphic';
@@ -635,7 +637,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   }, [baseFare, distanceFare, expressBoxFee, selectedDreamRide.priceAddon, amenitiesSummary.totalPrice, serviceAddonFee]);
 
   // C2C Marketplace state
-  const [c2cItems, setC2cItems] = useState<Array<{ id: string; name: string; price: number; rating: number; sales: number; tag: string; icon: string; imageUrl?: string; condition?: string; description?: string; aiVerified?: boolean }>>([]);
+  const [c2cItems, setC2cItems] = useState<Array<{ id: string; name: string; price: number; rating: number; sales: number; tag: string; icon: string; imageUrl?: string; condition?: string; description?: string; aiVerified?: boolean; sellerUid?: string }>>([]);
   const [showAddC2cModal, setShowAddC2cModal] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
@@ -1129,7 +1131,29 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     }
   };
 
-  const handleAddC2c = (e: React.FormEvent) => {
+  useEffect(() => {
+    let active = true;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    void loadProfileCustomization('customer').then((saved) => {
+      if (active && saved) setPassengerProfileData(saved);
+    }).catch((err) => console.warn('[Profile persistence] load failed:', err));
+
+    const loadMyListings = async () => {
+      try {
+        const q = query(collection(db, 'marketplace_listings'), where('sellerUid', '==', uid), orderBy('createdAt', 'desc'), limit(100));
+        const snap = await getDocs(q);
+        if (!active) return;
+        setC2cItems(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      } catch (err) {
+        console.warn('[Marketplace persistence] load failed:', err);
+      }
+    };
+    void loadMyListings();
+    return () => { active = false; };
+  }, []);
+
+  const handleAddC2c = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName || !newItemPrice) return;
 
@@ -1139,8 +1163,16 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     }
 
     const priceNum = parseFloat(newItemPrice) || 100;
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      alert('กรุณาเข้าสู่ระบบก่อนลงขายสินค้า');
+      return;
+    }
+
+    const listingId = `c2c-${uid}-${Date.now()}`;
     const newItem = {
-      id: Date.now().toString(),
+      id: listingId,
+      sellerUid: uid,
       name: newItemName,
       price: priceNum,
       rating: 5.0,
@@ -1150,7 +1182,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       imageUrl: passengerAiVerified.imageUrl,
       isAiVerified: true
     };
-    setC2cItems([newItem, ...c2cItems]);
+    await setDoc(doc(db, 'marketplace_listings', newItem.id), {
+      ...newItem,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    setC2cItems(prev => [newItem, ...prev.filter(item => item.id !== newItem.id)]);
 
     if (onAddNewCustomerItem) {
       onAddNewCustomerItem({
