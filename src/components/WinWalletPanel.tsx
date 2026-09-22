@@ -325,7 +325,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
 
           {/* Quick Amount Pills */}
           <div>
-            <label className="text-xs font-bold text-slate-300">เลือกจำนวนเงินที่ต้องการฝาก:</label>
+            <label className="text-sm font-bold text-slate-300">เลือกจำนวนเงินที่ต้องการฝาก:</label>
             <div className="grid grid-cols-4 gap-2 mt-2">
               {[100, 200, 500, 1000].map((amt) => (
                 <button
