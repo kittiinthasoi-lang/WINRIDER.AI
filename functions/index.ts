@@ -187,8 +187,9 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
   const wasCompleted = beforeData?.status === "COMPLETED" || beforeData?.status === "completed";
   const isCompleted = afterData?.status === "COMPLETED" || afterData?.status === "completed";
 
-  // รันเฉพาะเมื่อเพิ่งเปลี่ยนสถานะเป็น COMPLETED
-  if (!isCompleted || wasCompleted) return;
+  // Settlement ต้องทำงานเมื่อสถานะเป็น COMPLETED และยังไม่ settled
+  // รองรับกรณีที่ client ส่ง tip หลังสถานะ completed แต่ยังไม่มี settlement
+  if (!isCompleted || (wasCompleted && afterData.settled === true)) return;
 
   // ตรวจสอบว่าเคยตัดยอดไปแล้วหรือไม่
   if (afterData.settled === true || afterData.ledgerTransactionId) {
