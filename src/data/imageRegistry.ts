@@ -67,7 +67,7 @@ export const WIN_IMAGES = {
   faith: {
     header: '/images/religious-faith-header.svg',
     religion: '/images/faith_religion.jpg',
-    muBuddy: '/images/mu_buddy.jpg',
+    muBuddy: '/images/mu_buddy.jpg',\n    elderSupport: '/images/elderly_spirit.jpg',
   },
 
   family: {
@@ -115,7 +115,7 @@ export const WIN_IMAGES = {
     train: '/images/transit_train.jpg',
   },
 
-  cyber: {
+  admin: {\n    overview: '/images/admin/admin-overview.svg',\n    auditLogs: '/images/admin/audit-logs.svg',\n    feeRules: '/images/admin/fee-rules.svg',\n    kycReview: '/images/admin/kyc-review.svg',\n    paymentProfiles: '/images/admin/payment-profiles.svg',\n    systemHealth: '/images/admin/system-health.svg',\n    topupReview: '/images/admin/topup-review.svg',\n    usersManagement: '/images/admin/users-management.svg',\n    walletLedger: '/images/admin/wallet-ledger.svg',\n  },\n\n  cyber: {
     arena: '/images/cyber_arena.jpg',
     food: '/images/cyber_food.jpg',
     coins: '/images/cyber_coins.jpg',
@@ -139,7 +139,7 @@ export type WinImagePath =
   | (typeof WIN_IMAGES.profiles)[keyof typeof WIN_IMAGES.profiles]
   | (typeof WIN_IMAGES.shop)[keyof typeof WIN_IMAGES.shop]
   | (typeof WIN_IMAGES.transit)[keyof typeof WIN_IMAGES.transit]
-  | (typeof WIN_IMAGES.cyber)[keyof typeof WIN_IMAGES.cyber];
+  | (typeof WIN_IMAGES.cyber)[keyof typeof WIN_IMAGES.cyber]\n  | (typeof WIN_IMAGES.admin)[keyof typeof WIN_IMAGES.admin];
 
 export const getWinImage = (path?: string | null): string => {
   if (!path) return WIN_IMAGES.appLogo;
