@@ -33,7 +33,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
   order,
   audioEnabled = false
 }) => {
-  const [tipAmount, setTipAmount] = useState<number>(10);
+  const [tipAmount, setTipAmount] = useState<number>(0);
   const [rating, setRating] = useState<number>(5);
   const [selectedBadges, setSelectedBadges] = useState<string[]>([
     'ขับขี่นุ่มนวล ปลอดภัย',
@@ -118,7 +118,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
                   SOVEREIGN TRIP RECEIPT
                 </span>
                 <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold">
-                  2-BAHT VERIFIED
+                  COMPLETED ORDER
                 </span>
               </div>
               <h3 className="text-base font-black text-white">สรุปเที่ยววิ่ง & ใบเสร็จกองทุนสวัสดิการ</h3>
@@ -198,7 +198,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
             {/* Sovereign 2 Baht deduction */}
             <div className="p-2.5 rounded-xl bg-black/50 border border-amber-400/30 space-y-1 text-[11px]">
               <div className="flex justify-between font-bold text-amber-300 font-mono">
-                <span>หักสมทบ "กองทุนสวัสดิการอัศวิน 2 บาท"</span>
+                <span>หักสมทบ "กองทุนสวัสดิการอัศวิน"</span>
                 <span>-฿{welfareFund.toFixed(2)}</span>
               </div>
               <div className="pl-2 space-y-0.5 text-[10px] text-slate-400">
@@ -359,7 +359,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
               <span>กำลังบันทึกและส่งข้อมูล...</span>
             ) : (
               <>
-                <span>เสร็จสิ้นภารกิจ (Finish Ride)</span>
+                <span>บันทึกทิป/คะแนน & ปิดใบเสร็จ</span>
                 <ArrowRight className="w-4 h-4 text-slate-950" />
               </>
             )}
