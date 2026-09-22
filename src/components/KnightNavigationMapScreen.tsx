@@ -733,11 +733,11 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-white font-black text-xs sm:text-sm tracking-wide">
-                  Google Maps Routes API (Live)
+                  Google Maps: เส้นทางถนนจริงปิดชั่วคราว
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-400/40 text-[9px] font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span>{liveRoute?.source === 'google_routes_api_live' ? 'สด 100%' : 'เชื่อมต่อพร้อมทำงาน'}</span>
+                  <span>{liveRoute?.success ? 'เส้นทางพร้อมใช้งาน' : 'เส้นทางถนนจริงปิดชั่วคราว'}</span>
                 </span>
               </div>
               <div className="text-[10px] text-cyan-300 flex items-center gap-1.5 mt-0.5">
@@ -830,13 +830,13 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             {/* Route Stats */}
             <div className="flex items-center gap-3 text-xs flex-wrap">
               <span className="px-2 py-0.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-bold">
-                📏 ระยะทาง: <strong className="text-white font-black">{liveRoute.totalDistanceKm}</strong>
+                📏 ระยะทาง: <strong className="text-white font-black">{liveRoute.totalDistanceKm || '—'}</strong>
               </span>
               <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 font-bold">
                 ⏱️ เวลา: <strong className="text-white font-black">{liveRoute.formattedEta}</strong>
               </span>
               <span className="text-[11px] text-slate-300 hidden md:inline">
-                {liveRoute.routeDescription}
+                {liveRoute.routeDescription || 'ยังไม่มีข้อมูลเส้นทางถนนจริง'}
               </span>
             </div>
 
@@ -1031,7 +1031,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
           /> : (
             <div className="min-h-[420px] flex items-center justify-center p-8 text-center text-sm text-slate-300 bg-slate-950">
               {driverLegPhase === 'to_destination' && !selectedDestination.lat
-                ? 'ถึงจุดรับแล้ว — กรุณาค้นหาหรือเลือกปลายทางด้านบน เพื่อคำนวณเส้นทางจริง'
+                ? 'ถึงจุดรับแล้ว — กรุณาค้นหาหรือเลือกปลายทางด้านบน เพื่อดูข้อมูลปลายทาง'
                 : 'ยังไม่มีงานจริงที่มีพิกัดจุดรับและปลายทาง จึงไม่แสดงเส้นทางจำลอง'}
             </div>
           )}
