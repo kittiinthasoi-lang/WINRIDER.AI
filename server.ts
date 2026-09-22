@@ -1989,7 +1989,7 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
   add("google_maps_server", "Google Places & Routes", googleServer ? "ok" : "error", googleServer ? "พบคีย์ฝั่งเซิร์ฟเวอร์ (การเรียกจริงจะตรวจสิทธิ์ API อีกครั้ง)" : "ไม่พบ GOOGLE_MAPS_API_KEY");
   add("google_maps_browser", "Google Maps หน้าเว็บ", process.env.VITE_GOOGLE_MAPS_API_KEY ? "ok" : "warning", process.env.VITE_GOOGLE_MAPS_API_KEY ? "พบคีย์สำหรับ build หน้าเว็บ" : "เซิร์ฟเวอร์ไม่พบ VITE_GOOGLE_MAPS_API_KEY โปรดตรวจ Build Environment");
   add("gemini", "Gemini API", process.env.GEMINI_API_KEY ? "ok" : "warning", process.env.GEMINI_API_KEY ? "พบคีย์ WIN-AI และตรวจสลิป" : "WIN-AI จะไม่ทำงานจนกว่าจะตั้ง GEMINI_API_KEY");
-  add("predicthq", "PredictHQ Events", process.env.PREDICTHQ_ACCESS_TOKEN ? "ok" : "warning", process.env.PREDICTHQ_ACCESS_TOKEN ? "พบ access token" : "อีเวนต์จริงยังไม่พร้อม");
+  add("tat-events", "TAT Tourism Events", "ok", "Win Alert ใช้ข้อมูลสาธารณะจาก TAT และแสดงเฉพาะรายการที่ Admin Verify แล้ว");
   const promptPayReady = Boolean(process.env.ADMIN_PROMPTPAY_ID && process.env.ADMIN_BANK_ACCOUNT_NAME && process.env.ADMIN_OWNER_EMAIL);
   add("promptpay", "PromptPay Admin", promptPayReady ? "ok" : "error", promptPayReady ? "ตั้งค่าผู้รับเงินและเจ้าของระบบครบ" : "ข้อมูล PromptPay/ชื่อบัญชี/อีเมลเจ้าของยังไม่ครบ");
 
