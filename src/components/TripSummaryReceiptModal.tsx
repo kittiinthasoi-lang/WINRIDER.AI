@@ -101,7 +101,7 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
 
   const handleShareReceipt = () => {
     if (audioEnabled) playTactileBlip(1100);
-    const receiptText = `🛵 WINRIDER.AI SOVEREIGN RECEIPT\nรหัสทริป: ${order.id}\nผู้โดยสาร: ${order.passengerName}\nอัศวิน: ${order.driverName || 'ข้อมูลพี่วินไม่พร้อม'}\nจุดรับ: ${order.pickupLocation}\nจุดส่ง: ${order.dropoffLocation}\nระยะทางที่บันทึกในงาน: ${recordedDistanceKm.toFixed(1)} กม.\nค่าโดยสารรวม: ฿${grossFare.toFixed(2)}\nหักกองทุนสวัสดิการ 2 บาท: -฿2.00 (สมทบกองทุนรักษาพยาบาลและน้ำมันเครื่อง)\nทิปอัศวิน (100%): ฿${tipAmount.toFixed(2)}\nยอดชำระสุทธิ: ฿${totalPassengerPaid.toFixed(2)}`;
+    const receiptText = `🛵 WINRIDER.AI SOVEREIGN RECEIPT\nรหัสทริป: ${displayOrder.id}\nผู้โดยสาร: ${displayOrder.passengerName}\nอัศวิน: ${displayOrder.driverName || 'ข้อมูลพี่วินไม่พร้อม'}\nจุดรับ: ${displayOrder.pickupLocation}\nจุดส่ง: ${displayOrder.dropoffLocation}\nระยะทางที่บันทึกในงาน: ${recordedDistanceKm.toFixed(1)} กม.\nค่าโดยสาร: ฿${grossFare.toFixed(2)}\nค่าธรรมเนียม/กองทุนฝั่งอัศวิน: ${knightFee === null ? 'รอยืนยัน Ledger' : `-฿${(knightFee + (equipmentFee || 0)).toFixed(2)}`}\nทิปอัศวิน (100%): ฿${settlementTipAmount.toFixed(2)}\nยอดที่ผู้โดยสารชำระ: ฿${totalPassengerPaid.toFixed(2)}\nสถานะบัญชี: ${settlementConfirmed ? `SETTLED / Ledger ${displayOrder.ledgerTransactionId}` : 'รอการยืนยัน Ledger'}`;
     navigator.clipboard.writeText(receiptText);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
@@ -217,11 +217,11 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
               <div className="pl-2 space-y-0.5 text-[10px] text-slate-400">
                 <div className="flex justify-between">
                   <span>• ค่าธรรมเนียม/กองทุนอัศวินจาก Ledger จริง</span>
-                  <span className="text-emerald-400 font-mono">✓ หักแล้ว</span>
+                  <span className="text-emerald-400 font-mono">{settlementConfirmed ? '✓ ยืนยันแล้ว' : 'รอยืนยัน'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>• ค่าอุปกรณ์จาก Ledger จริง (ถ้ามี)</span>
-                  <span className="text-emerald-400 font-mono">✓ หักแล้ว</span>
+                  <span className="text-emerald-400 font-mono">{settlementConfirmed ? '✓ ยืนยันแล้ว' : 'รอยืนยัน'}</span>
                 </div>
               </div>
             </div>
