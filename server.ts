@@ -2528,21 +2528,14 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 
-async function getLiveRouteForOrder(input: ServerOrder) {
-  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) throw new Error("ROUTES_API_NOT_CONFIGURED");
-  const origin = input.pickupCoord!;
-  const destination = input.dropoffCoord!;
-  const response = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } })),
-    signal: AbortSignal.timeout(12_000),
-  });
-  if (!response.ok) throw new Error(`ROUTES_API_HTTP_${response.status}`);
-  const payload = await response.json() as { routes?: Array<{ distanceMeters?: number; duration?: string }> };
-  const route = payload.routes?.[0];
-  const distanceMeters = Number(route?.distanceMeters);
-  const durationSeconds = Number.parseFloat(String(route?.duration || "").replace("s", ""));
-  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0 || !Number.isFinite(durationSeconds) || durationSeconds <= 0) throw new Error("ROUTES_API_EMPTY");
-  return { distanceKm: Math.round((distanceMeters / 1000) * 100) / 100, estMinutes: Math.max(1, Math.ceil(durationSeconds / 60)) };
+function getOrderEstimateFromCoordinates(input: ServerOrder) {
+  const distanceKm = Math.round(distanceKmBetween(input.pickupCoord!, input.dropoffCoord!) * 100) / 100;
+  return {
+    distanceKm,
+    estMinutes: Math.max(3, Math.ceil(distanceKm * 3.5)),
+    distanceSource: "straight_line_estimate",
+    etaSource: "local_estimate",
+  };
 }
 
 app.post("/api/orders", rateLimit(20), async (req, res) => {
@@ -2588,19 +2581,9 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
     return res.status(400).json({ error: "Invalid service, route, or fare data" });
   }
 
-  let distanceKm = clientDistanceKm > 0 ? clientDistanceKm : 3.0;
-  let estMinutes = 10;
-  try {
-    const liveRoute = await getLiveRouteForOrder(input);
-    distanceKm = liveRoute.distanceKm;
-    estMinutes = liveRoute.estMinutes;
-  } catch (error: any) {
-    console.warn("[Order Route Live Fallback]:", error?.message);
-    if (validCoordinates(input.pickupCoord) && validCoordinates(input.dropoffCoord)) {
-      distanceKm = distanceKmBetween(input.pickupCoord!, input.dropoffCoord!);
-      estMinutes = Math.max(3, Math.ceil(distanceKm * 3.5));
-    }
-  }
+  const estimate = getOrderEstimateFromCoordinates(input);
+  const distanceKm = estimate.distanceKm;
+  const estMinutes = estimate.estMinutes;
 
   const orderRef = ordersCollection.doc(String(input.id));
 
@@ -2661,7 +2644,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
     try {
       authoritativeQuote = calculateServerFare(normalizedServiceId, distanceKm);
     } catch (fareErr) {
-      authoritativeQuote = { fareBaht: requestedFare || 50, breakdown: [] };
+      return res.status(400).json({ error: "Unable to calculate authoritative fare", code: "FARE_CALCULATION_FAILED" });
     }
     const fare = authoritativeQuote.fareBaht;
 
@@ -2680,6 +2663,9 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       distanceKm,
       fare,
       fareQuote: authoritativeQuote,
+      distanceSource: estimate.distanceSource,
+      etaSource: estimate.etaSource,
+      fareBasis: "straight_line_estimate",
       welfareFund2Baht,
       netFare: Math.max(0, fare - welfareFund2Baht),
       estMinutes,
