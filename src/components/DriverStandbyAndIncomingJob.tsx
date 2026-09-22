@@ -434,7 +434,7 @@ distanceKm: pending.distanceKm,
         driverName: getCurrentUserSession()?.name || '',
         driverLevel: driverLevel || 1,
         driverPlate: getCurrentUserSession()?.plateNumber || '',
-        driverAvatarEmoji: '🦁'
+        driverAvatarEmoji: getCurrentUserSession()?.avatarEmoji || '🛵'
       };
       setCompletedOrderForReceipt(receiptOrder);
       setShowReceiptModal(true);
