@@ -1,12 +1,11 @@
 /**
  * WINRIDER.AI — Central Image Registry
  *
- * All production images that live under /public/images are declared here.
- * Public assets are served by Vite from the root path, so registry values
- * intentionally use /images/... URLs.
+ * Every production image in /public/images is mapped here to the exact
+ * original UI area it belongs to. Do not create replacement artwork here.
  *
- * Keep UI components from inventing image paths. Add/replace assets here
- * when the real file exists in public/images.
+ * Vite serves files in public/ from the site root, so:
+ *   public/images/example.jpg -> /images/example.jpg
  */
 
 export type WinImageKey =
@@ -23,11 +22,13 @@ export type WinImageKey =
   | 'profiles'
   | 'shop'
   | 'transit'
+  | 'admin'
   | 'cyber';
 
 export const WIN_IMAGES = {
   appLogo: '/images/app_logo.jpg',
 
+  // 8 เสาหลักบริการ
   pillars: {
     knight: '/images/pillar_knight.jpg',
     express: '/images/pillar_express.jpg',
@@ -39,6 +40,7 @@ export const WIN_IMAGES = {
     link: '/images/pillar_link.jpg',
   },
 
+  // ชุดเกราะ
   armor: {
     standard: '/images/armor_standard.jpg',
     circuit: '/images/armor_circuit.jpg',
@@ -47,6 +49,7 @@ export const WIN_IMAGES = {
     cyber: '/images/cyber_armor.jpg',
   },
 
+  // รถ / การเดินทาง
   vehicles: {
     standard: '/images/ride_standard.jpg',
     sport: '/images/ride_sport.jpg',
@@ -59,34 +62,42 @@ export const WIN_IMAGES = {
     ambulance: '/images/ambulance_vehicle.jpg',
   },
 
+  // ศูนย์พยาบาล & กู้ชีพฉุกเฉิน
   emergency: {
     hospital: '/images/hospital_clinic.jpg',
     ambulance: '/images/ambulance_vehicle.jpg',
   },
 
+  // Faith & Sacred Calendar / ความเชื่อ
   faith: {
     header: '/images/religious-faith-header.svg',
     religion: '/images/faith_religion.jpg',
-    muBuddy: '/images/mu_buddy.jpg',\n    elderSupport: '/images/elderly_spirit.jpg',
+    muBuddy: '/images/mu_buddy.jpg',
+    elderSupport: '/images/elderly_spirit.jpg',
   },
 
+  // WIN FAMILY
   family: {
     service: '/images/family_school.jpg',
   },
 
+  // WIN PETCARE
   petCare: {
     service: '/images/pet_care.jpg',
   },
 
+  // Lifestyle
   lifestyle: {
     cafe: '/images/lifestyle_cafe.jpg',
   },
 
+  // WIN Street Market
   market: {
     food: '/images/street_market_food.jpg',
     cookie: '/images/cookie_box.jpg',
   },
 
+  // โปรไฟล์ตามบทบาท
   profiles: {
     citizen: '/images/avatar_citizen.jpg',
     passengerFemale: '/images/avatar_passenger_female.jpg',
@@ -99,6 +110,7 @@ export const WIN_IMAGES = {
     commuter: '/images/person_commuter.jpg',
   },
 
+  // WIN SHOP
   shop: {
     armorKneeguards: '/images/shop_armor_kneeguards.jpg',
     commIntercom: '/images/shop_comm_intercom.jpg',
@@ -115,7 +127,21 @@ export const WIN_IMAGES = {
     train: '/images/transit_train.jpg',
   },
 
-  admin: {\n    overview: '/images/admin/admin-overview.svg',\n    auditLogs: '/images/admin/audit-logs.svg',\n    feeRules: '/images/admin/fee-rules.svg',\n    kycReview: '/images/admin/kyc-review.svg',\n    paymentProfiles: '/images/admin/payment-profiles.svg',\n    systemHealth: '/images/admin/system-health.svg',\n    topupReview: '/images/admin/topup-review.svg',\n    usersManagement: '/images/admin/users-management.svg',\n    walletLedger: '/images/admin/wallet-ledger.svg',\n  },\n\n  cyber: {
+  // Admin UI
+  admin: {
+    overview: '/images/admin/admin-overview.svg',
+    auditLogs: '/images/admin/audit-logs.svg',
+    feeRules: '/images/admin/fee-rules.svg',
+    kycReview: '/images/admin/kyc-review.svg',
+    paymentProfiles: '/images/admin/payment-profiles.svg',
+    systemHealth: '/images/admin/system-health.svg',
+    topupReview: '/images/admin/topup-review.svg',
+    usersManagement: '/images/admin/users-management.svg',
+    walletLedger: '/images/admin/wallet-ledger.svg',
+  },
+
+  // Cyber / shared UI artwork
+  cyber: {
     arena: '/images/cyber_arena.jpg',
     food: '/images/cyber_food.jpg',
     coins: '/images/cyber_coins.jpg',
@@ -139,9 +165,9 @@ export type WinImagePath =
   | (typeof WIN_IMAGES.profiles)[keyof typeof WIN_IMAGES.profiles]
   | (typeof WIN_IMAGES.shop)[keyof typeof WIN_IMAGES.shop]
   | (typeof WIN_IMAGES.transit)[keyof typeof WIN_IMAGES.transit]
-  | (typeof WIN_IMAGES.cyber)[keyof typeof WIN_IMAGES.cyber]\n  | (typeof WIN_IMAGES.admin)[keyof typeof WIN_IMAGES.admin];
+  | (typeof WIN_IMAGES.admin)[keyof typeof WIN_IMAGES.admin]
+  | (typeof WIN_IMAGES.cyber)[keyof typeof WIN_IMAGES.cyber];
 
 export const getWinImage = (path?: string | null): string => {
-  if (!path) return WIN_IMAGES.appLogo;
-  return path;
+  return path || WIN_IMAGES.appLogo;
 };
