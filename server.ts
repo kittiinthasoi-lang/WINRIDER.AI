@@ -3001,6 +3001,39 @@ app.post("/api/orders/:id/decline", rateLimit(30), async (req, res) => {
   }
 });
 
+app.post("/api/orders/:id/completion-proof", rateLimit(10), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const { id } = req.params;
+  const proofUrl = String(req.body?.proofUrl || "").trim();
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  if (!proofUrl || proofUrl.length > 2000 || !/^https?:\/\//i.test(proofUrl)) {
+    return res.status(400).json({ error: "หลักฐานรูปถ่ายไม่ถูกต้อง", code: "INVALID_PROOF" });
+  }
+  try {
+    const orderRef = ordersCollection.doc(id);
+    const snap = await orderRef.get();
+    if (!snap.exists) return res.status(404).json({ error: "Order not found" });
+    const order = snap.data() as ServerOrder;
+    if (order.driverUserId !== user.uid) return res.status(403).json({ error: "Driver action required" });
+    if (order.status !== "in_transit") return res.status(409).json({ error: "Completion proof is only accepted while the ride is in transit" });
+    const updatedAt = new Date().toISOString();
+    const proof = {
+      completionProofUrl: proofUrl,
+      completionProofCapturedAt: updatedAt,
+      ...(Number.isFinite(latitude) && Number.isFinite(longitude) ? { completionProofLatitude: latitude, completionProofLongitude: longitude } : {})
+    };
+    await orderRef.update({ ...proof, updatedAt });
+    const updatedOrder = { ...order, ...proof, updatedAt };
+    resilientOrdersStore.set(id, updatedOrder);
+    return res.json({ success: true, order: updatedOrder });
+  } catch (error: any) {
+    console.error("[Completion Proof Error]:", error?.message);
+    return res.status(503).json({ error: "ไม่สามารถบันทึกหลักฐานการส่งมอบได้" });
+  }
+});
+
 app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
