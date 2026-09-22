@@ -8,6 +8,7 @@ import {
 import { MarketItem } from '../types';
 import { useRealGeolocation } from '../hooks/useRealGeolocation';
 import { WinStreetMarketView } from './WinStreetMarketView';
+import { getExternalGoogleMapsNavUrl } from '../services/googleRoutesService';
 
 interface ShopProfile {
   id: string;
@@ -307,7 +308,24 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
 
             <div className="space-y-5 p-4 sm:p-5">
               {(selectedProfile.phone || selectedProfile.email || selectedProfile.contactPerson) && <section className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4"><h4 className="text-xs font-black text-emerald-300">ช่องทางติดต่อจริง</h4><div className="mt-2 grid gap-2 sm:grid-cols-3">{selectedProfile.contactPerson && <div className="rounded-xl bg-black/15 p-2.5"><p className="text-[9px] text-slate-500">ผู้ติดต่อ</p><p className="text-xs font-bold text-white">{selectedProfile.contactPerson}</p></div>}{selectedProfile.phone && <div className="rounded-xl bg-black/15 p-2.5"><p className="text-[9px] text-slate-500">โทรศัพท์</p><p className="text-xs font-bold text-white">{selectedProfile.phone}</p></div>}{selectedProfile.email && <div className="rounded-xl bg-black/15 p-2.5"><p className="text-[9px] text-slate-500">อีเมล</p><p className="truncate text-xs font-bold text-white">{selectedProfile.email}</p></div>}</div><p className="mt-2 text-[10px] text-slate-500">ข้อมูลจากการลงทะเบียนจริงของบัญชีใน WINRIDER.AI</p></section>}
-              {selectedProfile.address && <section className="rounded-2xl border border-white/10 bg-white/5 p-4"><h4 className="text-xs font-black text-cyan-300">📍 ที่ตั้ง</h4><p className="mt-2 text-sm text-white">{selectedProfile.address}</p><p className="mt-1 text-[10px] text-slate-500">ข้อมูลจากโปรไฟล์ที่ลงทะเบียนใน WINRIDER.AI</p></section>}
+              {selectedProfile.address && (
+                <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-cyan-300">📍 ที่ตั้งร้านค้า / พาร์ทเนอร์</h4>
+                    <a
+                      href={getExternalGoogleMapsNavUrl(`${selectedProfile.name} ${selectedProfile.address}`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-bold text-cyan-300 hover:bg-cyan-400/20 transition-colors"
+                    >
+                      <Navigation className="h-3 w-3" />
+                      เปิด Google Maps นำทาง ↗
+                    </a>
+                  </div>
+                  <p className="mt-2 text-sm text-white">{selectedProfile.address}</p>
+                  <p className="mt-1 text-[10px] text-slate-500">ข้อมูลจากโปรไฟล์ที่ลงทะเบียนใน WINRIDER.AI</p>
+                </section>
+              )}
               {selectedProfile.highlights.length > 0 && <section><h4 className="mb-2 text-sm font-black text-amber-300">จุดเด่นของร้าน/พาร์ทเนอร์</h4><div className="flex flex-wrap gap-2">{selectedProfile.highlights.map((item) => <span key={item} className="rounded-full border border-amber-400/20 bg-amber-400/5 px-3 py-1.5 text-xs text-amber-100">{item}</span>)}</div></section>}
               {([
                 ['products', 'สินค้า', 'สินค้าที่ลงขายในหน้าร้าน', 'products'],

@@ -272,7 +272,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   // Google Maps Routes API (New) Live Integration State
   const [selectedDestination, setSelectedDestination] = useState<RouteDestination>({
     id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0,
-    address: '', landmark: '', estimatedFare: 0
+    address: '', landmark: ''
   });
   const [liveRoute, setLiveRoute] = useState<ComputedLiveRoute | null>(null);
   const [isComputingRoute, setIsComputingRoute] = useState<boolean>(false);
@@ -398,8 +398,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
         lat: result.lat,
         lng: result.lng,
         address: result.address,
-        landmark: result.landmark,
-        estimatedFare: result.estimatedFare
+        landmark: result.landmark
       })));
       if (results.length === 0) {
         setDestinationInputError('ไม่พบปลายทางจริงจาก Google Places ลองค้นชื่อสถานที่หรือที่อยู่อีกครั้ง');
@@ -451,7 +450,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
     setDestinationSearchResults([]);
     setDestinationInputError('');
     setShowDestinationPicker(false);
-    setSelectedDestination({ id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0, address: '', landmark: '', estimatedFare: 0 });
+    setSelectedDestination({ id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0, address: '', landmark: '' });
   }, [activeJob?.id]);
 
   // Holo Overlay & Weather
@@ -948,8 +947,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
                   lat: activeJob.dropoffCoord!.lat,
                   lng: activeJob.dropoffCoord!.lng,
                   address: activeJob.dropoffAddressTh || activeJob.dropoffLocation || '',
-                  landmark: 'ปลายทางที่มากับงานที่รับ',
-                  estimatedFare: activeJob.netFare || activeJob.baseFare || 0
+                  landmark: 'ปลายทางที่มากับงานที่รับ'
                 })}
                 className="w-full mb-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 hover:bg-emerald-500/20 p-2 text-left"
               >
@@ -1016,7 +1014,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             onArrivedAtPickup={() => {
               if (audioEnabled) playTactileBlip(950);
               setDriverLegPhase('to_destination');
-              setSelectedDestination({ id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0, address: '', landmark: '', estimatedFare: 0 });
+              setSelectedDestination({ id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0, address: '', landmark: '' });
               setLiveRoute(null);
               setShowDestinationPicker(true);
               triggerVoiceGuidance('ถึงจุดรับแล้ว กรุณาค้นหาหรือเลือกปลายทางเพื่อเริ่มนำทาง');

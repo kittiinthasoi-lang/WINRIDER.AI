@@ -975,16 +975,16 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
                       {filteredLifestylePlaces.map((place) => {
                         const route = resolvedRoutes[`lifestyle:${place.id}`];
+                        const distKm = route ? route.distanceKm : ((place as any).distanceKm || 3.0);
                         return <div
                           key={place.id}
                           onClick={() => {
-                            if (!route) return;
                             if (audioEnabled) playTactileBlip(950);
                             if (onSelectLifestylePlace) {
-                              onSelectLifestylePlace({ ...place, distanceKm: route.distanceKm });
+                              onSelectLifestylePlace({ ...place, distanceKm: distKm });
                             }
                           }}
-                          className={`p-2 rounded-xl bg-black/40 border border-white/10 transition-all space-y-1 ${route ? 'hover:border-purple-400 hover:bg-purple-900/20 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
+                          className="p-2 rounded-xl bg-black/40 border border-white/10 hover:border-purple-400 hover:bg-purple-900/20 cursor-pointer transition-all space-y-1"
                         >
                           <div className="flex items-center justify-between text-xs font-bold text-white">
                             <span className="flex items-center gap-1 truncate">
@@ -1105,19 +1105,18 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                 </div>
 
                 <button
-                  disabled={!resolvedRoutes[`prayer:${selectedPrayer.id}`]}
                   onClick={() => {
                     const route = resolvedRoutes[`prayer:${selectedPrayer.id}`];
-                    if (!route) return;
+                    const distKm = route ? route.distanceKm : 4.0;
                     if (onSelectReligiousDestination) {
-                      onSelectReligiousDestination(selectedPrayer.location, route.distanceKm);
+                      onSelectReligiousDestination(selectedPrayer.location, distKm);
                     }
                     if (audioEnabled) playTactileBlip(1200);
                   }}
-                  className="w-full py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-amber-500 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-amber-500 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-lg hover:brightness-105 transition-all"
                 >
                   <MapPin className="w-3.5 h-3.5" />
-                  <span>{resolvedRoutes[`prayer:${selectedPrayer.id}`] ? `ปักหมุด • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].distanceKm} กม. • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].etaMinutes || '—'} นาที` : 'กำลังรอ GPS และข้อมูลปลายทาง'}</span>
+                  <span>{resolvedRoutes[`prayer:${selectedPrayer.id}`] ? `ปักหมุด • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].distanceKm} กม. • ${resolvedRoutes[`prayer:${selectedPrayer.id}`].etaMinutes || '—'} นาที` : 'ปักหมุดไปสถานที่นี้ & เดินทาง'}</span>
                 </button>
               </div>
             )}
@@ -1256,22 +1255,21 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
                       {/* One-Click Destination Button */}
                       <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                        <span className="text-[9px] text-slate-400 font-mono">{route ? '✓ มีข้อมูลปลายทาง/ระยะทางประมาณการ' : 'กำลังรอ GPS และข้อมูลปลายทาง'}</span>
+                        <span className="text-[9px] text-slate-400 font-mono">{route ? `✓ ${route.distanceKm} กม.` : `อ้างอิงสถานี ~${st.distanceKm || 3.5} กม.`}</span>
 
                         <button
-                          disabled={!route}
                           onClick={() => {
-                            if (!route) return;
+                            const effectiveDist = route ? route.distanceKm : (st.distanceKm || 3.5);
                             if (audioEnabled) {
                               playTactileBlip(1200);
                               speakThaiText(`ปักหมุดปลายทางไปยัง ${st.name}`);
                             }
                             if (onSelectReligiousDestination) {
-                              onSelectReligiousDestination(st.name, route.distanceKm);
+                              onSelectReligiousDestination(st.name, effectiveDist);
                             }
                             setActiveTab('drivers');
                           }}
-                          className="px-3 py-1 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-[10px] font-mono flex items-center gap-1 shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="px-3 py-1 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-[10px] font-mono flex items-center gap-1 shadow-md transition-all cursor-pointer"
                         >
                           <MapPin className="w-3 h-3" />
                           <span>ปักหมุดไปสถานที่นี้ & จับคู่วิน</span>

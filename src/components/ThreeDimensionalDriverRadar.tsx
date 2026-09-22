@@ -40,13 +40,15 @@ import {
   Crosshair,
   Clock,
   Leaf,
-  Globe
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import { Vehicle } from '../types';
 import { playTactileBlip, playRadarScan, playEngineRev, speakThaiText } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 import { GoogleMapsLiveView } from './GoogleMapsLiveView';
 import { ARLiveCameraNavigation, ARManeuverType } from './ARLiveCameraNavigation';
+import { getExternalGoogleMapsNavUrl } from '../services/googleRoutesService';
 import { 
   RadarNavRoute, 
   RadarNavStep, 
@@ -1156,6 +1158,18 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
                 </span>
               </div>
             )}
+
+            {/* External Google Maps Button */}
+            <a
+              href={getExternalGoogleMapsNavUrl(selectedPing.location || selectedPing.name)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-bold text-xs font-mono flex items-center gap-1.5 transition-all active:scale-95"
+              title="เปิดดูตำแหน่งใน Google Maps ภายนอก"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Google Maps</span>
+            </a>
 
             {/* Quick Navigate to Ping Button */}
             <button

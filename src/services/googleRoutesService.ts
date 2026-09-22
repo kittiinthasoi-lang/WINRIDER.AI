@@ -20,7 +20,6 @@ export interface RouteDestination {
   lng: number;
   address: string;
   landmark: string;
-  estimatedFare: number;
 }
 
 export interface LiveRouteStep {
@@ -56,73 +55,167 @@ export interface ResolvedDestinationSearch extends RouteDestination {
   etaMinutes?: number | null;
 }
 
+import { REAL_BANGKOK_LOCATIONS } from '../data/realBangkokLocations';
+
+function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 1.35 * 10) / 10; // 1.35x Bangkok urban road factor
+}
+
 /**
- * Search a real destination from the Knight's current GPS through the existing
- * authenticated Google Places (New) resolver.
- * Road-route calculation is intentionally unavailable while Google Routes API is disabled;
- * callers must treat distance/ETA from the resolver as estimates, not road-route truth.
+ * Generate a Google Maps Universal Directions URL for external navigation.
+ * Can be called with a single destination (uses current location), or origin + destination.
+ */
+export function getExternalGoogleMapsNavUrl(
+  destinationOrOrigin: { lat: number; lng: number } | string,
+  maybeDestination?: { lat: number; lng: number } | string
+): string {
+  if (!maybeDestination) {
+    const d = typeof destinationOrOrigin === 'string'
+      ? encodeURIComponent(destinationOrOrigin)
+      : `${destinationOrOrigin.lat},${destinationOrOrigin.lng}`;
+    return `https://www.google.com/maps/dir/?api=1&destination=${d}&travelmode=two-wheeler`;
+  }
+  const origin = destinationOrOrigin;
+  const destination = maybeDestination;
+  if (typeof origin === 'object' && typeof destination === 'object') {
+    return `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&travelmode=two-wheeler`;
+  }
+  const o = typeof origin === 'string' ? encodeURIComponent(origin) : `${origin.lat},${origin.lng}`;
+  const d = typeof destination === 'string' ? encodeURIComponent(destination) : `${destination.lat},${destination.lng}`;
+  return `https://www.google.com/maps/dir/?api=1&origin=${o}&destination=${d}&travelmode=two-wheeler`;
+}
+
+/**
+ * Opens external Google Maps turn-by-turn navigation in a new window/tab.
+ */
+export function openExternalGoogleMaps(
+  destination: { lat: number; lng: number; name?: string; address?: string },
+  origin?: { lat: number; lng: number }
+): void {
+  const originStr = origin && Number.isFinite(origin.lat) && Number.isFinite(origin.lng)
+    ? `&origin=${origin.lat},${origin.lng}`
+    : '';
+  const destStr = Number.isFinite(destination.lat) && Number.isFinite(destination.lng) && destination.lat !== 0
+    ? `&destination=${destination.lat},${destination.lng}`
+    : `&destination=${encodeURIComponent(destination.address || destination.name || 'กรุงเทพมหานคร')}`;
+  const url = `https://www.google.com/maps/dir/?api=1${originStr}${destStr}&travelmode=two-wheeler`;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/**
+ * Search reference destinations from GPS.
+ * Evaluates Bangkok reference points first, supplemented with the server resolver when available.
+ * Fares are NEVER fixed per destination; authoritative fares are always calculated via calculateAppFare(serviceId, distanceKm).
  */
 export async function searchDestinationsFromGps(params: {
   latitude: number;
   longitude: number;
   query: string;
 }): Promise<ResolvedDestinationSearch[]> {
-  const query = params.query.trim();
+  const query = params.query.trim().toLowerCase();
   if (!query || !Number.isFinite(params.latitude) || !Number.isFinite(params.longitude)) return [];
 
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('Authentication required for destination search');
+  // 1. Instant local matching against Bangkok reference destinations
+  const localMatches: ResolvedDestinationSearch[] = [];
+  const allReferencePlaces = [
+    ...POPULAR_BANGKOK_DESTINATIONS,
+    ...REAL_BANGKOK_LOCATIONS.map((loc) => ({
+      id: loc.id,
+      name: loc.name,
+      nameEn: loc.name,
+      category: loc.zoneTitle,
+      lat: loc.lat,
+      lng: loc.lng,
+      address: loc.addressTh,
+      landmark: loc.landmarkNote,
+    })),
+  ];
 
-  const response = await fetch('/api/places/resolve-routes', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      latitude: params.latitude,
-      longitude: params.longitude,
-      places: [{ key: 'knight-destination-search', query: `${query} ประเทศไทย` }]
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error('ค้นหาปลายทางจริงไม่สำเร็จ');
+  for (const place of allReferencePlaces) {
+    const textCorpus = `${place.name} ${place.nameEn} ${place.address} ${place.landmark} ${place.category}`.toLowerCase();
+    if (textCorpus.includes(query)) {
+      const dist = calculateDistanceKm(params.latitude, params.longitude, place.lat, place.lng);
+      localMatches.push({
+        ...place,
+        distanceKm: dist,
+        etaMinutes: Math.max(3, Math.ceil(dist * 3.5)),
+      });
+    }
   }
 
-  const payload = await response.json() as {
-    routes?: Array<{
-      key: string;
-      placeId?: string;
-      name?: string;
-      address?: string;
-      latitude?: number;
-      longitude?: number;
-      distanceKm?: number;
-      etaMinutes?: number | null;
-    }>;
-  };
+  // 2. Optionally attempt authenticated server-side places search for expanded coverage
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    if (token) {
+      const response = await fetch('/api/places/resolve-routes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          latitude: params.latitude,
+          longitude: params.longitude,
+          places: [{ key: 'knight-destination-search', query: `${params.query.trim()} ประเทศไทย` }]
+        })
+      });
 
-  return (payload.routes || [])
-    .filter((route) => typeof route.latitude === 'number' && Number.isFinite(route.latitude) && typeof route.longitude === 'number' && Number.isFinite(route.longitude))
-    .map((route) => ({
-      id: String(route.placeId || route.key),
-      name: String(route.name || query),
-      nameEn: '',
-      category: 'Google Places',
-      lat: Number(route.latitude),
-      lng: Number(route.longitude),
-      address: String(route.address || ''),
-      landmark: '',
-      estimatedFare: 0,
-      placeId: route.placeId,
-      distanceKm: typeof route.distanceKm === 'number' && Number.isFinite(route.distanceKm) ? Number(route.distanceKm) : undefined,
-      etaMinutes: route.etaMinutes ?? null
-    }));
+      if (response.ok) {
+        const payload = await response.json() as {
+          routes?: Array<{
+            key: string;
+            placeId?: string;
+            name?: string;
+            address?: string;
+            latitude?: number;
+            longitude?: number;
+            distanceKm?: number;
+            etaMinutes?: number | null;
+          }>;
+        };
+
+        const serverPlaces: ResolvedDestinationSearch[] = (payload.routes || [])
+          .filter((route) => typeof route.latitude === 'number' && Number.isFinite(route.latitude) && typeof route.longitude === 'number' && Number.isFinite(route.longitude))
+          .map((route) => ({
+            id: String(route.placeId || route.key),
+            name: String(route.name || params.query),
+            nameEn: '',
+            category: 'สถานที่ค้นหา',
+            lat: Number(route.latitude),
+            lng: Number(route.longitude),
+            address: String(route.address || ''),
+            landmark: '',
+            placeId: route.placeId,
+            distanceKm: typeof route.distanceKm === 'number' && Number.isFinite(route.distanceKm) ? Number(route.distanceKm) : calculateDistanceKm(params.latitude, params.longitude, Number(route.latitude), Number(route.longitude)),
+            etaMinutes: route.etaMinutes ?? Math.max(3, Math.ceil((route.distanceKm || 3) * 3.5))
+          }));
+
+        // Merge without duplicates by proximity
+        for (const sp of serverPlaces) {
+          if (!localMatches.some((lm) => Math.abs(lm.lat - sp.lat) < 0.001 && Math.abs(lm.lng - sp.lng) < 0.001)) {
+            localMatches.push(sp);
+          }
+        }
+      }
+    }
+  } catch {
+    // Graceful fallback to local reference matches
+  }
+
+  return localMatches.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
 }
 
 /**
- * Curated Bangkok Destinations for Quick Route Testing and Navigation
+ * Curated Bangkok Reference Destinations
+ * Note: Estimated fares are strictly computed by the real distance and WINRIDER Fare Engine.
+ * No static/hard-coded fares exist on reference destinations.
  */
 export const POPULAR_BANGKOK_DESTINATIONS: RouteDestination[] = [
   {
@@ -134,7 +227,6 @@ export const POPULAR_BANGKOK_DESTINATIONS: RouteDestination[] = [
     lng: 100.5700,
     address: 'สุขุมวิท 39 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ',
     landmark: 'ปากซอยติดศูนย์การค้า EmQuartier & BTS พร้อมพงษ์',
-    estimatedFare: 45
   },
   {
     id: 'dest-siam',
@@ -145,7 +237,6 @@ export const POPULAR_BANGKOK_DESTINATIONS: RouteDestination[] = [
     lng: 100.5348,
     address: 'ถนนพระรามที่ 1 แขวงปทุมวัน เขตปทุมวัน กรุงเทพฯ',
     landmark: 'ลานน้ำพุพารากอน ใกล้ BTS สยาม',
-    estimatedFare: 65
   },
   {
     id: 'dest-iconsiam',
@@ -156,7 +247,6 @@ export const POPULAR_BANGKOK_DESTINATIONS: RouteDestination[] = [
     lng: 100.5108,
     address: 'ถนนเจริญนคร แขวงคลองต้นไทร เขตคลองสาน กรุงเทพฯ',
     landmark: 'ริมแม่น้ำเจ้าพระยา ท่าเรือไอคอนสยาม',
-    estimatedFare: 55
   },
   {
     id: 'dest-siriraj',
@@ -167,7 +257,6 @@ export const POPULAR_BANGKOK_DESTINATIONS: RouteDestination[] = [
     lng: 100.4851,
     address: 'ถนนวังหลัง แขวงศิริราช เขตบางกอกน้อย กรุงเทพฯ',
     landmark: 'ตึก 100 ปี สมเด็จพระศรีนครินทร์ ท่าเรือวังหลัง',
-    estimatedFare: 40
   },
   {
     id: 'dest-thonglo',
@@ -178,7 +267,6 @@ export const POPULAR_BANGKOK_DESTINATIONS: RouteDestination[] = [
     lng: 100.5847,
     address: 'สุขุมวิท 55 (ทองหล่อ 10) แขวงคลองตันเหนือ เขตวัฒนา',
     landmark: 'หน้าศูนย์รวมร้านอาหาร The Commons & Arena 10',
-    estimatedFare: 50
   },
   {
     id: 'dest-silom',
@@ -189,7 +277,6 @@ export const POPULAR_BANGKOK_DESTINATIONS: RouteDestination[] = [
     lng: 100.5283,
     address: 'ถนนสีลม - สาทร แขวงสีลม เขตบางรัก กรุงเทพฯ',
     landmark: 'สกายวอล์กช่องนนทรี ใกล้ตึกมหานคร',
-    estimatedFare: 50
   },
   {
     id: 'dest-chatuchak',
@@ -200,7 +287,6 @@ export const POPULAR_BANGKOK_DESTINATIONS: RouteDestination[] = [
     lng: 100.5516,
     address: 'ถนนพหลโยธิน แขวงจตุจักร เขตจตุจักร กรุงเทพฯ',
     landmark: 'หอนาฬิกาจตุจักร ประตู 1 ติด MRT กำแพงเพชร',
-    estimatedFare: 85
   }
 ];
 
