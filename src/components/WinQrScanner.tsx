@@ -21,6 +21,7 @@ export const WinQrScanner: React.FC<Props> = ({ onVerified, onClose }) => {
   const [parsed, setParsed] = useState<ParsedQrPayload | null>(null);
   const [verification, setVerification] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [executing, setExecuting] = useState(false);
 
   const verifyPayload = useCallback(async (raw: string) => {
     if (busy || !raw.trim()) return;
@@ -64,6 +65,31 @@ export const WinQrScanner: React.FC<Props> = ({ onVerified, onClose }) => {
     const code = jsQR(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' });
     if (code?.data) void verifyPayload(code.data);
   }, [busy, verifyPayload]);
+
+  const executeWinWalletPayment = async () => {
+    if (!verification?.ok || parsed?.kind !== 'win_wallet' || !parsed.walletId || !verification.canExecute) return;
+    setExecuting(true);
+    try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+      const response = await fetch('/api/wallet/pay-by-qr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          walletId: parsed.walletId,
+          amountBaht: verification.amountBaht,
+          idempotencyKey: `QR-${auth.currentUser?.uid || 'user'}-${parsed.walletId}-${Math.round(verification.amountBaht * 100)}-${Date.now()}`,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.error || 'WIN_WALLET_PAYMENT_FAILED');
+      setStatus(`ดำเนินรายการสำเร็จ • เลขที่รายการ ${body.transactionId}`);
+      setVerification((prev: any) => ({ ...prev, executed: true, transactionId: body.transactionId, settlementStatus: body.status }));
+    } catch (error) {
+      setStatus(error instanceof Error ? `ดำเนินรายการไม่สำเร็จ: ${error.message}` : 'ดำเนินรายการไม่สำเร็จ');
+    } finally {
+      setExecuting(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -127,7 +153,7 @@ export const WinQrScanner: React.FC<Props> = ({ onVerified, onClose }) => {
         <div className="p-3 rounded-2xl bg-black/40 border border-white/10 text-xs">
           <p className="text-slate-300">{status}</p>
           {parsed && <div className="mt-2 text-[11px] space-y-1"><p>ชนิด: <b className="text-cyan-300">{parsed.kind}</b></p>{parsed.amountBaht !== undefined && <p>ยอดใน QR: <b className="text-amber-300">฿{parsed.amountBaht.toFixed(2)}</b></p>}{parsed.promptPayId && <p>ปลายทาง: <b className="text-white">{parsed.promptPayId}</b></p>}</div>}
-          {verification?.ok && <p className="mt-2 text-emerald-300 flex items-center gap-1"><ShieldCheck className="w-4 h-4" />Server ยืนยันเจ้าของ/ช่องทางแล้ว</p>}
+          {verification?.ok && <div className="mt-2 space-y-2"><p className="text-emerald-300 flex items-center gap-1"><ShieldCheck className="w-4 h-4" />Server ยืนยันเจ้าของ/ช่องทางแล้ว</p>{verification.canExecute && !verification.executed && <button disabled={executing} onClick={() => void executeWinWalletPayment()} className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs disabled:opacity-50">{executing ? 'กำลังดำเนินรายการ…' : `ดำเนินรายการ ฿${Number(verification.amountBaht).toFixed(2)}`}</button>}{verification.executed && <p className="text-cyan-300 text-[11px]">Settlement: {verification.transactionId}</p>}</div>}
           {verification?.error && <p className="mt-2 text-rose-300">{verification.error}</p>}
           {payload && <details className="mt-2"><summary className="text-slate-500 cursor-pointer">payload ที่ decode ได้</summary><pre className="text-[9px] text-slate-500 break-all whitespace-pre-wrap">{payload}</pre></details>}
         </div>
