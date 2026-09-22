@@ -1784,7 +1784,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   onBookEventRide={handleSelectWinAlertEvent}
                 />
 
-                {/* DESTINATION CAROUSEL & GOOGLE MAPS REAL LOCATIONS RANDOMIZER */}
+                {/* DESTINATION CAROUSEL — PLACE DATA ONLY */}
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -1826,8 +1826,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                         key={'real-' + idx}
                         onClick={() => {
                           if (audioEnabled) playTactileBlip(800);
-                          setSelectedDestination(`${realLoc.name} (${realLoc.zoneTitle})`);
-                          setShowBookingModal(true);
+                          void calculateDestinationRoute(
+                            realLoc.name + ' ' + realLoc.addressTh,
+                            realLoc.name + ' (' + realLoc.zoneTitle + ')'
+                          );
                         }}
                         className="flex-shrink-0 w-44 p-3 rounded-2xl bg-gradient-to-br from-[#0B2347] to-[#07132B] border border-cyan-500/40 hover:border-[#00D2FF] transition-all cursor-pointer snap-start"
                       >
