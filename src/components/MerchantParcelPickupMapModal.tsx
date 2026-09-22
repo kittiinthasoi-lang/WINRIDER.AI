@@ -74,40 +74,8 @@ export const MerchantParcelPickupMapModal: React.FC<MerchantParcelPickupMapModal
 
   const selectedParcel = parcels.find(p => p.id === selectedParcelId) || parcels[0];
 
-  // Moving animation timer for approaching knights
-  useEffect(() => {
-    if (!isSimulatingLiveMove || currentStep >= 4) return;
-
-    const interval = setInterval(() => {
-      setParcels(prev => prev.map(pkg => {
-        const currentDist = pkg.assignedKnight.currentDistanceMeters;
-        if (currentDist <= 40) {
-          return {
-            ...pkg,
-            assignedKnight: {
-              ...pkg.assignedKnight,
-              currentDistanceMeters: 0,
-              etaMinutes: 0
-            }
-          };
-        }
-        const newDist = Math.max(0, currentDist - 25);
-        const ratio = newDist / 600;
-        return {
-          ...pkg,
-          assignedKnight: {
-            ...pkg.assignedKnight,
-            currentDistanceMeters: newDist,
-            etaMinutes: Math.max(1, Math.ceil(newDist / 200)),
-            latOffset: pkg.assignedKnight.latOffset * 0.95,
-            lngOffset: pkg.assignedKnight.lngOffset * 0.95
-          }
-        };
-      }));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isSimulatingLiveMove, currentStep]);
+  // No simulated parcel movement or barcode success is allowed here.
+  // Parcels must come from real Dispatch data before scanning/handover controls are enabled.
 
   if (!isOpen) return null;
 
@@ -117,26 +85,6 @@ export const MerchantParcelPickupMapModal: React.FC<MerchantParcelPickupMapModal
     setTimeout(() => setCallToast(null), 3500);
   };
 
-  const handleScanBarcode = (pkgId: string) => {
-    if (scannedParcels.includes(pkgId)) return;
-    if (audioEnabled) playRadarScan();
-    setScannedParcels(prev => [...prev, pkgId]);
-    onGainMerchantXp(100, `สแกนส่งมอบพัสดุ ${pkgId} สำเร็จ`);
-    confetti({ particleCount: 35, spread: 60, colors: ['#00D2FF', '#FFD700', '#10B981'] });
-    
-    if (scannedParcels.length + 1 >= parcels.length) {
-      setCurrentStep(4);
-      if (audioEnabled) playLevelUpFanfare();
-    }
-  };
-
-  const handleCompleteAllHandover = () => {
-    if (audioEnabled) playLevelUpFanfare();
-    setScannedParcels(parcels.map(p => p.id));
-    setCurrentStep(4);
-    onGainMerchantXp(300, "อัศวินรับพัสดุครบตามรายการจริงแล้ว");
-    confetti({ particleCount: 80, spread: 90, colors: ['#00D2FF', '#FFD700', '#10B981', '#FFFFFF'] });
-  };
 
   if (!isOpen) return null;
   if (parcels.length === 0) {
