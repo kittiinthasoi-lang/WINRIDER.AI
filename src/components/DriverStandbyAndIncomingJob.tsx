@@ -125,6 +125,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   const [showGoogleMapsModal, setShowGoogleMapsModal] = useState<boolean>(false);
   const [dispatchActionPending, setDispatchActionPending] = useState(false);
   const [showCompletionProof, setShowCompletionProof] = useState(false);
+  const [completionProofReady, setCompletionProofReady] = useState(false);
   const [dispatchError, setDispatchError] = useState('');
   const { gpsState } = useRealtimeGps(isOnDuty);
   const presenceLatitude = Number(gpsState.latitude.toFixed(4));
@@ -349,7 +350,7 @@ distanceKm: pending.distanceKm,
       await advanceLiveOrderStep(job.id, 'heading_pickup');
       if (audioEnabled) playEngineRev();
       confetti({ particleCount: 70, spread: 80, colors: ['#00D2FF', '#FFD700', '#10B981'] });
-      setCurrentActiveTrip(job); setTripStep('heading_pickup'); setActiveIncomingJob(null); onAcceptJob(job);
+      setCurrentActiveTrip(job); setTripStep('heading_pickup'); setCompletionProofReady(false); setActiveIncomingJob(null); onAcceptJob(job);
     } catch (error) {
       console.error('Accept dispatch failed:', error);
       const reason = error instanceof Error ? error.message : '';
@@ -387,7 +388,7 @@ distanceKm: pending.distanceKm,
     if (!currentActiveTrip) return;
     setDispatchActionPending(true); setDispatchError('');
     try {
-      if (tripStep === 'navigating' && ['express', 'family'].includes(String(currentActiveTrip.serviceId)) && !showCompletionProof) {
+      if (tripStep === 'navigating' && ['express', 'family'].includes(String(currentActiveTrip.serviceId)) && !completionProofReady) {
         setShowCompletionProof(true);
         setDispatchActionPending(false);
         return;
@@ -441,6 +442,7 @@ distanceKm: pending.distanceKm,
       setTripStep('completed');
       setTimeout(() => {
         setCurrentActiveTrip(null);
+        setCompletionProofReady(false);
         setTripStep('heading_pickup');
       }, 3500);
       }
@@ -708,6 +710,7 @@ distanceKm: pending.distanceKm,
           orderId={currentActiveTrip.id}
           onClose={() => setShowCompletionProof(false)}
           onConfirm={() => {
+            setCompletionProofReady(true);
             setShowCompletionProof(false);
             void handleAdvanceTripStep();
           }}
