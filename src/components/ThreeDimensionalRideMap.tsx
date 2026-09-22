@@ -27,7 +27,7 @@ import {
 import { DreamRideVehicle } from '../types';
 import { playTactileBlip } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
-import { computeLiveRoute, ComputedLiveRoute } from '../services/googleRoutesService';
+
 
 const GOOGLE_MAPS_API_KEY = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
 
@@ -130,34 +130,7 @@ export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = (
   // Real nearby riders, merchants, and hubs within the radius
   const nearbyRadiusEntities = useMemo<Array<{ id: string; type: string; name: string; lat: number; lng: number; emoji: string; label: string }>>(() => [], []);
 
-  // Calculated route
-  const [routeData, setRouteData] = useState<ComputedLiveRoute | null>(null);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function fetchRoute() {
-      try {
-        if (!pickupCoords || !dropoffCoords) return;
-        const res = await computeLiveRoute({
-          origin: { latitude: driverCoords.lat, longitude: driverCoords.lng },
-          destination: { latitude: dropoffCoords.lat, longitude: dropoffCoords.lng },
-          travelMode: 'TWO_WHEELER'
-        });
-        if (!isCancelled) {
-          setRouteData(res);
-        }
-      } catch (err) {
-        console.warn('Waiting route compute error:', err);
-      }
-    }
-
-    fetchRoute();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [driverCoords.lat, driverCoords.lng, pickupCoords, dropoffCoords]);
+  // Road route geometry is intentionally not rendered while Google Routes API is disabled.
 
   // Open Real Google Maps App Navigation
   const handleOpenGoogleMapsApp = () => {
@@ -253,11 +226,7 @@ export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = (
             style={{ width: '100%', height: '100%' }}
           >
             {/* Real Polyline */}
-            <RidePolylineRenderer
-              path={routeData?.polylineCoordinates || [driverCoords, pickupCoords, dropoffCoords]}
-              pickupCoords={pickupCoords}
-              dropoffCoords={dropoffCoords}
-            />
+            {/* No synthetic straight-line polyline: only real GPS/Google Maps markers are shown. */}
 
             {/* A. Customer Pickup Marker */}
             <AdvancedMarker
@@ -359,7 +328,7 @@ export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = (
           </button>
         </div>
 
-        {/* Bottom ETA Info Bar */}
+        {/* Bottom status bar: ETA is not presented as a road-route result while Routes API is disabled. */
         <div className="absolute bottom-0 left-0 right-0 z-20 p-3 bg-gradient-to-t from-[#06101E] via-[#081427]/95 to-transparent backdrop-blur-md border-t border-white/10 flex items-center justify-between gap-3 font-mono">
           <div className="flex items-baseline gap-2">
             <div className="flex items-baseline gap-1">
