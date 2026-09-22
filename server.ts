@@ -377,12 +377,6 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
     }
     const raw = [...deduplicated.values()];
     if (!raw.length) return res.status(502).json({ error: "ดึงสถานที่จริงจาก Google Places ไม่สำเร็จ", places: [] });
-    let matrix: any[] = [];
-    if (raw.length) {
-      const routeResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } }));
-      if (routeResponse.ok) matrix = await routeResponse.json() as any[];
-    }
-    const routes = new Map(matrix.filter((route) => route?.condition === "ROUTE_EXISTS").map((route) => [Number(route.destinationIndex), route]));
     const toRadians = (degrees: number) => degrees * Math.PI / 180;
     const straightLineMeters = (destinationLat: number, destinationLng: number) => {
       const earthRadius = 6_371_000;
@@ -398,8 +392,8 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
         placeGroup: String(place.radarGroup), categoryLabel: String(place.radarGroupLabel),
         primaryType: String(place.primaryType || "store"), address: String(place.formattedAddress || ""), latitude: Number(place.location.latitude), longitude: Number(place.location.longitude),
         rating: Number.isFinite(place.rating) ? Number(place.rating) : null, openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
-        distanceMeters: route && Number.isFinite(route.distanceMeters) ? Math.round(Number(route.distanceMeters)) : straightLineMeters(Number(place.location.latitude), Number(place.location.longitude)),
-        distanceSource: route && Number.isFinite(route.distanceMeters) ? "route" : "straight_line", googleMapsUri: String(place.googleMapsUri || "") };
+        distanceMeters: straightLineMeters(Number(place.location.latitude), Number(place.location.longitude)),
+        distanceSource: "straight_line", googleMapsUri: String(place.googleMapsUri || "") };
     }).sort((a, b) => Number(a.distanceMeters) - Number(b.distanceMeters));
     radarPlacesCache.set(cacheKey, { expiresAt: Date.now() + RADAR_PLACES_CACHE_MS, places });
     if (radarPlacesCache.size > 200) {
@@ -413,7 +407,7 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
       categories: searchGroups.map((group) => ({ key: group.key, label: group.label, count: places.filter((place) => place.placeGroup === group.key).length })),
       perCategoryLimit: 20,
       defaultLimit: 20,
-      source: "Google Places API (New) + Google Routes API",
+      source: "Google Places API (New) + local straight-line estimate",
       registeredPeopleSynthesized: false,
     });
   } catch (error) {
@@ -3347,125 +3341,13 @@ Respond concisely in Thai (unless asked otherwise) with clear tactical actions o
 // Source: Google Maps Platform Code Assist
 // Internal Usage Attribution: gmp_mcp_codeassist_v1_aistudio
 // =========================================================================
-let routesApiRateLimitedUntil = 0;
-
-app.post("/api/routes/compute", rateLimit(0), async (req, res) => {
-  return res.status(503).json({ error: "ROUTES_API_DISABLED", code: "ROUTES_API_DISABLED_ENDPOINT" });
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return;
-  try {
-    const {
-      origin,
-      destination,
-      travelMode = "TWO_WHEELER",
-      routingPreference = "TRAFFIC_AWARE",
-      languageCode = "th-TH"
-    } = req.body;
-
-    if (!origin || !destination) {
-      return res.status(400).json({
-        error: "กรุณาระบุ origin และ destination พร้อมพิกัด latitude และ longitude"
-      });
-    }
-
-    const originLat = Number(origin.latitude ?? origin.lat);
-    const originLng = Number(origin.longitude ?? origin.lng);
-    const destinationLat = Number(destination.latitude ?? destination.lat);
-    const destinationLng = Number(destination.longitude ?? destination.lng);
-    const validCoord = (lat: number, lng: number) => Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-    if (!validCoord(originLat, originLng) || !validCoord(destinationLat, destinationLng)) {
-      return res.status(400).json({ error: "พิกัด origin/destination ไม่ถูกต้อง" });
-    }
-
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY || "";
-
-    // 1. If live Google Maps API Key is available and not rate-limited, request Google Routes API REST endpoint
-    if (apiKey && apiKey.trim() !== "" && !apiKey.includes("MY_GOOGLE_MAPS") && Date.now() > routesApiRateLimitedUntil) {
-      try {
-        const routesPayload = {
-          origin: {
-            location: {
-              latLng: {
-                latitude: originLat,
-                longitude: Number(origin.longitude || origin.lng)
-              }
-            }
-          },
-          destination: {
-            location: {
-              latLng: {
-                latitude: destinationLat,
-                longitude: Number(destination.longitude || destination.lng)
-              }
-            }
-          },
-          travelMode: travelMode === "MOTORCYCLE" || travelMode === "TWO_WHEELER" ? "TWO_WHEELER" : travelMode,
-          routingPreference: routingPreference || "TRAFFIC_AWARE",
-          computeAlternativeRoutes: false,
-          routeModifiers: {
-            avoidTolls: false,
-            avoidHighways: travelMode === "TWO_WHEELER",
-            avoidFerries: false
-          },
-          languageCode: languageCode || "th-TH",
-          units: "METRIC"
-        };
-
-        const fieldMask = [
-          "routes.duration",
-          "routes.distanceMeters",
-          "routes.polyline.encodedPolyline",
-          "routes.description",
-          "routes.warnings",
-          "routes.legs.duration",
-          "routes.legs.distanceMeters",
-          "routes.legs.startLocation",
-          "routes.legs.endLocation",
-          "routes.legs.steps.navigationInstruction",
-          "routes.legs.steps.distanceMeters",
-          "routes.legs.steps.staticDuration",
-          "routes.legs.steps.polyline.encodedPolyline",
-          "routes.legs.steps.startLocation",
-          "routes.legs.steps.endLocation"
-        ].join(",");
-
-        const googleResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } }));
-
-        if (googleResponse.ok) {
-          const data = await googleResponse.json();
-          if (data.routes && data.routes.length > 0) {
-            return res.json({
-              success: true,
-              source: "google_routes_api_live",
-              provider: "Google Maps Platform Routes API",
-              travelMode,
-              route: data.routes[0],
-              timestamp: new Date().toISOString()
-            });
-          }
-        } else {
-          if (googleResponse.status === 429) {
-            routesApiRateLimitedUntil = Date.now() + 15 * 60 * 1000;
-          }
-        }
-      } catch (_gErr: any) {
-        // Fall back gracefully to high-fidelity tactical engine
-      }
-    }
-
-    return res.status(503).json({
-      success: false,
-      error: "Google Routes API unavailable",
-      message: "Real routing data is required; synthetic routing has been disabled."
-    });
-
-  } catch (error: any) {
-    console.error("[Routes API Endpoint Error]:", error);
-    res.status(502).json({
-      error: "Google Routes API failed",
-      message: error?.message
-    });
-  }
+app.post("/api/routes/compute", rateLimit(0), async (_req, res) => {
+  return res.status(503).json({
+    success: false,
+    error: "ROUTES_API_DISABLED",
+    code: "ROUTES_API_DISABLED_ENDPOINT",
+    message: "Google Routes API is intentionally disabled. Use Google Places for place resolution or open native Google Maps for road navigation."
+  });
 });
 
 // ==========================================
