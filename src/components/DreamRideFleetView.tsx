@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 import { DREAM_RIDES_FLEET } from '../data/dreamRidesData';
 import { DreamRideVehicle, DreamRideCategory } from '../types';
 import { getAmenityPrice, isHelmetAmenity } from '../data/amenitiesData';
@@ -81,28 +82,28 @@ export const DreamRideFleetView: React.FC<DreamRideFleetViewProps> = ({
     { 
       id: 'all', 
       label: 'ทั้งหมด (All Motorcycles)', 
-      imageUrl: '/images/cyber_vehicle.jpg', 
+      imageUrl: WIN_IMAGES.vehicles.cyber, 
       count: DREAM_RIDES_FLEET.length,
       description: 'รวมมอเตอร์ไซค์ทุกแบรนด์ ทุกประเภท ทุกขนาดความจุ' 
     },
     { 
       id: 'standard', 
       label: '1. รถทั่วไป Standard (ใช้งานทั่วไปในชีวิตประจำวัน)', 
-      imageUrl: '/images/ride_standard.jpg', 
+      imageUrl: WIN_IMAGES.vehicles.standard, 
       count: DREAM_RIDES_FLEET.filter(v => v.category === 'standard').length,
       description: 'รถครอบครัว สกู๊ตเตอร์ในเมือง บิ๊กสกู๊ตเตอร์ ประหยัดน้ำมัน คล่องตัว ทนทาน (Wave, PCX, Grand Filano, Lead, Forza, XMAX, Smash, Drone)' 
     },
     { 
       id: 'sport', 
       label: '2. รถสายสปอร์ต Sport (ซูเปอร์ไบค์ & สปอร์ตบิ๊กไบค์)', 
-      imageUrl: '/images/ride_sport.jpg', 
+      imageUrl: WIN_IMAGES.vehicles.sport, 
       count: DREAM_RIDES_FLEET.filter(v => v.category === 'sport').length,
       description: 'สุดยอดยานยนต์ความเร็วสูงระดับเวิลด์คลาส 190-240 แรงม้า (Ducati Panigale V4 S, BMW S1000RR, Yamaha R1M, Honda CBR1000RR-R, Kawasaki Ninja H2, Hayabusa 1340, RSV4)' 
     },
     { 
       id: 'classic', 
       label: '3. รถสายคลาสสิค Classic (ครุยเซอร์ ฮาเลย์ ชอปเปอร์)', 
-      imageUrl: '/images/ride_classic.jpg', 
+      imageUrl: WIN_IMAGES.vehicles.classic, 
       count: DREAM_RIDES_FLEET.filter(v => v.category === 'classic').length,
       description: 'ตำนานเหนือกาลเวลา ครุยเซอร์ ชอปเปอร์ บ็อบเบอร์ วินเทจหรูหรา (Harley-Davidson Fat Boy 114, Breakout 117, Triumph Bonneville, Royal Enfield 350, Vespa 946, BMW R18, Rebel 1100)' 
     },
