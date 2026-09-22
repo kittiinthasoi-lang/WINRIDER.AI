@@ -16,7 +16,11 @@ import {
   BarChart3,
   BadgeAlert,
   HeartPulse,
-  QrCode
+  QrCode,
+  UserRound,
+  Bike,
+  Store,
+  Building2
 } from 'lucide-react';
 import { AdminLevel } from '../../types/admin';
 import { AdminDashboardView } from './AdminDashboardView';
@@ -34,13 +38,15 @@ interface AdminLayoutProps {
   adminEmail: string;
   onExitAdmin: () => void;
   onSwitchAdminLevel?: (lvl: AdminLevel) => void;
+  onSelectOwnerPersona?: (persona: 'customer' | 'driver' | 'merchant' | 'partner') => void;
 }
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   adminLevel,
   adminEmail,
   onExitAdmin,
-  onSwitchAdminLevel
+  onSwitchAdminLevel,
+  onSelectOwnerPersona
 }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
 
@@ -196,6 +202,45 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           </div>
         </div>
       </header>
+
+      {/* Owner Role Profile Center: four real personas, one Firebase identity */}
+      {onSelectOwnerPersona && (
+        <section className="max-w-7xl mx-auto w-full px-3 sm:px-6 pt-4">
+          <div className="rounded-3xl border border-cyan-400/20 bg-gradient-to-br from-[#0B1830] via-[#081329] to-[#050B18] p-4 shadow-2xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-cyan-300" />
+                  <h2 className="text-sm font-black text-white">ศูนย์โปรไฟล์ 4 บทบาท</h2>
+                  <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-300">REAL ACCOUNT</span>
+                </div>
+                <p className="mt-1 text-[10px] text-slate-400">เปิดใช้งานโปรไฟล์จริงของบัญชีแอดมินด้วย Firebase UID เดิม ไม่สร้างข้อมูลผู้ใช้จำลอง</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {([
+                  ['customer', 'ลูกค้า', '🛡️', UserRound],
+                  ['driver', 'พี่วิน', '🏍️', Bike],
+                  ['merchant', 'ร้านค้า', '🏪', Store],
+                  ['partner', 'พาร์ทเนอร์', '🏢', Building2],
+                ] as const).map(([persona, label, emoji, Icon]) => (
+                  <button
+                    key={persona}
+                    type="button"
+                    onClick={() => onSelectOwnerPersona(persona)}
+                    className="group flex min-w-[112px] items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left transition-all hover:border-cyan-400/40 hover:bg-cyan-400/10 active:scale-[0.98]"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/30 text-base">{emoji}</span>
+                    <span className="min-w-0">
+                      <span className="block text-[10px] font-black text-white">{label}</span>
+                      <span className="mt-0.5 flex items-center gap-1 text-[8px] text-slate-500"><Icon className="h-3 w-3" /> เปิดโปรไฟล์</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Main Admin Content Viewport */}
       <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 py-6 flex-1">
