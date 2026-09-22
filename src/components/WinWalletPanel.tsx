@@ -104,12 +104,12 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
 
   // Generate PromptPay QR for system deposit
   useEffect(() => {
-    const promptPayId = walletData?.systemPromptPay?.promptPayId || '0899999999';
+    const promptPayId = walletData?.systemPromptPay?.promptPayId || '';
     if (!promptPayId || depositAmount <= 0) {
       setDepositQr('');
       return;
     }
-    generatePromptPayQRDataUrl(promptPayId, depositAmount)
+    promptPayId ? generatePromptPayQRDataUrl(promptPayId, depositAmount) : Promise.resolve('')
       .then(setDepositQr)
       .catch(() => setDepositError('สร้าง QR โอนเงินของระบบไม่สำเร็จ'));
   }, [walletData?.systemPromptPay?.promptPayId, depositAmount]);
@@ -203,8 +203,10 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
   };
 
   const balance = walletData?.balance ?? 0.0;
-  const promptPaySystemId = walletData?.systemPromptPay?.promptPayId || '0899999999';
-  const systemAccountName = walletData?.systemPromptPay?.accountName || 'WINRIDER.AI SYSTEM WALLET';
+  const promptPaySystemId = walletData?.systemPromptPay?.promptPayId || '';
+  const systemBankName = walletData?.systemPromptPay?.bankName || '';
+  const systemBankAccountNumber = walletData?.systemPromptPay?.bankAccountNumber || '';
+  const systemAccountName = walletData?.systemPromptPay?.accountName || '';
 
   return (
     <div className="space-y-4 font-sans text-slate-100">
