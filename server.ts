@@ -4110,28 +4110,49 @@ async function startServer() {
 
 function serveStaticFiles(distPath: string) {
   console.log(`[WINRIDER.AI] Static distribution directory: ${distPath}`);
-  app.use(express.static(distPath));
 
-  app.get("*", (_req, res, next) => {
+  // Serve production artifacts first. Vite copies files from public/ to the
+  // root of dist/ during build, so /images/foo.jpg must resolve directly.
+  // Do not let the SPA fallback turn a missing asset into index.html.
+  app.use(express.static(distPath, {
+    fallthrough: true,
+    index: false,
+  }));
+
+  app.get("*", (req, res, next) => {
+    const pathname = req.path;
+    const isStaticAsset = (
+      pathname.startsWith("/images/") ||
+      pathname.startsWith("/assets/") ||
+      /\\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|css|js|mjs|map|json)$/i.test(pathname)
+    );
+
+    if (isStaticAsset) {
+      return res.status(404).json({
+        error: "Static asset not found",
+        path: pathname,
+      });
+    }
+
     const indexPath = path.join(distPath, "index.html");
     if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath, (err) => {
+      return res.sendFile(indexPath, (err) => {
         if (err && !res.headersSent) {
           next(err);
         }
       });
-    } else {
-      const fallbackPath = path.resolve(process.cwd(), "index.html");
-      if (fs.existsSync(fallbackPath)) {
-        res.sendFile(fallbackPath, (err) => {
-          if (err && !res.headersSent) {
-            next(err);
-          }
-        });
-      } else {
-        res.status(200).send("<!doctype html><html><head><title>WINRIDER.AI</title></head><body><h1>WINRIDER.AI</h1></body></html>");
-      }
     }
+
+    const fallbackPath = path.resolve(process.cwd(), "index.html");
+    if (fs.existsSync(fallbackPath)) {
+      return res.sendFile(fallbackPath, (err) => {
+        if (err && !res.headersSent) {
+          next(err);
+        }
+      });
+    }
+
+    return res.status(500).send("WINRIDER.AI production index.html is missing");
   });
 }
 
