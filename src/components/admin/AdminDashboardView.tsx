@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { WIN_IMAGES } from '../../data/imageRegistry';
 import { 
   Users, 
   FileCheck2, 
@@ -137,7 +138,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">ผู้สมัครใหม่วันนี้</span>
             <img 
-              src="/images/admin/users-management.svg" 
+              src={WIN_IMAGES.admin.usersManagement} 
               alt="ผู้สมัครใหม่" 
               className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#00D4FF]/40 shadow-sm" 
             />
@@ -176,7 +177,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               {metrics.pendingKycCount > 0 ? 'รอตรวจสอบ KYC ด่วน' : 'สถานะคิวตรวจสอบ KYC'}
             </span>
             <img 
-              src="/images/admin/kyc-review.svg" 
+              src={WIN_IMAGES.admin.kycReview} 
               alt="KYC Verification" 
               className={`w-8 h-8 rounded-xl object-cover shadow-sm ring-1 ${
                 metrics.pendingKycCount > 0 ? 'ring-[#FFC93C] animate-pulse' : 'ring-emerald-400/40'
@@ -204,7 +205,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">อัศวินออนไลน์สแตนด์บาย</span>
             <img 
-              src="/images/knight_ride.jpg" 
+              src={WIN_IMAGES.vehicles.knightRide} 
               alt="Knights Online" 
               className="w-8 h-8 rounded-xl object-cover ring-1 ring-emerald-400/50 shadow-sm" 
             />
@@ -228,7 +229,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">ทริปสำเร็จวันนี้</span>
             <img 
-              src="/images/transit_train.jpg" 
+              src={WIN_IMAGES.transit.train} 
               alt="Trips Completed" 
               className="w-8 h-8 rounded-xl object-cover ring-1 ring-cyan-400/50 shadow-sm" 
             />
@@ -248,7 +249,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">รายได้เข้าถังระบบวันนี้</span>
             <img 
-              src="/images/admin/payment-profiles.svg" 
+              src={WIN_IMAGES.admin.paymentProfiles} 
               alt="System Revenue" 
               className="w-8 h-8 rounded-xl object-cover ring-1 ring-indigo-400/50 shadow-sm" 
             />
@@ -271,7 +272,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400">สิทธิ์ Founding Knight คงเหลือ</span>
             <img 
-              src="/images/admin/wallet-ledger.svg" 
+              src={WIN_IMAGES.admin.walletLedger} 
               alt="Founding Knight Quota" 
               className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#FFC93C]/60 shadow-sm" 
             />
