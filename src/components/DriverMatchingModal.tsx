@@ -3,7 +3,6 @@ import { WIN_IMAGES } from '../data/imageRegistry';
 import { getAuth } from 'firebase/auth';
 import { MatchedDriver, DreamRideVehicle, LifestylePlace } from '../types';
 import { fetchLiveDrivers } from '../services/liveDriversService';
-import { LIFESTYLE_PLACES } from '../data/lifestyleData';
 import { 
   RELIGIOUS_SERVICES_DATA, 
   SACRED_MU_PRAYERS, 
@@ -188,11 +187,11 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
       case 'express':
         return {
           title: 'เกณฑ์จับคู่อัศวิน WIN Express',
-          badge: 'กล่องพัสดุ/อาหาร (ลดเหลือ 5฿) + เลเวล 10+',
+          badge: 'พี่วินทุกคนที่ผ่านการอนุมัติจากแอดมิน',
           rules: [
-            'ค่ากล่องใส่พัสดุ/เอกสาร/อาหาร ปรับลดพิเศษเหลือ +฿5.00 รวมในใบเสร็จแล้วเพื่อประชาชน',
-            'คัดกรองเฉพาะพี่วินระดับ Level 10 ขึ้นไปเท่านั้น (ผ่านการตรวจสอบประวัติ)',
-            'ต้องมีกล่องเก็บสัมภาระนิรภัยกันกระแทก ซีลกันน้ำ และฉนวนรักษาอุณหภูมิ'
+            'พี่วินทุกคนในระบบได้รับการตรวจสอบและยืนยันการอบรมก่อนเปิดใช้งานบัญชี',
+            'ไม่มี Level gate และไม่มีการจำกัดสิทธิ์รับงานด้วยระดับ',
+            'รายละเอียดพัสดุ/อุปกรณ์ของงานจะถูกส่งมากับออเดอร์จริง'
           ],
           color: 'text-emerald-400',
           borderColor: 'border-emerald-500/40',
@@ -201,15 +200,11 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
       case 'mu':
         return {
           title: 'เกณฑ์จับคู่อัศวิน WIN MU BUDDY',
-          badge: currentGender === 'female' 
-            ? 'ลูกค้าผู้หญิง 👩 ➔ แนะนำพี่วินผู้หญิง (Lady Knight) เลเวล 15+' 
-            : 'ลูกค้าผู้ชาย 👨 ➔ แนะนำพี่วินผู้ชาย เลเวล 15+',
+          badge: 'พี่วินทุกคนที่ผ่านการอนุมัติจากแอดมิน',
           rules: [
-            currentGender === 'female'
-              ? 'ระบบแนะนำและจับคู่พี่วินผู้หญิงที่เหมาะสม เลเวล 15 ขึ้นไป (Lady Knight) เพื่อความสบายใจ 100%'
-              : 'ระบบแนะนำและจับคู่พี่วินผู้ชายที่เชี่ยวชาญสายมู เลเวล 15 ขึ้นไป',
-            'หากลูกค้าต้องการเลือกพี่วินเอง (หรือข้ามเพศ) ระบบจะเปิดขั้นตอนขอความสมัครใจพี่วินและคุยรายละเอียดก่อนเริ่มงาน',
-            'ผ่านการอบรมเส้นทางไหว้พระ 9 วัด, มนต์พิธี, จุดเช็คอินสายมู, และมีบทสวดมนต์ศักดิ์สิทธิ์ประจำตัว'
+            'ไม่มีการจำกัด Level หรือเพศของพี่วินในการรับงาน',
+            'ระบบใช้ข้อมูลบริการของงานเพื่อแสดงรายละเอียดที่เกี่ยวข้องเท่านั้น',
+            'การอบรมและการตรวจสอบเกิดขึ้นก่อนบัญชีพี่วินได้รับอนุญาตให้รับงาน'
           ],
           color: 'text-[#FFD700]',
           borderColor: 'border-[#FFD700]/40',
@@ -217,13 +212,12 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
         };
       case 'spirit':
         return {
-          title: 'เกณฑ์จับคู่อัศวิน WIN Spirit (ดูแลผู้สูงอายุ & พาทำศาสนกิจทุกศาสนา)',
-          badge: 'อบรมดูแลผู้สูงอายุ + เลเวล 20+ (ศาสนาพุทธ/อิสลาม/คริสต์/ฮินดู/ซิกข์/จีน)',
+          title: 'เกณฑ์จับคู่อัศวิน WIN Spirit',
+          badge: 'พี่วินทุกคนที่ผ่านการอนุมัติจากแอดมิน',
           rules: [
-            'พี่วินต้องมีระดับ Level 20 ขึ้นไป (Platinum Sovereign) ผ่านการตรวจสอบประวัติสูงสุด',
-            'ผ่านการอบรมหลักสูตรการดูแลและประคองผู้สูงอายุจากสถานพยาบาลชั้นนำ',
-            'บริการพาคุณตา/คุณยายไปทำศาสนกิจทุกศาสนา เช่น พาคุณตาไปละหมาดที่มัสยิด, พาคุณยายไปทำบุญตักบาตร, พาไปโบสถ์คริสต์, หรือศาลเจ้า',
-            'ขับขี่ด้วยความเร็วคงที่นุ่มนวลสูงสุด (Gentle & Safe Escort) พร้อมบริการรอรับกลับ'
+            'ไม่มี Level gate สำหรับ WIN Spirit',
+            'การตรวจสอบการอบรมดูแลผู้สูงอายุเกิดขึ้นก่อนยืนยันบัญชีพี่วิน',
+            'ทุกงานจะส่งข้อมูลบริการและผู้รับบริการจริงไปยังออเดอร์'
           ],
           color: 'text-rose-400',
           borderColor: 'border-rose-500/40',
@@ -232,11 +226,11 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
       case 'family':
         return {
           title: 'เกณฑ์จับคู่อัศวิน WIN Family',
-          badge: 'อบรมดูแลเด็ก & หมวกกันน็อกเด็ก + เลเวล 15+',
+          badge: 'พี่วินทุกคนที่ผ่านการอนุมัติจากแอดมิน',
           rules: [
-            'พี่วินต้องมีระดับ Level 15 ขึ้นไป (Gold Sovereign)',
-            'ผ่านการอบรมการดูแลความปลอดภัยเด็กและเยาวชน (Child Care Safety)',
-            'มียานพาหนะพร้อมหมวกกันน็อกเด็กมาตรฐาน มอก. ทุกขนาด'
+            'ไม่มี Level gate สำหรับ WIN Family',
+            'การอบรมและการตรวจสอบของแอดมินเกิดขึ้นก่อนเปิดใช้งานบัญชี',
+            'รายละเอียดเด็ก/ครอบครัวที่จำเป็นจะถูกส่งมากับงานจริง'
           ],
           color: 'text-blue-400',
           borderColor: 'border-blue-500/40',
@@ -335,10 +329,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   }, [liveDrivers, candidateDrivers]);
 
   // Lifestyle recommendations filtered list
-  const filteredLifestylePlaces = useMemo(() => {
-    if (activeLifestyleCategory === 'all') return LIFESTYLE_PLACES;
-    return LIFESTYLE_PLACES.filter(p => p.category === activeLifestyleCategory);
-  }, [activeLifestyleCategory]);
+  const filteredLifestylePlaces = useMemo(() => [], []);
 
   const filteredTransitStations = useMemo(() => BANGKOK_TRANSIT_STATIONS.filter((station) => {
     const matchesCategory =
@@ -359,10 +350,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
   }), [activeTransitCategory, transitSearchQuery]);
 
   const activeRouteRequests = useMemo(() => {
-    if (activeTab === 'drivers' && serviceId === 'lifestyle') {
-      return filteredLifestylePlaces.map((place) => ({ key: `lifestyle:${place.id}`, query: `${place.name} ${place.area} ประเทศไทย` }));
-    }
-    if (activeTab === 'sacred_mu') {
+        if (activeTab === 'sacred_mu') {
       return SACRED_MU_PRAYERS.map((prayer) => ({ key: `prayer:${prayer.id}`, query: `${prayer.location} ประเทศไทย` }));
     }
     if (activeTab === 'transit_hub') {
