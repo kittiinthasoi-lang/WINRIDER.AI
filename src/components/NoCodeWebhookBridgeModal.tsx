@@ -84,28 +84,11 @@ export const NoCodeWebhookBridgeModal: React.FC<NoCodeWebhookBridgeModalProps> =
   };
 
   const handleTestDispatch = async () => {
-    if (audioEnabled) playTactileBlip(1000);
-    setIsTesting(true);
-    setTestResult(null);
-
-    const testPayload = buildWebhookPayload({
-      event: 'test_ping',
-      orderId: `WIN-TEST-${Math.floor(100 + Math.random() * 900)}`,
-      passengerName: 'คุณทดสอบ สมองกล (Test User)',
-      passengerPhone: '089-999-8888',
-      serviceTitle: 'WIN KNIGHT (ทดสอบยุทธวิธี)',
-      pickupLocation: 'ซอยสุขุมวิท 23 (ปากซอยคาวบอย)',
-      dropoffLocation: 'สถานีรถไฟฟ้า BTS อโศก',
-      distanceKm: 1.8,
-      fare: 35,
-      status: 'pending',
-      notes: 'ทดสอบส่งข้อมูลผ่าน Make.com / Zapier / Google Sheets'
+    setTestResult({
+      success: false,
+      status: 'disabled',
+      message: 'ปิดการส่งข้อมูลทดสอบแล้ว — ระบบส่งเฉพาะข้อมูลจากรายการจริงเท่านั้น'
     });
-
-    const res = await dispatchToWebhook(testPayload);
-    setIsTesting(false);
-    setTestResult(res);
-    setLogs(getDispatchLogs());
   };
 
   const handleCopy = (text: string, key: string) => {
@@ -147,11 +130,11 @@ export const NoCodeWebhookBridgeModal: React.FC<NoCodeWebhookBridgeModalProps> =
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white">No-Code Cloud & Webhook Dispatch Bridge</h3>
                 <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 font-bold">
-                  SIMULATED BRAIN
+                  LIVE DATA ONLY
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                จำลองสมอง AI ด้วย Google Sheets, Make.com, Zapier และ LINE OA
+                ส่งเฉพาะข้อมูลจากรายการจริงที่เกิดขึ้นในระบบ
               </p>
             </div>
           </div>
