@@ -4111,9 +4111,22 @@ async function startServer() {
 function serveStaticFiles(distPath: string) {
   console.log(`[WINRIDER.AI] Static distribution directory: ${distPath}`);
 
-  // Serve production artifacts first. Vite copies files from public/ to the
-  // root of dist/ during build, so /images/foo.jpg must resolve directly.
-  // Do not let the SPA fallback turn a missing asset into index.html.
+  // Vite copies public/ into dist/ unchanged during production builds.
+  // Keep an explicit /images fallback to the source public directory as an
+  // additional guard so an existing repository image is never mistaken for
+  // an SPA route just because the build artifact was incomplete.
+  const distImagesPath = path.join(distPath, "images");
+  const publicImagesPath = path.resolve(process.cwd(), "public", "images");
+
+  app.use("/images", express.static(distImagesPath, {
+    fallthrough: true,
+    index: false,
+  }));
+  app.use("/images", express.static(publicImagesPath, {
+    fallthrough: true,
+    index: false,
+  }));
+
   app.use(express.static(distPath, {
     fallthrough: true,
     index: false,
@@ -4124,7 +4137,7 @@ function serveStaticFiles(distPath: string) {
     const isStaticAsset = (
       pathname.startsWith("/images/") ||
       pathname.startsWith("/assets/") ||
-      /\\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|css|js|mjs|map|json)$/i.test(pathname)
+      /\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|css|js|mjs|map|json)$/i.test(pathname)
     );
 
     if (isStaticAsset) {
