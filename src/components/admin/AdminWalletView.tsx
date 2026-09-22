@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { WIN_IMAGES } from '../../data/imageRegistry';
 import { 
   Coins, 
   ShieldCheck, 
@@ -187,7 +188,7 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-[#00D4FF]">1. ถังค่าระบบ (System)</span>
               <img 
-                src="/images/admin/wallet-ledger.svg" 
+                src={WIN_IMAGES.admin.walletLedger} 
                 alt="System Bucket" 
                 className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#00D4FF]/40 shadow-sm" 
               />
@@ -210,7 +211,7 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-emerald-400">2. ถังคุ้มครองอุบัติเหตุ (Insurance)</span>
               <img 
-                src="/images/ambulance_vehicle.jpg" 
+                src={WIN_IMAGES.vehicles.ambulance} 
                 alt="Insurance Bucket" 
                 className="w-8 h-8 rounded-xl object-cover ring-1 ring-emerald-500/40 shadow-sm" 
               />
@@ -233,7 +234,7 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-[#FFC93C]">3. ถังบำนาญอัศวิน (Pension)</span>
               <img 
-                src="/images/admin/wallet-ledger.svg" 
+                src={WIN_IMAGES.admin.walletLedger} 
                 alt="Pension Bucket" 
                 className="w-8 h-8 rounded-xl object-cover ring-1 ring-[#FFC93C]/50 shadow-sm" 
               />
@@ -256,7 +257,7 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-indigo-300">4. ถังมัดจำหมวกนิรภัย (Helmet)</span>
               <img 
-                src="/images/cyber_armor.jpg" 
+                src={WIN_IMAGES.armor.cyber} 
                 alt="Helmet Bucket" 
                 className="w-8 h-8 rounded-xl object-cover ring-1 ring-indigo-400/50 shadow-sm" 
               />
@@ -279,7 +280,7 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-purple-300">5. ถังอุปกรณ์ & เสื้อเกราะ (Equipment)</span>
               <img 
-                src="/images/shop_armor_kneeguards.jpg" 
+                src={WIN_IMAGES.shop.armorKneeguards} 
                 alt="Equipment Bucket" 
                 className="w-8 h-8 rounded-xl object-cover ring-1 ring-purple-400/50 shadow-sm" 
               />
