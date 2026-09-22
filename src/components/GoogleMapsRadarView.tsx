@@ -2,6 +2,7 @@ import React from 'react';
 import { ExternalLink, MapPin, Navigation, Radio, ShieldAlert, Siren, Stethoscope, PawPrint, Flame, HeartPulse } from 'lucide-react';
 import { playTactileBlip } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
+import { buildGoogleMapsCoordinateUrl, buildGoogleMapsSearchUrl, openGoogleMapsExternal } from '../services/googleMapsExternal';
 
 export type RadarPerspective = 'customer' | 'driver' | 'merchant' | 'partner';
 
@@ -60,9 +61,9 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
 }) => {
   const { gpsState } = useRealtimeGps(true);
   const hasGps = Number.isFinite(gpsState.latitude) && Number.isFinite(gpsState.longitude) && Boolean(gpsState.latitude && gpsState.longitude);
-  const origin = hasGps ? `${gpsState.latitude},${gpsState.longitude}` : venueName || 'ประเทศไทย';
-  const makeUrl = (query: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${query} near ${origin}`)}`;
-  const open = (url: string) => { if (audioEnabled) playTactileBlip(900); window.open(url, '_blank', 'noopener,noreferrer'); };
+  const origin = hasGps ? { latitude: gpsState.latitude as number, longitude: gpsState.longitude as number } : null;
+  const makeUrl = (query: string) => buildGoogleMapsSearchUrl(query, origin);
+  const open = (url: string) => { if (audioEnabled) playTactileBlip(900); openGoogleMapsExternal(url); };
 
   const scans: Scan[] = [
     { label: 'โรงพยาบาล / คลินิกคน', query: 'โรงพยาบาล คลินิก', icon: <Stethoscope className="h-4 w-4" />, note: 'ค้นหาสถานพยาบาลใกล้ตำแหน่งจริง' },
@@ -96,7 +97,7 @@ export const GoogleMapsRadarView: React.FC<GoogleMapsRadarViewProps> = ({
         <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3 text-[9px] leading-4 text-slate-500">
           หน้าจอ RADAR นี้ไม่ฝังแผนที่จาก provider อื่นและไม่ใช้ Google Maps JavaScript API ใน browser. รายชื่อ/ตำแหน่งล่าสุดของ Google จะแสดงเมื่อเปิดผลการค้นหาภายนอกตามคำค้นที่เลือก.
         </div>
-        <button type="button" onClick={() => open(hasGps ? `https://www.google.com/maps/search/?api=1&query=${gpsState.latitude},${gpsState.longitude}` : makeUrl('สถานที่สำคัญ'))} className="mt-3 w-full rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-black text-slate-950"><Navigation className="mr-2 inline h-4 w-4" />เปิดตำแหน่งใน Google Maps</button>
+        <button type="button" onClick={() => open(hasGps ? buildGoogleMapsCoordinateUrl(origin as { latitude: number; longitude: number }) : makeUrl('สถานที่สำคัญ'))} className="mt-3 w-full rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-black text-slate-950"><Navigation className="mr-2 inline h-4 w-4" />เปิดตำแหน่งใน Google Maps</button>
       </div>
     </div>
   );
