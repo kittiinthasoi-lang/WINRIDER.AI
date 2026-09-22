@@ -31,15 +31,15 @@ interface CitizenDashboardViewProps {
 }
 
 export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
-  userName = 'พลเมืองอัศวิน',
+  userName = 'ผู้ใช้ WINRIDER.AI',
   onSwitchRole
 }) => {
   const [selectedPillar, setSelectedPillar] = useState<string>('WIN_KNIGHT');
-  const [pickupText, setPickupText] = useState<string>('สยามพารากอน (ประตูทิศใต้)');
-  const [dropoffText, setDropoffText] = useState<string>('จุฬาลงกรณ์มหาวิทยาลัย คณะวิศวกรรมศาสตร์');
-  const [estimatedDistance, setEstimatedDistance] = useState<number>(2.4);
+  const [pickupText, setPickupText] = useState<string>('');
+  const [dropoffText, setDropoffText] = useState<string>('');
+  const [estimatedDistance, setEstimatedDistance] = useState<number>(0);
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown>(
-    globalFeeEngine.calculateTripFees(45, 'WIN_KNIGHT')
+    globalFeeEngine.calculateTripFees(0, 'WIN_KNIGHT')
   );
 
   const [isSearchingKnight, setIsSearchingKnight] = useState<boolean>(false);
@@ -57,7 +57,7 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
     { id: 'WIN_LINK', name: 'WIN LINK', subtitle: 'เชื่อมต่อขนส่ง', icon: Train, desc: 'เชื่อมต่อสถานีรถไฟฟ้า BTS/MRT และท่าเรือ' }
   ];
 
-  // Recalculate fees on pillar change
+  // Recalculate fees only after a real route distance is available
   useEffect(() => {
     const baseFare = calculateBaseFareBaht(estimatedDistance);
     const calc = globalFeeEngine.calculateTripFees(baseFare, selectedPillar);
@@ -65,6 +65,7 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
   }, [selectedPillar, estimatedDistance]);
 
   const handleRequestTrip = () => {
+    if (!pickupText.trim() || !dropoffText.trim() || estimatedDistance <= 0) return;
     setIsSearchingKnight(true);
     defaultNotifyProvider.playAlertSound('mission_incoming');
 
@@ -73,11 +74,11 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
       const newTrip = TripStateMachine.createNewTrip({
         id: `TRIP-CTZ-${Date.now().toString().slice(-4)}`,
         pillar: selectedPillar as TripModel['pillar'],
-        citizenId: 'CITIZEN-01',
+        citizenId: '',
         citizenName: userName,
         citizenPhone: '',
         knightId: '',
-        knightName: 'พี่วินที่ระบบจับคู่จริง',
+        knightName: 'รอการจับคู่พี่วินที่ผ่านการยืนยัน',
         originName: pickupText,
         destinationName: dropoffText,
         distanceKm: estimatedDistance,
@@ -91,15 +92,8 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
         proofPhotos: {}
       });
 
-      const accepted = TripStateMachine.transition(
-        newTrip,
-        'ACCEPTED',
-        'KNT-01',
-        'knight',
-        'อัศวินในรัศมีตอบรับภารกิจ'
-      );
-      setActiveTrip(accepted);
-      defaultNotifyProvider.playAlertSound('mission_accepted');
+      setActiveTrip(newTrip);
+      defaultNotifyProvider.playAlertSound('mission_incoming');
     }, 2500);
   };
 
@@ -132,43 +126,26 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
       <main className="p-4 space-y-4">
         {/* Map View Container with Real-Time Knights Nearby */}
         <div className="relative h-44 rounded-2xl bg-[#0A1633] border border-[#00D4FF]/30 overflow-hidden shadow-inner flex flex-col justify-between p-3">
-          {/* Mock Map Background Grid */}
+          {/* Visual map shell — no simulated driver positions */}
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#00D4FF_1px,transparent_1px)] [background-size:16px_16px]" />
           
           <div className="relative z-10 flex items-center justify-between">
             <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#0A1633]/90 border border-[#00D4FF]/40 text-[#00D4FF] font-semibold flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#00D4FF] animate-ping" />
-              อัศวินในรัศมี 2.5 กม. (4 คัน)
+              พี่วินที่ผ่านการยืนยันจากแอดมิน
             </span>
             <span className="text-[10px] text-gray-400 bg-black/40 px-2 py-0.5 rounded-md font-mono">
               GPS Active
             </span>
           </div>
 
-          {/* Simulated Knight Pins on Map */}
-          <div className="relative z-10 flex items-center justify-around py-2">
-            <div className="flex flex-col items-center animate-bounce">
-              <div className="p-2 rounded-full bg-[#00D4FF] text-[#0A1633] shadow-[0_0_12px_#00D4FF]">
-                <Bike className="w-4 h-4" />
-              </div>
-              <span className="text-[9px] text-[#00D4FF] font-bold mt-1 bg-[#0A1633]/80 px-1 rounded">2 นาที</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="p-2 rounded-full bg-white/10 text-gray-300 border border-white/20">
-                <Bike className="w-4 h-4" />
-              </div>
-              <span className="text-[9px] text-gray-400 mt-1 bg-[#0A1633]/80 px-1 rounded">4 นาที</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="p-2 rounded-full bg-white/10 text-gray-300 border border-white/20">
-                <Bike className="w-4 h-4" />
-              </div>
-              <span className="text-[9px] text-gray-400 mt-1 bg-[#0A1633]/80 px-1 rounded">6 นาที</span>
-            </div>
+          {/* Real verified drivers only: positions are supplied by the live dispatch/map layer. */}
+          <div className="relative z-10 flex items-center justify-center py-5 text-center">
+            <span className="text-xs text-gray-400">ระบบจะแสดงพี่วินที่ผ่านการยืนยันจากแอดมินและมีตำแหน่งจริง เมื่อมีข้อมูลออนไลน์</span>
           </div>
 
           <div className="relative z-10 text-[10px] text-gray-400 flex items-center justify-between">
-            <span>พิกัดปัจจุบัน: ปทุมวัน กรุงเทพฯ</span>
+            <span>รอพิกัด GPS จริงจากอุปกรณ์</span>
             <span className="text-[#00D4FF]">Sovereign Map Ready</span>
           </div>
         </div>
