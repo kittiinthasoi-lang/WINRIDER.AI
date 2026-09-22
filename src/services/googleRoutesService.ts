@@ -57,16 +57,6 @@ export interface ResolvedDestinationSearch extends RouteDestination {
 
 import { REAL_BANGKOK_LOCATIONS } from '../data/realBangkokLocations';
 
-function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 1.35 * 10) / 10; // 1.35x Bangkok urban road factor
-}
 
 /**
  * Generate a Google Maps Universal Directions URL for external navigation.
@@ -141,8 +131,7 @@ export async function searchDestinationsFromGps(params: {
   for (const place of allReferencePlaces) {
     const textCorpus = `${place.name} ${place.nameEn} ${place.address} ${place.landmark} ${place.category}`.toLowerCase();
     if (textCorpus.includes(query)) {
-      const dist = calculateDistanceKm(params.latitude, params.longitude, place.lat, place.lng);
-      localMatches.push({
+            localMatches.push({
         ...place,
         distanceKm: undefined,
         etaMinutes: null,
@@ -223,8 +212,8 @@ export async function searchDestinationsFromGps(params: {
             address: String(route.address || ''),
             landmark: '',
             placeId: route.placeId,
-            distanceKm: typeof route.distanceKm === 'number' && Number.isFinite(route.distanceKm) ? Number(route.distanceKm) : calculateDistanceKm(params.latitude, params.longitude, Number(route.latitude), Number(route.longitude)),
-            etaMinutes: route.etaMinutes ?? Math.max(3, Math.ceil((route.distanceKm || 3) * 3.5))
+            distanceKm: typeof route.distanceKm === 'number' && Number.isFinite(route.distanceKm) ? Number(route.distanceKm) : undefined,
+            etaMinutes: route.etaMinutes ?? null
           }));
 
         // Merge without duplicates by proximity
