@@ -64,9 +64,6 @@ const FRESH_PROGRESSION = {
   questState: {},
 } as const;
 
-/**
- * Subscribe to real-time founding knight counter
- */
 export function subscribeFoundingKnightCounter(callback: (data: { count: number; limit: number; remaining: number }) => void) {
   const counterRef = doc(db, 'counters', 'foundingKnights');
   return onSnapshot(counterRef, (snap) => {
@@ -76,9 +73,7 @@ export function subscribeFoundingKnightCounter(callback: (data: { count: number;
       const limit = Number(d.limit || 1000);
       callback({ count, limit, remaining: Math.max(0, limit - count) });
     } else {
-      // Default initial state
       callback({ count: 0, limit: 1000, remaining: 1000 });
-      // Initialize doc softly
       setDoc(counterRef, { count: 0, limit: 1000 }).catch(() => {});
     }
   }, (err) => {
@@ -87,9 +82,6 @@ export function subscribeFoundingKnightCounter(callback: (data: { count: number;
   });
 }
 
-/**
- * Register Knight with atomic Founding Knight transaction and initial Satang wallet
- */
 export async function registerKnight(payload: KnightRegistrationPayload): Promise<boolean> {
   const counterRef = doc(db, 'counters', 'foundingKnights');
   const userRef = doc(db, 'users', payload.uid);
@@ -106,243 +98,91 @@ export async function registerKnight(payload: KnightRegistrationPayload): Promis
     } else {
       transaction.set(counterRef, { count: 0, limit: 1000 });
     }
-
     const isFoundingKnight = count < limit;
-    if (isFoundingKnight) {
-      transaction.update(counterRef, { count: count + 1 });
-    }
+    if (isFoundingKnight) transaction.update(counterRef, { count: count + 1 });
 
-    // 1. users/{uid}
     transaction.set(userRef, {
-      uid: payload.uid,
-      email: payload.email,
-      role: 'knight' as UserRole,
-      displayName: payload.displayName.trim(),
-      name: payload.displayName.trim(),
-      phone: payload.phone.trim(),
-      province: payload.province.trim(),
-      district: payload.district.trim(),
+      uid: payload.uid, email: payload.email, role: 'knight' as UserRole,
+      displayName: payload.displayName.trim(), name: payload.displayName.trim(),
+      phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
       status: 'pending_review' as UserStatus,
-      level: 1,
-      xp: 0,
-      points: 0,
-      creditScore: 0,
-      financialScore: 0,
-      rideLaterCredit: 0,
-      missionsCompleted: 0,
-      missionStreak: 0,
-      badges: [],
-      achievements: [],
-      questSeason: '2026-S3',
-      questState: {},
-      pdpaConsent: {
-        version: '1.0',
-        acceptedAt: serverTimestamp(),
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
+      missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
+      pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     });
 
-    // 2. knights/{uid}
     transaction.set(knightRef, {
       ...FRESH_PROGRESSION,
-      displayName: payload.displayName.trim(),
-      name: payload.displayName.trim(),
-      email: payload.email.trim(),
-      phone: payload.phone.trim(),
-      province: payload.province.trim(),
-      district: payload.district.trim(),
-      isOnline: false,
-      vehicleType: payload.vehicleType,
-      plateNumber: payload.plateNumber.trim(),
-      licenseNumber: payload.licenseNumber.trim(),
-      kycStatus: 'pending',
-      isFoundingKnight,
-      equipmentPaidSatang: 0,
-      dailyEquipmentCount: 0,
-      certifications: [],
-      documents: {
-        driverLicenseUrl: payload.driverLicenseUrl || '',
-        vehiclePhotoUrl: payload.vehiclePhotoUrl || '',
-      },
+      displayName: payload.displayName.trim(), name: payload.displayName.trim(), email: payload.email.trim(),
+      phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
+      isOnline: false, vehicleType: payload.vehicleType, plateNumber: payload.plateNumber.trim(),
+      licenseNumber: payload.licenseNumber.trim(), kycStatus: 'pending', isFoundingKnight,
+      equipmentPaidSatang: 0, dailyEquipmentCount: 0, certifications: [],
+      documents: { driverLicenseUrl: payload.driverLicenseUrl || '', vehiclePhotoUrl: payload.vehiclePhotoUrl || '' },
       createdAt: serverTimestamp(),
     });
-
-    // Note: wallets/{uid} is created securely by Admin SDK/Cloud Functions only
-
     return isFoundingKnight;
   });
 }
 
-/**
- * Register Citizen (Instant Active pass)
- */
 export async function registerCitizen(payload: CitizenRegistrationPayload): Promise<void> {
   const userRef = doc(db, 'users', payload.uid);
   const citizenRef = doc(db, 'citizens', payload.uid);
-
   await runTransaction(db, async (transaction) => {
     transaction.set(userRef, {
-      uid: payload.uid,
-      email: payload.email,
-      role: 'citizen' as UserRole,
-      displayName: payload.displayName.trim(),
-      phone: payload.phone.trim(),
-      province: payload.province.trim(),
-      district: payload.district.trim(),
-      status: 'active' as UserStatus, // Citizen gets immediate active pass!
-      level: 1,
-      xp: 0,
-      points: 0,
-      creditScore: 0,
-      financialScore: 0,
-      rideLaterCredit: 0,
-      missionsCompleted: 0,
-      missionStreak: 0,
-      badges: [],
-      achievements: [],
-      questSeason: '2026-S3',
-      questState: {},
-      pdpaConsent: {
-        version: '1.0',
-        acceptedAt: serverTimestamp(),
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      uid: payload.uid, email: payload.email, role: 'citizen' as UserRole,
+      displayName: payload.displayName.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
+      status: 'active' as UserStatus, level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
+      missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
+      pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     });
-
     transaction.set(citizenRef, {
       ...FRESH_PROGRESSION,
-      displayName: payload.displayName.trim(),
-      name: payload.displayName.trim(),
-      email: payload.email.trim(),
-      phone: payload.phone.trim(),
-      province: payload.province.trim(),
-      district: payload.district.trim(),
-      savedAddresses: [],
-      emergencyContact: {
-        name: payload.emergencyContactName.trim(),
-        phone: payload.emergencyContactPhone.trim(),
-      },
-      createdAt: serverTimestamp(),
+      displayName: payload.displayName.trim(), name: payload.displayName.trim(), email: payload.email.trim(),
+      phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(), savedAddresses: [],
+      emergencyContact: { name: payload.emergencyContactName.trim(), phone: payload.emergencyContactPhone.trim() }, createdAt: serverTimestamp(),
     });
-
-    // Note: wallets/{uid} is created securely by Admin SDK/Cloud Functions only
   });
 }
 
-/**
- * Register Merchant Partner
- */
 export async function registerMerchant(payload: MerchantRegistrationPayload): Promise<void> {
   const userRef = doc(db, 'users', payload.uid);
   const merchantRef = doc(db, 'merchants', payload.uid);
-
   await runTransaction(db, async (transaction) => {
     transaction.set(userRef, {
-      uid: payload.uid,
-      email: payload.email,
-      role: 'merchant' as UserRole,
-      displayName: payload.displayName.trim(),
-      phone: payload.phone.trim(),
-      province: payload.province.trim(),
-      district: payload.district.trim(),
-      status: 'pending_review' as UserStatus,
-      level: 1,
-      xp: 0,
-      points: 0,
-      creditScore: 0,
-      financialScore: 0,
-      rideLaterCredit: 0,
-      missionsCompleted: 0,
-      missionStreak: 0,
-      badges: [],
-      achievements: [],
-      questSeason: '2026-S3',
-      questState: {},
-      pdpaConsent: {
-        version: '1.0',
-        acceptedAt: serverTimestamp(),
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      uid: payload.uid, email: payload.email, role: 'merchant' as UserRole,
+      displayName: payload.displayName.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
+      status: 'pending_review' as UserStatus, level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
+      missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
+      pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     });
-
     transaction.set(merchantRef, {
       ...FRESH_PROGRESSION,
-      displayName: payload.displayName.trim(),
-      name: payload.shopName.trim(),
-      ownerName: payload.displayName.trim(),
-      email: payload.email.trim(),
-      phone: payload.phone.trim(),
-      province: payload.province.trim(),
-      district: payload.district.trim(),
-      shopName: payload.shopName.trim(),
-      shopType: payload.shopType.trim(),
-      address: payload.address.trim(),
-      gpRate: 10,
-      taxId: payload.taxId?.trim() || '',
-      createdAt: serverTimestamp(),
+      displayName: payload.displayName.trim(), name: payload.shopName.trim(), ownerName: payload.displayName.trim(),
+      email: payload.email.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
+      shopName: payload.shopName.trim(), shopType: payload.shopType.trim(), address: payload.address.trim(), gpRate: 10,
+      taxId: payload.taxId?.trim() || '', createdAt: serverTimestamp(),
     });
-
-    // Note: wallets/{uid} is created securely by Admin SDK/Cloud Functions only
   });
 }
 
-/**
- * Register Institutional Partner
- */
 export async function registerPartner(payload: PartnerRegistrationPayload): Promise<void> {
   const userRef = doc(db, 'users', payload.uid);
   const partnerRef = doc(db, 'partners', payload.uid);
-
   await runTransaction(db, async (transaction) => {
     transaction.set(userRef, {
-      uid: payload.uid,
-      email: payload.email,
-      role: 'partner' as UserRole,
-      displayName: payload.displayName.trim(),
-      phone: payload.phone.trim(),
-      province: payload.province.trim(),
-      district: payload.district.trim(),
-      status: 'pending_review' as UserStatus,
-      level: 1,
-      xp: 0,
-      points: 0,
-      creditScore: 0,
-      financialScore: 0,
-      rideLaterCredit: 0,
-      missionsCompleted: 0,
-      missionStreak: 0,
-      badges: [],
-      achievements: [],
-      questSeason: '2026-S3',
-      questState: {},
-      pdpaConsent: {
-        version: '1.0',
-        acceptedAt: serverTimestamp(),
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      uid: payload.uid, email: payload.email, role: 'partner' as UserRole,
+      displayName: payload.displayName.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
+      status: 'pending_review' as UserStatus, level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
+      missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
+      pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     });
-
     transaction.set(partnerRef, {
       ...FRESH_PROGRESSION,
-      displayName: payload.orgName.trim(),
-      name: payload.orgName.trim(),
-      contactPerson: payload.contactPerson.trim(),
-      contactEmail: payload.email.trim(),
-      phone: payload.phone.trim(),
-      province: payload.province.trim(),
-      district: payload.district.trim(),
-      orgName: payload.orgName.trim(),
-      orgType: payload.orgType.trim(),
-      contactPerson: payload.contactPerson.trim(),
-      estimatedUsers: Number(payload.estimatedUsers) || 0,
-      gpRate: 10,
-      createdAt: serverTimestamp(),
+      displayName: payload.orgName.trim(), name: payload.orgName.trim(), contactPerson: payload.contactPerson.trim(),
+      contactEmail: payload.email.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
+      orgName: payload.orgName.trim(), orgType: payload.orgType.trim(), estimatedUsers: Number(payload.estimatedUsers) || 0,
+      gpRate: 10, createdAt: serverTimestamp(),
     });
-
-    // Note: wallets/{uid} is created securely by Admin SDK/Cloud Functions only
   });
 }
