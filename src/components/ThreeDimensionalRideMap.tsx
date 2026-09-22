@@ -1,38 +1,7 @@
-// Source: Google Maps Platform Code Assist
-// Internal Usage Attribution: gmp_mcp_codeassist_v1_aistudio
-
-declare const google: any;
-
-import React, { useState, useEffect, useMemo } from 'react';
-import {
-  APIProvider,
-  Map,
-  AdvancedMarker,
-  useMap
-} from '@vis.gl/react-google-maps';
-import {
-  Navigation,
-  MapPin,
-  LocateFixed,
-  Phone,
-  Layers,
-  ShieldCheck,
-  Zap,
-  ExternalLink,
-  Bike,
-  AlertTriangle,
-  Store,
-  Train
-} from 'lucide-react';
+import React from 'react';
+import { ExternalLink, MapPin, Navigation, Phone, ShieldCheck, X } from 'lucide-react';
 import { DreamRideVehicle } from '../types';
 import { playTactileBlip } from '../utils/audio';
-import { useRealtimeGps } from './GpsRealTimeTracker';
-
-
-// Google Maps JavaScript API is disabled in FREE-ONLY mode.
-// The app uses its no-cost OSM/coordinate fallbacks instead of a billable dynamic map.
-const FREE_ONLY_MODE = true;
-const GOOGLE_MAPS_API_KEY = FREE_ONLY_MODE ? '' : String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
 
 interface ThreeDimensionalRideMapProps {
   selectedDreamRide?: DreamRideVehicle;
@@ -50,137 +19,56 @@ interface ThreeDimensionalRideMapProps {
 }
 
 /**
- * Polyline renderer for the ride track
- */
-function RidePolylineRenderer({
-  path,
-  pickupCoords,
-  dropoffCoords
-}: {
-  path: Array<{ lat: number; lng: number }>;
-  pickupCoords: { lat: number; lng: number };
-  dropoffCoords: { lat: number; lng: number };
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map || !path || path.length < 2) return;
-
-    const polyline = new google.maps.Polyline({
-      path,
-      geodesic: true,
-      strokeColor: '#00D2FF',
-      strokeOpacity: 0.9,
-      strokeWeight: 5,
-      map
-    });
-
-    const bounds = new google.maps.LatLngBounds();
-    path.forEach(pt => bounds.extend(pt));
-    bounds.extend(pickupCoords);
-    bounds.extend(dropoffCoords);
-    map.fitBounds(bounds, { top: 60, right: 40, bottom: 80, left: 40 });
-
-    return () => {
-      polyline.setMap(null);
-    };
-  }, [map, path, pickupCoords, dropoffCoords]);
-
-  return null;
-}
-
-/**
- * Real Google Maps Waiting & Live Ride Tracking View
- * Replaces simulated 3D capillary mesh with actual Google Maps,
- * showing nearby riders and merchants in the radius without fake movement or voice loops.
+ * Lightweight ride reference view.
+ * The previous embedded Google Maps implementation has been removed from this
+ * component. Coordinates remain real data; road navigation is delegated to
+ * Google Maps outside WINRIDER.AI.
  */
 export const ThreeDimensionalRideMap: React.FC<ThreeDimensionalRideMapProps> = ({
-  selectedDreamRide,
-  pickupLocation = 'หน้าคอนโดสุขุมวิท 39 (พร้อมพงษ์)',
-  destinationLocation = 'อาคาร Exchange Tower อโศก',
-  driverName = 'พี่วิน',
-  driverPhone,
-  driverLevel = 100,
-  driverEmoji = '🦁',
-  etaMinutes = 3,
-  pickupCoords: pickupCoordsProp,
-  dropoffCoords: dropoffCoordsProp,
+  pickupLocation = '',
+  destinationLocation = '',
+  driverName = '',
+  driverPhone = '',
+  etaMinutes,
+  pickupCoords,
+  dropoffCoords,
   onEmergencyClick,
-  audioEnabled = true
+  audioEnabled = true,
 }) => {
-  const { gpsState } = useRealtimeGps(true);
-  const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('roadmap');
-  const [showRadiusIcons, setShowRadiusIcons] = useState<boolean>(true);
-
-  // Default coordinates around Bangkok Sukhumvit / Phrom Phong
-  const pickupCoords = useMemo(() => {
-    if (pickupCoordsProp && Number.isFinite(pickupCoordsProp.lat) && Number.isFinite(pickupCoordsProp.lng)) return pickupCoordsProp;
-    if (gpsState.isRealGps && Number.isFinite(gpsState.latitude) && Number.isFinite(gpsState.longitude)) {
-      return { lat: gpsState.latitude, lng: gpsState.longitude };
-    }
-    return null;
-  }, [pickupCoordsProp, gpsState.isRealGps, gpsState.latitude, gpsState.longitude]);
-
-  const dropoffCoords = useMemo(() => {
-    if (dropoffCoordsProp && Number.isFinite(dropoffCoordsProp.lat) && Number.isFinite(dropoffCoordsProp.lng)) return dropoffCoordsProp;
-    return null;
-  }, [dropoffCoordsProp]);
-
-  // Assigned driver coordinates
-  const driverCoords = useMemo(() => ({
-    lat: pickupCoords?.lat ?? 0,
-    lng: pickupCoords?.lng ?? 0
-  }), [pickupCoords]);
-
-  // Real nearby riders, merchants, and hubs within the radius
-  const nearbyRadiusEntities = useMemo<Array<{ id: string; type: string; name: string; lat: number; lng: number; emoji: string; label: string }>>(() => [], []);
-
-  // Road route geometry is intentionally not rendered while Google Routes API is disabled.
-
-  // Open Real Google Maps App Navigation
-  const handleOpenGoogleMapsApp = () => {
-    if (audioEnabled) playTactileBlip(850);
-    if (!pickupCoords || !dropoffCoords) return;
-    const originParam = `${pickupCoords.lat},${pickupCoords.lng}`;
-    const destParam = `${dropoffCoords.lat},${dropoffCoords.lng}`;
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=two-wheeler`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const destination = dropoffCoords || pickupCoords;
+  const hasDestination = Boolean(destination && destination.lat !== 0 && destination.lng !== 0);
+  const mapsUrl = hasDestination
+    ? `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}&travelmode=two-wheeler`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinationLocation || 'ประเทศไทย')}`;
+  const openMaps = () => {
+    if (audioEnabled) playTactileBlip(900);
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
   };
 
-  if (!GOOGLE_MAPS_API_KEY || !pickupCoords || !dropoffCoords) {
-    return (
-      <div className="relative w-full h-[520px] rounded-3xl overflow-hidden bg-[#070F1E] border-2 border-cyan-500/50 shadow-[0_0_40px_rgba(0,210,255,0.25)] flex items-center justify-center p-6 text-center">
-        <div className="max-w-sm space-y-3">
-          <Navigation className="w-10 h-10 mx-auto text-cyan-300" />
-          <h3 className="text-lg font-black text-white">กำลังเตรียมแผนที่รอรถ</h3>
-          <p className="text-xs text-slate-400">
-            {!pickupCoords || !dropoffCoords
-              ? 'กำลังรอพิกัด GPS/ปลายทางจริงเพื่อแสดงเส้นทาง'
-              : 'ยังไม่ได้ตั้งค่า Google Maps API สำหรับหน้านี้'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative w-full h-[520px] rounded-3xl overflow-hidden bg-[#070F1E] border-2 border-cyan-500/50 shadow-[0_0_40px_rgba(0,210,255,0.25)] flex flex-col font-sans text-white select-none">
-      
-      {/* Top Header Card */}
-      <div className="absolute top-0 left-0 right-0 z-20 p-3 bg-gradient-to-b from-[#061427]/98 via-[#061427]/90 to-transparent backdrop-blur-md">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {driverPhone && (
-              <a
-                href={`tel:${driverPhone.replace(/\D/g, '')}`}
-                className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5"
-              >
-                <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                <span>โทรหาคนขับ</span>
-              </a>
-            )}
-          </div>       </div>
+    <div className="relative flex min-h-[420px] w-full flex-col overflow-hidden rounded-3xl border border-cyan-500/30 bg-[#07111f] text-white">
+      <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-4">
+        <div><div className="text-[10px] font-black text-cyan-300">RIDE MAP REFERENCE</div><div className="text-sm font-black">{destinationLocation || 'ยังไม่ได้ระบุปลายทาง'}</div></div>
+        {onEmergencyClick && <button onClick={onEmergencyClick} className="rounded-xl border border-rose-400/30 bg-rose-500/10 p-2 text-rose-300"><X className="h-4 w-4" /></button>}
+      </div>
+      <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_center,rgba(34,211,238,.15),transparent_55%)] p-6">
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-black/30 p-6 text-center backdrop-blur">
+          <Navigation className="mx-auto h-12 w-12 text-cyan-300" />
+          <p className="mt-3 text-lg font-black">แผนที่อ้างอิงการเดินทาง</p>
+          <p className="mt-1 text-[10px] text-slate-400">แอปจะแสดงข้อมูลสถานที่และพิกัดจริง ส่วนการนำทางถนนเปิดภายนอก</p>
+          {pickupLocation && <p className="mt-3 text-xs text-slate-300">รับ: {pickupLocation}</p>}
+          {destinationLocation && <p className="mt-1 text-xs text-slate-300">ส่ง: {destinationLocation}</p>}
+          {hasDestination && <p className="mt-2 font-mono text-[10px] text-slate-500">{destination!.lat.toFixed(6)}, {destination!.lng.toFixed(6)}</p>}
+          {driverName && <p className="mt-3 text-xs text-emerald-300">พี่วิน: {driverName}</p>}
+          {etaMinutes !== undefined && <p className="mt-1 text-[10px] text-slate-500">ETA: ใช้เฉพาะค่าที่มาจากข้อมูลจริงของงาน</p>}
+          <button onClick={openMaps} className="mt-5 w-full rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-black text-slate-950"><ExternalLink className="mr-2 inline h-4 w-4" />เปิด Google Maps ภายนอก</button>
+          {driverPhone && <a href={`tel:${driverPhone.replace(/\D/g, '')}`} className="mt-2 block rounded-2xl border border-white/10 px-4 py-3 text-xs font-black"><Phone className="mr-2 inline h-4 w-4" />โทรพี่วิน</a>}
+          {onEmergencyClick && <button onClick={onEmergencyClick} className="mt-2 w-full rounded-2xl border border-rose-400/20 px-4 py-3 text-xs font-black text-rose-300"><ShieldCheck className="mr-2 inline h-4 w-4" />ฉุกเฉิน</button>}
+          <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-slate-500"><MapPin className="h-3.5 w-3.5" /> ไม่มี Google Maps JavaScript API ฝังในแอป</div>
+        </div>
       </div>
     </div>
   );
 };
+
+export default ThreeDimensionalRideMap;
