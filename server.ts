@@ -124,19 +124,16 @@ app.get(["/api/health", "/healthz", "/health"], (_req, res) => {
 app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-
   const latitude = Number(req.body?.latitude);
   const longitude = Number(req.body?.longitude);
   const radiusMeters = Math.min(50_000, Math.max(1_000, Number(req.body?.radiusMeters) || 15_000));
   const validCoord = Number.isFinite(latitude) && Number.isFinite(longitude)
     && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
   if (!validCoord) return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง" });
-
   const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
   if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
     return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY สำหรับข้อมูลสถานที่จริง", places: [] });
   }
-
   try {
     const placesResponse = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
       method: "POST",
@@ -150,77 +147,37 @@ app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]),
         ].join(","),
       },
       body: JSON.stringify({
-        includedTypes: ["veterinary_care"],
-        maxResultCount: 20,
-        rankPreference: "DISTANCE",
-        languageCode: "th",
-        regionCode: "TH",
+        includedTypes: ["veterinary_care"], maxResultCount: 20, rankPreference: "DISTANCE",
+        languageCode: "th", regionCode: "TH",
         locationRestriction: { circle: { center: { latitude, longitude }, radius: radiusMeters } },
       }),
       signal: AbortSignal.timeout(12_000),
     });
-    if (!placesResponse.ok) {
-      console.error(`[Pet Care Places] Google returned ${placesResponse.status}`);
-      return res.status(502).json({ error: "ดึงข้อมูลโรงพยาบาลและคลินิกจริงจาก Google Places ไม่สำเร็จ", places: [] });
-    }
-
-    const placesPayload = await placesResponse.json() as { places?: any[] };
-    const rawPlaces = (Array.isArray(placesPayload.places) ? placesPayload.places : []).filter((place) =>
-      place?.id && place?.displayName?.text && Number.isFinite(place?.location?.latitude) && Number.isFinite(place?.location?.longitude)
-    );
-
-    let matrix: any[] = [];
-    if (rawPlaces.length > 0) {
-      const matrixResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } }))),
-          travelMode: "TWO_WHEELER",
-          languageCode: "th-TH",
-          units: "METRIC",
-        }),
-        signal: AbortSignal.timeout(12_000),
-      });
-      if (matrixResponse.ok) matrix = await matrixResponse.json() as any[];
-      else console.error(`[Pet Care Routes] Google returned ${matrixResponse.status}`);
-    }
-
-    const routeByDestination = new Map(matrix
-      .filter((item) => item?.condition === "ROUTE_EXISTS" && Number.isFinite(item?.distanceMeters))
-      .map((item) => [Number(item.destinationIndex), item]));
-
-    const places = rawPlaces.map((place, index) => {
-      const route = routeByDestination.get(index);
-      const distanceKm = route ? Math.round((Number(route.distanceMeters) / 1000) * 10) / 10 : null;
-      const durationSeconds = route ? Number.parseFloat(String(route.duration || "0").replace("s", "")) : NaN;
-      const weekdayDescriptions = Array.isArray(place.regularOpeningHours?.weekdayDescriptions)
-        ? place.regularOpeningHours.weekdayDescriptions : [];
-      const alwaysOpen = Array.isArray(place.regularOpeningHours?.periods)
-        && place.regularOpeningHours.periods.length === 1
-        && place.regularOpeningHours.periods[0]?.open?.hour === 0
-        && !place.regularOpeningHours.periods[0]?.close;
-      return {
-        id: String(place.id),
-        name: String(place.displayName.text),
-        address: String(place.formattedAddress || ""),
-        latitude: Number(place.location.latitude),
-        longitude: Number(place.location.longitude),
-        distanceKm,
-        etaMinutes: Number.isFinite(durationSeconds) ? Math.max(1, Math.ceil(durationSeconds / 60)) : null,
-        phoneNumber: String(place.nationalPhoneNumber || ""),
-        rating: Number.isFinite(place.rating) ? Number(place.rating) : null,
-        reviewsCount: Number.isFinite(place.userRatingCount) ? Number(place.userRatingCount) : 0,
-        openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
-        openHours: weekdayDescriptions,
-        is24Hours: alwaysOpen,
-        googleMapsUri: String(place.googleMapsUri || ""),
-        routeSource: route ? "google_routes_api_live" : null,
-      };
-    }).sort((a, b) => (a.distanceKm ?? Number.MAX_VALUE) - (b.distanceKm ?? Number.MAX_VALUE));
-
-    return res.json({
-      places,
-      source: "Google Places API (New) + Google Routes API",
-      origin: { latitude, longitude },
-      fetchedAt: new Date().toISOString(),
-    });
+    if (!placesResponse.ok) return res.status(502).json({ error: "ดึงข้อมูลโรงพยาบาลและคลินิกจริงจาก Google Places ไม่สำเร็จ", places: [] });
+    const payload = await placesResponse.json() as { places?: any[] };
+    const toRadians = (degrees: number) => degrees * Math.PI / 180;
+    const straightLineMeters = (lat: number, lng: number) => {
+      const earthRadius = 6_371_000;
+      const dLat = toRadians(lat - latitude), dLng = toRadians(lng - longitude);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(latitude)) * Math.cos(toRadians(lat)) * Math.sin(dLng / 2) ** 2;
+      return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+    const places = (Array.isArray(payload.places) ? payload.places : [])
+      .filter((place) => place?.id && place?.displayName?.text && Number.isFinite(place?.location?.latitude) && Number.isFinite(place?.location?.longitude))
+      .map((place) => {
+        const distanceKm = Math.round(straightLineMeters(Number(place.location.latitude), Number(place.location.longitude)) / 100) / 10;
+        return {
+          id: String(place.id), name: String(place.displayName.text), address: String(place.formattedAddress || ""),
+          latitude: Number(place.location.latitude), longitude: Number(place.location.longitude),
+          distanceKm, etaMinutes: Math.max(1, Math.ceil((distanceKm / 0.35))),
+          phoneNumber: String(place.nationalPhoneNumber || ""), rating: Number.isFinite(place.rating) ? Number(place.rating) : null,
+          reviewsCount: Number.isFinite(place.userRatingCount) ? Number(place.userRatingCount) : 0,
+          openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
+          openHours: Array.isArray(place.regularOpeningHours?.weekdayDescriptions) ? place.regularOpeningHours.weekdayDescriptions : [],
+          is24Hours: false, googleMapsUri: String(place.googleMapsUri || ""), routeSource: null,
+        };
+      }).sort((a, b) => a.distanceKm - b.distanceKm);
+    return res.json({ places, source: "Google Places API (New) + local straight-line estimate", origin: { latitude, longitude }, fetchedAt: new Date().toISOString() });
   } catch (error) {
     console.error("[Pet Care Nearby]", error instanceof Error ? error.message : error);
     return res.status(502).json({ error: "เชื่อมต่อข้อมูลสถานพยาบาลสัตว์จริงไม่ได้", places: [] });
@@ -296,8 +253,7 @@ app.patch("/api/sos/incidents/:id", rateLimit(30), async (req, res) => {
 app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const latitude = Number(req.body?.latitude);
-  const longitude = Number(req.body?.longitude);
+  const latitude = Number(req.body?.latitude), longitude = Number(req.body?.longitude);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
     return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง", places: [] });
   }
@@ -308,30 +264,31 @@ app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": "places.id,places.displayName,places.primaryType,places.formattedAddress,places.location,places.nationalPhoneNumber,places.googleMapsUri,places.currentOpeningHours.openNow" },
-      body: JSON.stringify({ includedTypes: ["hospital", "fire_station", "police"], maxResultCount: 20,
-        rankPreference: "DISTANCE", languageCode: "th", regionCode: "TH",
+      body: JSON.stringify({ includedTypes: ["hospital", "fire_station", "police"], maxResultCount: 20, rankPreference: "DISTANCE", languageCode: "th", regionCode: "TH",
         locationRestriction: { circle: { center: { latitude, longitude }, radius: 20000 } } }),
       signal: AbortSignal.timeout(12000),
     });
     if (!placesResponse.ok) return res.status(502).json({ error: "ดึงข้อมูลศูนย์ฉุกเฉินจริงไม่สำเร็จ", places: [] });
     const payload = await placesResponse.json() as { places?: any[] };
-    const raw = (payload.places || []).filter((place) => place?.id && place?.location);
-    let matrix: any[] = [];
-    if (raw.length) {
-      const routeResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } }));
-      if (routeResponse.ok) matrix = await routeResponse.json() as any[];
-    }
-    const routeMap = new Map(matrix.filter((route) => route?.condition === "ROUTE_EXISTS").map((route) => [Number(route.destinationIndex), route]));
-    const places = raw.map((place, index) => {
-      const route = routeMap.get(index) as any;
-      const seconds = route ? Number.parseFloat(String(route.duration || "0").replace("s", "")) : NaN;
-      return { id: String(place.id), name: String(place.displayName?.text || ""), type: String(place.primaryType || "hospital"),
-        address: String(place.formattedAddress || ""), phone: String(place.nationalPhoneNumber || ""), mapsUrl: String(place.googleMapsUri || ""),
-        openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
-        distanceKm: route ? Math.round((Number(route.distanceMeters) / 1000) * 10) / 10 : null,
-        etaMinutes: Number.isFinite(seconds) ? Math.max(1, Math.ceil(seconds / 60)) : null };
-    }).sort((a, b) => (a.distanceKm ?? Number.MAX_VALUE) - (b.distanceKm ?? Number.MAX_VALUE));
-    return res.json({ places, source: "Google Places API (New) + Google Routes API", fetchedAt: new Date().toISOString() });
+    const toRadians = (degrees: number) => degrees * Math.PI / 180;
+    const straightLineMeters = (lat: number, lng: number) => {
+      const earthRadius = 6_371_000;
+      const dLat = toRadians(lat - latitude), dLng = toRadians(lng - longitude);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(latitude)) * Math.cos(toRadians(lat)) * Math.sin(dLng / 2) ** 2;
+      return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+    const places = (Array.isArray(payload.places) ? payload.places : [])
+      .filter((place) => place?.id && place?.location)
+      .map((place) => {
+        const distanceKm = Math.round(straightLineMeters(Number(place.location.latitude), Number(place.location.longitude)) / 100) / 10;
+        return {
+          id: String(place.id), name: String(place.displayName?.text || ""), type: String(place.primaryType || "hospital"),
+          address: String(place.formattedAddress || ""), phone: String(place.nationalPhoneNumber || ""), mapsUrl: String(place.googleMapsUri || ""),
+          openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
+          distanceKm, etaMinutes: Math.max(1, Math.ceil(distanceKm / 0.35)),
+        };
+      }).sort((a, b) => a.distanceKm - b.distanceKm);
+    return res.json({ places, source: "Google Places API (New) + local straight-line estimate", fetchedAt: new Date().toISOString() });
   } catch (error) {
     console.error("[Emergency Nearby]", error instanceof Error ? error.message : error);
     return res.status(502).json({ error: "เชื่อมต่อข้อมูลศูนย์ฉุกเฉินจริงไม่ได้", places: [] });
