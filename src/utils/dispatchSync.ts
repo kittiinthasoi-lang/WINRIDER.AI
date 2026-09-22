@@ -36,6 +36,16 @@ export interface LiveRideOrder {
   tipAmount?: number;
   tips?: number;
   platformFee?: number;
+  settled?: boolean;
+  settlementStatus?: 'PENDING' | 'SETTLED';
+  ledgerTransactionId?: string;
+  fareSatang?: number;
+  tipSatang?: number;
+  citizenFeeSatang?: number;
+  citizenTotalPaidSatang?: number;
+  knightFeeSatang?: number;
+  equipmentFeeSatang?: number;
+  knightPayoutSatang?: number;
   ratingGiven?: number;
   reviewComment?: string;
   pickupCoord?: { lat: number; lng: number };
