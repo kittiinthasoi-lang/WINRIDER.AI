@@ -166,15 +166,13 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
     return null;
   }, [gpsState.latitude, gpsState.longitude, phase, pickupCoords]);
 
-  // Active calculated route. Recalculate from real GPS periodically or after meaningful movement,
-  // rather than on every GPS tick, so live navigation stays current without request bursts.
+  // Reserved route state. It remains null/unavailable while the paid Routes API is disabled.
   const [liveRoute, setLiveRoute] = useState<ComputedLiveRoute | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState<boolean>(true);
   const lastRouteRequestRef = useRef<{ lat: number; lng: number; at: number; phase: NavigationPhase; destLat: number; destLng: number } | null>(null);
 
-  // Calculate a real route from the Knight's current GPS to the active waypoint.
-  // Refresh on meaningful movement or after 10s so ETA/traffic stays current without
-  // firing a Routes API request for every GPS update.
+  // Road-route computation is intentionally unavailable while Google Routes is disabled.
+  // Keep GPS/map markers live, but never present a straight-line estimate as a road route.
   useEffect(() => {
     let isCancelled = false;
 
@@ -264,6 +262,9 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-200 border border-amber-400/40 font-mono font-bold">
+                  GPS/แผนที่สด • ยังไม่คำนวณเส้นทางถนน
+                </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-mono font-bold">
                   {phase === 'approaching' ? 'พี่วินกำลังเดินทางมารับ' : 'มุ่งหน้าสู่ปลายทาง'}
                 </span>
@@ -339,7 +340,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
             internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
             style={{ width: '100%', height: '100%' }}
           >
-            {/* Real Route Polyline */}
+            {/* Road-route polyline is intentionally omitted while Routes API is disabled. */}
             <MapRouteRenderer
               path={liveRoute?.polylineCoordinates || []}
               driverPosition={driverPos || undefined}
@@ -443,11 +444,11 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
         {/* ========================================================================= */}
         {/* 4. REAL TURN-BY-TURN STEPS DRAWER */}
         {/* ========================================================================= */}
-        {showStepsDrawer && liveRoute && liveRoute.steps && (
+        {showStepsDrawer && liveRoute?.success && liveRoute.steps && (
           <div className="absolute top-20 left-3 right-16 max-h-72 overflow-y-auto z-20 p-3 rounded-2xl bg-[#061427]/95 backdrop-blur-md border border-emerald-500/40 shadow-2xl space-y-2 font-mono text-xs">
             <div className="flex items-center justify-between pb-1 border-b border-white/10">
               <span className="font-bold text-emerald-300 flex items-center gap-1">
-                <ListOrdered className="w-3.5 h-3.5" /> รายละเอียดเส้นทางนำทางจริง
+                <ListOrdered className="w-3.5 h-3.5" /> รายละเอียดเส้นทางนำทาง
               </span>
               <button
                 type="button"
@@ -478,11 +479,11 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
         {/* ========================================================================= */}
         <div className="absolute bottom-0 left-0 right-0 z-30 p-3.5 bg-gradient-to-t from-[#06101E] via-[#081427]/98 to-[#081427]/90 backdrop-blur-md border-t-2 border-white/10 shadow-2xl space-y-2.5 font-mono">
           <div className="flex items-center justify-between gap-3">
-            {/* Real ETA & Distance */}
+            {/* Road ETA & distance are unavailable while Routes API is disabled. */}
             <div className="flex items-baseline gap-2.5">
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-black text-emerald-400 tracking-tight">
-                  {liveRoute?.totalDurationMinutes ?? (isLoadingRoute ? '…' : '—')}
+                  {liveRoute?.success ? liveRoute.totalDurationMinutes : (isLoadingRoute ? '…' : '—')}
                 </span>
                 <span className="text-xs font-bold text-emerald-300">นาที</span>
               </div>
@@ -490,7 +491,7 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
               <div className="flex items-center gap-1.5 text-xs text-slate-300">
                 <span>•</span>
                 <span className="font-bold text-white">
-                  {liveRoute?.totalDistanceKm || (isLoadingRoute ? 'กำลังคำนวณ' : '—')}
+                  {liveRoute?.success ? liveRoute.totalDistanceKm : (isLoadingRoute ? 'กำลังตรวจสอบ' : '—')}
                 </span>
                 <span>•</span>
                 <span className="text-slate-400 text-[11px]">
