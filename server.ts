@@ -685,188 +685,16 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
   }
 });
 
-// Win Alert event discovery uses Thailand's public TAT tourism activity dataset.
-// External source data is imported into Firestore as PENDING_ADMIN_REVIEW only.
-// The customer endpoint below reads approved Firestore records exclusively.
-const TAT_TOURISM_ACTIVITY_JSON_URL = String(process.env.TAT_TOURISM_ACTIVITY_JSON_URL || "https://datacatalog.tat.or.th/dataset/458dcb66-2093-4b29-adc7-82284b4c3ae6/resource/fa7a2cd7-0057-4152-a8df-78728515dcfe/download/activity.json").trim();
-const TAT_DATASET_PAGE_URL = "https://datacatalog.tat.or.th/dataset/tourismactivity";
-const TAT_DATASET_ID = "458dcb66-2093-4b29-adc7-82284b4c3ae6";
-const dailyEventsCache = new Map<string, { expiresAt: number; value: NearbyEventResult[] }>();
-const EVENT_CACHE_MS = 5 * 60 * 1000;
-
-function classifyRealEvent(category: string, title: string, labels: string[] = []): EventCategory {
-  const normalized = (String(category) + " " + String(title) + " " + labels.join(" ")).toLowerCase();
-  if (/sale|discount|ลดราคา|clearance|shopping/.test(normalized)) return "sale";
-  if (/market|bazaar|popup|pop-up|ตลาด|fair|expo/.test(normalized)) return "market";
-  if (/concert|music|performing-arts|ดนตรี|คอนเสิร์ต/.test(normalized)) return "concert";
-  if (/sport|football|soccer|basketball|กีฬา|แข่งขัน/.test(normalized)) return "sports";
-  if (/festival|เทศกาล/.test(normalized)) return "festival";
-  if (/community|academic|school|public-holiday|observance|ชุมชน/.test(normalized)) return "community";
-  return "other";
-}
-
-function firstValue(item: any, keys: string[]): unknown {
-  for (const key of keys) {
-    const value = key.split(".").reduce((current, part) => current?.[part], item);
-    if (value !== undefined && value !== null && String(value).trim() !== "") return value;
-  }
-  return undefined;
-}
-
-function parseThaiOrIsoDate(value: unknown): string | null {
-  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
-  const raw = String(value ?? "").trim();
-  if (!raw) return null;
-  const direct = Date.parse(raw);
-  if (Number.isFinite(direct)) return new Date(direct).toISOString();
-  const match = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
-  if (!match) return null;
-  let year = Number(match[3]);
-  if (year >= 2400) year -= 543;
-  const month = Number(match[2]);
-  const day = Number(match[1]);
-  const parsed = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
-    ? parsed.toISOString()
-    : null;
-}
-
-function normalizeTatCoordinate(value: unknown): number | null {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function normalizeTatEvent(item: any, index: number) {
-  const title = String(firstValue(item, ["title", "name", "event_name", "eventName", "ชื่อกิจกรรม", "ชื่อเรื่อง"]) || "").trim();
-  const startAt = parseThaiOrIsoDate(firstValue(item, ["startAt", "start", "start_date", "startDate", "วันที่เริ่มต้น", "วันที่เริ่ม"]));
-  const endAt = parseThaiOrIsoDate(firstValue(item, ["endAt", "end", "end_date", "endDate", "วันที่สิ้นสุด", "วันที่สิ้นสุด"]));
-  const venueName = String(firstValue(item, ["venueName", "venue", "location", "place", "สถานที่จัดงาน", "สถานที่"]) || "").trim();
-  const venueArea = String(firstValue(item, ["province", "จังหวัด", "district", "อำเภอ", "area", "region"]) || "").trim();
-  const latitude = normalizeTatCoordinate(firstValue(item, ["latitude", "lat", "location.latitude", "พิกัดละติจูด"]));
-  const longitude = normalizeTatCoordinate(firstValue(item, ["longitude", "lng", "lon", "location.longitude", "พิกัดลองจิจูด"]));
-  const description = String(firstValue(item, ["description", "detail", "รายละเอียด", "คำอธิบาย"]) || "").trim();
-  const categoryRaw = String(firstValue(item, ["category", "type", "ประเภท", "หมวดหมู่"]) || "other").trim();
-  const labelsRaw = firstValue(item, ["tags", "labels", "แท็ก", "keywords"]);
-  const labels = Array.isArray(labelsRaw) ? labelsRaw.map((value) => String(value)) : String(labelsRaw || "").split(/[,|]/).map((value) => value.trim()).filter(Boolean);
-  const externalId = String(firstValue(item, ["id", "_id", "event_id", "eventId", "รหัสกิจกรรม"]) || ("row-" + index)).trim();
-  if (!title || !startAt) return null;
-  const stableId = crypto.createHash("sha256").update(TAT_DATASET_ID + ":" + externalId + ":" + startAt + ":" + title).digest("hex").slice(0, 32);
-  return {
-    id: "tat-" + stableId,
-    title,
-    category: classifyRealEvent(categoryRaw, title, labels),
-    venueName,
-    venueArea,
-    latitude,
-    longitude,
-    startAt,
-    endAt: endAt || undefined,
-    description: description || undefined,
-    sourceName: "TAT Data Catalog • Thailand Tourism Authority",
-    providerEventId: externalId,
-    sourceUrl: TAT_DATASET_PAGE_URL,
-    adminApproved: false,
-    status: "pending_admin_review",
-    importedAt: new Date().toISOString(),
-  };
-}
-
-async function requireSuperAdmin(req: express.Request, res: express.Response) {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return null;
-  if (!isSuperAdminToken(user)) {
-    res.status(403).json({ error: "Admin verification required" });
-    return null;
-  }
-  return user;
-}
-
-// Admin-only import: fetch the free public TAT JSON and stage records for review.
-// Nothing imported here becomes visible to customers until an admin approves it.
-app.post("/api/admin/win-alert/import-tat", rateLimit(5), async (req, res) => {
-  const adminUser = await requireSuperAdmin(req, res);
-  if (!adminUser) return;
-  try {
-    const response = await fetch(TAT_TOURISM_ACTIVITY_JSON_URL, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (!response.ok) return res.status(502).json({ error: "ดึงข้อมูลกิจกรรมจาก TAT ไม่สำเร็จ", status: response.status });
-    const payload = await response.json();
-    const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.records) ? payload.records : [];
-    const horizon = Date.now() + 548 * 24 * 60 * 60 * 1000;
-    const normalized = rows.map(normalizeTatEvent).filter(Boolean).filter((event: any) => {
-      const startMs = Date.parse(event.startAt);
-      return Number.isFinite(startMs) && startMs <= horizon;
-    }).slice(0, 5000) as any[];
-
-    const batchLimit = 400;
-    let written = 0;
-    for (let offset = 0; offset < normalized.length; offset += batchLimit) {
-      const batch = ordersDb.batch();
-      for (const event of normalized.slice(offset, offset + batchLimit)) {
-        const ref = ordersDb.collection("winAlertEvents").doc(event.id);
-        batch.set(ref, {
-          ...event,
-          adminApproved: false,
-          status: "pending_admin_review",
-          importedBy: adminUser.uid,
-          importedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-      }
-      await batch.commit();
-      written += Math.min(batchLimit, normalized.length - offset);
-    }
-    dailyEventsCache.clear();
-    return res.json({ ok: true, source: "TAT Data Catalog", datasetId: TAT_DATASET_ID, sourceUrl: TAT_DATASET_PAGE_URL, fetchedAt: new Date().toISOString(), sourceRows: rows.length, stagedForAdminReview: written, customerVisible: 0 });
-  } catch (error) {
-    console.error("[Win Alert TAT Import]", error instanceof Error ? error.message : error);
-    return res.status(503).json({ error: "นำเข้าข้อมูล TAT ไม่สำเร็จ" });
-  }
-});
-
-app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
-  const eventDate = String(req.query.date || "").trim();
-  const country = "TH";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง", events: [] });
-  const cacheKey = country + ":" + eventDate;
-  const cached = dailyEventsCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return res.json({ events: cached.value, source: "WINRIDER.AI • Admin Verified Firestore", fetchedAt: new Date().toISOString(), eventDate, country, cached: true });
-  const dayStart = new Date(eventDate + "T00:00:00+07:00");
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
-  try {
-    const snapshot = await ordersDb.collection("winAlertEvents").get();
-    const events = snapshot.docs.flatMap((docSnap): NearbyEventResult[] => {
-      const item = docSnap.data() || {};
-      const approved = item.adminApproved === true || item.approved === true || item.status === "approved" || item.status === "active";
-      if (!approved) return [];
-      const startAt = parseThaiOrIsoDate(item.startAt || item.start);
-      const endAt = parseThaiOrIsoDate(item.endAt || item.end) || startAt;
-      const startMs = startAt ? Date.parse(startAt) : NaN;
-      const endMs = endAt ? Date.parse(endAt) : startMs;
-      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < dayStart.getTime() || startMs > dayEnd.getTime()) return [];
-      const latitude = Number(item.latitude ?? item.lat);
-      const longitude = Number(item.longitude ?? item.lng ?? item.lon);
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
-      const id = String(item.id || docSnap.id).trim();
-      const title = String(item.title || item.name || "").trim();
-      if (!id || !title) return [];
-      const categoryValue = String(item.category || "other").trim();
-      const allowedCategories: EventCategory[] = ["sale","market","concert","sports","festival","community","other"];
-      const category = allowedCategories.includes(categoryValue as EventCategory) ? categoryValue as EventCategory : classifyRealEvent(categoryValue, title, Array.isArray(item.labels) ? item.labels : []);
-      return [{ id: "admin-event-" + id, title, category, venueName: String(item.venueName || item.venue || "").trim(), venueArea: String(item.venueArea || item.area || item.province || "").trim(), latitude, longitude, startAt, endAt: endAt || undefined, description: typeof item.description === "string" ? item.description : undefined, sourceName: String(item.sourceName || "WINRIDER.AI • Admin Verified"), providerEventId: String(item.providerEventId || id), attendance: Number.isFinite(Number(item.attendance)) && Number(item.attendance) > 0 ? Number(item.attendance) : undefined, rank: Number.isFinite(Number(item.rank)) ? Number(item.rank) : undefined }];
-    }).sort((a,b) => Date.parse(a.startAt) - Date.parse(b.startAt));
-    dailyEventsCache.set(cacheKey, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
-    return res.json({ events, source: "WINRIDER.AI • Admin Verified Firestore", fetchedAt: new Date().toISOString(), eventDate, country, cached: false });
-  } catch (error) {
-    console.error("[Events API] Firestore read failed:", error instanceof Error ? error.message : error);
-    return res.status(503).json({ message: "โหลดกิจกรรมจริงจากฐานข้อมูลไม่สำเร็จ", events: [] });
-  }
-});
-
-
-
+// WINRIDER.AI Public Data Layer
+// Source of truth: TAT Data Catalog CKAN metadata + its current JSON resource.
+// Public-source records are source-driven and do NOT require Admin Verify.
+// Admin access is used only to trigger/inspect synchronization.
+// TAT's tourism activity dataset is public, JSON, Open Data Common, nationwide,
+// and the catalog currently identifies an annual minimum update frequency.
 type PublicDataKind = "attractions" | "restaurants" | "accommodations" | "souvenirs" | "events";
+
+const TAT_CKAN_API_BASE = "https://datacatalog.tat.or.th/api/3/action/package_show";
+const TAT_DATASET_PAGE_BASE = "https://datacatalog.tat.or.th/dataset";
 
 const TAT_PUBLIC_DATASETS: Record<PublicDataKind, { slug: string; label: string; description: string }> = {
   attractions: { slug: "tourist-attraction", label: "แหล่งท่องเที่ยว", description: "สถานที่ท่องเที่ยว พิกัด ที่ตั้ง ช่องทางติดต่อ และเวลาให้บริการ" },
@@ -875,6 +703,10 @@ const TAT_PUBLIC_DATASETS: Record<PublicDataKind, { slug: string; label: string;
   souvenirs: { slug: "souvenir-shop", label: "ร้านของที่ระลึก", description: "ร้านของฝาก สินค้าชุมชน และของที่ระลึก" },
   events: { slug: "tourismactivity", label: "กิจกรรมท่องเที่ยว", description: "เทศกาล งานประเพณี และกิจกรรมท่องเที่ยว" },
 };
+
+const dailyEventsCache = new Map<string, { expiresAt: number; value: NearbyEventResult[] }>();
+const EVENT_CACHE_MS = 5 * 60 * 1000;
+const FIRESTORE_BATCH_LIMIT = 400;
 
 function normalizePublicRecordValue(item: any, keys: string[]): unknown {
   for (const key of keys) {
@@ -889,6 +721,35 @@ function normalizePublicCoordinate(value: unknown): number | null {
   return Number.isFinite(n) && Math.abs(n) <= 180 ? n : null;
 }
 
+function parseThaiOrIsoDate(value: unknown): string | null {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const direct = Date.parse(raw);
+  if (Number.isFinite(direct)) return new Date(direct).toISOString();
+  const match = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if (!match) return null;
+  let year = Number(match[3]);
+  if (year >= 2400) year -= 543;
+  const month = Number(match[2]);
+  const day = Number(match[1]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
+    ? parsed.toISOString()
+    : null;
+}
+
+function classifyPublicEvent(category: string, title: string, labels: string[] = []): EventCategory {
+  const normalized = (String(category) + " " + String(title) + " " + labels.join(" ")).toLowerCase();
+  if (/sale|discount|ลดราคา|clearance|shopping/.test(normalized)) return "sale";
+  if (/market|bazaar|popup|pop-up|ตลาด|fair|expo/.test(normalized)) return "market";
+  if (/concert|music|performing-arts|ดนตรี|คอนเสิร์ต/.test(normalized)) return "concert";
+  if (/sport|football|soccer|basketball|กีฬา|แข่งขัน/.test(normalized)) return "sports";
+  if (/festival|เทศกาล/.test(normalized)) return "festival";
+  if (/community|academic|school|public-holiday|observance|ชุมชน/.test(normalized)) return "community";
+  return "other";
+}
+
 function normalizePublicRecord(kind: PublicDataKind, item: any, index: number, sourceUrl: string) {
   const name = String(normalizePublicRecordValue(item, [
     "name", "title", "businessName", "placeName", "event_name", "eventName",
@@ -896,10 +757,10 @@ function normalizePublicRecord(kind: PublicDataKind, item: any, index: number, s
   ]) || "").trim();
   if (!name) return null;
 
-  const lat = normalizePublicCoordinate(normalizePublicRecordValue(item, [
+  const latitude = normalizePublicCoordinate(normalizePublicRecordValue(item, [
     "latitude", "lat", "location.latitude", "พิกัดละติจูด", "ละติจูด"
   ]));
-  const lng = normalizePublicCoordinate(normalizePublicRecordValue(item, [
+  const longitude = normalizePublicCoordinate(normalizePublicRecordValue(item, [
     "longitude", "lng", "lon", "location.longitude", "พิกัดลองจิจูด", "ลองจิจูด"
   ]));
   const address = String(normalizePublicRecordValue(item, [
@@ -911,186 +772,411 @@ function normalizePublicRecord(kind: PublicDataKind, item: any, index: number, s
   const website = String(normalizePublicRecordValue(item, ["website", "url", "เว็บไซต์"]) || "").trim();
   const description = String(normalizePublicRecordValue(item, ["description", "detail", "รายละเอียด", "คำอธิบาย"]) || "").trim();
   const category = String(normalizePublicRecordValue(item, ["category", "type", "ประเภท", "หมวดหมู่"]) || kind).trim();
-  const externalId = String(normalizePublicRecordValue(item, ["id", "_id", "code", "รหัส", "รหัสสถานที่", "รหัสกิจกรรม"]) || ("row-" + index)).trim();
-  const startAt = kind === "events" ? parseThaiOrIsoDate(normalizePublicRecordValue(item, ["startAt", "start", "start_date", "startDate", "วันที่เริ่มต้น", "วันที่เริ่ม"])) : null;
-  const endAt = kind === "events" ? parseThaiOrIsoDate(normalizePublicRecordValue(item, ["endAt", "end", "end_date", "endDate", "วันที่สิ้นสุด", "วันที่สิ้นสุด"])) : null;
+  const venueName = String(normalizePublicRecordValue(item, ["venueName", "venue", "สถานที่จัดงาน", "สถานที่"]) || "").trim();
+  const externalId = String(normalizePublicRecordValue(item, [
+    "id", "_id", "code", "รหัส", "รหัสสถานที่", "รหัสกิจกรรม"
+  ]) || ("row-" + index)).trim();
+  const startAt = kind === "events"
+    ? parseThaiOrIsoDate(normalizePublicRecordValue(item, ["startAt", "start", "start_date", "startDate", "วันที่เริ่มต้น", "วันที่เริ่ม"]))
+    : null;
+  const endAt = kind === "events"
+    ? parseThaiOrIsoDate(normalizePublicRecordValue(item, ["endAt", "end", "end_date", "endDate", "วันที่สิ้นสุด"]))
+    : null;
+
   if (kind === "events" && !startAt) return null;
 
   const stableId = crypto.createHash("sha256")
-    .update("tat:" + kind + ":" + externalId + ":" + name + ":" + String(lat) + ":" + String(lng))
+    .update("tat:" + kind + ":" + externalId + ":" + name + ":" + String(latitude) + ":" + String(longitude))
     .digest("hex").slice(0, 32);
 
   return {
     id: "tat-" + kind + "-" + stableId,
     kind,
     name,
+    title: kind === "events" ? name : undefined,
     category,
+    venueName: venueName || undefined,
     address,
     province,
     district,
-    latitude: lat,
-    longitude: lng,
+    latitude,
+    longitude,
     phone: phone || undefined,
     website: website || undefined,
     description: description || undefined,
     startAt: startAt || undefined,
     endAt: endAt || undefined,
+    labels: Array.isArray(item.labels) ? item.labels.filter((label: unknown) => typeof label === "string").slice(0, 20) : undefined,
+    source: "TAT Data Catalog",
     sourceName: "TAT Data Catalog • Thailand Tourism Authority",
     sourceUrl,
     providerRecordId: externalId,
-    adminApproved: false,
-    status: "pending_admin_review",
+    sourceDriven: true,
+    publicVisible: true,
+    status: "active",
     importedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
-async function fetchTatDatasetRows(kind: PublicDataKind): Promise<{ rows: any[]; sourceUrl: string }> {
+async function fetchTatDatasetRows(kind: PublicDataKind): Promise<{
+  rows: any[];
+  sourceUrl: string;
+  datasetUrl: string;
+  metadataModified?: string;
+}> {
   const config = TAT_PUBLIC_DATASETS[kind];
-  const apiUrl = "https://datacatalog.tat.or.th/api/3/action/package_show?id=" + encodeURIComponent(config.slug);
+  const datasetUrl = TAT_DATASET_PAGE_BASE + "/" + config.slug;
+  const apiUrl = TAT_CKAN_API_BASE + "?id=" + encodeURIComponent(config.slug);
+
   const apiResponse = await fetch(apiUrl, {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(60_000),
   });
   if (!apiResponse.ok) throw new Error("TAT_CKAN_" + apiResponse.status);
+
   const packagePayload = await apiResponse.json();
-  const resources = Array.isArray(packagePayload?.result?.resources) ? packagePayload.result.resources : [];
-  const resource = resources.find((r: any) => String(r?.format || "").toLowerCase() === "json" && typeof r?.url === "string")
-    || resources.find((r: any) => typeof r?.url === "string");
+  if (packagePayload?.success !== true || !packagePayload?.result) {
+    throw new Error("TAT_CKAN_INVALID_" + kind);
+  }
+
+  const resources = Array.isArray(packagePayload.result.resources) ? packagePayload.result.resources : [];
+  const resource = resources.find((r: any) =>
+    String(r?.format || "").toLowerCase() === "json" && typeof r?.url === "string"
+  ) || resources.find((r: any) => typeof r?.url === "string");
+
   if (!resource?.url) throw new Error("TAT_RESOURCE_NOT_FOUND_" + kind);
 
-  const dataResponse = await fetch(resource.url, {
+  const dataResponse = await fetch(String(resource.url), {
     headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(180_000),
   });
   if (!dataResponse.ok) throw new Error("TAT_DATA_" + dataResponse.status);
+
   const payload = await dataResponse.json();
   const rows = Array.isArray(payload) ? payload
     : Array.isArray(payload?.data) ? payload.data
     : Array.isArray(payload?.results) ? payload.results
     : Array.isArray(payload?.records) ? payload.records
     : [];
-  return { rows, sourceUrl: resource.url };
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("TAT_EMPTY_DATASET_" + kind);
+  }
+
+  return {
+    rows,
+    sourceUrl: String(resource.url),
+    datasetUrl,
+    metadataModified: typeof packagePayload.result.metadata_modified === "string"
+      ? packagePayload.result.metadata_modified
+      : undefined,
+  };
 }
 
-app.get("/api/admin/win-alert/pending", async (req, res) => {
-  const adminUser = await requireSuperAdmin(req, res);
-  if (!adminUser) return;
-  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 300);
-  const snapshot = await ordersDb.collection("winAlertEvents").limit(limit).get();
-  const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((record: any) => record.status === "pending_admin_review");
-  return res.json({ records });
+async function syncTatPublicData(kinds: PublicDataKind[]) {
+  const imported: Array<Record<string, unknown>> = [];
+
+  for (const kind of kinds) {
+    const { rows, sourceUrl, datasetUrl, metadataModified } = await fetchTatDatasetRows(kind);
+    const normalized = rows
+      .map((row, index) => normalizePublicRecord(kind, row, index, sourceUrl))
+      .filter((record): record is NonNullable<ReturnType<typeof normalizePublicRecord>> => Boolean(record));
+
+    if (normalized.length === 0) {
+      throw new Error("TAT_NO_VALID_RECORDS_" + kind);
+    }
+
+    const collectionName = kind === "events" ? "winAlertEvents" : "publicDataRecords";
+    const existingSnapshot = await ordersDb.collection(collectionName)
+      .where("source", "==", "TAT Data Catalog")
+      .get();
+    const existingIds = new Set(
+      existingSnapshot.docs
+        .filter((doc) => doc.data()?.sourceKind === kind || doc.data()?.kind === kind)
+        .map((doc) => doc.id)
+    );
+    const incomingIds = new Set<string>(normalized.map((record) => record.id));
+
+    let written = 0;
+    for (let offset = 0; offset < normalized.length; offset += FIRESTORE_BATCH_LIMIT) {
+      const batch = ordersDb.batch();
+      for (const record of normalized.slice(offset, offset + FIRESTORE_BATCH_LIMIT)) {
+        const ref = ordersDb.collection(collectionName).doc(record.id);
+        batch.set(ref, {
+          ...record,
+          sourceKind: kind,
+          sourceDriven: true,
+          publicVisible: true,
+          status: "active",
+          lastSourceSyncAt: new Date().toISOString(),
+          sourceDatasetUrl: datasetUrl,
+          sourceMetadataModified: metadataModified || null,
+        }, { merge: true });
+      }
+      await batch.commit();
+      written += Math.min(FIRESTORE_BATCH_LIMIT, normalized.length - offset);
+    }
+
+    const staleIds = [...existingIds].filter((id) => !incomingIds.has(id));
+    let removed = 0;
+    for (let offset = 0; offset < staleIds.length; offset += FIRESTORE_BATCH_LIMIT) {
+      const batch = ordersDb.batch();
+      for (const id of staleIds.slice(offset, offset + FIRESTORE_BATCH_LIMIT)) {
+        batch.delete(ordersDb.collection(collectionName).doc(id));
+      }
+      await batch.commit();
+      removed += Math.min(FIRESTORE_BATCH_LIMIT, staleIds.length - offset);
+    }
+
+    imported.push({
+      kind,
+      sourceRows: rows.length,
+      written,
+      removed,
+      sourceUrl,
+      datasetUrl,
+      metadataModified: metadataModified || null,
+      sourceDriven: true,
+      publicVisible: true,
+    });
+  }
+
+  dailyEventsCache.clear();
+  return imported;
+}
+
+function requireTatSyncSecret(req: express.Request, res: express.Response): boolean {
+  const configured = String(process.env.TAT_INTERNAL_SYNC_SECRET || "").trim();
+  const supplied = String(req.headers["x-winrider-tat-sync-secret"] || "").trim();
+  if (!configured) {
+    res.status(503).json({ error: "TAT_INTERNAL_SYNC_SECRET is not configured" });
+    return false;
+  }
+  if (!supplied || supplied !== configured) {
+    res.status(401).json({ error: "Unauthorized TAT sync request" });
+    return false;
+  }
+  return true;
+}
+
+// Internal endpoint for a scheduler (for example GitHub Actions) to run source sync
+// without granting it an Admin Firebase session. The secret is never stored in source.
+app.post("/api/internal/public-data/sync-tat", rateLimit(2), async (req, res) => {
+  if (!requireTatSyncSecret(req, res)) return;
+  try {
+    const imported = await syncTatPublicData(["events", "attractions", "restaurants", "accommodations", "souvenirs"]);
+    return res.json({
+      success: true,
+      source: "TAT Data Catalog",
+      sourceDriven: true,
+      publicVisible: true,
+      imported,
+      syncedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("[TAT Internal Sync]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ error: "ไม่สามารถซิงก์ข้อมูล TAT จากแหล่งต้นทางได้" });
+  }
 });
 
-app.post("/api/admin/win-alert/review", async (req, res) => {
-  const adminUser = await requireSuperAdmin(req, res);
-  if (!adminUser) return;
-  const id = String(req.body?.id || "").trim();
-  const approved = req.body?.approved === true;
-  if (!id) return res.status(400).json({ error: "ไม่พบรหัสกิจกรรม" });
-  const ref = ordersDb.collection("winAlertEvents").doc(id);
-  const snapshot = await ref.get();
-  if (!snapshot.exists) return res.status(404).json({ error: "ไม่พบกิจกรรม" });
-  await ref.set({
-    adminApproved: approved,
-    status: approved ? "approved" : "rejected",
-    reviewedBy: adminUser.uid,
-    reviewedAt: FieldValue.serverTimestamp(),
-  }, { merge: true });
-  dailyEventsCache.clear();
-  return res.json({ ok: true, id, approved });
+app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
+  const eventDate = String(req.query.date || "").trim();
+  const country = "TH";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง", events: [] });
+  }
+
+  const cacheKey = country + ":" + eventDate;
+  const cached = dailyEventsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return res.json({
+      events: cached.value,
+      source: "WINRIDER.AI • Direct TAT Public Data",
+      sourceDriven: true,
+      fetchedAt: new Date().toISOString(),
+      eventDate,
+      country,
+      cached: true,
+    });
+  }
+
+  const dayStart = new Date(eventDate + "T00:00:00+07:00");
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+  try {
+    const snapshot = await ordersDb.collection("winAlertEvents")
+      .where("source", "==", "TAT Data Catalog")
+      .where("sourceDriven", "==", true)
+      .get();
+
+    const events = snapshot.docs.flatMap((docSnap): NearbyEventResult[] => {
+      const item = docSnap.data() || {};
+      if (item.publicVisible !== true) return [];
+
+      const startAt = parseThaiOrIsoDate(item.startAt || item.start);
+      const endAt = parseThaiOrIsoDate(item.endAt || item.end) || startAt;
+      const startMs = startAt ? Date.parse(startAt) : NaN;
+      const endMs = endAt ? Date.parse(endAt) : startMs;
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < dayStart.getTime() || startMs > dayEnd.getTime()) return [];
+
+      const latitude = Number(item.latitude ?? item.lat);
+      const longitude = Number(item.longitude ?? item.lng ?? item.lon);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
+
+      const id = String(item.id || docSnap.id).trim();
+      const title = String(item.title || item.name || "").trim();
+      if (!id || !title) return [];
+
+      const categoryValue = String(item.category || "other").trim();
+      const allowedCategories: EventCategory[] = ["sale", "market", "concert", "sports", "festival", "community", "other"];
+      const category = allowedCategories.includes(categoryValue as EventCategory)
+        ? categoryValue as EventCategory
+        : classifyPublicEvent(categoryValue, title, Array.isArray(item.labels) ? item.labels : []);
+
+      return [{
+        id: "tat-event-" + id,
+        title,
+        category,
+        venueName: String(item.venueName || item.venue || "").trim(),
+        venueArea: String(item.venueArea || item.area || item.province || "").trim(),
+        latitude,
+        longitude,
+        startAt,
+        endAt: endAt || undefined,
+        description: typeof item.description === "string" ? item.description : undefined,
+        sourceName: "WINRIDER.AI • Direct TAT Public Data",
+        providerEventId: String(item.providerRecordId || id),
+        attendance: Number.isFinite(Number(item.attendance)) && Number(item.attendance) > 0 ? Number(item.attendance) : undefined,
+        rank: Number.isFinite(Number(item.rank)) ? Number(item.rank) : undefined,
+      }];
+    }).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+
+    dailyEventsCache.set(cacheKey, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
+    return res.json({
+      events,
+      source: "WINRIDER.AI • Direct TAT Public Data",
+      sourceDriven: true,
+      fetchedAt: new Date().toISOString(),
+      eventDate,
+      country,
+      cached: false,
+    });
+  } catch (error) {
+    console.error("[Events API] Firestore read failed:", error instanceof Error ? error.message : error);
+    return res.status(503).json({ message: "โหลดกิจกรรมจริงจากฐานข้อมูลไม่สำเร็จ", events: [] });
+  }
 });
 
 app.get("/api/admin/public-data/catalog", async (req, res) => {
   const adminUser = await requireSuperAdmin(req, res);
   if (!adminUser) return;
-  const snapshot = await ordersDb.collection("publicDataRecords").get();
-  const pending = snapshot.docs.filter((doc) => doc.data()?.status === "pending_admin_review").length;
-  const approved = snapshot.docs.filter((doc) => doc.data()?.adminApproved === true || doc.data()?.status === "approved").length;
-  const byKind = Object.keys(TAT_PUBLIC_DATASETS).reduce((acc, key) => {
-    const kind = key as PublicDataKind;
-    acc[kind] = {
+
+  const collections: Record<string, any> = {};
+  for (const kind of Object.keys(TAT_PUBLIC_DATASETS) as PublicDataKind[]) {
+    const collectionName = kind === "events" ? "winAlertEvents" : "publicDataRecords";
+    const snapshot = await ordersDb.collection(collectionName)
+      .where("source", "==", "TAT Data Catalog")
+      .where("sourceKind", "==", kind)
+      .get();
+
+    let lastSourceSyncAt = "";
+    for (const doc of snapshot.docs) {
+      const value = String(doc.data()?.lastSourceSyncAt || "");
+      if (value > lastSourceSyncAt) lastSourceSyncAt = value;
+    }
+
+    collections[kind] = {
       ...TAT_PUBLIC_DATASETS[kind],
-      pending: snapshot.docs.filter((doc) => doc.data()?.kind === kind && doc.data()?.status === "pending_admin_review").length,
-      approved: snapshot.docs.filter((doc) => doc.data()?.kind === kind && (doc.data()?.adminApproved === true || doc.data()?.status === "approved")).length,
+      records: snapshot.size,
+      publicVisible: snapshot.docs.filter((doc) => doc.data()?.publicVisible === true).length,
+      sourceDriven: snapshot.docs.filter((doc) => doc.data()?.sourceDriven === true).length,
+      lastSourceSyncAt: lastSourceSyncAt || null,
     };
-    return acc;
-  }, {} as Record<string, any>);
-  return res.json({ source: "TAT Data Catalog", free: true, license: "Open Data Common", pending, approved, datasets: byKind });
+  }
+
+  return res.json({
+    source: "TAT Data Catalog",
+    free: true,
+    license: "Open Data Common",
+    adminVerifyRequired: false,
+    datasets: collections,
+  });
 });
 
-// Public-data synchronization is source-driven. Imported records are published directly from the configured public source.
-// No Admin Verify gate is used for public datasets; source updates are picked up on the next sync.
-// Administrative review remains reserved for WINRIDER-owned/business records, not public-source records.
+// Backward-compatible admin trigger. It now means "sync source", not "approve records".
 app.post("/api/admin/public-data/import-tat", rateLimit(5), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   if (!(await isAdminUser(user))) return res.status(403).json({ error: "Admin only" });
+
   const requestedKind = String(req.body?.kind || "all") as PublicDataKind | "all";
   const kinds: PublicDataKind[] = requestedKind === "all"
     ? ["events", "attractions", "restaurants", "accommodations", "souvenirs"]
     : [requestedKind];
-  if (kinds.some((kind) => !["events", "attractions", "restaurants", "accommodations", "souvenirs"].includes(kind))) {
+
+  if (kinds.some((kind) => !Object.prototype.hasOwnProperty.call(TAT_PUBLIC_DATASETS, kind))) {
     return res.status(400).json({ error: "Invalid public data kind" });
   }
 
   try {
-    const imported = [];
-    for (const kind of kinds) {
-      const rows = await fetchTatDatasetRows(kind);
-      const collectionName = kind === "events" ? "winAlertEvents" : "publicDataRecords";
-      const snapshot = await ordersDb.collection(collectionName).where("source", "==", "TAT Data Catalog").get();
-      const existingIds = new Set(snapshot.docs.map((doc) => doc.id));
-      const incomingIds = new Set<string>();
-      const batch = ordersDb.batch();
-      let count = 0;
-      for (const row of rows) {
-        const record = normalizePublicRecord(row, kind);
-        if (!record?.id) continue;
-        incomingIds.add(record.id);
-        batch.set(ordersDb.collection(collectionName).doc(record.id), {
-          ...record,
-          source: "TAT Data Catalog",
-          sourceKind: kind,
-          sourceDriven: true,
-          publicVisible: true,
-          adminApproved: true,
-          status: "active",
-          lastSourceSyncAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
-        count++;
-      }
-      // Remove records that disappeared from the source so the app mirrors the source.
-      for (const staleId of existingIds) {
-        if (!incomingIds.has(staleId)) batch.delete(ordersDb.collection(collectionName).doc(staleId));
-      }
-      await batch.commit();
-      imported.push({ kind, count, removed: Math.max(0, existingIds.size - incomingIds.size) });
-    }
-    dailyEventsCache.clear();
-    return res.json({ success: true, source: "TAT Data Catalog", sourceDriven: true, publicVisible: true, imported });
+    const imported = await syncTatPublicData(kinds);
+    return res.json({
+      success: true,
+      source: "TAT Data Catalog",
+      sourceDriven: true,
+      publicVisible: true,
+      adminVerifyRequired: false,
+      imported,
+      syncedAt: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[TAT Public Data Sync]", error instanceof Error ? error.message : error);
     return res.status(503).json({ error: "ไม่สามารถซิงก์ข้อมูลจากแหล่งต้นทางได้" });
   }
 });
 
+// Legacy public-data review endpoints remain harmless compatibility shims.
+// They never gate visibility of source-driven public records.
+app.get("/api/admin/public-data/pending", async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  return res.json({ records: [], adminVerifyRequired: false });
+});
+
+app.post("/api/admin/public-data/review", async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  return res.status(409).json({ error: "ข้อมูลสาธารณะจาก TAT ใช้ source-driven publishing และไม่ต้อง Admin Verify" });
+});
+
 app.get("/api/public-data/discovery", rateLimit(30), async (req, res) => {
   const query = String(req.query.query || "").trim().toLowerCase();
   const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
   const kinds: PublicDataKind[] = ["events", "attractions", "restaurants", "accommodations", "souvenirs"];
+
   try {
     const data: Record<string, any[]> = {};
     for (const kind of kinds) {
       const collection = kind === "events" ? "winAlertEvents" : "publicDataRecords";
-      const snapshot = await ordersDb.collection(collection).where("kind", "==", kind).where("sourceDriven", "==", true).limit(500).get();
+      const snapshot = await ordersDb.collection(collection)
+        .where("source", "==", "TAT Data Catalog")
+        .where("sourceDriven", "==", true)
+        .get();
+
       data[kind] = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
         .filter((record: any) => record.publicVisible === true)
         .filter((record: any) => !query || [record.name, record.title, record.category, record.address, record.province, record.district]
           .some((value) => String(value || "").toLowerCase().includes(query)))
         .slice(0, limit);
     }
-    return res.json({ source: "WINRIDER.AI • Direct Public Source", sourceDriven: true, data });
+
+    return res.json({
+      source: "WINRIDER.AI • Direct TAT Public Data",
+      sourceDriven: true,
+      adminVerifyRequired: false,
+      data,
+    });
   } catch (error) {
     console.error("[Public Data Discovery]", error instanceof Error ? error.message : error);
     return res.status(503).json({ data: {}, error: "โหลดข้อมูลสาธารณะไม่สำเร็จ" });
@@ -1101,14 +1187,29 @@ app.get("/api/public-data/places", rateLimit(30), async (req, res) => {
   const kind = String(req.query.kind || "attractions").trim() as PublicDataKind;
   const query = String(req.query.query || "").trim().toLowerCase();
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
-  if (!["attractions","restaurants","accommodations","souvenirs"].includes(kind)) return res.status(400).json({ records: [] });
+  if (!["attractions", "restaurants", "accommodations", "souvenirs"].includes(kind)) {
+    return res.status(400).json({ records: [] });
+  }
+
   try {
-    const snapshot = await ordersDb.collection("publicDataRecords").where("kind", "==", kind).where("sourceDriven", "==", true).limit(500).get();
+    const snapshot = await ordersDb.collection("publicDataRecords")
+      .where("source", "==", "TAT Data Catalog")
+      .where("sourceDriven", "==", true)
+      .get();
+
     const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((record: any) => record.publicVisible === true)
       .filter((record: any) => Number.isFinite(Number(record.latitude)) && Number.isFinite(Number(record.longitude)))
-      .filter((record: any) => !query || [record.name, record.category, record.address, record.province, record.district].some((value) => String(value || "").toLowerCase().includes(query)))
+      .filter((record: any) => !query || [record.name, record.category, record.address, record.province, record.district]
+        .some((value) => String(value || "").toLowerCase().includes(query)))
       .slice(0, limit);
-    return res.json({ records, source: "WINRIDER.AI • Direct TAT Public Data" });
+
+    return res.json({
+      records,
+      source: "WINRIDER.AI • Direct TAT Public Data",
+      sourceDriven: true,
+      adminVerifyRequired: false,
+    });
   } catch (error) {
     console.error("[Public Data Places]", error instanceof Error ? error.message : error);
     return res.status(503).json({ records: [] });
