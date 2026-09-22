@@ -434,7 +434,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-6 py-4">
         {activeMode === 'passenger' && (
           <ProtectedRoute 
-            allowedRoles={['citizen', 'knight']}
+            allowedRoles={['citizen', 'knight', 'merchant', 'partner']}
             onRedirectToMyDashboard={(r) => {
               if (r === 'knight') setActiveMode('driver');
               else if (r === 'merchant') setActiveMode('merchant');
