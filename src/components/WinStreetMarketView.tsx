@@ -26,6 +26,11 @@ const normalize = (raw: Partial<MarketItem> & Record<string, unknown>): MarketIt
   originalPrice: typeof raw.originalPrice === 'number' ? raw.originalPrice : undefined,
   sellerType: raw.sellerType === 'merchant' ? 'merchant' : 'citizen',
   sellerName: String(raw.sellerName || 'ผู้ขายในชุมชน'), sellerAvatar: String(raw.sellerAvatar || '👤'),
+  sellerAvatarUrl: typeof raw.sellerAvatarUrl === 'string' ? raw.sellerAvatarUrl : undefined,
+  sellerUid: typeof raw.sellerUserId === 'string' ? raw.sellerUserId : (typeof raw.sellerUid === 'string' ? raw.sellerUid : undefined),
+  sellerLocationEnabled: raw.sellerLocationEnabled === true,
+  sellerLatitude: Number.isFinite(Number(raw.sellerLatitude)) ? Number(raw.sellerLatitude) : undefined,
+  sellerLongitude: Number.isFinite(Number(raw.sellerLongitude)) ? Number(raw.sellerLongitude) : undefined,
   sellerLevel: Number(raw.sellerLevel) || 0, sellerRating: Number(raw.sellerRating) || 0,
   category: (raw.category || 'second_hand') as MarketItemCategory,
   categoryLabel: String(raw.categoryLabel || categories[(raw.category || 'second_hand') as MarketItemCategory]),
@@ -71,7 +76,11 @@ export const WinStreetMarketView: React.FC<Props> = ({ customerListedItems = [],
         const payload = await response.json() as { listings?: Array<Partial<MarketItem> & Record<string, unknown>>; error?: string };
         if (!response.ok) throw new Error(payload.error || 'โหลดรายการสินค้าไม่สำเร็จ');
         if (!cancelled) {
-          const merged = [...(payload.listings || []).map(normalize), ...customerListedItems.map((item) => normalize(item as MarketItem & Record<string, unknown>))];
+          const serverItems = (payload.listings || []).map(normalize);
+          // Server data is authoritative after re-login/reload; local callback state is only a short-lived UI fallback.
+          const serverIds = new Set(serverItems.map((item) => item.id));
+          const localOnly = customerListedItems.map((item) => normalize(item as MarketItem & Record<string, unknown>)).filter((item) => !serverIds.has(item.id));
+          const merged = [...serverItems, ...localOnly];
           setItems(Array.from(new Map(merged.filter((item) => item.id).map((item) => [item.id, item])).values()));
         }
       } catch (cause) {
