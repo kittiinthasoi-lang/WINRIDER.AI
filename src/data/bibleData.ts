@@ -1,4 +1,5 @@
-import { WeaponItem, ArmorTier, PillarItem, CIZone } from '../types';\nimport { WIN_IMAGES } from './imageRegistry';
+import { WeaponItem, ArmorTier, PillarItem, CIZone } from '../types';
+import { WIN_IMAGES } from './imageRegistry';
 
 export const SOVEREIGN_LEADERS = {
   ceo: {
