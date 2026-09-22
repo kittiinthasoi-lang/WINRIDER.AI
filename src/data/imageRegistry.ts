@@ -60,6 +60,7 @@ export const WIN_IMAGES = {
     pcx: '/images/garage_pcx.jpg',
     cyber: '/images/cyber_vehicle.jpg',
     ambulance: '/images/ambulance_vehicle.jpg',
+    knightRide: '/images/knight_ride.jpg',
   },
 
   // ศูนย์พยาบาล & กู้ชีพฉุกเฉิน
