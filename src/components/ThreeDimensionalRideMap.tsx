@@ -29,7 +29,10 @@ import { playTactileBlip } from '../utils/audio';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 
 
-const GOOGLE_MAPS_API_KEY = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
+// Google Maps JavaScript API is disabled in FREE-ONLY mode.
+// The app uses its no-cost OSM/coordinate fallbacks instead of a billable dynamic map.
+const FREE_ONLY_MODE = true;
+const GOOGLE_MAPS_API_KEY = FREE_ONLY_MODE ? '' : String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
 
 interface ThreeDimensionalRideMapProps {
   selectedDreamRide?: DreamRideVehicle;
