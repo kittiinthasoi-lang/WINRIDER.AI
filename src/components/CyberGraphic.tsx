@@ -392,7 +392,7 @@ export const EMOJI_IMAGE_MAP: Record<string, string> = {
   '🟢': WIN_IMAGES.appLogo,
   '🔸': WIN_IMAGES.appLogo,
   '🔹': WIN_IMAGES.appLogo,
-  '🔲': '/images/armor_circuit.jpg',
+  '🔲': WIN_IMAGES.armor.circuit,
   '➕': WIN_IMAGES.appLogo,
   '➔': WIN_IMAGES.transit.train,
   '➡': WIN_IMAGES.transit.train,
