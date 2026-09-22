@@ -10,6 +10,8 @@ export interface WalletStateResponse {
     configured: boolean;
     promptPayId: string;
     accountName: string;
+    bankName?: string;
+    bankAccountNumber?: string;
   };
   submissions: Array<{
     id: string;
