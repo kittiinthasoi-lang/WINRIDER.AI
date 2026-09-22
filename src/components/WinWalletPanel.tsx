@@ -314,10 +314,10 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
             <div>
               <h4 className="text-sm font-black text-white flex items-center gap-2">
                 <QrCode className="h-4 w-4 text-emerald-400" />
-                <span>สแกน QR PromptPay ของระบบเพื่อเติมเงิน</span>
+                <span>{systemBankAccountNumber ? 'โอนเข้าบัญชีธนาคารสำหรับเติม WIN Wallet' : 'สแกน QR PromptPay ของระบบเพื่อเติมเงิน'}</span>
               </h4>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                ยอดโอนเข้าบัญชีส่วนกลาง • AI อ่านสลิปและบันทึก Double-Entry Ledger
+                ระบบจะให้แอดมินตรวจยอดเงินจริงจากบัญชีธนาคารก่อนเครดิตเข้า WIN Wallet • บันทึก Double-Entry Ledger
               </p>
             </div>
             <span className="rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 text-[10px] font-mono text-emerald-300">
@@ -364,7 +364,15 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
           </div>
 
           {/* QR Code and Account Info Card */}
-          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 items-center rounded-2xl bg-black/40 border border-white/10 p-4">
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-500/5 p-4 space-y-1.5">
+  <p className="text-sm font-black text-amber-200">บัญชีรับเงินสำหรับเติม WIN Wallet</p>
+  {systemBankName && <p className="text-sm text-white">ธนาคาร: <strong>{systemBankName}</strong></p>}
+  {systemBankAccountNumber && <p className="text-base font-mono font-black text-emerald-300">เลขบัญชี: {systemBankAccountNumber}</p>}
+  {systemAccountName && <p className="text-sm text-white">ชื่อบัญชี: <strong>{systemAccountName}</strong></p>}
+  {!systemBankAccountNumber && !promptPaySystemId && <p className="text-xs text-rose-300">ยังไม่ได้ตั้งค่าบัญชีรับเงินในระบบ กรุณาให้ Super Admin ตั้งค่าก่อนเติมเงิน</p>}
+</div>
+
+<div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 items-center rounded-2xl bg-black/40 border border-white/10 p-4">
             {depositQr ? (
               <div className="flex flex-col items-center mx-auto">
                 <div className="rounded-2xl bg-white p-2.5 shadow-lg">
