@@ -58,9 +58,9 @@ export interface ResolvedDestinationSearch extends RouteDestination {
 
 /**
  * Search a real destination from the Knight's current GPS through the existing
- * authenticated Google Places (New) + Routes API backend resolver.
- * The backend returns real coordinates/place IDs; the final turn-by-turn route
- * is still calculated separately by computeLiveRoute().
+ * authenticated Google Places (New) resolver.
+ * Road-route calculation is intentionally unavailable while Google Routes API is disabled;
+ * callers must treat distance/ETA from the resolver as estimates, not road-route truth.
  */
 export async function searchDestinationsFromGps(params: {
   latitude: number;
@@ -281,7 +281,7 @@ export function mapGoogleManeuverToArType(maneuverStr?: string, instructionsText
 }
 
 /**
- * Requests real-time route from server proxy (Google Maps Platform Routes API)
+ * Route calculation is currently unavailable because Google Maps Platform Routes API is disabled.
  */
 export async function computeLiveRoute(_params: {
   origin: { latitude: number; longitude: number };
