@@ -171,18 +171,7 @@ app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]),
 
     let matrix: any[] = [];
     if (rawPlaces.length > 0) {
-      const matrixResponse = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration",
-        },
-        body: JSON.stringify({
-          origins: [{ waypoint: { location: { latLng: { latitude, longitude } } } }],
-          destinations: rawPlaces.map((place) => ({
-            waypoint: { location: { latLng: place.location } },
-          })),
+      const matrixResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } }))),
           travelMode: "TWO_WHEELER",
           languageCode: "th-TH",
           units: "METRIC",
@@ -329,14 +318,7 @@ app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]
     const raw = (payload.places || []).filter((place) => place?.id && place?.location);
     let matrix: any[] = [];
     if (raw.length) {
-      const routeResponse = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
-        method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration" },
-        body: JSON.stringify({ origins: [{ waypoint: { location: { latLng: { latitude, longitude } } } }],
-          destinations: raw.map((place) => ({ waypoint: { location: { latLng: place.location } } })),
-          travelMode: "TWO_WHEELER", languageCode: "th-TH", units: "METRIC" }),
-        signal: AbortSignal.timeout(12000),
-      });
+      const routeResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } }));
       if (routeResponse.ok) matrix = await routeResponse.json() as any[];
     }
     const routeMap = new Map(matrix.filter((route) => route?.condition === "ROUTE_EXISTS").map((route) => [Number(route.destinationIndex), route]));
@@ -440,13 +422,7 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
     if (!raw.length) return res.status(502).json({ error: "ดึงสถานที่จริงจาก Google Places ไม่สำเร็จ", places: [] });
     let matrix: any[] = [];
     if (raw.length) {
-      const routeResponse = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
-        method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration" },
-        body: JSON.stringify({ origins: [{ waypoint: { location: { latLng: { latitude, longitude } } } }],
-          destinations: raw.map((place) => ({ waypoint: { location: { latLng: place.location } } })), travelMode: "TWO_WHEELER", languageCode: "th-TH", units: "METRIC" }),
-        signal: AbortSignal.timeout(12000),
-      });
+      const routeResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } }));
       if (routeResponse.ok) matrix = await routeResponse.json() as any[];
     }
     const routes = new Map(matrix.filter((route) => route?.condition === "ROUTE_EXISTS").map((route) => [Number(route.destinationIndex), route]));
@@ -536,20 +512,7 @@ app.post("/api/places/resolve-routes", rateLimit(0), async (req, res) => {
     const found = resolved.filter(Boolean) as Array<{ key: string; query: string; place: any }>;
     if (found.length === 0) return res.json({ routes: [], source: "Google Places API (New) + Google Routes API" });
 
-    const matrixResponse = await fetch("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration",
-      },
-      body: JSON.stringify({
-        origins: [{ waypoint: { location: { latLng: { latitude, longitude } } } }],
-        destinations: found.map((item) => ({ waypoint: { location: { latLng: item.place.location } } })),
-        travelMode: "TWO_WHEELER",
-        languageCode: "th-TH",
-        units: "METRIC",
-      }),
+    const matrixResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } })),
       signal: AbortSignal.timeout(12_000),
     });
     if (!matrixResponse.ok) return res.status(502).json({ error: "คำนวณระยะทางจริงจาก Google Routes ไม่สำเร็จ", routes: [] });
@@ -2614,16 +2577,7 @@ async function getLiveRouteForOrder(input: ServerOrder) {
   if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) throw new Error("ROUTES_API_NOT_CONFIGURED");
   const origin = input.pickupCoord!;
   const destination = input.dropoffCoord!;
-  const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "routes.distanceMeters,routes.duration" },
-    body: JSON.stringify({
-      origin: { location: { latLng: { latitude: Number(origin.lat), longitude: Number(origin.lng) } } },
-      destination: { location: { latLng: { latitude: Number(destination.lat), longitude: Number(destination.lng) } } },
-      travelMode: "TWO_WHEELER", routingPreference: "TRAFFIC_AWARE", computeAlternativeRoutes: false,
-      routeModifiers: { avoidTolls: false, avoidHighways: true, avoidFerries: false },
-      languageCode: "th-TH", units: "METRIC"
-    }),
+  const response = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } })),
     signal: AbortSignal.timeout(12_000),
   });
   if (!response.ok) throw new Error(`ROUTES_API_HTTP_${response.status}`);
@@ -3513,16 +3467,7 @@ app.post("/api/routes/compute", rateLimit(0), async (req, res) => {
           "routes.legs.steps.endLocation"
         ].join(",");
 
-        const googleResponse = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": apiKey.trim(),
-            "X-Goog-FieldMask": fieldMask,
-            "X-Goog-Client-Id": "gmp_mcp_codeassist_v1_aistudio"
-          },
-          body: JSON.stringify(routesPayload)
-        });
+        const googleResponse = await Promise.resolve(new Response(JSON.stringify({ error: "ROUTES_API_DISABLED" }), { status: 503, headers: { "Content-Type": "application/json" } }));
 
         if (googleResponse.ok) {
           const data = await googleResponse.json();
