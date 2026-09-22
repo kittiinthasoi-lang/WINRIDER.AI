@@ -1,4 +1,5 @@
-import { WIN_IMAGES } from './imageRegistry';\nexport interface ArmorSuit {
+import { WIN_IMAGES } from './imageRegistry';
+export interface ArmorSuit {
   id: string;
   code: string;
   name: string;
