@@ -436,94 +436,53 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
 });
 
 app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolve-routes"]), async (req, res) => {
-  if (FREE_ONLY_MODE) {
-    return res.status(503).json({
-      error: "FREE_ONLY_MODE",
-      message: "บริการภายนอกที่อาจมีค่าใช้บริการถูกปิดเพื่อป้องกันค่าใช้จ่าย"
-    });
-  }
-
-  // ROUTES API DISABLED: resolve destinations with Places API only and calculate
-  // a local straight-line estimate. No request is sent to routes.googleapis.com.
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
 
-  const latitude = Number(req.body?.latitude);
-  const longitude = Number(req.body?.longitude);
   const requestedPlaces = Array.isArray(req.body?.places) ? req.body.places.slice(0, 20) : [];
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
-      latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง", routes: [] });
-  }
-
   const places = requestedPlaces
     .map((item: any) => ({ key: String(item?.key || "").trim(), query: String(item?.query || "").trim() }))
     .filter((item: { key: string; query: string }) => item.key && item.query);
-  if (places.length === 0) return res.status(400).json({ error: "ไม่มีสถานที่", routes: [] });
-
-  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
-    return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY", routes: [] });
-  }
-
-  const earthRadiusKm = 6371;
-  const distanceKm = (lat: number, lng: number) => {
-    const dLat = (lat - latitude) * Math.PI / 180;
-    const dLng = (lng - longitude) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(latitude * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-    return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  };
+  if (!places.length) return res.status(400).json({ error: "ไม่มีสถานที่", routes: [] });
 
   try {
-    const resolved = await Promise.all(places.map(async (item: { key: string; query: string }) => {
-      const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri",
-        },
-        body: JSON.stringify({
-          textQuery: item.query,
-          languageCode: "th",
-          regionCode: "TH",
-          locationBias: { circle: { center: { latitude, longitude }, radius: 50_000 } },
-          maxResultCount: 1,
-        }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!response.ok) return null;
-      const data = await response.json() as { places?: any[] };
-      const place = data.places?.[0];
-      if (!place?.id || !Number.isFinite(place?.location?.latitude) || !Number.isFinite(place?.location?.longitude)) return null;
+    const snapshot = await ordersDb.collection("publicDataRecords")
+      .where("adminApproved", "==", true)
+      .limit(500)
+      .get();
+    const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as any));
 
-      const km = distanceKm(Number(place.location.latitude), Number(place.location.longitude));
+    const routes = places.map((item: { key: string; query: string }) => {
+      const q = item.query.toLowerCase().replace(" ประเทศไทย", "").trim();
+      const match = records.find((record: any) =>
+        [record.name, record.address, record.province, record.district, record.category]
+          .some((value) => String(value || "").toLowerCase().includes(q))
+      );
+      if (!match) return null;
       return {
         key: item.key,
-        placeId: String(place.id),
-        name: String(place.displayName?.text || item.query),
-        address: String(place.formattedAddress || ""),
-        latitude: Number(place.location.latitude),
-        longitude: Number(place.location.longitude),
-        distanceKm: Number(km.toFixed(2)),
-        // ETA is deliberately an estimate, not a Routes API result.
-        etaMinutes: Math.max(1, Math.round(km / 0.35)),
-        distanceSource: "straight_line_estimate",
-        etaSource: "estimated",
-        googleMapsUri: String(place.googleMapsUri || ""),
+        placeId: String(match.id),
+        name: String(match.name || item.query),
+        address: String(match.address || ""),
+        latitude: Number(match.latitude),
+        longitude: Number(match.longitude),
+        distanceKm: null,
+        etaMinutes: null,
+        distanceSource: "unavailable_without_real_routing_provider",
+        etaSource: "unavailable_without_real_routing_provider",
+        googleMapsUri: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(String(match.name || "") + " " + String(match.address || "")),
       };
-    }));
+    }).filter(Boolean);
 
     return res.json({
-      routes: resolved.filter(Boolean),
-      source: "Google Places API (New) + local straight-line estimate",
+      routes,
+      source: "WINRIDER.AI • Admin Verified Thai Public Data",
       routesApi: "disabled",
-      warning: "ระยะทางและเวลาเป็นค่าประมาณจากพิกัด ไม่ใช่เส้นทางถนนจริง",
+      warning: "ยังไม่มีบริการคำนวณเส้นทางถนนแบบชำระเงิน จึงไม่สร้างระยะทาง/ETA ปลอม",
     });
   } catch (error) {
     console.error("[Places Resolve]", error instanceof Error ? error.message : error);
-    return res.status(502).json({ error: "ค้นหาสถานที่จาก Google Places ไม่สำเร็จ", routes: [] });
+    return res.status(503).json({ error: "ค้นหาสถานที่จากข้อมูลสาธารณะไม่สำเร็จ", routes: [] });
   }
 });
 app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
