@@ -46,11 +46,11 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     { label: '⚡ เลือกรถในฝัน: ดูคาติ พานิกาเล่ (Ducati Panigale V4)', action: 'เลือกรถในฝัน ดูคาติ พานิกาเล่' },
     { label: '🦅 เลือกรถในฝัน: ฮาร์เลย์ แฟตบอย (Harley Fat Boy)', action: 'เลือกรถในฝัน ฮาร์เลย์ แฟตบอย' },
     { label: '📦 ส่งของด่วน WIN Express (+กล่อง 20฿)', action: 'ส่งของด่วน Win Express ค่ากล่อง 20 บาท' },
-    { label: '👩‍🦰 ขอพี่วินผู้หญิง WIN MU BUDDY (LV.15+)', action: 'ขอพี่วินผู้หญิง Win Mu Buddy' },
+    { label: '👩‍🦰 ขอพี่วินผู้หญิง WIN MU BUDDY', action: 'ขอพี่วินผู้หญิง Win Mu Buddy' },
     { label: '🕌 พาคุณตาไปละหมาดที่มัสยิด (WIN Spirit)', action: 'พาคุณตาไปละหมาดที่มัสยิด Win Spirit' },
     { label: '🪷 พาคุณยายไปทำบุญตักบาตร (WIN Spirit)', action: 'พาคุณยายไปทำบุญตักบาตร Win Spirit' },
-    { label: '👵 พาผู้สูงอายุไปทำศาสนกิจ/หาหมอ (LV.20+)', action: 'พาผู้สูงอายุไปทำศาสนกิจ Win Spirit' },
-    { label: '👨‍👩‍👧 รับส่งลูกไปโรงเรียน WIN Family (LV.15+)', action: 'รับส่งลูกไปโรงเรียน Win Family' },
+    { label: '👵 พาผู้สูงอายุไปทำศาสนกิจ/หาหมอ', action: 'พาผู้สูงอายุไปทำศาสนกิจ Win Spirit' },
+    { label: '👨‍👩‍👧 รับส่งลูกไปโรงเรียน WIN Family', action: 'รับส่งลูกไปโรงเรียน Win Family' },
     { label: '🍱 แม่ส่งข้าวกล่องให้ลูกที่หอ WIN Link', action: 'แม่ส่งข้าวกล่องให้ลูก Win Link' },
     { label: '☕ แนะนำคาเฟ่และร้านเด็ด WIN Lifestyle', action: 'แนะนำคาเฟ่และร้านเด็ด Win Lifestyle' },
     { label: '📍 ปักหมุดไปสยามพารากอน', action: 'เรียกรถมอเตอร์ไซค์ไปสยามพารากอน' },
@@ -95,45 +95,45 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
 
     // 3. WIN Express (Mandatory 20฿ box fee)
     if (lower.includes('express') || lower.includes('เอกซ์เพรส') || lower.includes('ส่งของ') || lower.includes('พัสดุ') || lower.includes('กล่อง')) {
-      const reply = "เปิดบริการ WIN Express ฝากพี่วินส่งของด่วน บังคับบวกค่ากล่องนิรภัย 20 บาท และคัดกรองพี่วินเลเวล 10 ขึ้นไปเรียบร้อยครับ";
+      const reply = "เปิดบริการ WIN Express ฝากพี่วินส่งของด่วน บังคับบวกค่ากล่องนิรภัย 20 บาท และคัดกรองพี่วินพี่วินที่ผ่านการอนุมัติจากแอดมินเรียบร้อยครับ";
       setAssistantResponse(reply);
       if (audioEnabled) speakThaiText(reply);
       setCommandStatus('success');
       confetti({ particleCount: 40, spread: 60, colors: ['#10B981', '#FFD700'] });
-      onSelectServiceByVoice('express', 'Win Express (บังคับค่ากล่อง +20฿ • Level 10+)');
+      onSelectServiceByVoice('express', 'Win Express (บังคับค่ากล่อง +20฿)');
       return;
     }
 
-    // 4. WIN MU BUDDY (Female/Male Knight, Level 15+, Sacred Prayers & Routes)
+    // 4. WIN MU BUDDY (Female/Male Knight, Sacred Prayers & Routes)
     if (lower.includes('mu') || lower.includes('buddy') || lower.includes('มู') || lower.includes('ผู้หญิง') || lower.includes('ไหว้พระ') || lower.includes('สายมู') || lower.includes('บทสวด')) {
-      const reply = "เปิดบริการ WIN MU BUDDY แนะนำพี่วินเลเวล 15 ขึ้นไป พร้อมระบบคลังบทสวดมนต์ศักดิ์สิทธิ์และเส้นทางสายมู 9 วัดเรียบร้อยครับ";
+      const reply = "เปิดบริการ WIN MU BUDDY แนะนำพี่วินพี่วินที่ผ่านการอนุมัติจากแอดมิน พร้อมระบบคลังบทสวดมนต์ศักดิ์สิทธิ์และเส้นทางสายมู 9 วัดเรียบร้อยครับ";
       setAssistantResponse(reply);
       if (audioEnabled) speakThaiText(reply);
       setCommandStatus('success');
       confetti({ particleCount: 40, spread: 60, colors: ['#FFD700', '#EC4899'] });
-      onSelectServiceByVoice('mu', 'WIN MU BUDDY (สายมู 9 วัด • Level 15+)');
+      onSelectServiceByVoice('mu', 'WIN MU BUDDY (สายมู 9 วัด)');
       return;
     }
 
-    // 5. WIN Spirit (Elderly Care, Level 20+, All Religions - Mosque / Temple / Church / Shrine)
+    // 5. WIN Spirit (Elderly Care, All Religions - Mosque / Temple / Church / Shrine)
     if (lower.includes('spirit') || lower.includes('ผู้สูงอายุ') || lower.includes('คนแก่') || lower.includes('ละหมาด') || lower.includes('มัสยิด') || lower.includes('ทำบุญ') || lower.includes('ตักบาตร') || lower.includes('โบสถ์') || lower.includes('มิสซา') || lower.includes('ศาสนกิจ') || lower.includes('หาหมอ') || lower.includes('คุณตา') || lower.includes('คุณยาย')) {
-      const reply = "เปิดบริการ WIN Spirit ดูแลผู้สูงอายุและบริการพาทำศาสนกิจทุกศาสนา (ละหมาดมัสยิด/ทำบุญ/โบสถ์) พี่วินเลเวล 20 ขึ้นไป พร้อมดูแลรอรับกลับเรียบร้อยครับ";
+      const reply = "เปิดบริการ WIN Spirit ดูแลผู้สูงอายุและบริการพาทำศาสนกิจทุกศาสนา (ละหมาดมัสยิด/ทำบุญ/โบสถ์) พี่วินพี่วินที่ผ่านการอนุมัติจากแอดมิน พร้อมดูแลรอรับกลับเรียบร้อยครับ";
       setAssistantResponse(reply);
       if (audioEnabled) speakThaiText(reply);
       setCommandStatus('success');
       confetti({ particleCount: 40, spread: 60, colors: ['#F43F5E', '#FFD700'] });
-      onSelectServiceByVoice('spirit', 'WIN Spirit (ดูแลผู้สูงอายุ & พาทำศาสนกิจ • Level 20+)');
+      onSelectServiceByVoice('spirit', 'WIN Spirit (ดูแลผู้สูงอายุ & พาทำศาสนกิจ)');
       return;
     }
 
-    // 6. WIN Family (Child Care, Level 15+)
+    // 6. WIN Family (Child Care)
     if (lower.includes('family') || lower.includes('เด็ก') || lower.includes('ลูก') || lower.includes('ครอบครัว') || lower.includes('โรงเรียน')) {
-      const reply = "เปิดบริการ WIN Family รับส่งคนในครอบครัวและน้องๆ นักเรียน พี่วินเลเวล 15 ขึ้นไป พร้อมหมวกกันน็อกเด็กปลอดภัย 100% เรียบร้อยครับ";
+      const reply = "เปิดบริการ WIN Family รับส่งคนในครอบครัวและน้องๆ นักเรียน พี่วินพี่วินที่ผ่านการอนุมัติจากแอดมิน พร้อมหมวกกันน็อกเด็กปลอดภัย 100% เรียบร้อยครับ";
       setAssistantResponse(reply);
       if (audioEnabled) speakThaiText(reply);
       setCommandStatus('success');
       confetti({ particleCount: 40, spread: 60, colors: ['#3B82F6', '#FFD700'] });
-      onSelectServiceByVoice('family', 'WIN Family (รับส่งเด็ก & ครอบครัว • Level 15+)');
+      onSelectServiceByVoice('family', 'WIN Family (รับส่งเด็ก & ครอบครัว)');
       return;
     }
 
