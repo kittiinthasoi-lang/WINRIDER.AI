@@ -3,6 +3,9 @@ import { ExternalLink, MapPin, Navigation, X } from 'lucide-react';
 import { GpsLocationState } from './GpsRealTimeTracker';
 import { playTactileBlip } from '../utils/audio';
 
+/** @deprecated Kept only for component API compatibility; no provider is embedded. */
+export type MapProvider = 'google_maps' | 'mapbox';
+
 interface GoogleMapsLiveViewProps {
   gpsLocation: GpsLocationState;
   targetDestination?: string;
@@ -11,6 +14,7 @@ interface GoogleMapsLiveViewProps {
   height?: string;
   showControls?: boolean;
   mapType?: 'roadmap' | 'satellite' | 'terrain' | 'hybrid';
+  initialProvider?: MapProvider;
   audioEnabled?: boolean;
   onSwitchToCameraAR?: () => void;
   onSwitchTo3DMap?: () => void;
