@@ -270,6 +270,27 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   const [driverLegPhase, setDriverLegPhase] = useState<'to_pickup' | 'to_destination'>('to_pickup');
   const { gpsState } = useRealtimeGps(true);
 
+  // The active job is the source of truth for driver navigation. When a real
+  // customer order is accepted, load its destination into navigation.
+  useEffect(() => {
+    if (!activeJob) return;
+    const target = activeJob.dropoffCoord;
+    if (target && Number.isFinite(Number(target.lat)) && Number.isFinite(Number(target.lng))) {
+      setSelectedDestination({
+        id: activeJob.id || 'active-order-destination',
+        name: activeJob.dropoffLocation || 'ปลายทางงาน',
+        nameEn: activeJob.dropoffLocation || 'Active order destination',
+        category: activeJob.serviceId || 'ride',
+        lat: Number(target.lat),
+        lng: Number(target.lng),
+        address: activeJob.dropoffLocation || '',
+        landmark: ''
+      });
+      setDriverLegPhase('to_pickup');
+      setNavPhase('to_pickup');
+    }
+  }, [activeJob?.id, activeJob?.dropoffLocation, activeJob?.dropoffCoord?.lat, activeJob?.dropoffCoord?.lng]);
+
   // Google Maps Routes API (New) Live Integration State
   const [selectedDestination, setSelectedDestination] = useState<RouteDestination>({
     id: '', name: '', nameEn: '', category: '', lat: 0, lng: 0,
@@ -372,7 +393,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
   };
 
   // Search a real destination by name/address using the Knight's current GPS.
-  // Results come from Google Places (New); road routing is opened separately in Google Maps while Routes API is disabled.
+  // Results come from Google Places (New); road routing uses the server-side Google Routes API; native Google Maps remains available for turn-by-turn navigation.
   const handleSearchDestination = async () => {
     const query = destinationSearchQuery.trim();
     if (query.length < 2) {
