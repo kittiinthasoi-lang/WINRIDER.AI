@@ -13,6 +13,7 @@ import { ThreeDimensionalRideMap } from './ThreeDimensionalRideMap';
 import { PetCareHospitalSection } from './PetCareHospitalSection';
 import { DensityRadarOverlay } from './DensityRadarOverlay';
 import { WinAlertEventsCard } from './WinAlertEventsCard';
+import { PublicDataDiscoveryCard } from './PublicDataDiscoveryCard';
 import { PetHospitalClinic } from '../data/petHospitalData';
 import { getCitizenTier, CITIZEN_10_TIERS, calculateLevelMaxXp, getLevelDifficultyMetrics } from '../data/tierHierarchyData';
 import { DriverMatchingModal } from './DriverMatchingModal';
@@ -1901,6 +1902,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   audioEnabled={audioEnabled}
                   onBookEventRide={handleSelectWinAlertEvent}
                 />
+
+                <PublicDataDiscoveryCard />
 
                 {/* DESTINATION CAROUSEL — PLACE DATA ONLY */}
                 <div className="space-y-2 pt-2">
