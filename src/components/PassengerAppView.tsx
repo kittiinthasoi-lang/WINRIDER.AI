@@ -836,8 +836,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   ];
 
   const handleSelectHospitalForBooking = (hospital: PetHospitalClinic) => {
-    if (hospital.distanceKm === null || hospital.routeSource !== 'google_routes_api_live') {
-      setBookingError('ยังไม่มีระยะทางจาก Google Routes จึงยังไม่สามารถเริ่มจับคู่ได้');
+    if (hospital.distanceKm === null) {
+      setBookingError('ยังไม่มีระยะทางประมาณการของสถานพยาบาลนี้ กรุณาลองค้นหาใหม่');
       return;
     }
     if (audioEnabled) {
