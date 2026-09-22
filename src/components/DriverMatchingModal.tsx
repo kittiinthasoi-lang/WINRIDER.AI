@@ -1239,7 +1239,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
                         <div className="text-right font-mono flex-shrink-0">
                           <span className="text-xs font-bold text-[#FFD700] block">{routeFare !== null ? `ประมาณ ฿${routeFare}` : 'รอเส้นทางจริง'}</span>
-                          <span className="text-[9px] text-emerald-400">{route ? `${route.distanceKm} กม. • ${route.etaMinutes || '—'} นาที` : 'ไม่ใช้ระยะทางจำลอง'}</span>
+                          <span className="text-[9px] text-emerald-400">{route ? `ประมาณ ${route.distanceKm} กม. • ประมาณ ${route.etaMinutes || '—'} นาที` : 'ยังไม่มีข้อมูลระยะทาง'}</span>
                         </div>
                       </div>
 
