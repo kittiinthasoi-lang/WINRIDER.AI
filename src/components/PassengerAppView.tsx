@@ -1791,34 +1791,17 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       <Sparkles className="w-3.5 h-3.5 text-[#FFD700]" />
                       ค้นพบไลฟ์สไตล์ & ปลายทางยอดนิยม
                     </h3>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (audioEnabled) playTactileBlip(900);
-                          const randomLoc = REAL_BANGKOK_LOCATIONS[Math.floor(Math.random() * REAL_BANGKOK_LOCATIONS.length)];
-                          void calculateDestinationRoute(
-                            randomLoc.name + ' (' + randomLoc.zoneTitle + ')',
-                            randomLoc.name + ' (' + randomLoc.zoneTitle + ')'
-                          );
-                        }}
-                        className="px-2 py-0.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-400 hover:text-slate-950 text-cyan-300 text-[10px] font-mono font-bold border border-cyan-400/40 transition-all flex items-center gap-1"
-                      >
-                        <span>🗺️ สุ่มพิกัดจริง</span>
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setActiveServiceId('lifestyle');
-                          setSelectedService('WIN Lifestyle');
-                          setShowDriverMatchingModal(true);
-                        }}
-                        className="text-[10px] text-cyan-400 hover:underline"
-                      >
-                        ดูทั้งหมด
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveServiceId('lifestyle');
+                        setSelectedService('WIN Lifestyle');
+                        setShowDriverMatchingModal(true);
+                      }}
+                      className="text-[10px] text-cyan-400 hover:underline"
+                    >
+                      ดูทั้งหมด
+                    </button>
                   </div>
-
                   <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none snap-x">
                     {/* Google Maps Real Bangkok Locations Live Chips */}
                     {REAL_BANGKOK_LOCATIONS.slice(0, 6).map((realLoc, idx) => (
