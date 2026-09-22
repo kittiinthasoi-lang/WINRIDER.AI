@@ -118,6 +118,7 @@ export async function registerKnight(payload: KnightRegistrationPayload): Promis
       email: payload.email,
       role: 'knight' as UserRole,
       displayName: payload.displayName.trim(),
+      name: payload.displayName.trim(),
       phone: payload.phone.trim(),
       province: payload.province.trim(),
       district: payload.district.trim(),
@@ -145,6 +146,12 @@ export async function registerKnight(payload: KnightRegistrationPayload): Promis
     // 2. knights/{uid}
     transaction.set(knightRef, {
       ...FRESH_PROGRESSION,
+      displayName: payload.displayName.trim(),
+      name: payload.displayName.trim(),
+      email: payload.email.trim(),
+      phone: payload.phone.trim(),
+      province: payload.province.trim(),
+      district: payload.district.trim(),
       isOnline: false,
       vehicleType: payload.vehicleType,
       plateNumber: payload.plateNumber.trim(),
@@ -206,6 +213,12 @@ export async function registerCitizen(payload: CitizenRegistrationPayload): Prom
 
     transaction.set(citizenRef, {
       ...FRESH_PROGRESSION,
+      displayName: payload.displayName.trim(),
+      name: payload.displayName.trim(),
+      email: payload.email.trim(),
+      phone: payload.phone.trim(),
+      province: payload.province.trim(),
+      district: payload.district.trim(),
       savedAddresses: [],
       emergencyContact: {
         name: payload.emergencyContactName.trim(),
@@ -257,6 +270,13 @@ export async function registerMerchant(payload: MerchantRegistrationPayload): Pr
 
     transaction.set(merchantRef, {
       ...FRESH_PROGRESSION,
+      displayName: payload.displayName.trim(),
+      name: payload.shopName.trim(),
+      ownerName: payload.displayName.trim(),
+      email: payload.email.trim(),
+      phone: payload.phone.trim(),
+      province: payload.province.trim(),
+      district: payload.district.trim(),
       shopName: payload.shopName.trim(),
       shopType: payload.shopType.trim(),
       address: payload.address.trim(),
@@ -308,6 +328,13 @@ export async function registerPartner(payload: PartnerRegistrationPayload): Prom
 
     transaction.set(partnerRef, {
       ...FRESH_PROGRESSION,
+      displayName: payload.orgName.trim(),
+      name: payload.orgName.trim(),
+      contactPerson: payload.contactPerson.trim(),
+      contactEmail: payload.email.trim(),
+      phone: payload.phone.trim(),
+      province: payload.province.trim(),
+      district: payload.district.trim(),
       orgName: payload.orgName.trim(),
       orgType: payload.orgType.trim(),
       contactPerson: payload.contactPerson.trim(),
