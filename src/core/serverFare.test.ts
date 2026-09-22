@@ -4,7 +4,8 @@ import { calculateServerFare } from "./serverFare";
 
 test("server fare is deterministic from live distance", () => {
   assert.deepEqual(calculateServerFare("knight", 1), {
-    serviceId: "knight", distanceKm: 1, baseFareBaht: 15, serviceSurchargeBaht: 0, fareBaht: 20
+    serviceId: "knight", distanceKm: 1, baseFareBaht: 20, serviceSurchargeBaht: 0, fareBaht: 20,
+    addons: { expressBoxBaht: 0, dreamRideBaht: 0, amenitiesBaht: 0, serviceAddonBaht: 0 }
   });
   assert.equal(calculateServerFare("express", 3.25).fareBaht, 42);
 });
