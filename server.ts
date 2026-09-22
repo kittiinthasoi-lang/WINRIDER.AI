@@ -601,7 +601,36 @@ app.get("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asyn
         .sort((a, b) => String(b.data().createdAt || "").localeCompare(String(a.data().createdAt || "")))
         .slice(0, 100);
     }
-    const listings = docs.map((doc) => doc.data()).filter((item: any) => item.status === "active");
+    const activeListings = docs.map((doc) => doc.data()).filter((item: any) => item.status === "active");
+    // Always hydrate seller identity/location from the seller's current persisted profile.
+    // Never trust stale client-side seller name/avatar/location stored in a listing.
+    const listings = await Promise.all(activeListings.map(async (item: any) => {
+      const sellerUid = String(item.sellerUserId || "").trim();
+      if (!sellerUid) return item;
+      try {
+        const sellerDoc = await ordersDb.collection("users").doc(sellerUid).get();
+        const sellerData = sellerDoc.data() || {};
+        const profile = (sellerData.profileCustomization || {}) as Record<string, unknown>;
+        const locationEnabled = profile.locationEnabled === true
+          && Number.isFinite(Number(profile.latitude))
+          && Number.isFinite(Number(profile.longitude));
+        return {
+          ...item,
+          sellerName: String(profile.displayName || sellerData.displayName || item.sellerName || "ผู้ขาย WIN"),
+          sellerAvatar: String(profile.avatarEmoji || sellerData.avatarEmoji || item.sellerAvatar || "👤"),
+          sellerAvatarUrl: String(profile.avatarUrl || sellerData.avatarUrl || item.sellerAvatarUrl || ""),
+          location: locationEnabled
+            ? String(profile.locationLabel || "ตำแหน่งที่ผู้ขายบันทึกไว้ในโปรไฟล์")
+            : String(item.location || ""),
+          sellerLatitude: locationEnabled ? Number(profile.latitude) : null,
+          sellerLongitude: locationEnabled ? Number(profile.longitude) : null,
+          sellerLocationEnabled: locationEnabled,
+        };
+      } catch (profileError) {
+        console.warn("[Shop Listings GET] seller profile hydrate failed:", sellerUid, profileError instanceof Error ? profileError.message : profileError);
+        return item;
+      }
+    }));
     return res.json({ listings });
   } catch (error) {
     console.error("[Shop Listings GET]", error instanceof Error ? error.message : error);
@@ -620,7 +649,9 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
     return res.status(400).json({ error: "ข้อมูลสินค้าไม่ถูกต้อง" });
   }
   try {
-    const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
+    const userSnapshot = await ordersDb.collection("users").doc(user.uid).get();
+    const userData = userSnapshot.data() || {};
+    const sellerProfile = (userData.profileCustomization || {}) as Record<string, unknown>;
     const sellerRole = String(userData.role || "citizen").trim();
     const sellerWallet = await ensureWalletIdentityId(user.uid, WALLET_ROLE_PREFIX[sellerRole] ? sellerRole : "citizen");
     const id = `listing-${crypto.randomUUID()}`;
@@ -629,10 +660,14 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
       id,
       sellerUserId: user.uid,
       sellerType: userData.role === "merchant" ? "merchant" : "citizen",
-      sellerName: String(userData.displayName || user.name || "ผู้ขาย WIN"),
+      sellerName: String(sellerProfile.displayName || userData.displayName || user.name || "ผู้ขาย WIN"),
       sellerWalletId: sellerWallet.walletId,
       sellerWalletRole: sellerWallet.role,
-      sellerAvatar: String(userData.avatarEmoji || "👤"),
+      sellerAvatar: String(sellerProfile.avatarEmoji || userData.avatarEmoji || "👤"),
+      sellerAvatarUrl: String(sellerProfile.avatarUrl || userData.avatarUrl || ""),
+      sellerLocationEnabled: sellerProfile.locationEnabled === true,
+      sellerLatitude: sellerProfile.locationEnabled === true && Number.isFinite(Number(sellerProfile.latitude)) ? Number(sellerProfile.latitude) : null,
+      sellerLongitude: sellerProfile.locationEnabled === true && Number.isFinite(Number(sellerProfile.longitude)) ? Number(sellerProfile.longitude) : null,
       title,
       price,
       originalPrice: Number.isFinite(Number(input.originalPrice)) ? Number(input.originalPrice) : null,
@@ -646,7 +681,9 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
       isAiVerified: input.isAiVerified === true,
       aiCertificateId: input.isAiVerified === true ? String(input.aiCertificateId || "") : "",
       aiQualityScore: input.isAiVerified === true && Number.isFinite(Number(input.aiQualityScore)) ? Number(input.aiQualityScore) : null,
-      location: String(input.location || userData.locationLabel || userData.address || "").trim(),
+      location: sellerProfile.locationEnabled === true
+        ? String(sellerProfile.locationLabel || "ตำแหน่งที่ผู้ขายบันทึกไว้ในโปรไฟล์")
+        : String(input.location || userData.locationLabel || userData.address || "").trim(),
       sellerLatitude: Number.isFinite(Number(userData.latitude)) ? Number(userData.latitude) : null,
       sellerLongitude: Number.isFinite(Number(userData.longitude)) ? Number(userData.longitude) : null,
       sellerLocationEnabled: userData.locationEnabled === true,
