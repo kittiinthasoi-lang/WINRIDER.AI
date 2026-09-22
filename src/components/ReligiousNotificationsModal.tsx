@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 import { BellRing, CalendarDays, Check, Clock3, Loader2, MapPin, Settings2, X } from 'lucide-react';
 import {
   getNotificationPermission,
