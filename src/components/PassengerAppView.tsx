@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { auth, db } from '../firebase';
-import { collection, getDocs, query, where, orderBy, limit, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { } from 'firebase/firestore';
 import { emitQuestMetric } from '../services/questService';
 import { createSosIncident } from '../services/sosIncidentService';
 import { WIN_SHOP_ITEMS, WinShopItem } from '../data/winShopItems';
@@ -1141,10 +1141,31 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
     const loadMyListings = async () => {
       try {
-        const q = query(collection(db, 'marketplace_listings'), where('sellerUid', '==', uid), orderBy('createdAt', 'desc'), limit(100));
-        const snap = await getDocs(q);
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) return;
+        const response = await fetch('/api/shop/listings', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json() as { listings?: any[] };
         if (!active) return;
-        setC2cItems(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+        const mine = (payload.listings || [])
+          .filter(item => item.sellerUserId === uid)
+          .map(item => ({
+            id: String(item.id),
+            name: String(item.title || ''),
+            price: Number(item.price || 0),
+            rating: Number(item.rating || 0),
+            sales: Number(item.salesCount || 0),
+            tag: String(item.category || 'second_hand'),
+            icon: String(item.imageIcon || '📦'),
+            imageUrl: item.imageUrl || undefined,
+            condition: item.condition,
+            description: item.description,
+            aiVerified: item.isAiVerified === true,
+            sellerUid: uid,
+          }));
+        setC2cItems(mine);
       } catch (err) {
         console.warn('[Marketplace persistence] load failed:', err);
       }
@@ -1182,12 +1203,46 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       imageUrl: passengerAiVerified.imageUrl,
       isAiVerified: true
     };
-    await setDoc(doc(db, 'marketplace_listings', newItem.id), {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) {
+      alert('เซสชันเข้าสู่ระบบหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+      return;
+    }
+    const listingResponse = await fetch('/api/shop/listings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        title: newItem.name,
+        price: newItem.price,
+        stock: 1,
+        category: newItem.tag,
+        categoryLabel: newItem.tag,
+        condition: newItemCondition || 'used',
+        conditionLabel: newItemCondition || 'มือสองสภาพดี',
+        description: newItemDescription,
+        imageIcon: newItem.icon,
+        imageUrl: newItem.imageUrl,
+        isAiVerified: true,
+        aiCertificateId: passengerAiVerified.certificateId,
+        aiQualityScore: passengerAiVerified.qualityScore,
+        tags: ['AI Verified ✨', 'C2C พลเมืองขายเอง', newItem.tag],
+      }),
+    });
+    if (!listingResponse.ok) {
+      const payload = await listingResponse.json().catch(() => ({}));
+      throw new Error(payload?.error || 'บันทึกสินค้าไม่สำเร็จ');
+    }
+    const savedPayload = await listingResponse.json() as { listing?: any };
+    const savedListing = savedPayload.listing;
+    const persistedItem = {
       ...newItem,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    setC2cItems(prev => [newItem, ...prev.filter(item => item.id !== newItem.id)]);
+      id: String(savedListing?.id || newItem.id),
+      sellerUid: uid,
+    };
+    setC2cItems(prev => [persistedItem, ...prev.filter(item => item.id !== persistedItem.id)]);
 
     if (onAddNewCustomerItem) {
       onAddNewCustomerItem({
