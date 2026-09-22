@@ -9,6 +9,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
 import { calculateAppFare } from "./src/core/serverFare";
+import { parseQrPayload } from "./src/utils/qrPayload";
 
 dotenv.config();
 
@@ -1458,6 +1459,133 @@ async function ensureWalletIdentityId(uid: string, requestedRole?: string): Prom
     return { walletId, role: resolvedRole };
   });
 }
+
+app.post("/api/payments/qr/verify", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const rawPayload = String(req.body?.payload || "").trim();
+  const requestedAmount = Number(req.body?.amount);
+  if (!rawPayload) return res.status(400).json({ error: "QR_PAYLOAD_REQUIRED" });
+
+  const parsed = parseQrPayload(rawPayload);
+  const effectiveAmount = parsed.amountBaht ?? (Number.isFinite(requestedAmount) && requestedAmount > 0 ? requestedAmount : undefined);
+  if (!effectiveAmount || effectiveAmount <= 0 || effectiveAmount > 10_000_000) {
+    return res.status(422).json({ error: "QR_AMOUNT_REQUIRED", kind: parsed.kind });
+  }
+  if (parsed.amountBaht !== undefined && Number.isFinite(requestedAmount) && requestedAmount > 0 && Math.abs(parsed.amountBaht - requestedAmount) > 0.005) {
+    return res.status(422).json({ error: "QR_AMOUNT_MISMATCH", qrAmount: parsed.amountBaht, requestedAmount });
+  }
+
+  try {
+    if (parsed.kind === "win_wallet") {
+      if (!/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(String(parsed.walletId || ""))) {
+        return res.status(422).json({ error: "INVALID_WIN_WALLET_QR" });
+      }
+      const walletIdSnap = await ordersDb.collection("wallet_ids").doc(String(parsed.walletId)).get();
+      if (!walletIdSnap.exists) return res.status(404).json({ error: "WIN_WALLET_OWNER_NOT_FOUND" });
+      const owner = walletIdSnap.data() || {};
+      if (String(owner.userId || "") === user.uid) return res.status(422).json({ error: "SELF_PAYMENT_NOT_ALLOWED" });
+      return res.json({
+        ok: true,
+        kind: parsed.kind,
+        amountBaht: effectiveAmount,
+        owner: { userId: String(owner.userId), role: String(owner.role || ""), walletId: String(parsed.walletId) },
+        settlementMode: "WIN_WALLET_SERVER_LEDGER",
+        canExecute: true
+      });
+    }
+
+    if (parsed.kind === "promptpay" && parsed.promptPayId) {
+      const normalized = parsed.promptPayId.replace(/^0066/, "0").replace(/[^0-9]/g, "");
+      const snap = await ordersDb.collection("payment_profiles")
+        .where("promptPayId", "==", normalized)
+        .where("status", "==", "verified")
+        .limit(1)
+        .get();
+      if (snap.empty) return res.status(404).json({ error: "VERIFIED_PAYMENT_OWNER_NOT_FOUND" });
+      const profile = snap.docs[0].data() || {};
+      if (String(profile.userId || "") === user.uid) return res.status(422).json({ error: "SELF_PAYMENT_NOT_ALLOWED" });
+      return res.json({
+        ok: true,
+        kind: parsed.kind,
+        amountBaht: effectiveAmount,
+        owner: { userId: String(profile.userId), role: String(profile.role || ""), accountName: String(profile.accountName || ""), promptPayId: normalized },
+        settlementMode: "EXTERNAL_PROMPTPAY",
+        canExecute: false,
+        message: "QR และเจ้าของช่องทางรับเงินผ่านการตรวจสอบแล้ว แต่การตัดเงินจากธนาคารต้องเกิดในระบบธนาคาร/ผู้ให้บริการชำระเงินจริง"
+      });
+    }
+
+    return res.status(422).json({ error: "UNSUPPORTED_QR_TYPE" });
+  } catch (error) {
+    console.error("QR verification failed:", error);
+    return res.status(500).json({ error: "QR_SERVER_VERIFY_FAILED" });
+  }
+});
+
+app.post("/api/wallet/pay-by-qr", rateLimit(10), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const walletId = String(req.body?.walletId || "").trim();
+  const amountSatang = Math.round(Number(req.body?.amountBaht) * 100);
+  const idempotencyKey = String(req.body?.idempotencyKey || "").trim();
+  if (!/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(walletId)) return res.status(400).json({ error: "INVALID_WIN_WALLET_ID" });
+  if (!Number.isSafeInteger(amountSatang) || amountSatang < 1 || amountSatang > 1_000_000_000) return res.status(400).json({ error: "INVALID_PAYMENT_AMOUNT" });
+  if (!idempotencyKey || idempotencyKey.length > 120) return res.status(400).json({ error: "IDEMPOTENCY_KEY_REQUIRED" });
+
+  try {
+    const result = await ordersDb.runTransaction(async (tx) => {
+      const idemRef = ordersDb.collection("wallet_payment_transactions").doc(idempotencyKey);
+      const idemSnap = await tx.get(idemRef);
+      if (idemSnap.exists) return { ...idemSnap.data(), replayed: true };
+
+      const receiverIdRef = ordersDb.collection("wallet_ids").doc(walletId);
+      const receiverIdSnap = await tx.get(receiverIdRef);
+      if (!receiverIdSnap.exists) throw new Error("WIN_WALLET_OWNER_NOT_FOUND");
+      const receiverUid = String(receiverIdSnap.data()?.userId || "");
+      if (!receiverUid || receiverUid === user.uid) throw new Error("SELF_PAYMENT_NOT_ALLOWED");
+
+      const payerRef = ordersDb.collection("wallets").doc(user.uid);
+      const receiverRef = ordersDb.collection("wallets").doc(receiverUid);
+      const [payerSnap, receiverSnap] = await Promise.all([tx.get(payerRef), tx.get(receiverRef)]);
+      const payerBalance = Number(payerSnap.data()?.balanceSatang || 0);
+      const receiverBalance = Number(receiverSnap.data()?.balanceSatang || 0);
+      if (payerBalance < amountSatang) throw new Error("INSUFFICIENT_BALANCE");
+
+      const paymentRef = ordersDb.collection("wallet_payment_transactions").doc(idempotencyKey);
+      const payerLedger = ordersDb.collection("ledger_entries").doc();
+      const receiverLedger = ordersDb.collection("ledger_entries").doc();
+      tx.set(payerRef, { userId: user.uid, balanceSatang: payerBalance - amountSatang, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      tx.set(receiverRef, { userId: receiverUid, balanceSatang: receiverBalance + amountSatang, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      tx.create(payerLedger, {
+        transactionId: paymentRef.id, userId: user.uid, amountSatang: -amountSatang,
+        type: "WIN_WALLET_QR_PAYMENT", direction: "DEBIT", counterpartyUserId: receiverUid,
+        walletId, createdAt: FieldValue.serverTimestamp()
+      });
+      tx.create(receiverLedger, {
+        transactionId: paymentRef.id, userId: receiverUid, amountSatang,
+        type: "WIN_WALLET_QR_PAYMENT", direction: "CREDIT", counterpartyUserId: user.uid,
+        walletId, createdAt: FieldValue.serverTimestamp()
+      });
+      const data = {
+        transactionId: paymentRef.id, payerUserId: user.uid, receiverUserId: receiverUid,
+        receiverWalletId: walletId, amountSatang, status: "SETTLED",
+        createdAt: FieldValue.serverTimestamp()
+      };
+      tx.create(paymentRef, data);
+      return { ...data, replayed: false };
+    });
+
+    return res.json({ ok: true, status: result.status, transactionId: result.transactionId, amountBaht: Number(result.amountSatang) / 100, replayed: Boolean(result.replayed) });
+  } catch (error: any) {
+    const code = String(error?.message || "");
+    if (code === "INSUFFICIENT_BALANCE") return res.status(400).json({ error: "INSUFFICIENT_BALANCE" });
+    if (code === "WIN_WALLET_OWNER_NOT_FOUND") return res.status(404).json({ error: code });
+    if (code === "SELF_PAYMENT_NOT_ALLOWED") return res.status(422).json({ error: code });
+    console.error("WIN Wallet QR payment failed:", error);
+    return res.status(500).json({ error: "WIN_WALLET_PAYMENT_FAILED" });
+  }
+});
 
 app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
