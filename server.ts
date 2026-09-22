@@ -1071,7 +1071,7 @@ app.get("/api/admin/public-data/pending", async (req, res) => {
   if (!adminUser) return;
   const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 300);
   const kind = String(req.query.kind || "").trim();
-  let query: FirebaseFirestore.Query = ordersDb.collection("publicDataRecords");
+  let query = ordersDb.collection("publicDataRecords");
   if (kind && kind in TAT_PUBLIC_DATASETS) query = query.where("kind", "==", kind);
   const snapshot = await query.limit(limit).get();
   const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((record: any) => record.status === "pending_admin_review");
