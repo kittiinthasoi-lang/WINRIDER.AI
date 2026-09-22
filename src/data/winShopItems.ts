@@ -1,4 +1,5 @@
-import { WIN_IMAGES } from './imageRegistry';\nconst commIntercomImg = WIN_IMAGES.shop.commIntercom;
+import { WIN_IMAGES } from './imageRegistry';
+const commIntercomImg = WIN_IMAGES.shop.commIntercom;
 const glovesCarbonImg = WIN_IMAGES.shop.glovesCarbon;
 const armorKneeguardsImg = WIN_IMAGES.shop.armorKneeguards;
 const petPodImg = WIN_IMAGES.shop.petPod;
