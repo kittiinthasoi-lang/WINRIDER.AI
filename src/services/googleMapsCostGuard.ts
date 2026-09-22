@@ -1,11 +1,11 @@
 /**
  * Client-side Google Maps request guard.
- * The app remains usable without billable Google Routes/Places calls.
+ * Real Google Routes/Places remain enabled, but duplicate/burst requests are cached and throttled.
  */
 type CacheEntry = { expiresAt: number; response: Response };
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 120_000;
 const WINDOW_MS = 60_000;
-const MAX_REQUESTS_PER_WINDOW = 12;
+const MAX_REQUESTS_PER_WINDOW = 6;
 const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<Response>>();
 const windowCounts = new Map<string, { startedAt: number; count: number }>();
