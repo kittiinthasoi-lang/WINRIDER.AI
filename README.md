@@ -46,7 +46,7 @@ React 19 + Vite
 - **Backend:** Node.js 20+, Express 4
 - **Database/Auth:** Firebase / Firestore / Firebase Authentication
 - **Serverless:** Firebase Functions
-- **Maps:** Google Maps / Google Maps Platform (Routes API currently disabled for billing safety)
+- **Maps:** OSM/coordinate fallback in FREE-ONLY mode; Google Routes/Places/Dynamic Maps are hard-disabled
 - **AI:** Google GenAI
 - **Charts/UI:** Recharts, Lucide React, Motion
 - **PWA:** vite-plugin-pwa
@@ -66,7 +66,7 @@ WINRIDER.AI/
 │   ├── data/             # domain/reference data
 │   └── types/            # TypeScript types
 ├── functions/             # Firebase Functions
-├── server.ts              # Express application/server
+├── server.ts              # Express application/server (FREE-ONLY external API lock)
 ├── scripts/               # build/generation scripts
 ├── public/                # static assets
 ├── package.json
