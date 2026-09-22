@@ -66,7 +66,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           password,
           displayName,
           role,
-          phone || '0812345678'
+          phone
         );
         onAuthenticated(user);
         onClose();
