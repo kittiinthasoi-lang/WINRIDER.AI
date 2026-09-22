@@ -283,45 +283,16 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
 
   // Filter available drivers according to service and gender rules, plus Dream Ride vehicle matching
   const candidateDrivers = useMemo(() => {
-    return liveDrivers.filter(driver => {
-      const capabilities = [...driver.certifications, ...driver.specialtyTags].join(' ').toLowerCase();
-      if (serviceId === 'express') {
-        return driver.hasDeliveryBox;
-      }
-      if (serviceId === 'mu') {
-        // MU BUDDY: Recommend matching gender with service eligibility
-        // If passenger is female, recommend female driver (service eligibility)
-        // If passenger is male, recommend male driver (service eligibility)
-        if (currentGender === 'female') {
-          return driver.gender === 'female' && true;
-        } else {
-          return driver.gender === 'male' && true;
-        }
-      }
-      if (serviceId === 'spirit') {
-        return ['spirit', 'ผู้สูงอายุ', 'ศาสนา', 'elder'].some((tag) => capabilities.includes(tag));
-      }
-      if (serviceId === 'family') {
-        return ['family', 'เด็ก', 'ผู้สูงอายุ', 'ผู้พิการ', 'child', 'elder', 'disabled'].some((tag) => capabilities.includes(tag));
-      }
-      if (serviceId === 'pet') {
-        return ['pet', 'สัตว์'].some((tag) => capabilities.includes(tag));
-      }
-      if (serviceId === 'lifestyle') {
-        return driver.specialtyTags.some(t => t.includes('Lifestyle') || t.includes('คาเฟ่') || t.includes('สตรีทฟู้ด'));
-      }
-      if (serviceId === 'link') {
-        return driver.specialtyTags.some(t => t.includes('Link') || t.includes('Express') || t.includes('ส่ง'));
-      }
-      return true;
-    }).sort((a, b) => {
+    // All active, admin-verified Knights may accept every service.
+    // Level, gender, specialty tags and equipment are never used as acceptance gates.
+    return liveDrivers.filter((driver) => Boolean(driver.id)).sort((a, b) => {
       const matchA = checkDreamRideMatch(a.vehicleModel, selectedDreamRide);
       const matchB = checkDreamRideMatch(b.vehicleModel, selectedDreamRide);
       const scoreA = a.serviceMatchScore + (matchA.isExact ? 40 : matchA.isBrand ? 20 : 0);
       const scoreB = b.serviceMatchScore + (matchB.isExact ? 40 : matchB.isBrand ? 20 : 0);
       return scoreB - scoreA;
     });
-  }, [liveDrivers, serviceId, currentGender, selectedDreamRide]);
+  }, [liveDrivers, selectedDreamRide]);
 
   // Alternative drivers (for manual choice / opposite gender / other specialties)
   const allOtherDrivers = useMemo(() => {
