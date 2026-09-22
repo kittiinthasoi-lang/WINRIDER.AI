@@ -85,3 +85,11 @@ export async function uploadProfileImage(uid: string, role: string, file: File):
     });
   }
 }
+
+
+export async function uploadProductImage(uid: string, file: File): Promise<string> {
+  const compressedBlob = await compressImage(file, 1600, 0.82);
+  const storageRef = ref(storage, `products/${uid}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`);
+  await uploadBytes(storageRef, compressedBlob, { contentType: 'image/jpeg' });
+  return getDownloadURL(storageRef);
+}
