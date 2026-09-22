@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { WIN_IMAGES } from '../data/imageRegistry';
 import { ARMOR_TIERS } from '../data/bibleData';
 import { playTactileBlip, playLevelUpFanfare } from '../utils/audio';
 import confetti from 'canvas-confetti';
@@ -199,7 +200,7 @@ export const ArmorTechSection: React.FC<Props> = ({ audioEnabled }) => {
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-700 p-0.5 flex items-center justify-center shadow-[0_0_15px_rgba(0,210,255,0.4)] overflow-hidden">
               <img
-                src="/images/armor_lightning.jpg"
+                src=WIN_IMAGES.armor.lightning
                 alt="Equipped Armor"
                 className="w-full h-full object-cover rounded-[14px]"
                 referrerPolicy="no-referrer"
