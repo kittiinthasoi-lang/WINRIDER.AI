@@ -1187,8 +1187,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       if (refDropoff && typeof refDropoff.lat === 'number' && typeof refDropoff.lng === 'number') {
         dropoffCoord = { lat: refDropoff.lat, lng: refDropoff.lng };
         dropoffLocation = refDropoff.address || refDropoff.name;
-        resolvedDistanceKm = Math.round(computeHaversineDistanceKm(pickupCoord.lat, pickupCoord.lng, dropoffCoord.lat, dropoffCoord.lng) * 10) / 10;
-      } else {
+        if (!resolvedDistanceKm && typeof (refDropoff as any).distanceKm === 'number' && (refDropoff as any).distanceKm > 0) {
+          resolvedDistanceKm = (refDropoff as any).distanceKm;
+        }
+      }
+
+      if (resolvedDistanceKm === null || resolvedDistanceKm <= 0) {
         try {
           const destinationResponse = await fetch('/api/places/resolve-routes', {
             method: 'POST', headers: await getAuthHeaders(),
