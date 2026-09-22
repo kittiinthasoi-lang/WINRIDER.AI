@@ -34,6 +34,7 @@ import {
   MessageCircle,
   Share2
 } from 'lucide-react';
+import { ServicePhotoVerificationModal } from './ServicePhotoVerificationModal';
 import { Vehicle } from '../types';
 import { ThreeDimensionalDriverRadar, Radar3DPing } from './ThreeDimensionalDriverRadar';
 import { KnightNavigationMapScreen } from './KnightNavigationMapScreen';
@@ -123,6 +124,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string>('all');
   const [showGoogleMapsModal, setShowGoogleMapsModal] = useState<boolean>(false);
   const [dispatchActionPending, setDispatchActionPending] = useState(false);
+  const [showCompletionProof, setShowCompletionProof] = useState(false);
   const [dispatchError, setDispatchError] = useState('');
   const { gpsState } = useRealtimeGps(isOnDuty);
   const presenceLatitude = Number(gpsState.latitude.toFixed(4));
@@ -385,6 +387,11 @@ distanceKm: pending.distanceKm,
     if (!currentActiveTrip) return;
     setDispatchActionPending(true); setDispatchError('');
     try {
+      if (tripStep === 'navigating' && ['express', 'family'].includes(String(currentActiveTrip.serviceId)) && !showCompletionProof) {
+        setShowCompletionProof(true);
+        setDispatchActionPending(false);
+        return;
+      }
       if (tripStep === 'heading_pickup') {
         await advanceLiveOrderStep(currentActiveTrip.id, 'picked_up');
         if (audioEnabled) playTactileBlip(1000);
@@ -687,6 +694,24 @@ distanceKm: pending.distanceKm,
             isEmbedded={true}
           />
         </div>
+      )}
+
+      {showCompletionProof && currentActiveTrip && (
+        <ServicePhotoVerificationModal
+          type={currentActiveTrip.serviceId === 'express' ? 'express_delivery' : 'family_arrival'}
+          serviceName={currentActiveTrip.serviceTitle}
+          driverName={getCurrentUserSession()?.name || 'พี่วิน'}
+          driverLevel={driverLevel || 1}
+          recipientOrPassengerName={currentActiveTrip.customerName || 'ผู้รับบริการ'}
+          locationName={currentActiveTrip.dropoffLocation}
+          audioEnabled={audioEnabled}
+          orderId={currentActiveTrip.id}
+          onClose={() => setShowCompletionProof(false)}
+          onConfirm={() => {
+            setShowCompletionProof(false);
+            void handleAdvanceTripStep();
+          }}
+        />
       )}
 
       {/* โหมดแท็บแผนที่นำทาง: ยังไม่มีงานที่รับ → แสดงหน้านำทางแบบรอรับงาน */}
