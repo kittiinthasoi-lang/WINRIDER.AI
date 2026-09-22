@@ -1094,6 +1094,86 @@ async function generateWithGemini(contents: any, config: any) {
   throw lastError || new Error("ALL_MODELS_FAILED");
 }
 
+app.post("/api/ai/product-photo-verify", rateLimit(10), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const image = decodeImageDataUrl(req.body?.imageDataUrl);
+  if (!image) return res.status(400).json({ error: "รูปสินค้าต้องเป็น JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB", errorCode: "INVALID_IMAGE" });
+
+  const ai = getAiClient();
+  if (!ai) return res.status(503).json({ error: "WIN-AI Vision ยังไม่ได้ตั้งค่า GEMINI_API_KEY", errorCode: "MISSING_API_KEY" });
+
+  const itemName = String(req.body?.itemName || "").trim().slice(0, 200);
+  const category = String(req.body?.category || "").trim().slice(0, 100);
+  const prompt = `วิเคราะห์ภาพสินค้าจริงสำหรับการลงขายใน WIN Street Market
+ชื่อที่ผู้ขายระบุ: ${itemName || "ไม่ระบุ"}
+หมวดหมู่ที่ผู้ขายระบุ: ${category || "ไม่ระบุ"}
+
+ตอบ JSON เท่านั้นตาม schema:
+{
+ "isProductVisible": boolean,
+ "detectedTitle": string,
+ "detectedCategory": string,
+ "detectedCondition": string,
+ "qualityScore": number,
+ "confidenceScore": number,
+ "safetyPassed": boolean,
+ "tags": string[],
+ "aiAnalysisNotes": string
+}
+
+กติกา:
+- ห้ามแต่งข้อมูลที่มองไม่เห็น
+- qualityScore 0-100 ประเมินคุณภาพภาพเท่านั้น
+- confidenceScore 0-100 คือความมั่นใจในการจำแนก ไม่ใช่คะแนนความแท้
+- ห้ามอ้างว่าเป็นของแท้หรือปลอดภัย 100% จากภาพเดียว
+- safetyPassed ให้ false หากเห็นสินค้าหรือเนื้อหาที่มีแนวโน้มเป็นสินค้าต้องห้าม/อันตราย หรือระบุไม่ได้ชัดเจน
+- isProductVisible ต้อง false ถ้าภาพไม่มีสินค้าให้ตรวจ
+- วิเคราะห์เฉพาะสิ่งที่เห็นในภาพ`;
+
+  try {
+    const response = await generateWithGemini(
+      [{
+        role: "user",
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") } }
+        ]
+      }],
+      { temperature: 0.1, maxOutputTokens: 700 }
+    );
+    const raw = response.text.trim().replace(/^\`\`\`json\s*/i, "").replace(/\s*\`\`\`$/i, "");
+    const parsed = JSON.parse(raw);
+    const confidence = Math.max(0, Math.min(100, Number(parsed.confidenceScore) || 0));
+    const quality = Math.max(0, Math.min(100, Number(parsed.qualityScore) || 0));
+    const isVerified = parsed.isProductVisible === true && parsed.safetyPassed === true && confidence >= 70 && quality >= 60;
+    return res.json({
+      result: {
+        isVerified,
+        certificateId: isVerified ? `WIN-AI-${Date.now().toString(36).toUpperCase()}` : "",
+        detectedTitle: String(parsed.detectedTitle || itemName || "สินค้าจากภาพ"),
+        detectedCategory: String(parsed.detectedCategory || category || "สินค้าทั่วไป"),
+        detectedCondition: String(parsed.detectedCondition || "ไม่สามารถยืนยันสภาพจากภาพได้"),
+        qualityScore: quality,
+        authenticityScore: confidence,
+        safetyPassed: parsed.safetyPassed === true,
+        fairPriceRange: { min: 0, max: 0 },
+        tags: Array.isArray(parsed.tags) ? parsed.tags.filter((x: unknown) => typeof x === "string").slice(0, 10) : [],
+        aiAnalysisNotes: String(parsed.aiAnalysisNotes || "ผลวิเคราะห์จากภาพสินค้าจริงโดย WIN-AI Vision; ไม่ใช่การรับประกันความแท้")
+      },
+      model: response.model,
+      userId: user.uid
+    });
+  } catch (error: any) {
+    const classified = classifyGeminiError(error);
+    return res.status(classified.errorCode === "TIMEOUT" ? 504 : 503).json({
+      error: classified.message,
+      errorCode: classified.errorCode,
+      canRetry: true
+    });
+  }
+});
+
 app.post("/api/ai/personal-assistant", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
