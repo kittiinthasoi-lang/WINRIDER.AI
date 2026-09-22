@@ -732,10 +732,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorName: 'Purple',
       colorHex: '#A855F7',
       colorGlow: 'rgba(168, 85, 247, 0.8)',
-      desc: 'ระบบแนะนำและจับคู่พี่วินผู้หญิงที่เหมาะสม เลเวล 15+ พร้อมเส้นทางสายมูและบทสวด (ชายจับคู่ชาย หรือเลือกเองพร้อมระบบขอความสมัครใจ)',
+      desc: 'ระบบจับคู่งานจริงกับพี่วินที่ผ่านการอนุมัติจากแอดมิน พร้อมข้อมูลเส้นทางสายมูและบทสวด',
       icon: <Sparkles className="w-6 h-6 text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.95)]" />,
       imageUrl: WIN_IMAGES.pillars.mubuddy,
-      badge: 'พี่วินหญิง LV.15+ (ชายคู่ชาย)',
+      badge: 'พี่วินที่ผ่านการอนุมัติจากแอดมิน',
       bgGlow: 'from-purple-500/25 to-transparent',
       eta: '4-8 นาที',
       priceEstimate: '฿45 - ฿180',
@@ -743,7 +743,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       actionText: '⛩️ กดจับคู่ทริปสายมู',
       actionGradient: 'from-purple-400 to-fuchsia-600',
       actionTextGlow: 'shadow-[0_0_14px_rgba(168,85,247,0.6)]',
-      infoData: 'ℹ️ ข้อมูล: คัดกรองพี่วินหญิง LV.15+ (ชายคู่ชาย) • พร้อมบทสวด'
+      infoData: 'ℹ️ ข้อมูล: คัดกรองพี่วินที่ผ่านการอนุมัติจากแอดมิน • พร้อมบทสวด'
     },
     {
       id: 'lifestyle',
@@ -774,10 +774,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorName: 'Yellow',
       colorHex: '#FACC15',
       colorGlow: 'rgba(250, 204, 21, 0.8)',
-      desc: 'คัดกรองพี่วินเลเวล 20+ อบรมดูแลผู้สูงอายุ พาไปทำศาสนกิจทุกศาสนา (มัสยิด, วัด, โบสถ์, ศาลเจ้า) พร้อมรอรับกลับ',
+      desc: 'พี่วินที่ผ่านการอนุมัติและอบรมดูแลผู้สูงอายุ พาไปทำศาสนกิจทุกศาสนา (มัสยิด, วัด, โบสถ์, ศาลเจ้า) พร้อมรอรับกลับ',
       icon: <Heart className="w-6 h-6 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.95)]" />,
       imageUrl: WIN_IMAGES.pillars.spirit,
-      badge: 'อบรมพิเศษ LV.20+ (ทุกศาสนา)',
+      badge: 'อบรมพิเศษ • ทุกศาสนา',
       bgGlow: 'from-yellow-400/25 to-transparent',
       eta: '3-5 นาที',
       priceEstimate: '฿35 - ฿110',
@@ -785,7 +785,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       actionText: '👵 กดจองดูแลผู้สูงอายุ',
       actionGradient: 'from-yellow-400 to-amber-500',
       actionTextGlow: 'shadow-[0_0_14px_rgba(250,204,21,0.6)]',
-      infoData: 'ℹ️ ข้อมูล: อบรมดูแลผู้สูงอายุ LV.20+ • ดูแลรอรับกลับ'
+      infoData: 'ℹ️ ข้อมูล: อบรมดูแลผู้สูงอายุ • ดูแลรอรับกลับ'
     },
     {
       id: 'family',
@@ -795,10 +795,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       colorName: 'SkyBlue',
       colorHex: '#38BDF8',
       colorGlow: 'rgba(56, 189, 248, 0.8)',
-      desc: 'พี่วินเลเวล 15+ ผ่านการอบรมดูแลเด็ก รับส่งไปโรงเรียน หมวกกันน็อกเด็ก พร้อมติดตาม GPS สด',
+      desc: 'พี่วินที่ผ่านการอนุมัติและอบรมดูแลเด็ก รับส่งไปโรงเรียน หมวกกันน็อกเด็ก พร้อมติดตาม GPS สด',
       icon: <Users className="w-6 h-6 text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.95)]" />,
       imageUrl: WIN_IMAGES.pillars.family,
-      badge: 'อบรมดูแลเด็ก LV.15+',
+      badge: 'อบรมดูแลเด็ก',
       bgGlow: 'from-sky-400/25 to-transparent',
       eta: '3-5 นาที',
       priceEstimate: '฿30 - ฿95',
