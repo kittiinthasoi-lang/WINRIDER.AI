@@ -242,6 +242,11 @@ export interface MarketItem {
   sellerType: 'merchant' | 'citizen';
   sellerName: string;
   sellerAvatar: string;
+  sellerAvatarUrl?: string;
+  sellerUid?: string;
+  sellerLocationEnabled?: boolean;
+  sellerLatitude?: number;
+  sellerLongitude?: number;
   sellerLevel: number;
   sellerRating: number;
   category: MarketItemCategory;
