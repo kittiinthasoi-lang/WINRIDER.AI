@@ -1009,7 +1009,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           headers: { Accept: 'application/json' }
         });
         if (publicResponse.ok) {
-          const publicPayload = await publicResponse.json() as { records?: Array<{ name?: string; address?: string; province?: string; latitude?: number; longitude?: number }> };
+          const publicPayload = await publicResponse.json() as { records?: Array<{ name?: string; address?: string; district?: string; province?: string; latitude?: number; longitude?: number }> };
           const publicMatch = publicPayload.records?.[0];
           if (publicMatch) {
             resolvedAddress = [publicMatch.name, publicMatch.address, publicMatch.district, publicMatch.province].filter(Boolean).join(' ');
