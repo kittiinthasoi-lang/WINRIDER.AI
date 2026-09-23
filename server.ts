@@ -2069,6 +2069,9 @@ app.post("/api/admin/manual-topup", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
+  if (!getManualSettlementConfig().configured) {
+    return res.status(503).json({ error: "ยังไม่ได้ตั้งค่าบัญชีบริษัทสำหรับรับเงิน" });
+  }
 
   const walletId = String(req.body?.walletId || "").trim().toUpperCase();
   const amountSatang = Math.round(Number(req.body?.amount) * 100);
