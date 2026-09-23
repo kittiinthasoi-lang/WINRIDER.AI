@@ -137,6 +137,10 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
   };
 
   const handleDepositSubmit = async () => {
+    if (!walletData?.systemPromptPay?.configured) {
+      setDepositError('ระบบยังไม่ได้ตั้งค่าบัญชีรับเงิน กรุณาติดต่อผู้ดูแล');
+      return;
+    }
     if (!proofFile || depositAmount <= 0) return;
     setDepositBusy(true);
     setDepositMessage('');
@@ -145,7 +149,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
 
     try {
       const res = await submitTopupProof(depositAmount, proofFile);
-      setDepositMessage(res.message || 'ส่งสลิปให้ AI และระบบตรวจสอบเรียบร้อยแล้ว');
+      setDepositMessage(res.message || 'ส่งสลิปแล้ว รอ Admin ตรวจเงินจริงในบัญชีธนาคารและยืนยันยอด');
       setProofFile('');
       if (audioEnabled) playPaymentSuccessChime();
       loadWallet(true);
@@ -157,17 +161,17 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
   };
 
   const handleWithdrawSubmit = async () => {
-    const currentBalance = walletData?.balance || 0;
+    const currentBalance = walletData?.availableBalance ?? walletData?.balance ?? 0;
     setWithdrawError('');
     setWithdrawMessage('');
 
     if (currentBalance <= 0) {
-      setWithdrawError('ยอดเงินคงเหลือใน WIN Wallet คือ ฿0.00 ไม่สามารถทำรายการถอนได้');
+      setWithdrawError('ยอดเงินที่ถอนได้ใน WIN Wallet คือ ฿0.00 หรือกำลังถูกล็อกไว้ในคำขอถอนก่อนหน้า');
       return;
     }
 
     if (withdrawAmount <= 0 || withdrawAmount > currentBalance) {
-      setWithdrawError(`ยอดเงินที่ต้องการถอนต้องไม่เกินยอดคงเหลือ (฿${currentBalance.toFixed(2)})`);
+      setWithdrawError(`ยอดเงินที่ต้องการถอนต้องไม่เกินยอดที่ถอนได้ (฿${currentBalance.toFixed(2)})`);
       return;
     }
 
@@ -192,7 +196,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
         bankName: withdrawBank,
       });
 
-      setWithdrawMessage(res.message || 'ส่งคำขอถอนเงินสำเร็จ ยอดเงินถูกตัดจาก WIN Wallet แล้ว');
+      setWithdrawMessage(res.message || 'ส่งคำขอถอนเงินแล้ว ระบบล็อกยอดไว้จนกว่า Admin จะโอนเงินจริงและยืนยัน');
       if (audioEnabled) playPaymentSuccessChime();
       loadWallet(true);
     } catch (err: any) {
@@ -203,6 +207,8 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
   };
 
   const balance = walletData?.balance ?? 0.0;
+  const availableBalance = walletData?.availableBalance ?? balance;
+  const lockedBalance = (walletData?.lockedSatang ?? 0) / 100;
   const promptPaySystemId = walletData?.systemPromptPay?.promptPayId || '';
   const systemBankName = walletData?.systemPromptPay?.bankName || '';
   const systemBankAccountNumber = walletData?.systemPromptPay?.bankAccountNumber || '';
@@ -269,6 +275,16 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
               <span>แสดงยอดจริง 0.00 บาทตามฐานข้อมูลระบบ (ไม่มีการจำลองยอดปลอม)</span>
             </p>
           )}
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-2.5">
+              <p className="text-[10px] text-emerald-200/70">ยอดที่ใช้/ถอนได้</p>
+              <p className="font-mono font-black text-emerald-300">฿{availableBalance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            </div>
+            <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-2.5">
+              <p className="text-[10px] text-amber-200/70">ยอดล็อกรอถอน</p>
+              <p className="font-mono font-black text-amber-300">฿{lockedBalance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            </div>
+          </div>
         </div>
       </div>
 
