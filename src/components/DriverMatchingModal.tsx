@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { WIN_IMAGES } from '../data/imageRegistry';
 import { LIFESTYLE_PLACES } from '../data/lifestyleData';
-import { getAuth } from 'firebase/auth';
 import { MatchedDriver, DreamRideVehicle, LifestylePlace } from '../types';
 import { fetchLiveDrivers } from '../services/liveDriversService';
 import { 
+import { auth } from '../firebase';
   RELIGIOUS_SERVICES_DATA, 
   SACRED_MU_PRAYERS, 
   ReligiousActivityOption, 
@@ -338,7 +338,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
       setRoutesLoading(true);
       setRoutesError('');
       try {
-        const user = getAuth().currentUser;
+        const user = auth.currentUser;
         if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนคำนวณระยะทางประมาณการ');
         const response = await fetch('/api/places/resolve-routes', {
           method: 'POST',
