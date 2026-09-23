@@ -199,22 +199,34 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
 
   const rideId = event.params.rideId;
   const idempotencyKey = afterData.idempotencyKey || `trip_complete_${rideId}`;
-  const citizenId = afterData.passengerId || afterData.citizenId || afterData.customerId || afterData.userId;
-  const knightId = afterData.driverId || afterData.knightId;
+  const citizenId = afterData.passengerUserId || afterData.passengerId || afterData.citizenId || afterData.customerId || afterData.userId;
+  const knightId = afterData.driverUserId || afterData.driverId || afterData.knightId;
 
   if (!citizenId || !knightId) {
     console.error(`[onTripCompleted] Missing citizenId (${citizenId}) or knightId (${knightId}) for ride ${rideId}`);
     return;
   }
 
-  // คำนวณค่าโดยสารเป็นหน่วยสตางค์
+  // Settlement must consume the authoritative quote captured by the server at
+  // ride creation. Legacy fields remain only as a compatibility fallback.
   let fareSatang = 0;
-  if (typeof afterData.fareSatang === "number" && afterData.fareSatang > 0) {
+  const quotedFareBaht = Number(afterData.fareQuote?.fareBaht);
+  if (Number.isFinite(quotedFareBaht) && quotedFareBaht > 0) {
+    fareSatang = Math.round(quotedFareBaht * 100);
+  } else if (typeof afterData.fareSatang === "number" && afterData.fareSatang > 0) {
     fareSatang = Math.round(afterData.fareSatang);
   } else if (typeof afterData.fare === "number" && afterData.fare > 0) {
     fareSatang = Math.round(afterData.fare * 100);
   } else if (typeof afterData.price === "number" && afterData.price > 0) {
     fareSatang = Math.round(afterData.price * 100);
+  }
+
+  if (Number.isFinite(quotedFareBaht) && typeof afterData.fare === "number") {
+    const storedFareSatang = Math.round(Number(afterData.fare) * 100);
+    if (storedFareSatang !== fareSatang) {
+      console.error(`[onTripCompleted] Authoritative quote mismatch for ride ${rideId}: quote=${fareSatang}, fare=${storedFareSatang}`);
+      return;
+    }
   }
 
   if (fareSatang <= 0) {
@@ -376,7 +388,7 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
     // อัปเดตกระเป๋าพลเมือง
     const currentCitizenBalance = Number(citizenWalletData.balanceSatang || 0);
     const currentCitizenLocked = Number(citizenWalletData.lockedSatang || 0);
-    const newCitizenBalance = currentCitizenBalance - feeResult.totalCitizenPaySatang;
+    const newCitizenBalance = currentCitizenBalance - feeResult.totalCitizenPaySatang - tipSatang;
 
     transaction.set(
       citizenWalletRef,
