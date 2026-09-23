@@ -78,6 +78,41 @@ function rateLimitKey(req: express.Request): string {
   return "ip:" + String(req.ip || "unknown");
 }
 
+function distributedRateLimit(scope: string, maxRequests: number) {
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const now = Date.now();
+    const principal = rateLimitKey(req);
+    const docId = crypto.createHash("sha256").update(scope + ":" + principal).digest("hex");
+    const ref = ordersDb.collection("_distributed_rate_limits").doc(docId);
+    try {
+      let allowed = true;
+      await ordersDb.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const data = snap.data() || {};
+        const windowStart = Number(data.windowStart || 0);
+        const count = Number(data.count || 0);
+        if (!windowStart || now - windowStart >= RATE_WINDOW_MS) {
+          tx.set(ref, { scope, principalHash: docId, windowStart: now, count: 1, updatedAt: FieldValue.serverTimestamp() });
+          return;
+        }
+        if (count >= maxRequests) {
+          allowed = false;
+          return;
+        }
+        tx.update(ref, { count: count + 1, updatedAt: FieldValue.serverTimestamp() });
+      });
+      if (!allowed) {
+        res.setHeader("Retry-After", "60");
+        return res.status(429).json({ error: "Too many requests", code: "DISTRIBUTED_RATE_LIMIT" });
+      }
+      return next();
+    } catch (error: any) {
+      console.error("[Distributed Rate Limit]", scope, error?.message);
+      return res.status(503).json({ error: "Rate-limit service unavailable" });
+    }
+  };
+}
+
 function rateLimit(maxRequests: number) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const now = Date.now();
@@ -2505,7 +2540,7 @@ app.post("/api/admin/topup-review", rateLimit(20), async (req, res) => {
 });
 
 
-app.post("/api/webhooks/payment-provider", rateLimit(120), async (req, res) => {
+app.post("/api/webhooks/payment-provider", rateLimit(120), distributedRateLimit("payment_webhook", 120), async (req, res) => {
   const secret = String(process.env.PAYMENT_PROVIDER_WEBHOOK_SECRET || "").trim();
   if (!secret) return res.status(503).json({ error: "Payment provider webhook is not configured" });
 
@@ -2647,7 +2682,7 @@ app.post("/api/webhooks/payment-provider", rateLimit(120), async (req, res) => {
   }
 });
 
-app.post("/api/admin/payments/refund", rateLimit(10), async (req, res) => {
+app.post("/api/admin/payments/refund", rateLimit(10), distributedRateLimit("admin_refund", 10), async (req, res) => {
   const adminUser = await requireSuperAdmin(req, res);
   if (!adminUser) return;
   const submissionId = String(req.body?.submissionId || "").trim();
@@ -3398,7 +3433,7 @@ app.get("/api/admin/ops/overview", rateLimit(30), async (req, res) => {
 });
 
 
-app.post("/api/admin/ops/ride-action", rateLimit(20), async (req, res) => {
+app.post("/api/admin/ops/ride-action", rateLimit(20), distributedRateLimit("admin_ride_action", 20), async (req, res) => {
   const adminUser = await requireSuperAdmin(req, res);
   if (!adminUser) return;
   const rideId = String(req.body?.rideId || "").trim();
@@ -3463,7 +3498,7 @@ app.post("/api/admin/ops/ride-action", rateLimit(20), async (req, res) => {
   }
 });
 
-app.post("/api/admin/ops/sos-action", rateLimit(20), async (req, res) => {
+app.post("/api/admin/ops/sos-action", rateLimit(20), distributedRateLimit("admin_sos_action", 20), async (req, res) => {
   const adminUser = await requireSuperAdmin(req, res);
   if (!adminUser) return;
   const incidentId = String(req.body?.incidentId || "").trim();
@@ -3826,7 +3861,7 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
   }
 });
 
-app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
+app.post("/api/orders/:id/accept", rateLimit(10), distributedRateLimit("ride_accept", 10), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const eligibility = await requireEligibleDriver(user.uid, user);
@@ -3941,7 +3976,7 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
   }
 });
 
-app.post("/api/orders/:id/decline", rateLimit(30), async (req, res) => {
+app.post("/api/orders/:id/decline", rateLimit(30), distributedRateLimit("ride_decline", 30), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const { id } = req.params;
@@ -3989,7 +4024,7 @@ app.post("/api/orders/:id/decline", rateLimit(30), async (req, res) => {
   }
 });
 
-app.post("/api/orders/:id/completion-proof", rateLimit(10), async (req, res) => {
+app.post("/api/orders/:id/completion-proof", rateLimit(10), distributedRateLimit("ride_completion_proof", 10), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const { id } = req.params;
@@ -4041,7 +4076,7 @@ app.post("/api/orders/:id/completion-proof", rateLimit(10), async (req, res) => 
   }
 });
 
-app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
+app.post("/api/orders/:id/step", rateLimit(30), distributedRateLimit("ride_step", 30), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const { id } = req.params;
