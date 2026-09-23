@@ -48,6 +48,16 @@ const RATE_LIMITS: Record<string, number> = {
   "/api/events/daily": 30,
 };
 
+function rideMutationIdempotencyRef(req: express.Request, action: string, rideId: string, actorUid: string, payload: unknown = {}) {
+  const supplied = String(req.headers["idempotency-key"] || req.body?.idempotencyKey || "").trim();
+  const logicalKey = supplied || `${action}:${rideId}:${actorUid}:${stableCanonicalJson(payload)}`;
+  const hash = crypto.createHash("sha256").update(logicalKey).digest("hex");
+  return {
+    logicalKey,
+    ref: ordersDb.collection("ride_mutation_idempotency").doc(hash),
+  };
+}
+
 function stableCanonicalJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return "[" + value.map(stableCanonicalJson).join(",") + "]";
@@ -3796,10 +3806,17 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
   };
   try {
     const orderRef = ordersCollection.doc(id);
+    const idempotency = rideMutationIdempotencyRef(req, "ACCEPT", id, user.uid);
     let acceptedOrder: ServerOrder | null = null;
 
     await ordersDb.runTransaction(async (transaction) => {
+      const idempotencySnap = await transaction.get(idempotency.ref);
       const snapshot = await transaction.get(orderRef);
+      if (idempotencySnap.exists) {
+        if (!snapshot.exists) throw new Error("ORDER_NOT_FOUND");
+        acceptedOrder = snapshot.data() as ServerOrder;
+        return;
+      }
       if (!snapshot.exists) {
         throw new Error("ORDER_NOT_FOUND");
       }
@@ -3856,6 +3873,13 @@ app.post("/api/orders/:id/accept", rateLimit(10), async (req, res) => {
         toStatus: "accepted",
         createdAt: FieldValue.serverTimestamp(),
       });
+      transaction.create(idempotency.ref, {
+        logicalKey: idempotency.logicalKey,
+        action: "ACCEPT",
+        rideId: id,
+        actorUid: user.uid,
+        createdAt: FieldValue.serverTimestamp(),
+      });
     });
 
     if (acceptedOrder) {
@@ -3884,9 +3908,16 @@ app.post("/api/orders/:id/decline", rateLimit(30), async (req, res) => {
   const { id } = req.params;
   try {
     const orderRef = ordersCollection.doc(id);
+    const idempotency = rideMutationIdempotencyRef(req, "DECLINE", id, user.uid);
     let updatedOrder: ServerOrder | null = null;
     await ordersDb.runTransaction(async (transaction) => {
+      const idempotencySnap = await transaction.get(idempotency.ref);
       const snapshot = await transaction.get(orderRef);
+      if (idempotencySnap.exists) {
+        if (!snapshot.exists) throw new Error("ORDER_NOT_FOUND");
+        updatedOrder = snapshot.data() as ServerOrder;
+        return;
+      }
       if (!snapshot.exists) throw new Error("ORDER_NOT_FOUND");
       const order = snapshot.data() as ServerOrder;
       if (order.status !== "pending") throw new Error("ORDER_NOT_PENDING");
@@ -3897,6 +3928,13 @@ app.post("/api/orders/:id/decline", rateLimit(30), async (req, res) => {
       transaction.set(ordersDb.collection("audit_logs").doc(), {
         action: "RIDE_OFFER_DECLINED", rideId: id, actorUid: user.uid,
         nextDriverUid: offer.offeredDriverId, createdAt: FieldValue.serverTimestamp(),
+      });
+      transaction.create(idempotency.ref, {
+        logicalKey: idempotency.logicalKey,
+        action: "DECLINE",
+        rideId: id,
+        actorUid: user.uid,
+        createdAt: FieldValue.serverTimestamp(),
       });
     });
     if (updatedOrder?.offeredDriverId) {
@@ -3968,10 +4006,18 @@ app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
 
   try {
     const orderRef = ordersCollection.doc(id);
+    const mutationPayload = { status: status ?? null, tipAmount: tipAmount ?? null, ratingGiven: ratingGiven ?? null, reviewComment: reviewComment ?? null };
+    const idempotency = rideMutationIdempotencyRef(req, "STEP", id, user.uid, mutationPayload);
     let updatedOrder: ServerOrder | null = null;
 
     await ordersDb.runTransaction(async (transaction) => {
+      const idempotencySnap = await transaction.get(idempotency.ref);
       const snapshot = await transaction.get(orderRef);
+      if (idempotencySnap.exists) {
+        if (!snapshot.exists) throw new Error("ORDER_NOT_FOUND");
+        updatedOrder = snapshot.data() as ServerOrder;
+        return;
+      }
       if (!snapshot.exists) throw new Error("ORDER_NOT_FOUND");
 
       const order = snapshot.data() as ServerOrder;
@@ -4037,6 +4083,14 @@ app.post("/api/orders/:id/step", rateLimit(30), async (req, res) => {
           createdAt: FieldValue.serverTimestamp(),
         });
       }
+      transaction.create(idempotency.ref, {
+        logicalKey: idempotency.logicalKey,
+        action: "STEP",
+        rideId: id,
+        actorUid: user.uid,
+        payload: mutationPayload,
+        createdAt: FieldValue.serverTimestamp(),
+      });
     });
 
     if (updatedOrder) {
