@@ -24,7 +24,6 @@ import { auth } from '../firebase';
 import { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';
 import { useRealGeolocation } from '../hooks/useRealGeolocation';
 import { buildGoogleMapsCoordinateUrl } from '../services/googleMapsExternal';
-import { LAUNCH_TIMELINE } from '../data/bibleData';
 
 interface WinAlertEventsCardProps {
   audioEnabled: boolean;
@@ -240,28 +239,6 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
       })}</div>}
 
       {sourceName && !loading && <p className="text-xs text-slate-500">แหล่งข้อมูล: {sourceName} • อัปเดต {formatDateTime(fetchedAt)} • ช่วงค้นหา {rangeDays === 1 ? 'วันนี้' : `${rangeDays} วัน`}</p>}
-
-      <section className="rounded-2xl border border-violet-400/20 bg-violet-950/20 p-4">
-        <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-violet-400/15 p-2 text-lg">📖</div>
-          <div className="min-w-0">
-            <h4 className="font-black text-violet-100">WINRIDER Bible • Internal Milestones</h4>
-            <p className="mt-1 text-xs leading-relaxed text-violet-200/70">ข้อมูลจาก bibleData.ts ใช้เป็นแผน/หมุดหมายภายใน ไม่ปะปนกับอีเวนต์สาธารณะ และจะไม่สร้างวันที่หรือสถานที่ขึ้นมาเอง หากยังไม่ได้กำหนดจริง</p>
-          </div>
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {LAUNCH_TIMELINE.filter((item) => item.status !== 'Completed').map((item) => (
-            <article key={item.phase} className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-violet-300/30 bg-violet-300/10 px-2 py-0.5 text-[10px] font-black text-violet-200">{item.status}</span>
-                <span className="text-[10px] font-bold text-slate-500">{item.dayRange}</span>
-              </div>
-              <h5 className="mt-2 text-sm font-black text-white">{item.title}</h5>
-              <p className="mt-1 text-xs leading-relaxed text-slate-400">{item.desc}</p>
-            </article>
-          ))}
-        </div>
-      </section>
 
       {selectedEventModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="event-detail-title"><div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-cyan-400/30 bg-[#071126] p-5 text-slate-100 shadow-2xl"><div className="flex items-start justify-between gap-3"><div><span className={`inline-block rounded-full border px-2.5 py-1 text-xs font-bold ${categoryMeta[selectedEventModal.category].className}`}>{categoryMeta[selectedEventModal.category].icon} {categoryMeta[selectedEventModal.category].label}</span><h3 id="event-detail-title" className="mt-3 text-xl font-black">{selectedEventModal.title}</h3></div><button type="button" onClick={() => setSelectedEventModal(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5" aria-label="ปิดรายละเอียด"><X className="h-5 w-5" /></button></div><div className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm"><p className="flex gap-2"><MapPin className="h-4 w-4 shrink-0 text-cyan-300" /><span>{selectedEventModal.venueName}{selectedEventModal.venueArea ? ` • ${selectedEventModal.venueArea}` : ''}</span></p><p className="flex gap-2"><CalendarDays className="h-4 w-4 shrink-0 text-amber-300" /><span>{formatDateTime(selectedEventModal.startAt)}{selectedEventModal.endAt ? ` – ${formatDateTime(selectedEventModal.endAt)}` : ''}</span></p>{typeof selectedEventModal.attendance === 'number' && selectedEventModal.attendance > 0 && (<p className="flex items-center gap-2 font-semibold text-amber-300"><Users className="h-4 w-4 shrink-0" /><span>คาดการณ์ผู้เข้าร่วม: ~{selectedEventModal.attendance.toLocaleString('th-TH')} คน {selectedEventModal.attendance >= 2500 ? '(จุดหนาแน่นสูง แนะนำเลี่ยงรถติดด้วยวิน)' : ''}</span></p>)}</div>{selectedEventModal.description && (<div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-950/30 p-4 text-sm leading-relaxed text-slate-200"><p className="mb-1 font-bold text-cyan-300">รายละเอียดกิจกรรม & ข้อแนะนำการเดินทาง:</p><p>{selectedEventModal.description}</p></div>)}<p className="mt-4 text-xs text-slate-500">รหัสข้อมูล: {selectedEventModal.providerEventId} • {selectedEventModal.sourceName}</p>{selectedEventModal.sourceUrl && <a href={selectedEventModal.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-cyan-300"><ExternalLink className="h-3.5 w-3.5" />เปิดข้อมูลต้นทาง</a>}
 <div className="mt-3 flex flex-wrap gap-2">
