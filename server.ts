@@ -9,6 +9,21 @@ import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
 import { calculateAppFare } from "./src/core/serverFare";
 import { parseQrPayload } from "./src/utils/qrPayload";
+import {
+  createWinAuthSession,
+  createWinAuthUser,
+  deleteWinAuthSession,
+  getWinAuthSessionUser,
+  getWinAuthUserByEmail,
+  getWinAuthUserById,
+  hashWinAuthPassword,
+  listWinAuthUsers,
+  normalizeWinAuthEmail,
+  saveWinAuthUser,
+  verifyWinAuthPassword,
+  type WinAuthRole,
+  type WinAuthStoredUser,
+} from "./src/server/winAuthStore";
 
 dotenv.config();
 
@@ -1614,6 +1629,253 @@ function getAdminDb() {
 
 const ordersDb = getAdminDb();
 
+const WIN_AUTH_ROLES = new Set<WinAuthRole>(["citizen", "knight", "merchant", "partner"]);
+
+function publicWinAuthUser(user: WinAuthStoredUser) {
+  return {
+    uid: user.uid,
+    email: user.email,
+    role: user.role,
+    displayName: user.displayName,
+    phone: user.phone,
+    status: user.status,
+    isAdmin: user.isAdmin === true,
+    adminLevel: user.adminLevel,
+    level: user.isAdmin ? 100 : 1,
+    xp: 0,
+    rating: user.isAdmin ? 5 : undefined,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
+async function mirrorWinAuthUser(user: WinAuthStoredUser) {
+  await ordersDb.collection("users").doc(user.uid).set({
+    ...publicWinAuthUser(user),
+    authProvider: "win_auth",
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
+}
+
+function rawBearerToken(req: express.Request): string {
+  const header = String(req.headers.authorization || "");
+  return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+}
+
+function safePlainPasswordEqual(a: string, b: string): boolean {
+  const left = crypto.createHash("sha256").update(a).digest();
+  const right = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(left, right);
+}
+
+function ownerAdminEmail(): string {
+  return normalizeWinAuthEmail(process.env.WINRIDER_ADMIN_EMAIL || process.env.ADMIN_OWNER_EMAIL || "kittiinthasoi@gmail.com");
+}
+
+function verifyBootstrapAdminPassword(password: string): { configured: boolean; valid: boolean } {
+  const encoded = String(process.env.WINRIDER_ADMIN_PASSWORD_HASH || "").trim();
+  if (encoded) return { configured: true, valid: verifyWinAuthPassword(password, encoded) };
+  const plain = String(process.env.WINRIDER_ADMIN_PASSWORD || "");
+  if (plain) return { configured: true, valid: safePlainPasswordEqual(password, plain) };
+  return { configured: false, valid: false };
+}
+
+async function requireWinAuthAdmin(req: express.Request, res: express.Response) {
+  const token = rawBearerToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+    return null;
+  }
+  try {
+    const user = await getWinAuthSessionUser(token);
+    if (!user || user.status !== "active" || user.isAdmin !== true || user.adminLevel !== "super") {
+      res.status(403).json({ error: "Super Admin access required", code: "ADMIN_REQUIRED" });
+      return null;
+    }
+    return user;
+  } catch (error: any) {
+    res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+    return null;
+  }
+}
+
+app.post("/api/auth/register", rateLimit(10), async (req, res) => {
+  const email = normalizeWinAuthEmail(req.body?.email);
+  const password = String(req.body?.password || "");
+  const role = String(req.body?.role || "") as WinAuthRole;
+
+  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: "Invalid email", code: "INVALID_EMAIL" });
+  if (password.length < 8 || password.length > 200) return res.status(400).json({ error: "Password must contain at least 8 characters", code: "WEAK_PASSWORD" });
+  if (!WIN_AUTH_ROLES.has(role)) return res.status(400).json({ error: "Invalid role", code: "INVALID_ROLE" });
+  if (email === ownerAdminEmail()) return res.status(409).json({ error: "Owner account already exists", code: "EMAIL_ALREADY_REGISTERED" });
+
+  try {
+    const user = await createWinAuthUser({
+      email,
+      password,
+      role,
+      displayName: String(req.body?.displayName || "").trim() || email.split("@")[0],
+      phone: String(req.body?.phone || "").trim(),
+      status: "pending_review",
+    });
+    await mirrorWinAuthUser(user);
+    const token = await createWinAuthSession(user.uid);
+    return res.status(201).json({ token, user: publicWinAuthUser(user), approvalRequired: true });
+  } catch (error: any) {
+    if (error?.code === "EMAIL_ALREADY_REGISTERED" || error?.message === "EMAIL_ALREADY_REGISTERED") {
+      return res.status(409).json({ error: "Email already registered", code: "EMAIL_ALREADY_REGISTERED" });
+    }
+    console.error("[WIN Auth Register]", error?.message);
+    return res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+  }
+});
+
+app.post("/api/auth/login", rateLimit(20), async (req, res) => {
+  const email = normalizeWinAuthEmail(req.body?.email);
+  const password = String(req.body?.password || "");
+  if (!email || !password) return res.status(400).json({ error: "Email and password required", code: "INVALID_CREDENTIALS" });
+
+  try {
+    let user = await getWinAuthUserByEmail(email);
+
+    if (email === ownerAdminEmail()) {
+      const storedValid = Boolean(user && verifyWinAuthPassword(password, user.passwordHash));
+      const bootstrap = verifyBootstrapAdminPassword(password);
+      if (!storedValid && !bootstrap.valid) {
+        const code = !user && !bootstrap.configured ? "ADMIN_PASSWORD_NOT_CONFIGURED" : "INVALID_CREDENTIALS";
+        return res.status(code === "ADMIN_PASSWORD_NOT_CONFIGURED" ? 503 : 401).json({
+          error: code === "ADMIN_PASSWORD_NOT_CONFIGURED" ? "Admin password is not configured" : "Invalid credentials",
+          code,
+        });
+      }
+
+      if (!user) {
+        user = await createWinAuthUser({
+          email,
+          password,
+          role: "knight",
+          displayName: "กิตติ อินทะสร้อย",
+          status: "active",
+          isAdmin: true,
+          adminLevel: "super",
+        });
+      } else {
+        user = await saveWinAuthUser({
+          ...user,
+          passwordHash: storedValid ? user.passwordHash : hashWinAuthPassword(password),
+          role: "knight",
+          status: "active",
+          displayName: "กิตติ อินทะสร้อย",
+          isAdmin: true,
+          adminLevel: "super",
+          approvedAt: user.approvedAt || new Date().toISOString(),
+          approvedBy: user.approvedBy || "OWNER_BOOTSTRAP",
+        });
+      }
+      await mirrorWinAuthUser(user);
+    } else {
+      if (!user || !verifyWinAuthPassword(password, user.passwordHash)) {
+        return res.status(401).json({ error: "Invalid credentials", code: "INVALID_CREDENTIALS" });
+      }
+      if (user.status === "suspended") {
+        return res.status(403).json({ error: "Account suspended", code: "ACCOUNT_SUSPENDED" });
+      }
+    }
+
+    const token = await createWinAuthSession(user.uid);
+    return res.json({ token, user: publicWinAuthUser(user), approvalRequired: user.status === "pending_review" });
+  } catch (error: any) {
+    console.error("[WIN Auth Login]", error?.message);
+    return res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+  }
+});
+
+app.get("/api/auth/me", rateLimit(60), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  try {
+    const user = await getWinAuthSessionUser(token);
+    if (!user) return res.status(401).json({ error: "Invalid session", code: "INVALID_SESSION" });
+    return res.json({ user: publicWinAuthUser(user), approvalRequired: user.status === "pending_review" });
+  } catch (error: any) {
+    return res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+  }
+});
+
+app.post("/api/auth/logout", rateLimit(30), async (req, res) => {
+  const token = rawBearerToken(req);
+  try {
+    if (token) await deleteWinAuthSession(token);
+    return res.json({ ok: true });
+  } catch {
+    return res.json({ ok: true });
+  }
+});
+
+app.get("/api/admin/auth/users", rateLimit(30), async (req, res) => {
+  const admin = await requireWinAuthAdmin(req, res);
+  if (!admin) return;
+  try {
+    const users = await listWinAuthUsers();
+    const summaries = await Promise.all(users.map(async (user) => {
+      let walletBalanceSatang = 0;
+      try {
+        const wallet = await ordersDb.collection("wallets").doc(user.uid).get();
+        walletBalanceSatang = Number(wallet.data()?.balanceSatang || 0);
+      } catch {}
+      return { ...publicWinAuthUser(user), walletBalanceSatang };
+    }));
+    summaries.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return res.json({ users: summaries });
+  } catch (error: any) {
+    return res.status(503).json({ error: "Unable to load WIN Auth users", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+  }
+});
+
+app.post("/api/admin/auth/users/:uid/approve", rateLimit(30), async (req, res) => {
+  const admin = await requireWinAuthAdmin(req, res);
+  if (!admin) return;
+  try {
+    const user = await getWinAuthUserById(String(req.params.uid || ""));
+    if (!user) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+    const next = await saveWinAuthUser({
+      ...user,
+      status: "active",
+      approvedAt: new Date().toISOString(),
+      approvedBy: admin.uid,
+      rejectionReason: undefined,
+    });
+    await mirrorWinAuthUser(next);
+    return res.json({ ok: true, user: publicWinAuthUser(next) });
+  } catch (error: any) {
+    return res.status(503).json({ error: "Approval failed", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+  }
+});
+
+app.post("/api/admin/auth/users/:uid/status", rateLimit(30), async (req, res) => {
+  const admin = await requireWinAuthAdmin(req, res);
+  if (!admin) return;
+  const status = String(req.body?.status || "");
+  if (!["active", "pending_review", "suspended"].includes(status)) {
+    return res.status(400).json({ error: "Invalid status", code: "INVALID_STATUS" });
+  }
+  try {
+    const user = await getWinAuthUserById(String(req.params.uid || ""));
+    if (!user) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+    if (user.isAdmin) return res.status(409).json({ error: "Owner admin status is protected", code: "OWNER_PROTECTED" });
+    const next = await saveWinAuthUser({
+      ...user,
+      status: status as any,
+      rejectionReason: String(req.body?.reason || "").slice(0, 500) || undefined,
+      ...(status === "active" ? { approvedAt: new Date().toISOString(), approvedBy: admin.uid } : {}),
+    });
+    await mirrorWinAuthUser(next);
+    return res.json({ ok: true, user: publicWinAuthUser(next) });
+  } catch (error: any) {
+    return res.status(503).json({ error: "Account status update failed", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+  }
+});
+
 async function releaseRideWalletHoldInTransaction(
   tx: any,
   orderRef: any,
@@ -3013,12 +3275,40 @@ app.get("/api/users/profile", async (req, res) => {
 });
 
 async function requireFirebaseUser(req: express.Request, res: express.Response) {
-  const header = req.headers.authorization || "";
-  if (!header.startsWith("Bearer ")) {
+  const token = rawBearerToken(req);
+  if (!token) {
     res.status(401).json({ error: "Authentication required" });
     return null;
   }
-  const token = header.slice(7);
+
+  try {
+    const winUser = await getWinAuthSessionUser(token);
+    if (winUser) {
+      if (winUser.status !== "active" && winUser.isAdmin !== true) {
+        res.status(403).json({ error: "Account pending admin approval", code: "ACCOUNT_PENDING_APPROVAL" });
+        return null;
+      }
+      return {
+        uid: winUser.uid,
+        email: winUser.email,
+        name: winUser.displayName,
+        displayName: winUser.displayName,
+        role: winUser.role,
+        status: winUser.status,
+        admin: winUser.isAdmin === true,
+        isAdmin: winUser.isAdmin === true,
+        adminLevel: winUser.adminLevel,
+        authProvider: "win_auth",
+      };
+    }
+  } catch (error: any) {
+    if (error?.code !== "WIN_AUTH_STORE_NOT_CONFIGURED") {
+      console.warn("[WIN Auth Session Verify]", error?.message);
+    }
+  }
+
+  // Temporary migration fallback: existing Firebase sessions remain accepted
+  // until every installed client has moved to WIN Auth.
   try {
     return await adminAuth.verifyIdToken(token);
   } catch {
@@ -3028,9 +3318,25 @@ async function requireFirebaseUser(req: express.Request, res: express.Response) 
 }
 
 async function requireFirebaseUserOptional(req: express.Request) {
-  const header = req.headers.authorization || "";
-  if (!header.startsWith("Bearer ")) return null;
-  const token = header.slice(7);
+  const token = rawBearerToken(req);
+  if (!token) return null;
+  try {
+    const winUser = await getWinAuthSessionUser(token);
+    if (winUser && (winUser.status === "active" || winUser.isAdmin === true)) {
+      return {
+        uid: winUser.uid,
+        email: winUser.email,
+        name: winUser.displayName,
+        displayName: winUser.displayName,
+        role: winUser.role,
+        status: winUser.status,
+        admin: winUser.isAdmin === true,
+        isAdmin: winUser.isAdmin === true,
+        adminLevel: winUser.adminLevel,
+        authProvider: "win_auth",
+      };
+    }
+  } catch {}
   try {
     return await adminAuth.verifyIdToken(token);
   } catch {
