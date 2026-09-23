@@ -1842,8 +1842,8 @@ app.get("/api/admin/auth/users/:uid/ledger", rateLimit(30), async (req, res) => 
     const ledger = snapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .sort((a: any, b: any) => {
-        const av = a?.createdAt?.toMillis?.() ?? Date.parse(String(a?.createdAt || "")) || 0;
-        const bv = b?.createdAt?.toMillis?.() ?? Date.parse(String(b?.createdAt || "")) || 0;
+        const av = (a?.createdAt?.toMillis?.() ?? Date.parse(String(a?.createdAt || ""))) || 0;
+        const bv = (b?.createdAt?.toMillis?.() ?? Date.parse(String(b?.createdAt || ""))) || 0;
         return bv - av;
       });
     return res.json({ ledger });
