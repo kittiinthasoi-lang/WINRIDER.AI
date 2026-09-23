@@ -3983,20 +3983,11 @@ app.post("/api/orders/:id/location", rateLimit(120), async (req, res) => {
   const heading = req.body?.heading === undefined ? undefined : Number(req.body.heading);
   const speedMps = req.body?.speedMps === undefined ? undefined : Number(req.body.speedMps);
 
-  if (
-    !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
-    !Number.isFinite(longitude) || longitude < -180 || longitude > 180
-  ) {
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     return res.status(400).json({ error: "Invalid GPS coordinates" });
   }
   if (accuracyMeters !== undefined && (!Number.isFinite(accuracyMeters) || accuracyMeters < 0 || accuracyMeters > 10000)) {
     return res.status(400).json({ error: "Invalid GPS accuracy" });
-  }
-  if (heading !== undefined && (!Number.isFinite(heading) || heading < 0 || heading > 360)) {
-    return res.status(400).json({ error: "Invalid GPS heading" });
-  }
-  if (speedMps !== undefined && (!Number.isFinite(speedMps) || speedMps < 0 || speedMps > 100)) {
-    return res.status(400).json({ error: "Invalid GPS speed" });
   }
 
   try {
@@ -4005,73 +3996,95 @@ app.post("/api/orders/:id/location", rateLimit(120), async (req, res) => {
     if (!snapshot.exists) return res.status(404).json({ error: "Order not found" });
 
     const order = snapshot.data() as ServerOrder;
-    const activeStatuses = ["accepted", "heading_pickup", "picked_up", "in_transit"];
-    if (order.driverUserId !== user.uid) return res.status(403).json({ error: "Only the assigned driver may publish GPS" });
+    const isDriver = order.driverUserId === user.uid;
+    const isPassenger = order.passengerUserId === user.uid;
+    if (!isDriver && !isPassenger) return res.status(403).json({ error: "Ride participant access required" });
+
+    const activeStatuses = ["pending", "accepted", "heading_pickup", "picked_up", "in_transit"];
     if (!activeStatuses.includes(order.status)) {
       return res.status(409).json({ error: "GPS updates are not allowed for this ride state" });
     }
+    if (isDriver && order.status === "pending") return res.status(409).json({ error: "Driver GPS requires accepted ride" });
 
-    const previous = (order as any).lastDriverLocation;
+    const role = isDriver ? "driver" : "passenger";
+    const previous = (order as any)[isDriver ? "lastDriverLocation" : "lastPassengerLocation"];
     if (previous && Number.isFinite(Number(previous.latitude)) && Number.isFinite(Number(previous.longitude))) {
       const previousAt = Date.parse(String(previous.recordedAt || ""));
       if (Number.isFinite(previousAt)) {
         const elapsedSeconds = (Date.now() - previousAt) / 1000;
-        if (elapsedSeconds < 0) {
-          return res.status(409).json({ error: "Out-of-order GPS sample", code: "GPS_OUT_OF_ORDER" });
-        }
-        // Allow a generous urban upper bound plus GPS-accuracy slack. This catches
-        // impossible jumps without penalizing normal tunnels/reacquisition noise.
         const jumpKm = distanceKmBetween(
           { lat: Number(previous.latitude), lng: Number(previous.longitude) },
           { lat: latitude, lng: longitude }
         );
         const accuracySlackKm = Math.max(Number(previous.accuracyMeters || 0), Number(accuracyMeters || 0)) / 1000;
         const maxPlausibleKm = Math.max(0.75, elapsedSeconds * 0.075 + accuracySlackKm);
-        if (jumpKm > maxPlausibleKm) {
-          return res.status(409).json({
-            error: "Implausible GPS jump rejected",
-            code: "GPS_OUTLIER",
-            jumpKm: Math.round(jumpKm * 1000) / 1000,
-            maxPlausibleKm: Math.round(maxPlausibleKm * 1000) / 1000,
-          });
+        if (elapsedSeconds >= 0 && jumpKm > maxPlausibleKm) {
+          return res.status(409).json({ error: "Implausible GPS jump rejected", code: "GPS_OUTLIER" });
         }
       }
     }
 
-    const locationRef = orderRef.collection("locations").doc();
     const now = new Date().toISOString();
     const location = {
-      driverUserId: user.uid,
+      role,
+      userId: user.uid,
       latitude,
       longitude,
       ...(accuracyMeters !== undefined ? { accuracyMeters } : {}),
       ...(heading !== undefined ? { heading } : {}),
       ...(speedMps !== undefined ? { speedMps } : {}),
       recordedAt: now,
-      serverRecordedAt: FieldValue.serverTimestamp()
+      serverRecordedAt: FieldValue.serverTimestamp(),
     };
-    await locationRef.create(location);
 
+    await orderRef.collection("locations").doc().create(location);
     await orderRef.update({
-      lastDriverLocation: {
+      [isDriver ? "lastDriverLocation" : "lastPassengerLocation"]: {
         latitude,
         longitude,
         ...(accuracyMeters !== undefined ? { accuracyMeters } : {}),
         ...(heading !== undefined ? { heading } : {}),
         ...(speedMps !== undefined ? { speedMps } : {}),
-        recordedAt: now
+        recordedAt: now,
       },
-      updatedAt: now
+      updatedAt: now,
     });
 
-    return res.status(201).json({ success: true, location });
+    return res.status(201).json({ success: true, role, location });
   } catch (error: any) {
     console.error("[GPS Location Error]:", error?.message);
     return res.status(503).json({ error: "Location store unavailable" });
   }
 });
 
-function validateWebhookTarget(rawUrl: string): URL {
+app.get("/api/orders/:id/locations", rateLimit(120), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const ref = ordersCollection.doc(String(req.params.id));
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ error: "Order not found" });
+    const order = snapshot.data() as ServerOrder;
+    if (![order.passengerUserId, order.driverUserId].includes(user.uid)) {
+      return res.status(403).json({ error: "Ride participant access required" });
+    }
+    const clean = (value: any) => value && Number.isFinite(Number(value.latitude)) && Number.isFinite(Number(value.longitude))
+      ? { lat: Number(value.latitude), lng: Number(value.longitude), timestamp: value.recordedAt || null }
+      : null;
+    return res.json({
+      rideId: req.params.id,
+      driver: clean((order as any).lastDriverLocation),
+      passenger: clean((order as any).lastPassengerLocation) || (order.pickupCoord ? { lat: Number(order.pickupCoord.lat), lng: Number(order.pickupCoord.lng), timestamp: null } : null),
+      destination: order.dropoffCoord ? { lat: Number(order.dropoffCoord.lat), lng: Number(order.dropoffCoord.lng) } : null,
+      status: order.status,
+    });
+  } catch (error: any) {
+    console.error("[Ride Locations GET]", error?.message);
+    return res.status(503).json({ error: "Location store unavailable" });
+  }
+});
+
+function validateWebhookTargetfunction validateWebhookTarget(rawUrl: string): URL {
   let target: URL;
   try {
     target = new URL(rawUrl);
@@ -4224,115 +4237,29 @@ app.post("/api/notifications/line", rateLimit(10), async (req, res) => {
   }
 });
 
-// WIN Buddy AI NLP & Tactical Voice Endpoint
+// WIN Buddy prompt handoff. WINRIDER does not call an AI provider with an API key.
 app.post("/api/win-buddy/chat", async (req, res) => {
-  try {
-    const { message, context, mode } = req.body;
-    const ai = getAiClient();
-
-    const systemInstruction = `You are "WIN Buddy AI" (วินบัดดี้ เอไอ), the sovereign NLP tactical voice copilot of the WINRIDER.AI empire.
-Leadership:
-- Visionary CEO: Cosmo-Ko (🦁 โก้ - ราชสีห์สีน้ำเงินแห่งฝั่งธนบุรี)
-- Sovereign Advisor: จิตใจ (🦥 ไอ้สลอต - พลเมืองแห่งตรรกะจักรวาล)
-
-Core Tenets:
-1. "Thailand is Home" - เข้าถึงทุกเส้นเลือดฝอย "P'Win First" (อัศวินต้องมีเกียรติ)
-2. Visual DNA: Navy 70% (มั่นคง), Neon Blue 27% (พลัง AI), Gold 3% (เกียรติยศที่หายาก)
-3. 2-Baht Flat Fee Engine: 1 บาทรันระบบ, 1 บาทประกัน/กองทุนเกษียณ
-4. Protocols: Backhaul Match (จับคู่งานขากลับ), Safe Pass Transfer (โอนงานในซอยแคบ), Predictive Dispatch ("เราไปส่งได้นะ"), Ghost Runner CI Map Sync.
-
-Tone: Respectful, tactical, brotherly (เรียกผู้ใช้ว่า "พี่อัศวิน" หรือ "ท่านไนท์"), swift, highly efficient, and infused with Universal Logic & cosmic wisdom.
-Respond concisely in Thai (unless asked otherwise) with clear tactical actions or advice for riders on the road.`;
-
-    // Modern supported models from @google/genai guidelines prioritized for real-time speed & availability
-    const candidateModels = [
-      "gemini-3.1-flash-lite",
-      "gemini-flash-latest",
-      "gemini-3.8-flash",
-    ];
-    let aiResponseText: string | null = null;
-    let usedModel = "local-tactical-engine";
-
-    if (ai) {
-      for (const modelName of candidateModels) {
-        try {
-          // Guard each model attempt with a 6-second timeout to guarantee swift copilot response
-          const modelCallPromise = ai.models.generateContent({
-            model: modelName,
-            contents: `Context: ${JSON.stringify(context || {})}\nRider Voice Input: "${message}"`,
-            config: {
-              systemInstruction,
-              temperature: 0.7,
-            },
-          });
-
-          const timeoutPromise = new Promise<null>((_, reject) =>
-            setTimeout(() => reject(new Error("Model request timeout")), 6000)
-          );
-
-          const response = await Promise.race([modelCallPromise, timeoutPromise]);
-          if (response && response.text) {
-            aiResponseText = response.text;
-            usedModel = modelName;
-            break;
-          }
-        } catch (modelErr: any) {
-          console.log(`[WIN Buddy AI] Model ${modelName} unavailable (${modelErr?.message || modelErr?.status || 'temporary'}), trying next...`);
-        }
-      }
-    }
-
-    if (aiResponseText) {
-      return res.json({
-        reply: aiResponseText,
-        protocol: mode || "general",
-        timestamp: new Date().toISOString(),
-        source: usedModel,
-      });
-    }
-
-    // Local tactical engine fallback when AI is unavailable or under heavy demand
-    const fallbackResponses: Record<string, string> = {
-      backhaul: "📍 [AI Backhaul Match] ตรวจพบผู้โดยสารขากลับจาก ซอยจรัญสนิทวงศ์ 13 มุ่งหน้า ท่าพระ ระยะทาง 3.2 กม. อัตราความคุ้มค่า 98.4% รับงานโดยกดแท็บที่หน้าจอหรือสั่ง 'ยืนยันรับงาน' ได้เลยครับพี่อัศวิน!",
-      safepass: "🔄 [Safe Pass Transfer] ตรวจพบตรอกแคบกว้าง 1.2 เมตรในซอยสมเด็จพระเจ้าตากสิน 4 ส่งสัญญาณให้อัศวิน Knight-042 ที่อยู่ปากซอยรับช่วงต่อพัสดุเรียบร้อย ปลอดภัย 100%",
-      predictive: "🔮 [Predictive Match] คาดการณ์ฝนตกบริเวณวงเวียนใหญ่ในอีก 12 นาที แนะนำเปิดใช้งาน Storm Shield Gore-Tex และปรับโหมดเส้นทาง CI Map เลี่ยงน้ำท่วมขังครับ",
-      armor: "🛡️ [Armor Status] The Guardian Zipper ออนไลน์, แบตเตอรี่พลังงานจลน์ 94%, ชิป NB-IoT เชื่อมต่อดาวเทียมสมบูรณ์ เกียรติยศอัศวินระดับ Lvl 45 พร้อมลุย!",
-    };
-
-    const lowerMsg = (message || "").toLowerCase();
-    let matched = "รับทราบคำสั่งครับพี่อัศวิน! WIN Buddy AI เชื่อมต่อระบบ Safe Pass และผังเส้นเลือดฝอย CI Map พร้อมสนับสนุนภารกิจตามหลักการ 2 บาทครองเมือง และเกียรติยศแห่งราชสีห์ฝั่งธนบุรี!";
-
-    if (lowerMsg.includes("ขากลับ") || lowerMsg.includes("backhaul") || mode === "backhaul") {
-      matched = fallbackResponses.backhaul;
-    } else if (lowerMsg.includes("ซอย") || lowerMsg.includes("safepass") || mode === "safepass") {
-      matched = fallbackResponses.safepass;
-    } else if (lowerMsg.includes("พยากรณ์") || lowerMsg.includes("predictive") || mode === "predictive" || lowerMsg.includes("ฝน")) {
-      matched = fallbackResponses.predictive;
-    } else if (lowerMsg.includes("เกราะ") || lowerMsg.includes("armor") || mode === "armor" || lowerMsg.includes("zipper")) {
-      matched = fallbackResponses.armor;
-    }
-
-    return res.json({
-      reply: matched,
-      protocol: mode || "general",
-      timestamp: new Date().toISOString(),
-      source: "local-tactical-engine",
-    });
-  } catch (error: any) {
-    console.error("WIN Buddy AI unexpected error:", error);
-    res.json({
-      reply: "🛡️ [Tactical Standby] รับทราบสัญญาณครับพี่อัศวิน ระบบผังเมืองและ Safe Pass ในตัวยังทำงานแบบ Offline ได้เต็มประสิทธิภาพ 100%",
-      protocol: "emergency-offline",
-      timestamp: new Date().toISOString(),
-      source: "emergency-tactical-engine",
-    });
-  }
+  const message = String(req.body?.message || "").trim().slice(0, 4000);
+  const mode = String(req.body?.mode || "general");
+  if (!message) return res.status(400).json({ error: "กรุณาพิมพ์คำถาม" });
+  const prompt = [
+    "คุณคือ WIN Buddy ผู้ช่วยของ WINRIDER.AI ตอบภาษาไทยแบบกระชับ เน้นความปลอดภัยและการใช้งานจริง",
+    "โหมด: " + mode,
+    "คำถาม: " + message,
+  ].join("\n");
+  return res.json({
+    externalOnly: true,
+    prompt,
+    providers: externalAiProviders,
+    source: "external_ai_handoff",
+    privacyNote: "ระบบไม่ส่งข้อความไป AI ภายนอกอัตโนมัติ ผู้ใช้เป็นผู้เลือกเปิด/คัดลอกเอง",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // =========================================================================
+// LOCAL GPS ROUTE ESTIMATE - NO PAID MAP API// =========================================================================
 // GOOGLE MAPS ROUTES API (NEW) - LIVE ROUTE COMPUTATION PROXY
-// Source: Google Maps Platform Code Assist
-// Internal Usage Attribution: gmp_mcp_codeassist_v1_aistudio
 // =========================================================================
 app.post("/api/routes/compute", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
