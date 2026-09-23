@@ -162,7 +162,7 @@ support
 WIN-AI และ WIN Buddy ใช้ **External AI Handoff**:
 - WINRIDER เตรียม prompt จากสิ่งที่ผู้ใช้พิมพ์
 - ไม่ส่ง prompt หรือรูปไป AI provider อัตโนมัติ
-- ไม่มี `GEMINI_API_KEY` / OpenAI provider key ในระบบ
+- ไม่มี AI-provider credential สำหรับการเรียกโมเดลจากเซิร์ฟเวอร์ WINRIDER
 - ผู้ใช้เลือกเปิด ChatGPT, Gemini หรือ Copilot ภายนอกด้วยตนเอง
 
 ## Maps / Live Location
@@ -173,7 +173,7 @@ WINRIDER ใช้ GPS จริงและข้อมูลสาธารณ
 - ระยะทางในแอปเป็นค่าประมาณจากพิกัด
 - Radar / WIN Pet Care / ศูนย์พยาบาลใช้ WIN Public Data + OpenStreetMap contributors
 - Turn-by-turn, traffic และเส้นทางถนนเปิดใน Google Maps / Apple Maps / Waze ภายนอก
-- ไม่มี `GOOGLE_MAPS_API_KEY`, `VITE_GOOGLE_MAPS_API_KEY` หรือ Routes/Places paid API ใน runtime
+- ไม่มี Maps/Places/Routes provider credential หรือ paid routing API ใน runtime
 
 ## Environment Variables
 
