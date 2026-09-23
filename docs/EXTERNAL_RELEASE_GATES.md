@@ -27,15 +27,11 @@ Configure:
 
 Run the same workflow with **run_load=true**. Record request count, failures, p50, p95 and p99.
 
-## 3. Real payment provider
+## 3. Manual WIN Wallet settlement
 
-Deployment secrets/config:
-- `PAYMENT_PROVIDER_WEBHOOK_SECRET`
-- `PAYMENT_PROVIDER_REFUND_URL`
-- `PAYMENT_PROVIDER_API_TOKEN`
-- `PAYMENT_PROVIDER_ALLOWED_HOST`
+Production verification must include a real low-value bank transfer to the configured company/owner receiving account, slip submission, independent admin confirmation that the money actually arrived, wallet credit, withdrawal request, daily withdrawal-limit enforcement, and reconciliation against the bank statement.
 
-Verification must include a real low-value confirmed top-up, duplicate webhook replay, partial refund, failed-refund recovery, and reconciliation against the provider/bank settlement report. A slip image alone must never credit the wallet.
+A slip image alone must never credit the wallet.
 
 ## 4. Edge rate limiting / WAF
 
@@ -43,7 +39,7 @@ The repository now has both per-instance and distributed Firestore application l
 
 ## 5. Independent security review
 
-Run an independent review/penetration test covering IDOR, privilege escalation, Firebase token abuse, replay/idempotency, webhook authentication, rate-limit bypass, upload abuse and payment/refund logic. Internal engineering notes live in `docs/SECURITY_REVIEW.md`; they are not a substitute for an independent review.
+Run an independent review/penetration test covering IDOR, privilege escalation, Firebase token abuse, replay/idempotency, session authentication, rate-limit bypass, upload abuse and top-up/withdrawal logic. Internal engineering notes live in `docs/SECURITY_REVIEW.md`; they are not a substitute for an independent review.
 
 ## 6. Device and outage QA
 
