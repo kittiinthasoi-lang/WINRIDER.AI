@@ -9,12 +9,16 @@ export interface WalletStateResponse {
   availableSatang: number;
   balance: number;
   availableBalance: number;
+  withdrawalLimitPerDay: number;
+  withdrawalsToday: number;
+  withdrawalsRemainingToday: number;
   systemPromptPay: {
     configured: boolean;
     promptPayId: string;
     accountName: string;
     bankName?: string;
     bankAccountNumber?: string;
+    lineUrl?: string;
   };
   submissions: Array<{
     id: string;
@@ -44,6 +48,9 @@ const emptyWallet = (role?: string): WalletStateResponse => ({
   availableSatang: 0,
   balance: 0,
   availableBalance: 0,
+  withdrawalLimitPerDay: 3,
+  withdrawalsToday: 0,
+  withdrawalsRemainingToday: 3,
   systemPromptPay: {
     configured: false,
     promptPayId: '',
@@ -72,21 +79,21 @@ export async function getWalletMe(role?: string): Promise<WalletStateResponse> {
   return await res.json();
 }
 
-export async function submitTopupProof(amount: number, imageDataUrl: string) {
+export async function getRecipientWallet(userId: string, role?: string): Promise<{
+  userId: string;
+  walletId: string;
+  role: string;
+  displayName?: string;
+  ownWallet?: boolean;
+}> {
   const token = await getToken();
-  if (!token) throw new Error('กรุณาเข้าสู่ระบบก่อนทำรายการเติมเงิน');
-
-  const res = await fetch('/api/wallet/topup-proof', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ amount, imageDataUrl }),
+  if (!token) throw new Error('กรุณาเข้าสู่ระบบก่อนดู WIN Wallet ผู้รับ');
+  const query = role ? `?role=${encodeURIComponent(role)}` : '';
+  const res = await fetch(`/api/wallet/recipient/${encodeURIComponent(userId)}${query}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
-
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'ส่งสลิปไม่สำเร็จ');
+  if (!res.ok) throw new Error(data.error || 'ไม่พบ WIN Wallet ของผู้รับ');
   return data;
 }
 

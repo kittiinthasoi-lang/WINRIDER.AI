@@ -31,7 +31,6 @@ import { ServicePhotoVerificationModal } from './ServicePhotoVerificationModal';
 import { CustomerPaymentQrCodeModal } from './CustomerPaymentQrCodeModal';
 import { createLiveOrder, cancelLiveOrder, subscribeToLiveOrders, getOrdersForPassenger, fetchFirestoreOrdersForUser, fetchMyPassengerOrders, getAuthHeaders, LiveRideOrder } from '../utils/dispatchSync';
 import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
-import { PromptPayPaymentModal } from './PromptPayPaymentModal';
 import { InRideDirectChatModal } from './InRideDirectChatModal';
 import { RealGpsMapModal } from './RealGpsMapModal';
 import { PersonalNavigationScreen } from './PersonalNavigationScreen';
@@ -275,7 +274,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   // --- Real-Time Active Ride, AI Voice Announcer & Live Dispatch Sync ---
   const [activeLiveOrder, setActiveLiveOrder] = useState<LiveRideOrder | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
-  const [showPromptPayModal, setShowPromptPayModal] = useState<boolean>(false);
   const [showInRideChatModal, setShowInRideChatModal] = useState<boolean>(false);
   const [showRealGpsModal, setShowRealGpsModal] = useState<boolean>(false);
   const [showProfileCustomizerModal, setShowProfileCustomizerModal] = useState<boolean>(false);
@@ -2330,12 +2328,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                         type="button"
                         onClick={() => {
                           if (audioEnabled) playTactileBlip(920);
-                          setShowPromptPayModal(true);
+                          setShowReceiptModal(true);
                         }}
                         className="p-2.5 rounded-2xl bg-gradient-to-r from-blue-600/20 to-cyan-500/20 hover:from-blue-600/30 hover:to-cyan-500/30 border border-blue-400/40 text-blue-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(59,130,246,0.15)]"
                       >
-                        <QrCode className="w-4 h-4 text-cyan-300" />
-                        <span className="text-[11px] whitespace-nowrap">พร้อมเพย์ QR</span>
+                        <Coins className="w-4 h-4 text-cyan-300" />
+                        <span className="text-[11px] whitespace-nowrap">WIN Wallet</span>
                       </button>
 
                       <button
@@ -3986,22 +3984,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           audioEnabled={audioEnabled}
         />
       )}
-
-      {/* PROMPTPAY EMVCo PAYMENT MODAL */}
-      <PromptPayPaymentModal
-        isOpen={showPromptPayModal}
-        onClose={() => setShowPromptPayModal(false)}
-        orderId={activeLiveOrder?.id || 'RIDE-' + Date.now().toString().slice(-4)}
-        payeeName={currentMatchedDriver?.name || 'ผู้รับเงินที่ระบบกำหนด'}
-        promptPayId={activeLiveOrder?.driverPhone?.replace(/[^0-9]/g, '') || ''}
-        amount={activeLiveOrder?.fare || totalCalculatedFare || 45}
-        tipAmount={activeLiveOrder?.tipAmount || 0}
-        audioEnabled={audioEnabled}
-        onPaymentConfirmed={() => {
-          setShowPromptPayModal(false);
-          setShowReceiptModal(true);
-        }}
-      />
 
       {/* IN-RIDE DIRECT CHAT MODAL */}
       <InRideDirectChatModal

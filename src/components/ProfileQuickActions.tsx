@@ -42,7 +42,7 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({ role =
   const artworkRole = role === 'partner' ? 'merchant' : role;
   const actions = [
     { id: 'wallet' as const, label: 'WIN Wallet', image: `/ui/profile-actions/${artworkRole}-wallet.svg` },
-    { id: 'payment' as const, label: 'ตั้งค่ารับเงิน', image: `/ui/profile-actions/${artworkRole}-payment.svg` },
+    { id: 'payment' as const, label: 'บัญชีถอนเงิน', image: `/ui/profile-actions/${artworkRole}-payment.svg` },
     { id: 'assistant' as const, label: 'WIN-AI ผู้ช่วย', image: `/ui/profile-actions/${artworkRole}-assistant.svg` },
     { id: 'quests' as const, label: 'ภารกิจ XP', image: `/ui/profile-actions/${artworkRole}-quests.svg` },
     { id: 'contact' as const, label: 'ข้อมูลติดต่อจริง', image: '' },

@@ -910,7 +910,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                     ))}
                   </div>
 
-                  {/* PROMPTPAY QR QUICK ACTION BANNER IN PROFILE */}
+                  {/* WIN WALLET QR QUICK ACTION BANNER IN PROFILE */}
                   <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#2A1F06]/80 via-[#3D2C08]/90 to-[#1E1604]/80 border border-[#FFD700]/50 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                       <div className="w-10 h-10 rounded-xl bg-[#FFD700] text-slate-950 flex items-center justify-center font-black shadow-[0_0_10px_#FFD700] flex-shrink-0">
@@ -918,11 +918,11 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-[#FFD700] font-mono">PROMPTPAY DIRECT QR (วินรับเต็ม 100%)</span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 font-mono">0% GP</span>
+                          <span className="text-xs font-black text-[#FFD700] font-mono">WIN WALLET QR</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/40 font-mono">WALLET ONLY</span>
                         </div>
                         <p className="text-[11px] text-slate-300 mt-0.5">
-                          แสดง QR ให้ผู้โดยสารสแกนจ่ายเงินทันที ไม่หักเปอร์เซ็นต์ เงินเข้ากระเป๋าวินเรียลไทม์
+                          ผู้โดยสารต้องเติมเงินก่อน แล้วสแกนจ่ายผ่าน WIN Wallet ระบบบันทึกการโอนและค่าธรรมเนียมใน Ledger
                         </p>
                       </div>
                     </div>
@@ -935,7 +935,7 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                       className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#FFD700] hover:bg-amber-400 text-slate-950 font-black text-xs font-mono shadow-md flex items-center justify-center gap-1.5 transition-transform active:scale-95 flex-shrink-0"
                     >
                       <QrCode className="w-4 h-4" />
-                      <span>แสดง QR สแกนรับเงิน</span>
+                      <span>แสดง WIN Wallet QR</span>
                     </button>
                   </div>
 

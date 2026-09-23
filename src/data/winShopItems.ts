@@ -314,7 +314,7 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     iconEmoji: '📦',
     imageUrl: temperatureTopBoxImg,
     glowTheme: 'from-blue-600/20 to-transparent',
-    installment: 'พี่วินเลือกซื้อสดหรือผ่อน +1฿/รอบ | คนทั่วไปเงินสดเท่านั้น'
+    installment: 'ชำระจริงผ่าน WIN Wallet เท่านั้น | พี่วินเลือกผ่อนตามสิทธิ์ได้'
   },
   {
     id: 'shop-10',
@@ -345,6 +345,6 @@ export const WIN_SHOP_ITEMS: WinShopItem[] = [
     iconEmoji: '🦾',
     imageUrl: armorKneeguardsImg,
     glowTheme: 'from-emerald-500/20 to-transparent',
-    installment: 'พี่วินเลือกซื้อสดหรือผ่อน +1฿/รอบ | คนทั่วไปเงินสดเท่านั้น'
+    installment: 'ชำระจริงผ่าน WIN Wallet เท่านั้น | พี่วินเลือกผ่อนตามสิทธิ์ได้'
   }
 ];

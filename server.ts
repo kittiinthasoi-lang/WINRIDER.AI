@@ -1543,6 +1543,12 @@ interface ServerOrder {
   distanceSource?: string;
   etaSource?: string;
   fareBasis?: string;
+  paymentMethod?: "WIN_WALLET";
+  walletHoldSatang?: number;
+  walletHoldStatus?: "HELD" | "RELEASED" | "CONSUMED";
+  walletHoldCreatedAt?: string;
+  walletHoldReleasedAt?: string;
+  walletHoldReleaseReason?: string;
 }
 
 function getAdminDb() {
@@ -1607,6 +1613,35 @@ function getAdminDb() {
 }
 
 const ordersDb = getAdminDb();
+
+async function releaseRideWalletHoldInTransaction(
+  tx: any,
+  orderRef: any,
+  order: ServerOrder,
+  reason: string
+) {
+  const holdSatang = Math.round(Number(order.walletHoldSatang || 0));
+  if (order.walletHoldStatus !== "HELD" || holdSatang <= 0 || !order.passengerUserId) return;
+
+  const walletRef = ordersDb.collection("wallets").doc(String(order.passengerUserId));
+  const walletSnap = await tx.get(walletRef);
+  const wallet = walletSnap.data() || {};
+  const balanceSatang = Number(wallet.balanceSatang || 0);
+  const lockedSatang = Math.max(0, Number(wallet.lockedSatang || 0));
+  if (lockedSatang < holdSatang) throw new Error("RIDE_WALLET_HOLD_MISMATCH");
+
+  const nextLocked = lockedSatang - holdSatang;
+  tx.set(walletRef, {
+    lockedSatang: nextLocked,
+    availableSatang: balanceSatang - nextLocked,
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+  tx.update(orderRef, {
+    walletHoldStatus: "RELEASED",
+    walletHoldReleasedAt: new Date().toISOString(),
+    walletHoldReleaseReason: reason
+  });
+}
 
 const adminAuth = getAuth();
 
@@ -1725,8 +1760,15 @@ function getManualSettlementConfig() {
   const bankName = String(process.env.ADMIN_BANK_NAME || "").trim();
   const bankAccountNumber = String(process.env.ADMIN_BANK_ACCOUNT_NUMBER || "").trim();
   const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
+  const lineUrl = String(process.env.WINRIDER_LINE_URL || "").trim();
   const configured = Boolean(accountName && (promptPayId || bankAccountNumber));
-  return { configured, promptPayId, bankName, bankAccountNumber, accountName };
+  return { configured, promptPayId, bankName, bankAccountNumber, accountName, lineUrl };
+}
+
+function getWithdrawalDailyLimit() {
+  const configured = Number(process.env.WINRIDER_WITHDRAWALS_PER_DAY || 3);
+  if (!Number.isInteger(configured) || configured < 1 || configured > 20) return 3;
+  return configured;
 }
 
 app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
@@ -1830,24 +1872,12 @@ app.post("/api/payments/qr/verify", rateLimit(20), async (req, res) => {
       });
     }
 
-    if (parsed.kind === "promptpay" && parsed.promptPayId) {
-      const normalized = parsed.promptPayId.replace(/^0066/, "0").replace(/[^0-9]/g, "");
-      const snap = await ordersDb.collection("payment_profiles")
-        .where("promptPayId", "==", normalized)
-        .where("status", "==", "verified")
-        .limit(1)
-        .get();
-      if (snap.empty) return res.status(404).json({ error: "VERIFIED_PAYMENT_OWNER_NOT_FOUND" });
-      const profile = snap.docs[0].data() || {};
-      if (String(profile.userId || "") === user.uid) return res.status(422).json({ error: "SELF_PAYMENT_NOT_ALLOWED" });
-      return res.json({
-        ok: true,
+    if (parsed.kind === "promptpay") {
+      return res.status(422).json({
+        error: "WIN_WALLET_ONLY",
         kind: parsed.kind,
-        amountBaht: effectiveAmount,
-        owner: { userId: String(profile.userId), role: String(profile.role || ""), accountName: String(profile.accountName || ""), promptPayId: normalized },
-        settlementMode: "EXTERNAL_PROMPTPAY",
         canExecute: false,
-        message: "QR และเจ้าของช่องทางรับเงินผ่านการตรวจสอบแล้ว แต่การตัดเงินจากธนาคารต้องเกิดในระบบธนาคาร/ผู้ให้บริการชำระเงินจริง"
+        message: "การจ่ายเงินภายใน WINRIDER ต้องใช้ WIN Wallet เท่านั้น กรุณาเติมเงินเข้า WIN Wallet ก่อนชำระ"
       });
     }
 
@@ -1855,6 +1885,33 @@ app.post("/api/payments/qr/verify", rateLimit(20), async (req, res) => {
   } catch (error) {
     console.error("QR verification failed:", error);
     return res.status(500).json({ error: "QR_SERVER_VERIFY_FAILED" });
+  }
+});
+
+app.get("/api/wallet/recipient/:userId", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const targetUserId = String(req.params.userId || "").trim();
+  const requestedRole = String(req.query?.role || "").trim();
+  if (!targetUserId || targetUserId.length > 160) return res.status(400).json({ error: "INVALID_RECIPIENT" });
+
+  try {
+    const targetUserSnap = await ordersDb.collection("users").doc(targetUserId).get();
+    if (!targetUserSnap.exists && targetUserId !== user.uid) {
+      return res.status(404).json({ error: "RECIPIENT_NOT_FOUND" });
+    }
+    const targetData = targetUserSnap.data() || {};
+    const identity = await ensureWalletIdentityId(targetUserId, requestedRole);
+    return res.json({
+      userId: targetUserId,
+      walletId: identity.walletId,
+      role: identity.role,
+      displayName: String(targetData.displayName || targetData.name || ""),
+      ownWallet: targetUserId === user.uid,
+    });
+  } catch (error) {
+    console.error("recipient wallet lookup failed:", error);
+    return res.status(503).json({ error: "RECIPIENT_WALLET_UNAVAILABLE" });
   }
 });
 
@@ -1953,13 +2010,18 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
     
     let submissions: any[] = [];
     let withdrawals: any[] = [];
+    let withdrawalsToday = 0;
+    const withdrawalLimitPerDay = getWithdrawalDailyLimit();
+    const withdrawalDateKey = bangkokDateKey();
     try {
-      const [topupSnap, withdrawSnap] = await Promise.all([
-        ordersDb.collection("topup_submissions").where("userId", "==", user.uid).limit(10).get(),
-        ordersDb.collection("withdrawal_requests").where("userId", "==", user.uid).limit(10).get()
+      const [topupSnap, withdrawSnap, dailyCounterSnap] = await Promise.all([
+        ordersDb.collection("manual_topups").where("userId", "==", user.uid).limit(10).get(),
+        ordersDb.collection("withdrawal_requests").where("userId", "==", user.uid).limit(10).get(),
+        ordersDb.collection("withdrawal_daily_counters").doc(`${user.uid}_${withdrawalDateKey}`).get()
       ]);
       submissions = topupSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       withdrawals = withdrawSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      withdrawalsToday = Math.max(0, Number(dailyCounterSnap.data()?.count || 0));
     } catch {
       // index or fetch fallback
     }
@@ -1975,6 +2037,9 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
       availableSatang,
       balance: balanceSatang / 100,
       availableBalance: availableSatang / 100,
+      withdrawalLimitPerDay,
+      withdrawalsToday,
+      withdrawalsRemainingToday: Math.max(0, withdrawalLimitPerDay - withdrawalsToday),
       systemPromptPay: settlement,
       submissions,
       withdrawals
@@ -1990,6 +2055,9 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
       availableSatang: 0,
       balance: 0.0,
       availableBalance: 0.0,
+      withdrawalLimitPerDay: getWithdrawalDailyLimit(),
+      withdrawalsToday: 0,
+      withdrawalsRemainingToday: getWithdrawalDailyLimit(),
       systemPromptPay: getManualSettlementConfig(),
       submissions: [],
       withdrawals: []
@@ -2006,8 +2074,8 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
   const accountName = String(req.body?.accountName || "").trim();
   const bankName = String(req.body?.bankName || "PromptPay").trim();
 
-  if (!Number.isSafeInteger(amountSatang) || amountSatang < 2000) {
-    return res.status(400).json({ error: "ยอดถอนขั้นต่ำคือ 20.00 บาท" });
+  if (!Number.isSafeInteger(amountSatang) || amountSatang < 1) {
+    return res.status(400).json({ error: "ยอดถอนต้องมากกว่า 0 บาท" });
   }
   if (!promptPayOrAccount || !accountName) {
     return res.status(400).json({ error: "กรุณาระบุบัญชีปลายทางและชื่อเจ้าของบัญชี" });
@@ -2017,13 +2085,24 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
     const walletRef = ordersDb.collection("wallets").doc(user.uid);
     let availableAfterSatang = 0;
     const withdrawRef = ordersDb.collection("withdrawal_requests").doc();
+    const withdrawalLimitPerDay = getWithdrawalDailyLimit();
+    const withdrawalDateKey = bangkokDateKey();
+    const dailyCounterRef = ordersDb.collection("withdrawal_daily_counters").doc(`${user.uid}_${withdrawalDateKey}`);
+    let withdrawalsTodayAfter = 0;
 
     await ordersDb.runTransaction(async (tx) => {
-      const snap = await tx.get(walletRef);
+      const [snap, dailyCounterSnap] = await Promise.all([
+        tx.get(walletRef),
+        tx.get(dailyCounterRef)
+      ]);
       const currentBalance = snap.exists ? Number(snap.data()?.balanceSatang || 0) : 0;
       const currentLocked = Math.max(0, Number(snap.data()?.lockedSatang || 0));
       const currentAvailable = Math.max(0, currentBalance - currentLocked);
       if (currentAvailable < amountSatang) throw new Error("INSUFFICIENT_AVAILABLE_BALANCE");
+
+      const withdrawalsToday = Math.max(0, Number(dailyCounterSnap.data()?.count || 0));
+      if (withdrawalsToday >= withdrawalLimitPerDay) throw new Error("DAILY_WITHDRAWAL_LIMIT_REACHED");
+      withdrawalsTodayAfter = withdrawalsToday + 1;
 
       const nextLocked = currentLocked + amountSatang;
       availableAfterSatang = currentBalance - nextLocked;
@@ -2032,6 +2111,14 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
         balanceSatang: currentBalance,
         lockedSatang: nextLocked,
         availableSatang: availableAfterSatang,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      tx.set(dailyCounterRef, {
+        userId: user.uid,
+        dateKey: withdrawalDateKey,
+        count: withdrawalsTodayAfter,
+        limit: withdrawalLimitPerDay,
         updatedAt: FieldValue.serverTimestamp()
       }, { merge: true });
 
@@ -2045,6 +2132,9 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
         bankName,
         status: "WAITING_ADMIN",
         settlementMode: "MANUAL_BANK_TRANSFER",
+        withdrawalDateKey,
+        dailySequence: withdrawalsTodayAfter,
+        dailyLimit: withdrawalLimitPerDay,
         createdAt: FieldValue.serverTimestamp()
       });
     });
@@ -2053,134 +2143,155 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
       status: "WAITING_ADMIN",
       withdrawalId: withdrawRef.id,
       availableBalance: availableAfterSatang / 100,
+      withdrawalsToday: withdrawalsTodayAfter,
+      withdrawalLimitPerDay,
+      withdrawalsRemainingToday: Math.max(0, withdrawalLimitPerDay - withdrawalsTodayAfter),
       message: `ส่งคำขอถอนเงิน ฿${(amountSatang / 100).toFixed(2)} แล้ว ระบบล็อกยอดไว้จนกว่า Admin จะโอนเงินจริงและยืนยันรายการ`
     });
   } catch (err: any) {
     if (err?.message === "INSUFFICIENT_AVAILABLE_BALANCE") {
       return res.status(400).json({ error: "ยอดที่ถอนได้ไม่เพียงพอ เนื่องจากมีเงินบางส่วนถูกล็อกไว้ในคำขอถอนที่กำลังรอตรวจ" });
     }
+    if (err?.message === "DAILY_WITHDRAWAL_LIMIT_REACHED") {
+      return res.status(429).json({
+        error: `วันนี้ถอนครบ ${getWithdrawalDailyLimit()} ครั้งแล้ว กรุณาถอนใหม่หลังเที่ยงคืนเวลาไทย`,
+        withdrawalLimitPerDay: getWithdrawalDailyLimit()
+      });
+    }
     console.error("withdrawal error:", err);
     return res.status(500).json({ error: "เกิดข้อผิดพลาดในการทำรายการถอนเงิน กรุณาลองใหม่อีกครั้ง" });
   }
 });
 
-app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
+app.post("/api/admin/manual-topup", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const amountSatang = Math.round(Number(req.body?.amount) * 100);
-  const image = decodeImageDataUrl(req.body?.imageDataUrl);
-  const settlement = getManualSettlementConfig();
-  if (!settlement.configured) return res.status(503).json({ error: "ผู้ดูแลยังไม่ได้ตั้งค่าบัญชีธนาคารหรือ PromptPay สำหรับรับเงิน" });
-  if (!Number.isSafeInteger(amountSatang) || amountSatang < 100 || amountSatang > 10_000_000) return res.status(400).json({ error: "ยอดเติมเงินไม่ถูกต้อง" });
-  if (!image) return res.status(400).json({ error: "สลิปต้องเป็น JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB" });
-
-  const imageHash = crypto.createHash("sha256").update(image.buffer).digest("hex");
-  const submissionRef = ordersDb.collection("topup_submissions").doc();
-  try {
-    await ordersDb.runTransaction(async (tx) => {
-      const duplicateRef = ordersDb.collection("topup_references").doc(imageHash);
-      const duplicate = await tx.get(duplicateRef);
-      if (duplicate.exists) throw new Error("DUPLICATE_SLIP");
-      tx.create(duplicateRef, { submissionId: submissionRef.id, status: "WAITING_ADMIN", createdAt: FieldValue.serverTimestamp() });
-      tx.create(submissionRef, {
-        userId: user.uid,
-        userEmail: user.email || null,
-        amountSatang,
-        reference: imageHash.slice(0, 20),
-        refHash: imageHash,
-        imageHash,
-        extracted: null,
-        verificationMode: "manual_bank_admin_confirmation",
-        status: "WAITING_ADMIN",
-        createdAt: FieldValue.serverTimestamp(),
-      });
-    });
-
-    const ext = image.mimeType.split("/")[1].replace("jpeg", "jpg");
-    const proofStoragePath = "topup-proofs/" + user.uid + "/" + submissionRef.id + "." + ext;
-    try {
-      await getStorage().bucket().file(proofStoragePath).save(image.buffer, {
-        contentType: image.mimeType,
-        resumable: false,
-        metadata: { cacheControl: "private, no-store" },
-      });
-      await submissionRef.update({ proofStoragePath, proofMimeType: image.mimeType, storageProvider: "firebase-storage" });
-    } catch (storageError: any) {
-      console.warn("Top-up proof GCS storage error (using Firestore fallback):", storageError?.message);
-      try {
-        await submissionRef.collection("proof_blobs").doc("image").set({
-          data: image.buffer.toString("base64"),
-          mimeType: image.mimeType,
-          userId: user.uid,
-          createdAt: FieldValue.serverTimestamp(),
-        });
-        await submissionRef.update({ proofStoragePath: "firestore:proof_blobs/image", proofMimeType: image.mimeType, storageProvider: "firestore-fallback" });
-      } catch (fallbackError: any) {
-        console.error("Top-up proof fallback storage error", fallbackError?.message);
-        await Promise.allSettled([submissionRef.delete(), ordersDb.collection("topup_references").doc(imageHash).delete()]);
-        return res.status(503).json({ error: "จัดเก็บภาพสลิปไม่สำเร็จ กรุณาลองใหม่" });
-      }
-    }
-    return res.status(202).json({
-      status: "WAITING_ADMIN",
-      submissionId: submissionRef.id,
-      message: "รับสลิปแล้ว รอ Admin ตรวจยอดเงินจริงในบัญชีธนาคาร เมื่อยืนยันแล้วระบบจะเครดิต WIN Wallet ทันที",
-    });
-  } catch (error: any) {
-    if (error?.message === "DUPLICATE_SLIP") return res.status(409).json({ error: "ภาพสลิปนี้ถูกส่งแล้ว" });
-    console.error("Top-up proof error", error?.message);
-    return res.status(503).json({ error: "รับหลักฐานไม่สำเร็จ กรุณาลองใหม่" });
+  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
+  if (!getManualSettlementConfig().configured) {
+    return res.status(503).json({ error: "ยังไม่ได้ตั้งค่าบัญชีบริษัทสำหรับรับเงิน" });
   }
-});
 
-app.get("/api/admin/topup-submissions", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
-  const snap = await ordersDb.collection("topup_submissions").where("status", "==", "WAITING_ADMIN").limit(50).get();
-  return res.json({ submissions: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) });
-});
+  const walletId = String(req.body?.walletId || "").trim().toUpperCase();
+  const amountSatang = Math.round(Number(req.body?.amount) * 100);
+  const bankReference = String(req.body?.bankReference || "").trim().slice(0, 120);
+  const note = String(req.body?.note || "").trim().slice(0, 500);
 
-app.get("/api/admin/topup-proof/:id", rateLimit(30), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
-  const submissionId = String(req.params.id || "");
-  if (!/^[A-Za-z0-9_-]{10,80}$/.test(submissionId)) return res.status(400).json({ error: "Invalid submission" });
+  if (!/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(walletId)) {
+    return res.status(400).json({ error: "WIN Wallet ID ไม่ถูกต้อง" });
+  }
+  if (!Number.isSafeInteger(amountSatang) || amountSatang < 100 || amountSatang > 100_000_000) {
+    return res.status(400).json({ error: "จำนวนเงินไม่ถูกต้อง" });
+  }
+  if (!bankReference) {
+    return res.status(400).json({ error: "กรุณาระบุเลขอ้างอิงจากรายการเงินจริงในบัญชีธนาคาร" });
+  }
+
   try {
-    const snap = await ordersDb.collection("topup_submissions").doc(submissionId).get();
-    if (!snap.exists) return res.status(404).json({ error: "ไม่พบรายการสลิป" });
-    const data = snap.data() || {};
-    const proofStoragePath = String(data.proofStoragePath || "");
+    const result = await ordersDb.runTransaction(async (tx) => {
+      const walletIdRef = ordersDb.collection("wallet_ids").doc(walletId);
+      const walletIdSnap = await tx.get(walletIdRef);
+      if (!walletIdSnap.exists) throw new Error("WIN_WALLET_NOT_FOUND");
 
-    // 1. Try downloading from Cloud Storage if stored there
-    if (proofStoragePath.startsWith(`topup-proofs/${data.userId}/`)) {
-      try {
-        const [buffer] = await getStorage().bucket().file(proofStoragePath).download();
-        res.setHeader("Content-Type", String(data.proofMimeType || "image/jpeg"));
-        res.setHeader("Cache-Control", "private, no-store, max-age=0");
-        res.setHeader("Content-Disposition", `inline; filename="topup-${submissionId}"`);
-        return res.send(buffer);
-      } catch (storageErr: any) {
-        console.warn("Storage download failed, attempting firestore fallback check:", storageErr?.message);
-      }
-    }
+      const walletOwner = walletIdSnap.data() || {};
+      const targetUserId = String(walletOwner.userId || "");
+      if (!targetUserId) throw new Error("WIN_WALLET_NOT_FOUND");
 
-    // 2. Check Firestore fallback subcollection
-    const blobDoc = await ordersDb.collection("topup_submissions").doc(submissionId).collection("proof_blobs").doc("image").get();
-    if (blobDoc.exists) {
-      const blobData = blobDoc.data() || {};
-      const buffer = Buffer.from(String(blobData.data || ""), "base64");
-      res.setHeader("Content-Type", String(blobData.mimeType || data.proofMimeType || "image/jpeg"));
-      res.setHeader("Cache-Control", "private, no-store, max-age=0");
-      res.setHeader("Content-Disposition", `inline; filename="topup-${submissionId}"`);
-      return res.send(buffer);
-    }
+      const bankRef = ordersDb.collection("manual_bank_references").doc(
+        crypto.createHash("sha256").update(bankReference).digest("hex")
+      );
+      const bankRefSnap = await tx.get(bankRef);
+      if (bankRefSnap.exists) throw new Error("BANK_REFERENCE_REUSED");
 
-    return res.status(404).json({ error: "ไม่พบภาพสลิปที่จัดเก็บไว้" });
+      const walletRef = ordersDb.collection("wallets").doc(targetUserId);
+      const walletSnap = await tx.get(walletRef);
+      const wallet = walletSnap.data() || {};
+      const currentBalance = Number(wallet.balanceSatang || 0);
+      const currentLocked = Math.max(0, Number(wallet.lockedSatang || 0));
+      const nextBalance = currentBalance + amountSatang;
+      const ledgerRef = ordersDb.collection("ledger_entries").doc();
+      const manualTopupRef = ordersDb.collection("manual_topups").doc();
+      const auditRef = ordersDb.collection("audit_logs").doc();
+
+      tx.set(walletRef, {
+        userId: targetUserId,
+        balanceSatang: nextBalance,
+        lockedSatang: currentLocked,
+        availableSatang: nextBalance - currentLocked,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      tx.create(ledgerRef, {
+        userId: targetUserId,
+        walletId,
+        amountSatang,
+        type: "TOP_UP_LINE_BANK_CONFIRMED",
+        manualTopupId: manualTopupRef.id,
+        bankReference,
+        confirmedBy: user.uid,
+        totalDebitSatang: amountSatang,
+        totalCreditSatang: amountSatang,
+        balanced: true,
+        legs: [
+          { accountId: "COMPANY_BANK_CASH", direction: "DEBIT", amountSatang },
+          { accountId: targetUserId, direction: "CREDIT", amountSatang }
+        ],
+        createdAt: FieldValue.serverTimestamp()
+      });
+
+      tx.create(manualTopupRef, {
+        userId: targetUserId,
+        walletId,
+        role: String(walletOwner.role || ""),
+        amountSatang,
+        amountBaht: amountSatang / 100,
+        bankReference,
+        source: "LINE_SLIP_AND_BANK_CHECK",
+        note: note || null,
+        status: "CONFIRMED",
+        confirmedBy: user.uid,
+        ledgerId: ledgerRef.id,
+        createdAt: FieldValue.serverTimestamp()
+      });
+
+      tx.create(bankRef, {
+        bankReference,
+        kind: "LINE_MANUAL_TOPUP",
+        manualTopupId: manualTopupRef.id,
+        userId: targetUserId,
+        walletId,
+        amountSatang,
+        createdAt: FieldValue.serverTimestamp()
+      });
+
+      tx.create(auditRef, {
+        adminUid: user.uid,
+        adminEmail: user.email || null,
+        action: "MANUAL_TOPUP_CONFIRMED",
+        targetUid: targetUserId,
+        targetCollection: "wallets",
+        reason: note || "Admin verified LINE slip against company bank transaction",
+        metadata: { walletId, amountSatang, bankReference, manualTopupId: manualTopupRef.id },
+        createdAt: FieldValue.serverTimestamp()
+      });
+
+      return {
+        status: "CONFIRMED",
+        manualTopupId: manualTopupRef.id,
+        userId: targetUserId,
+        walletId,
+        amountSatang,
+        newBalanceSatang: nextBalance,
+        ledgerId: ledgerRef.id
+      };
+    });
+
+    return res.json({ ok: true, ...result });
   } catch (error: any) {
-    console.error("Top-up proof read error", error?.message);
-    return res.status(503).json({ error: "โหลดภาพสลิปไม่สำเร็จ" });
+    const code = String(error?.message || "");
+    if (code === "WIN_WALLET_NOT_FOUND") return res.status(404).json({ error: "ไม่พบ WIN Wallet ID นี้" });
+    if (code === "BANK_REFERENCE_REUSED") return res.status(409).json({ error: "เลขอ้างอิงธนาคารนี้ถูกใช้เติมเงินแล้ว" });
+    console.error("manual LINE topup error:", error);
+    return res.status(500).json({ error: "ปรับยอด WIN Wallet ไม่สำเร็จ" });
   }
 });
 
@@ -2324,115 +2435,6 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
   return res.json({ status: summary.error ? "action_required" : summary.warning ? "degraded" : "operational", summary, checks, dispatch: { onlineKnights, pendingOrders }, recentOrders, checkedAt: new Date().toISOString() });
 });
 
-app.post("/api/admin/topup-review", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
-  const submissionId = String(req.body?.submissionId || "").trim();
-  const decision = String(req.body?.decision || "").trim().toUpperCase();
-  const bankReference = String(req.body?.bankReference || "").trim().slice(0, 120);
-  if (!submissionId || !["APPROVE", "REJECT"].includes(decision)) {
-    return res.status(400).json({ error: "ข้อมูลการอนุมัติไม่ถูกต้อง" });
-  }
-  if (decision === "APPROVE" && !bankReference) {
-    return res.status(400).json({ error: "กรุณาระบุเลขอ้างอิงจากรายการเงินจริงในบัญชีธนาคาร" });
-  }
-
-  try {
-    const result = await ordersDb.runTransaction(async (tx) => {
-      const topupRef = ordersDb.collection("topup_submissions").doc(submissionId);
-      const snap = await tx.get(topupRef);
-      if (!snap.exists) throw new Error("TOPUP_NOT_FOUND");
-      const topup: any = snap.data() || {};
-      if (String(topup.status) !== "WAITING_ADMIN") throw new Error("ALREADY_REVIEWED");
-
-      if (decision === "REJECT") {
-        tx.update(topupRef, {
-          status: "REJECTED_ADMIN",
-          reviewedBy: user.uid,
-          reviewedAt: FieldValue.serverTimestamp()
-        });
-        if (topup.refHash) {
-          tx.update(ordersDb.collection("topup_references").doc(String(topup.refHash)), { status: "REJECTED_ADMIN" });
-        }
-        return { status: "REJECTED_ADMIN" };
-      }
-
-      const amountSatang = Number(topup.amountSatang || 0);
-      const targetUserId = String(topup.userId || "");
-      if (!targetUserId || !Number.isSafeInteger(amountSatang) || amountSatang <= 0) throw new Error("INVALID_TOPUP");
-
-      const bankRef = ordersDb.collection("manual_bank_references").doc(
-        crypto.createHash("sha256").update(bankReference).digest("hex")
-      );
-      const bankRefSnap = await tx.get(bankRef);
-      if (bankRefSnap.exists) throw new Error("BANK_REFERENCE_REUSED");
-
-      const walletRef = ordersDb.collection("wallets").doc(targetUserId);
-      const walletSnap = await tx.get(walletRef);
-      const currentBalance = Number(walletSnap.data()?.balanceSatang || 0);
-      const currentLocked = Math.max(0, Number(walletSnap.data()?.lockedSatang || 0));
-      const nextBalance = currentBalance + amountSatang;
-      const ledgerRef = ordersDb.collection("ledger_entries").doc();
-
-      tx.set(walletRef, {
-        userId: targetUserId,
-        balanceSatang: nextBalance,
-        lockedSatang: currentLocked,
-        availableSatang: nextBalance - currentLocked,
-        updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      tx.create(ledgerRef, {
-        userId: targetUserId,
-        amountSatang,
-        type: "TOP_UP_MANUAL_BANK_CONFIRMED",
-        submissionId,
-        bankReference,
-        reviewedBy: user.uid,
-        totalDebitSatang: amountSatang,
-        totalCreditSatang: amountSatang,
-        balanced: true,
-        legs: [
-          { accountId: "COMPANY_BANK_CASH", direction: "DEBIT", amountSatang },
-          { accountId: targetUserId, direction: "CREDIT", amountSatang }
-        ],
-        createdAt: FieldValue.serverTimestamp()
-      });
-
-      tx.create(bankRef, {
-        bankReference,
-        kind: "TOPUP",
-        submissionId,
-        userId: targetUserId,
-        amountSatang,
-        createdAt: FieldValue.serverTimestamp()
-      });
-
-      tx.update(topupRef, {
-        status: "MANUAL_CONFIRMED",
-        bankReference,
-        reviewedBy: user.uid,
-        reviewedAt: FieldValue.serverTimestamp(),
-        creditedAt: FieldValue.serverTimestamp(),
-        ledgerId: ledgerRef.id
-      });
-      if (topup.refHash) {
-        tx.update(ordersDb.collection("topup_references").doc(String(topup.refHash)), { status: "MANUAL_CONFIRMED" });
-      }
-      return { status: "MANUAL_CONFIRMED", newBalanceSatang: nextBalance, ledgerId: ledgerRef.id };
-    });
-
-    return res.json({ ok: true, ...result });
-  } catch (error: any) {
-    const code = String(error?.message || "");
-    if (["TOPUP_NOT_FOUND"].includes(code)) return res.status(404).json({ error: "ไม่พบรายการเติมเงิน" });
-    if (["ALREADY_REVIEWED", "BANK_REFERENCE_REUSED"].includes(code)) return res.status(409).json({ error: code });
-    console.error("topup review error:", error);
-    return res.status(500).json({ error: "ยืนยันรายการเติมเงินไม่สำเร็จ" });
-  }
-});
-
 app.get("/api/admin/withdrawal-requests", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
@@ -2561,7 +2563,7 @@ app.get("/api/admin/system-payouts", rateLimit(20), async (req, res) => {
     ordersDb.collection("system_payout_requests").where("status", "==", "WAITING_BANK_TRANSFER").limit(30).get()
   ]);
   const pool = poolSnap.data() || {};
-  const systemSatang = Number(pool.system || 0);
+  const systemSatang = Number(pool.buckets?.system || 0);
   const lockedSatang = Math.max(0, Number(pool.systemPayoutLockedSatang || 0));
   return res.json({
     systemSatang,
@@ -2580,8 +2582,8 @@ app.post("/api/admin/system-payout-request", rateLimit(10), async (req, res) => 
   const bankName = String(req.body?.bankName || "").trim().slice(0, 120);
   const bankAccountNumber = String(req.body?.bankAccountNumber || "").trim().slice(0, 80);
   const accountName = String(req.body?.accountName || "").trim().slice(0, 160);
-  if (!Number.isSafeInteger(amountSatang) || amountSatang < 2000) {
-    return res.status(400).json({ error: "ยอดถอนรายได้ขั้นต่ำคือ 20.00 บาท" });
+  if (!Number.isSafeInteger(amountSatang) || amountSatang < 1) {
+    return res.status(400).json({ error: "ยอดถอนรายได้ต้องมากกว่า 0 บาท" });
   }
   if (!bankName || !bankAccountNumber || !accountName) {
     return res.status(400).json({ error: "กรุณากรอกธนาคาร เลขบัญชี และชื่อบัญชีให้ครบ" });
@@ -2594,7 +2596,7 @@ app.post("/api/admin/system-payout-request", rateLimit(10), async (req, res) => 
       const poolRef = ordersDb.collection("wallets").doc("SYSTEM_POOLS");
       const poolSnap = await tx.get(poolRef);
       const pool = poolSnap.data() || {};
-      const systemSatang = Number(pool.system || 0);
+      const systemSatang = Number(pool.buckets?.system || 0);
       const lockedSatang = Math.max(0, Number(pool.systemPayoutLockedSatang || 0));
       const availableSatang = Math.max(0, systemSatang - lockedSatang);
       if (availableSatang < amountSatang) throw new Error("INSUFFICIENT_SYSTEM_REVENUE");
@@ -2657,7 +2659,7 @@ app.post("/api/admin/system-payout-review", rateLimit(10), async (req, res) => {
       const poolRef = ordersDb.collection("wallets").doc("SYSTEM_POOLS");
       const poolSnap = await tx.get(poolRef);
       const pool = poolSnap.data() || {};
-      const systemSatang = Number(pool.system || 0);
+      const systemSatang = Number(pool.buckets?.system || 0);
       const lockedSatang = Math.max(0, Number(pool.systemPayoutLockedSatang || 0));
       if (!Number.isSafeInteger(amountSatang) || amountSatang <= 0 || lockedSatang < amountSatang) {
         throw new Error("SYSTEM_PAYOUT_HOLD_MISMATCH");
@@ -2684,11 +2686,11 @@ app.post("/api/admin/system-payout-review", rateLimit(10), async (req, res) => {
       if (bankRefSnap.exists) throw new Error("BANK_REFERENCE_REUSED");
 
       const ledgerRef = ordersDb.collection("ledger_entries").doc();
-      tx.set(poolRef, {
-        system: systemSatang - amountSatang,
+      tx.update(poolRef, {
+        "buckets.system": systemSatang - amountSatang,
         systemPayoutLockedSatang: lockedSatang - amountSatang,
         updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
+      });
       tx.create(ledgerRef, {
         userId: user.uid,
         amountSatang: -amountSatang,
@@ -3719,6 +3721,7 @@ app.post("/api/admin/ops/ride-action", rateLimit(20), distributedRateLimit("admi
         });
         result = { ...ride, offeredDriverId: null, offerExpiresAt: null, dispatchCandidateIndex: -1, updatedAt: now };
       } else {
+        await releaseRideWalletHoldInTransaction(tx, ref, ride as ServerOrder, "admin_operations_cancelled");
         tx.update(ref, {
           status: "cancelled",
           cancellationReason: "admin_operations_cancelled",
@@ -3983,15 +3986,25 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       return data.status === "pending" && Date.parse(String(data.createdAt || "")) < pendingExpiry;
     });
     if (stalePending.length) {
-      try {
-        const batch = ordersDb.batch();
-        stalePending.forEach((doc) => batch.update(doc.ref, {
-          status: "cancelled",
-          cancellationReason: "dispatch_timeout_no_driver",
-          updatedAt: new Date().toISOString(),
-        }));
-        await batch.commit();
-      } catch (ignore) {}
+      for (const stale of stalePending) {
+        try {
+          await ordersDb.runTransaction(async (tx) => {
+            const staleRef = ordersCollection.doc(String(stale.id));
+            const staleSnap = await tx.get(staleRef);
+            if (!staleSnap.exists) return;
+            const staleOrder = staleSnap.data() as ServerOrder;
+            if (String(staleOrder.status) !== "pending") return;
+            await releaseRideWalletHoldInTransaction(tx, staleRef, staleOrder, "dispatch_timeout_no_driver");
+            tx.update(staleRef, {
+              status: "cancelled",
+              cancellationReason: "dispatch_timeout_no_driver",
+              updatedAt: new Date().toISOString(),
+            });
+          });
+        } catch (cleanupError: any) {
+          console.warn("[Orders stale hold cleanup warning]:", cleanupError?.message);
+        }
+      }
     }
     const activeRideDoc = existingRideDocs.find((doc) => {
       if (stalePending.some((stale) => stale.id === doc.id)) return false;
@@ -4042,6 +4055,10 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       distanceSource: estimate.distanceSource,
       etaSource: estimate.etaSource,
       fareBasis: "WINRIDER_APP_FARE_RULE",
+      paymentMethod: "WIN_WALLET",
+      walletHoldSatang: Math.round(fare * 100) + 500,
+      walletHoldStatus: "HELD",
+      walletHoldCreatedAt: now.toISOString(),
       welfareFund2Baht,
       fareAddons: authoritativeQuote.addons,
       netFare: Math.max(0, fare - welfareFund2Baht),
@@ -4067,10 +4084,36 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
     let persistedToFirestore = false;
     try {
       await ordersDb.runTransaction(async (transaction) => {
-        const existing = await transaction.get(orderRef);
+        const passengerWalletRef = ordersDb.collection("wallets").doc(user.uid);
+        const [existing, walletSnap] = await Promise.all([
+          transaction.get(orderRef),
+          transaction.get(passengerWalletRef)
+        ]);
         if (existing.exists) {
           throw new Error("ORDER_ALREADY_EXISTS");
         }
+
+        const wallet = walletSnap.data() || {};
+        const balanceSatang = Number(wallet.balanceSatang || 0);
+        const lockedSatang = Math.max(0, Number(wallet.lockedSatang || 0));
+        const availableSatang = Math.max(0, balanceSatang - lockedSatang);
+        const holdSatang = Math.round(Number(newOrder.walletHoldSatang || 0));
+        if (!Number.isSafeInteger(holdSatang) || holdSatang <= 0) {
+          throw new Error("INVALID_WALLET_HOLD");
+        }
+        if (availableSatang < holdSatang) {
+          throw new Error("INSUFFICIENT_WIN_WALLET");
+        }
+
+        const nextLocked = lockedSatang + holdSatang;
+        transaction.set(passengerWalletRef, {
+          userId: user.uid,
+          balanceSatang,
+          lockedSatang: nextLocked,
+          availableSatang: balanceSatang - nextLocked,
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+
         transaction.create(orderRef, {
           ...newOrder,
           serverCreatedAt: FieldValue.serverTimestamp(),
@@ -4099,10 +4142,21 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
         }
         return res.status(409).json({ error: "Order already exists" });
       }
-      console.warn("[Orders DB Admin Warning - using resilient store]:", dbError?.message);
+      if (dbError?.message === "INSUFFICIENT_WIN_WALLET") {
+        return res.status(402).json({
+          error: "ยอด WIN Wallet ไม่เพียงพอ กรุณาเติมเงินก่อนเรียกรถ",
+          code: "INSUFFICIENT_WIN_WALLET",
+          requiredSatang: Number(newOrder.walletHoldSatang || 0)
+        });
+      }
+      if (dbError?.message === "INVALID_WALLET_HOLD") {
+        return res.status(500).json({ error: "ไม่สามารถคำนวณยอดกันเงินสำหรับทริปได้", code: "INVALID_WALLET_HOLD" });
+      }
+      console.error("[Orders DB Admin Error]:", dbError?.message);
+      return res.status(503).json({ error: "ไม่สามารถกันยอด WIN Wallet เพื่อสร้างงานได้", code: "WALLET_HOLD_UNAVAILABLE" });
     }
 
-    // Store in resilient in-memory store
+    // Firestore + WIN Wallet hold are authoritative for real orders.
     resilientOrdersStore.set(newOrder.id, newOrder);
 
     return res.status(201).json({
@@ -4399,9 +4453,16 @@ app.post("/api/orders/:id/step", rateLimit(30), distributedRateLimit("ride_step"
       if ((tipAmount !== undefined || ratingGiven !== undefined || reviewComment !== undefined) && !isPassenger) throw new Error("PASSENGER_REQUIRED");
       if ((ratingGiven !== undefined || reviewComment !== undefined) && order.status !== "completed") throw new Error("RIDE_NOT_COMPLETED");
 
+      if (status && String(status) === "cancelled") {
+        await releaseRideWalletHoldInTransaction(transaction, orderRef, order, "participant_cancelled");
+      }
+
       updatedOrder = {
         ...order,
         ...(status ? { status: String(status) } : {}),
+        ...(status && String(status) === "cancelled" && order.walletHoldStatus === "HELD"
+          ? { walletHoldStatus: "RELEASED" as const, walletHoldReleaseReason: "participant_cancelled" }
+          : {}),
         ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
         ...(ratingGiven !== undefined ? { ratingGiven: Number(ratingGiven) } : {}),
         ...(reviewComment !== undefined ? { reviewComment: String(reviewComment).slice(0, 1000) } : {}),

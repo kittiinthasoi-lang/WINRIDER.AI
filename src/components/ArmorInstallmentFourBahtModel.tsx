@@ -304,7 +304,7 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
                 <span>อุปกรณ์เสริมไม่บังคับ (Optional Gear Add-ons):</span>
               </span>
               <span className="text-[10px] text-slate-400">
-                พี่วินเลือกผ่อนเพิ่มอย่างละ +1฿/รอบ (สูงสุด 20 รอบ/วัน) หรือเลือกซื้อเงินสดรอบเดียวจบ
+                พี่วินเลือกผ่อนเพิ่มอย่างละ +1฿/รอบ (สูงสุด 20 รอบ/วัน) หรือชำระเต็มจำนวนผ่าน WIN Wallet
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -323,11 +323,11 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-300">
               <div className="p-1.5 rounded-lg bg-black/30 border border-cyan-500/20">
                 <span className="text-cyan-300 font-bold block">🛵 สำหรับพี่วิน (Win Knights):</span>
-                <span>สามารถเลือกซื้อได้ทั้ง <strong>"เงินสด (Cash)"</strong> และ <strong>"ผ่อน 4฿ GEAR PAY (+1฿/รอบ)"</strong></span>
+                <span>การชำระจริงใช้ <strong>WIN Wallet เท่านั้น</strong> และสามารถเลือก <strong>ผ่อน 4฿ GEAR PAY (+1฿/รอบ)</strong> ตามสิทธิ์</span>
               </div>
               <div className="p-1.5 rounded-lg bg-black/30 border border-amber-500/20">
                 <span className="text-amber-300 font-bold block">👥 สำหรับคนทั่วไป (General Public / Passengers):</span>
-                <span>สามารถซื้อได้ที่เมนู <strong>WIN SHOP</strong> โดยชำระเป็น <strong>"เงินสดเท่านั้น (Cash Only)"</strong></span>
+                <span>ซื้อได้ที่เมนู <strong>WIN SHOP</strong> โดยชำระผ่าน <strong>WIN Wallet เท่านั้น</strong></span>
               </div>
             </div>
           </div>
@@ -356,13 +356,13 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
                 <span className="text-base">🎧</span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[9px]">
-                <span className="text-slate-400">หรือซื้อสด: ฿2,490</span>
+                <span className="text-slate-400">ชำระเต็มผ่าน Wallet: ฿2,490</span>
                 <button 
                   type="button"
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
-                    alert("💸 พี่วินเลือกซื้อสด 'หูฟังติดหมวก Intercom BT-5.4' ราคา ฿2,490 เรียบร้อย! รับของที่ศูนย์และไม่ต้องหักค่ารอบ");
-                    confetti({ particleCount: 25, spread: 45 });
+                    alert("การซื้อจริงต้องชำระผ่าน WIN Wallet ใน WIN SHOP เท่านั้น");
+                    
                   }}
                   className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 font-bold transition-all"
                 >
@@ -394,13 +394,13 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
                 <span className="text-base">🦾</span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[9px]">
-                <span className="text-slate-400">หรือซื้อสด: ฿1,490</span>
+                <span className="text-slate-400">ชำระเต็มผ่าน Wallet: ฿1,490</span>
                 <button 
                   type="button"
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
-                    alert("💸 พี่วินเลือกซื้อสด 'สนับศอกชีวกล D3O Bionic' ราคา ฿1,490 เรียบร้อย! รับของทันที");
-                    confetti({ particleCount: 25, spread: 45 });
+                    alert("การซื้อจริงต้องชำระผ่าน WIN Wallet ใน WIN SHOP เท่านั้น");
+                    
                   }}
                   className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 font-bold transition-all"
                 >
@@ -432,13 +432,13 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
                 <span className="text-base">🐱</span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[9px]">
-                <span className="text-slate-400">หรือซื้อสด: ฿3,990</span>
+                <span className="text-slate-400">ชำระเต็มผ่าน Wallet: ฿3,990</span>
                 <button 
                   type="button"
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
-                    alert("💸 พี่วินเลือกซื้อสด 'กล่องใส่สัตว์เลี้ยง WIN-Pet Space Pod' ราคา ฿3,990 เรียบร้อย! ปลดล็อกงานสัตว์เลี้ยงทันที");
-                    confetti({ particleCount: 25, spread: 45 });
+                    alert("การซื้อจริงต้องชำระผ่าน WIN Wallet ใน WIN SHOP เท่านั้น");
+                    
                   }}
                   className="px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold transition-all"
                 >
@@ -470,13 +470,13 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
                 <span className="text-base">📦</span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[9px]">
-                <span className="text-slate-400">หรือซื้อสด: ฿3,490</span>
+                <span className="text-slate-400">ชำระเต็มผ่าน Wallet: ฿3,490</span>
                 <button 
                   type="button"
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
-                    alert("💸 พี่วินเลือกซื้อสด 'กล่องส่งของอัจฉริยะควบคุมความเย็น Thermo Box' ราคา ฿3,490 เรียบร้อย!");
-                    confetti({ particleCount: 25, spread: 45 });
+                    alert("การซื้อจริงต้องชำระผ่าน WIN Wallet ใน WIN SHOP เท่านั้น");
+                    
                   }}
                   className="px-1.5 py-0.5 rounded bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-slate-950 font-bold transition-all"
                 >
@@ -508,13 +508,13 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
                 <span className="text-base">🧤</span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[9px]">
-                <span className="text-slate-400">หรือซื้อสด: ฿1,290</span>
+                <span className="text-slate-400">ชำระเต็มผ่าน Wallet: ฿1,290</span>
                 <button 
                   type="button"
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
-                    alert("💸 พี่วินเลือกซื้อสด 'ถุงมือหนังแท้การ์ดคาร์บอน' ราคา ฿1,290 เรียบร้อย!");
-                    confetti({ particleCount: 25, spread: 45 });
+                    alert("การซื้อจริงต้องชำระผ่าน WIN Wallet ใน WIN SHOP เท่านั้น");
+                    
                   }}
                   className="px-1.5 py-0.5 rounded bg-purple-500/20 hover:bg-purple-500 text-purple-300 hover:text-slate-950 font-bold transition-all"
                 >
@@ -546,13 +546,13 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
                 <span className="text-base">🛡️</span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[9px]">
-                <span className="text-slate-400">หรือซื้อสด: ฿1,890</span>
+                <span className="text-slate-400">ชำระเต็มผ่าน Wallet: ฿1,890</span>
                 <button 
                   type="button"
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
-                    alert("💸 พี่วินเลือกซื้อสด 'สนับเข่า Guardian Plates' ราคา ฿1,890 เรียบร้อย!");
-                    confetti({ particleCount: 25, spread: 45 });
+                    alert("การซื้อจริงต้องชำระผ่าน WIN Wallet ใน WIN SHOP เท่านั้น");
+                    
                   }}
                   className="px-1.5 py-0.5 rounded bg-purple-500/20 hover:bg-purple-500 text-purple-300 hover:text-slate-950 font-bold transition-all"
                 >
@@ -584,13 +584,13 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
                 <span className="text-base">📱</span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[9px]">
-                <span className="text-slate-400">หรือซื้อสด: ฿990</span>
+                <span className="text-slate-400">ชำระเต็มผ่าน Wallet: ฿990</span>
                 <button 
                   type="button"
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
-                    alert("💸 พี่วินเลือกซื้อสด 'ที่ยึดมือถือ CNC 7075 ชาร์จ Qi2' ราคา ฿990 เรียบร้อย!");
-                    confetti({ particleCount: 25, spread: 45 });
+                    alert("การซื้อจริงต้องชำระผ่าน WIN Wallet ใน WIN SHOP เท่านั้น");
+                    
                   }}
                   className="px-1.5 py-0.5 rounded bg-purple-500/20 hover:bg-purple-500 text-purple-300 hover:text-slate-950 font-bold transition-all"
                 >
@@ -622,13 +622,13 @@ export const ArmorInstallmentFourBahtModel: React.FC<ArmorInstallmentFourBahtMod
                 <span className="text-base">⚡</span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[9px]">
-                <span className="text-slate-400">หรือซื้อสด: ฿2,890</span>
+                <span className="text-slate-400">ชำระเต็มผ่าน Wallet: ฿2,890</span>
                 <button 
                   type="button"
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(900);
-                    alert("💸 พี่วินเลือกซื้อสด 'ชุดแจ็กเก็ตกันฝน Storm Shield Pro' ราคา ฿2,890 เรียบร้อย!");
-                    confetti({ particleCount: 25, spread: 45 });
+                    alert("การซื้อจริงต้องชำระผ่าน WIN Wallet ใน WIN SHOP เท่านั้น");
+                    
                   }}
                   className="px-1.5 py-0.5 rounded bg-purple-500/20 hover:bg-purple-500 text-purple-300 hover:text-slate-950 font-bold transition-all"
                 >

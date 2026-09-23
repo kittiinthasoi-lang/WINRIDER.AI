@@ -386,10 +386,32 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
     const knightWalletSnap = await transaction.get(knightWalletRef);
     const knightWalletData = knightWalletSnap.exists ? knightWalletSnap.data() || {} : {};
 
-    // อัปเดตกระเป๋าพลเมือง
+    // อัปเดตกระเป๋าพลเมือง: ใช้ WIN Wallet เท่านั้น และ consume ยอดที่กันไว้ตอนสร้างทริป
     const currentCitizenBalance = Number(citizenWalletData.balanceSatang || 0);
-    const currentCitizenLocked = Number(citizenWalletData.lockedSatang || 0);
-    const newCitizenBalance = currentCitizenBalance - feeResult.totalCitizenPaySatang - tipSatang;
+    const currentCitizenLocked = Math.max(0, Number(citizenWalletData.lockedSatang || 0));
+    const rideHoldSatang = afterData.walletHoldStatus === "HELD"
+      ? Math.max(0, Math.round(Number(afterData.walletHoldSatang || 0)))
+      : 0;
+    const requiredCitizenDebitSatang = feeResult.totalCitizenPaySatang + tipSatang;
+
+    if (String(afterData.paymentMethod || "WIN_WALLET") !== "WIN_WALLET") {
+      throw new Error(`[WIN_WALLET_ONLY] Ride ${rideId} attempted non-wallet settlement`);
+    }
+    if (rideHoldSatang <= 0 || currentCitizenLocked < rideHoldSatang) {
+      throw new Error(`[RIDE_WALLET_HOLD_MISMATCH] Ride ${rideId} hold=${rideHoldSatang} locked=${currentCitizenLocked}`);
+    }
+
+    const availableOutsideRideHold = Math.max(0, currentCitizenBalance - currentCitizenLocked);
+    const extraBeyondHold = Math.max(0, requiredCitizenDebitSatang - rideHoldSatang);
+    if (currentCitizenBalance < requiredCitizenDebitSatang || availableOutsideRideHold < extraBeyondHold) {
+      throw new Error(
+        `[INSUFFICIENT_WIN_WALLET] Ride ${rideId} requires=${requiredCitizenDebitSatang} balance=${currentCitizenBalance} extraAvailable=${availableOutsideRideHold}`
+      );
+    }
+
+    const newCitizenBalance = currentCitizenBalance - requiredCitizenDebitSatang;
+    const newCitizenLocked = currentCitizenLocked - rideHoldSatang;
+    const newCitizenAvailable = newCitizenBalance - newCitizenLocked;
 
     transaction.set(
       citizenWalletRef,
@@ -397,8 +419,8 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
         userId: citizenId,
         role: "citizen",
         balanceSatang: newCitizenBalance,
-        lockedSatang: currentCitizenLocked,
-        availableSatang: newCitizenBalance - currentCitizenLocked,
+        lockedSatang: newCitizenLocked,
+        availableSatang: newCitizenAvailable,
         updatedAt: FieldValue.serverTimestamp()
       },
       { merge: true }
@@ -506,6 +528,10 @@ export const onTripCompleted = onDocumentWritten("rides/{rideId}", async (event)
       settled: true,
       ledgerTransactionId: ledgerRef.id,
       settlementStatus: "SETTLED",
+      paymentMethod: "WIN_WALLET",
+      walletHoldStatus: "CONSUMED",
+      walletHoldConsumedSatang: rideHoldSatang,
+      walletHoldConsumedAt: FieldValue.serverTimestamp(),
       fareSatang: feeResult.fareSatang,
       tipSatang,
       citizenFeeSatang: feeResult.citizenFeeSatang,
@@ -780,182 +806,13 @@ export const updatePayoutStatus = onCall(async (request) => {
 });
 
 export const requestPayout = onCall(async (request) => {
-  if (!request.auth || !request.auth.uid) {
+  if (!request.auth?.uid) {
     throw new HttpsError("unauthenticated", "ต้องเข้าสู่ระบบก่อนทำรายการขอถอนเงิน");
   }
-
-  const uid = request.auth.uid;
-  const data = request.data || {};
-  const amountSatang = Math.round(Number(data.amountSatang || 0));
-  const idempotencyKey = String(data.idempotencyKey || "").trim();
-  const bankAccount = data.bankAccount || {};
-  const bankName = String(bankAccount.bankName || "").trim();
-  const accountNumber = String(bankAccount.accountNumber || "").replace(/\D/g, "");
-  const accountName = String(bankAccount.accountName || "").trim();
-
-  // ตรวจสอบความถูกต้องของ Input
-  if (!amountSatang || amountSatang <= 0 || !Number.isInteger(amountSatang)) {
-    throw new HttpsError("invalid-argument", "จำนวนเงินที่ขอถอนต้องเป็นจำนวนเต็มสตางค์ที่มากกว่า 0");
-  }
-
-  if (!idempotencyKey) {
-    throw new HttpsError("invalid-argument", "idempotencyKey จำเป็นต้องระบุเพื่อป้องกันการถอนเงินซ้ำซ้อน");
-  }
-
-  if (!bankName || accountNumber.length < 10 || accountNumber.length > 16 || !accountName) {
-    throw new HttpsError("invalid-argument", "ข้อมูลบัญชีรับเงินไม่ครบถ้วนหรือไม่ถูกต้อง");
-  }
-
-  const result = await db.runTransaction(async (transaction) => {
-    // 1. เช็ค Idempotency Key
-    const idempRef = db.collection("idempotency_keys").doc(idempotencyKey);
-    const idempSnap = await transaction.get(idempRef);
-
-    if (idempSnap.exists) {
-      const existing = idempSnap.data();
-      return {
-        success: true,
-        alreadyProcessed: true,
-        idempotencyKey,
-        payoutId: existing?.payoutId,
-        amountSatang: existing?.amountSatang || amountSatang,
-        remainingBalanceSatang: existing?.remainingBalanceSatang,
-        availableSatang: existing?.availableSatang
-      };
-    }
-
-    // 2. ตรวจสอบยอดเงินคงเหลือในกระเป๋า (Balance - Locked)
-    const walletRef = db.collection("wallets").doc(uid);
-    const walletSnap = await transaction.get(walletRef);
-
-    if (!walletSnap.exists) {
-      throw new HttpsError("not-found", "ไม่พบบัญชีกระเป๋าเงินของคุณในระบบ");
-    }
-
-    const walletData = walletSnap.data() || {};
-    const userSnap = await transaction.get(db.collection("users").doc(uid));
-    const userData = userSnap.exists ? userSnap.data() || {} : {};
-
-    if (userData.status !== "active") {
-      throw new HttpsError("failed-precondition", "บัญชีผู้ใช้ยังไม่อยู่ในสถานะ active จึงไม่สามารถถอนเงินได้");
-    }
-
-    if (!["citizen", "knight"].includes(String(walletData.role || ""))) {
-      throw new HttpsError("failed-precondition", "ประเภทกระเป๋าเงินไม่สามารถขอถอนได้");
-    }
-
-    const currentBalance = Number(walletData.balanceSatang || 0);
-    const currentLocked = Number(walletData.lockedSatang || 0);
-    const available = currentBalance - currentLocked;
-
-    if (available < amountSatang) {
-      throw new HttpsError(
-        "failed-precondition",
-        `ยอดเงินคงเหลือที่ใช้ได้ไม่เพียงพอ (ยอดที่ใช้ได้: ${(available / 100).toFixed(2)} บาท [${available} สตางค์], ขอถอน: ${(amountSatang / 100).toFixed(2)} บาท [${amountSatang} สตางค์])`
-      );
-    }
-
-    // 3. Double-Entry Legs
-    const ledgerLegs: LedgerLeg[] = [
-      {
-        accountId: uid,
-        accountType: (walletData.role === 'knight' ? 'KNIGHT_WALLET' : 'CITIZEN_WALLET') as any,
-        direction: 'DEBIT',
-        amountSatang,
-        descriptionTh: `หักยอดเงินขอถอนเข้าบัญชีธนาคาร`
-      },
-      {
-        accountId: 'CLEARING_PAYOUT_PENDING',
-        accountType: 'CLEARING_PAYOUT_PENDING',
-        direction: 'CREDIT',
-        amountSatang,
-        descriptionTh: `พักยอดเงินรอโอนไปยังบัญชีธนาคารภายนอก`
-      }
-    ];
-
-    const sumDebit = ledgerLegs.filter(l => l.direction === 'DEBIT').reduce((s, l) => s + l.amountSatang, 0);
-    const sumCredit = ledgerLegs.filter(l => l.direction === 'CREDIT').reduce((s, l) => s + l.amountSatang, 0);
-
-    if (sumDebit !== sumCredit) {
-      throw new Error(`Double-entry check failed for payout: Debit (${sumDebit}) != Credit (${sumCredit})`);
-    }
-
-    // 4. หัก balance และคำนวณ available ใหม่
-    const newBalance = currentBalance - amountSatang;
-    const newAvailable = newBalance - currentLocked;
-
-    transaction.update(walletRef, {
-      balanceSatang: newBalance,
-      availableSatang: newAvailable,
-      updatedAt: FieldValue.serverTimestamp()
-    });
-
-    // 5. สร้างรายการขอถอนเงิน (Payout Request)
-    const payoutRef = db.collection("payout_requests").doc();
-    transaction.set(payoutRef, {
-      payoutId: payoutRef.id,
-      idempotencyKey,
-      userId: uid,
-      amountSatang,
-      bankAccount: {
-        bankName,
-        accountNumber,
-        accountName
-      },
-      status: "PENDING_TRANSFER",
-      statusHistory: [{
-        status: "PENDING_TRANSFER",
-        at: FieldValue.serverTimestamp(),
-        actorUid: uid,
-        actorType: "user"
-      }],
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
-    });
-
-    // 6. บันทึก Journal Ledger
-    const ledgerRef = db.collection("ledger").doc();
-    transaction.set(ledgerRef, {
-      transactionId: ledgerRef.id,
-      idempotencyKey,
-      type: "PAYOUT_REQUEST",
-      userId: uid,
-      referenceId: payoutRef.id,
-      amountSatang,
-      totalDebitSatang: sumDebit,
-      totalCreditSatang: sumCredit,
-      balanced: true,
-      legs: ledgerLegs,
-      createdAt: FieldValue.serverTimestamp()
-    });
-
-    // 7. บันทึก Idempotency Key
-    transaction.set(idempRef, {
-      idempotencyKey,
-      status: "COMPLETED",
-      type: "PAYOUT_REQUEST",
-      userId: uid,
-      payoutId: payoutRef.id,
-      amountSatang,
-      remainingBalanceSatang: newBalance,
-      availableSatang: newAvailable,
-      ledgerTransactionId: ledgerRef.id,
-      completedAt: FieldValue.serverTimestamp()
-    });
-
-    return {
-      success: true,
-      alreadyProcessed: false,
-      payoutId: payoutRef.id,
-      idempotencyKey,
-      amountSatang,
-      remainingBalanceSatang: newBalance,
-      availableSatang: newAvailable,
-      ledgerTransactionId: ledgerRef.id
-    };
-  });
-
-  return result;
+  throw new HttpsError(
+    "failed-precondition",
+    "ใช้เมนูถอนเงินใน WIN Wallet เท่านั้น เพื่อบังคับกฎถอนทุกบทบาทและจำนวนครั้งต่อวันจาก backend เดียว"
+  );
 });
 
 /**
@@ -1009,32 +866,28 @@ export {
 /**
  * Daily internal payment reconciliation.
  *
- * WINRIDER currently supports manual bank settlement as the no-gateway path.
+ * LINE/manual bank top-ups are the primary no-gateway settlement path.
  * Legacy provider-confirmed entries are still reconciled for historical compatibility.
  */
 export const reconcilePaymentsDaily = onSchedule(
   { schedule: "15 3 * * *", timeZone: "Asia/Bangkok", retryCount: 1 },
   async () => {
     const [manualTopupsSnap, providerTopupsSnap, refundsSnap] = await Promise.all([
-      db.collection("topup_submissions").where("status", "==", "MANUAL_CONFIRMED").limit(2000).get(),
+      db.collection("manual_topups").where("status", "==", "CONFIRMED").limit(2000).get(),
       db.collection("topup_submissions").where("status", "==", "PROVIDER_CONFIRMED").limit(2000).get(),
       db.collection("refund_requests").where("status", "==", "REFUNDED").limit(2000).get(),
     ]);
-    const topupDocs = [...manualTopupsSnap.docs, ...providerTopupsSnap.docs];
 
     const mismatches: Array<Record<string, unknown>> = [];
     let matchedTopups = 0;
     let matchedRefunds = 0;
 
-    for (const doc of topupDocs) {
+    for (const doc of manualTopupsSnap.docs) {
       const topup = doc.data() || {};
       const amountSatang = Number(topup.amountSatang || 0);
-      const expectedLedgerType = String(topup.status) === "MANUAL_CONFIRMED"
-        ? "TOP_UP_MANUAL_BANK_CONFIRMED"
-        : "TOP_UP_PROVIDER_VERIFIED";
       const ledgerSnap = await db.collection("ledger_entries")
-        .where("submissionId", "==", doc.id)
-        .where("type", "==", expectedLedgerType)
+        .where("manualTopupId", "==", doc.id)
+        .where("type", "==", "TOP_UP_LINE_BANK_CONFIRMED")
         .limit(3)
         .get();
       const ledgers = ledgerSnap.docs.map((ledgerDoc) => ledgerDoc.data() || {});
@@ -1045,10 +898,34 @@ export const reconcilePaymentsDaily = onSchedule(
         && Number(ledgers[0].totalCreditSatang || 0) === amountSatang;
       if (valid) matchedTopups++;
       else mismatches.push({
-        kind: "TOPUP",
-        settlementMode: String(topup.status || ""),
-        submissionId: doc.id,
+        kind: "LINE_MANUAL_TOPUP",
+        manualTopupId: doc.id,
+        walletId: String(topup.walletId || ""),
         bankReference: String(topup.bankReference || ""),
+        expectedAmountSatang: amountSatang,
+        ledgerCount: ledgers.length,
+        ledgerAmounts: ledgers.map((l) => Number(l.amountSatang || 0)),
+      });
+    }
+
+    for (const doc of providerTopupsSnap.docs) {
+      const topup = doc.data() || {};
+      const amountSatang = Number(topup.amountSatang || 0);
+      const ledgerSnap = await db.collection("ledger_entries")
+        .where("submissionId", "==", doc.id)
+        .where("type", "==", "TOP_UP_PROVIDER_VERIFIED")
+        .limit(3)
+        .get();
+      const ledgers = ledgerSnap.docs.map((ledgerDoc) => ledgerDoc.data() || {});
+      const valid = ledgers.length === 1
+        && Number(ledgers[0].amountSatang || 0) === amountSatang
+        && ledgers[0].balanced === true
+        && Number(ledgers[0].totalDebitSatang || 0) === amountSatang
+        && Number(ledgers[0].totalCreditSatang || 0) === amountSatang;
+      if (valid) matchedTopups++;
+      else mismatches.push({
+        kind: "LEGACY_PROVIDER_TOPUP",
+        submissionId: doc.id,
         providerTransactionId: String(topup.providerTransactionId || ""),
         expectedAmountSatang: amountSatang,
         ledgerCount: ledgers.length,
@@ -1088,7 +965,7 @@ export const reconcilePaymentsDaily = onSchedule(
     await db.collection("reconciliation_reports").doc(dateKey).set({
       dateKey,
       checkedAt: FieldValue.serverTimestamp(),
-      manualConfirmedTopups: manualTopupsSnap.size,
+      lineManualTopups: manualTopupsSnap.size,
       providerConfirmedTopups: providerTopupsSnap.size,
       refundedRequests: refundsSnap.size,
       matchedTopups,
@@ -1101,7 +978,7 @@ export const reconcilePaymentsDaily = onSchedule(
     if (mismatches.length) {
       console.error("[Payment Reconciliation] mismatches", JSON.stringify(mismatches.slice(0, 20)));
     } else {
-      console.log("[Payment Reconciliation] manual/provider settlements match balanced ledgers");
+      console.log("[Payment Reconciliation] LINE/manual and provider settlements match balanced ledgers");
     }
   }
 );
