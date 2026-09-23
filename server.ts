@@ -728,21 +728,22 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
   const title = String(input.title || "").trim();
   const price = Number(input.price);
   const stock = Number(input.stock ?? 1);
-  if (title.length < 3 || !Number.isFinite(price) || price <= 0 || !Number.isFinite(stock) || stock < 1) {
-    return res.status(400).json({ error: "ข้อมูลสินค้าไม่ถูกต้อง" });
+  const imageUrl = validEvidenceImageUrl(input.imageUrl);
+  if (title.length < 3 || !Number.isFinite(price) || price <= 0 || !Number.isFinite(stock) || stock < 1 || !imageUrl) {
+    return res.status(400).json({ error: "กรุณากรอกข้อมูลสินค้าและแนบรูปสินค้าจริงให้ครบ" });
   }
   try {
     const userSnapshot = await ordersDb.collection("users").doc(user.uid).get();
     const userData = userSnapshot.data() || {};
     const sellerProfile = (userData.profileCustomization || {}) as Record<string, unknown>;
-    const sellerRole = String(userData.role || "citizen").trim();
+    const sellerRole = String(userData.role || (user as any).role || "citizen").trim();
     const sellerWallet = await ensureWalletIdentityId(user.uid, WALLET_ROLE_PREFIX[sellerRole] ? sellerRole : "citizen");
     const id = `listing-${crypto.randomUUID()}`;
     const now = new Date().toISOString();
     const listing = {
       id,
       sellerUserId: user.uid,
-      sellerType: userData.role === "merchant" ? "merchant" : "citizen",
+      sellerType: sellerRole === "merchant" ? "merchant" : "citizen",
       sellerName: String(sellerProfile.displayName || userData.displayName || user.name || "ผู้ขาย WIN"),
       sellerWalletId: sellerWallet.walletId,
       sellerWalletRole: sellerWallet.role,
@@ -757,29 +758,53 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
       category: String(input.category || "second_hand"),
       categoryLabel: String(input.categoryLabel || "สินค้าทั่วไป"),
       condition: String(input.condition || "used"),
-      conditionLabel: String(input.conditionLabel || "สภาพดี"),
+      conditionLabel: String(input.conditionLabel || "ผู้ขายระบุสภาพสินค้า"),
       description: String(input.description || "").trim(),
-      imageIcon: String(input.imageIcon || "📦"),
-      imageUrl: String(input.imageUrl || ""),
-      isAiVerified: input.isAiVerified === true,
-      aiCertificateId: input.isAiVerified === true ? String(input.aiCertificateId || "") : "",
-      aiQualityScore: input.isAiVerified === true && Number.isFinite(Number(input.aiQualityScore)) ? Number(input.aiQualityScore) : null,
+      imageIcon: String(input.imageIcon || "📸"),
+      imageUrl,
+      isAiVerified: false,
+      adminReviewStatus: "pending_review",
       location: sellerProfile.locationEnabled === true
         ? String(sellerProfile.locationLabel || "ตำแหน่งที่ผู้ขายบันทึกไว้ในโปรไฟล์")
         : String(input.location || userData.locationLabel || userData.address || "").trim(),
       stock,
       tags: Array.isArray(input.tags) ? input.tags.filter((tag: unknown) => typeof tag === "string").slice(0, 10) : [],
-      status: "active",
+      status: "pending_review",
       salesCount: 0,
       createdAt: now,
       updatedAt: now,
       serverCreatedAt: FieldValue.serverTimestamp(),
     };
-    await ordersDb.collection("marketListings").doc(id).create(listing);
-    return res.status(201).json({ listing });
+
+    const listingRef = ordersDb.collection("marketListings").doc(id);
+    const verificationRef = ordersDb.collection("adminVerificationQueue").doc();
+    await ordersDb.runTransaction(async (tx) => {
+      tx.create(listingRef, listing);
+      tx.create(verificationRef, {
+        id: verificationRef.id,
+        status: "pending_review",
+        submittedBy: user.uid,
+        submittedRole: sellerRole,
+        category: "ตรวจรูปและรายการสินค้าก่อนลงขาย",
+        subjectType: "market_listing",
+        subjectId: id,
+        imageUrl,
+        note: [title, String(input.description || "")].filter(Boolean).join(" • ").slice(0, 1000),
+        metadata: { price, category: String(input.category || "second_hand"), location: listing.location },
+        createdAt: now,
+        updatedAt: now,
+        serverCreatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+    return res.status(202).json({
+      listing,
+      verificationId: verificationRef.id,
+      pendingAdminReview: true,
+      message: "ส่งรายการสินค้าให้แอดมินตรวจแล้ว",
+    });
   } catch (error) {
     console.error("[Shop Listings POST]", error instanceof Error ? error.message : error);
-    return res.status(503).json({ error: "บันทึกสินค้าไม่สำเร็จ" });
+    return res.status(503).json({ error: "บันทึกสินค้าเพื่อรอแอดมินตรวจไม่สำเร็จ" });
   }
 });
 
