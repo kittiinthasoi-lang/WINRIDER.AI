@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { emitQuestMetric } from '../services/questService';
-import { getAuth } from 'firebase/auth';
 import { FlashSaleItem } from '../types';
 import { NeonProfileAvatar } from './NeonProfileAvatar';
 import { SovereignTiersModal } from './SovereignTiersModal';
@@ -18,6 +17,7 @@ import confetti from 'canvas-confetti';
 import { loadProfileCustomization } from '../services/profileService';
 import { ProfileQuickActions } from './ProfileQuickActions';
 import { 
+import { auth } from '../firebase';
   ShoppingBag, 
   Users, 
   Truck, 
@@ -150,7 +150,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
     if (!canEdit) return;
     void (async () => {
       try {
-        const user = getAuth().currentUser;
+        const user = auth.currentUser;
         if (!user) return;
         const response = await fetch('/api/shop/profile-content', { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
         const payload = await response.json() as { products?: StoreCatalogProduct[] };
@@ -163,7 +163,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
 
   const persistMerchantProducts = async (products: StoreCatalogProduct[]) => {
     try {
-      const user = getAuth().currentUser;
+      const user = auth.currentUser;
       if (!user) return;
       await fetch('/api/shop/profile-content', {
         method: 'PUT',
