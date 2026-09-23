@@ -3,8 +3,8 @@ import { WIN_IMAGES } from '../data/imageRegistry';
 import { LIFESTYLE_PLACES } from '../data/lifestyleData';
 import { MatchedDriver, DreamRideVehicle, LifestylePlace } from '../types';
 import { fetchLiveDrivers } from '../services/liveDriversService';
-import { 
 import { auth } from '../firebase';
+import {
   RELIGIOUS_SERVICES_DATA, 
   SACRED_MU_PRAYERS, 
   ReligiousActivityOption, 
