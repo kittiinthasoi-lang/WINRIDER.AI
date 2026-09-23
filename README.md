@@ -10,7 +10,7 @@ WINRIDER.AI คือ Mobility / Local Service Super App สำหรับผ�
 
 ระบบอยู่ในระดับ **พร้อมทดสอบแบบ controlled staging / production-like** แต่ยังไม่ควรประกาศว่า production-ready 100% จนกว่าจะผ่าน release gates ที่เหลือใน `docs/PRODUCTION_READINESS.md`
 
-สิ่งที่ repository ตรวจผ่านด้วย CI แล้วครอบคลุม TypeScript, unit tests, integration tests, production build, Cloud Functions build, dependency audit และ secret scan ส่วนการทดสอบที่ยังต้องทำกับ environment จริง เช่น authenticated ride E2E, concurrent load, mobile/background GPS, reconnect, real payment provider, backup/restore, monitoring และ independent security review
+สิ่งที่ repository ตรวจผ่านด้วย CI แล้วครอบคลุม TypeScript, unit tests, integration tests, production build, Cloud Functions build, dependency audit และ secret scan ส่วนการทดสอบที่ยังต้องทำกับ environment จริง เช่น authenticated ride E2E, concurrent load, mobile/background GPS, reconnect, manual top-up/withdrawal reconciliation, backup/restore, monitoring และ independent security review
 
 ## บทบาทผู้ใช้
 
@@ -23,7 +23,7 @@ WINRIDER.AI คือ Mobility / Local Service Super App สำหรับผ�
 | `merchant` | ร้านค้าพันธมิตร | ร้านค้าและผู้ขาย |
 | `partner` | องค์กรพาร์ทเนอร์ | องค์กร / B2B / บริการพันธมิตร |
 
-Knight, Merchant และ Partner มีสถานะตรวจสอบ `pending_review` ก่อนเปิดสิทธิ์เต็ม ส่วน Citizen ไม่ถูกบล็อกด้วยหน้ารอตรวจแบบเดียวกัน
+บัญชีใหม่ทุกบทบาท (`citizen`, `knight`, `merchant`, `partner`) เริ่มที่สถานะ `pending_review` และต้องให้ Super Admin อนุมัติก่อนเข้าใช้งานจริง
 
 ระบบยังมี **Owner / Super Admin** ซึ่งสามารถเข้าศูนย์ Admin และสลับมุมมอง Customer / Driver / Merchant / Partner จากบัญชีเจ้าของเดียวกันตามสิทธิ์ที่ backend อนุญาต
 
@@ -154,7 +154,7 @@ WIN Alert แสดง event/public activity จาก source-driven public data
 - เลือก event เป็นปลายทางเรียกรถได้
 - TAT/public-data sync ใช้ internal sync secret ไม่ใช่ paid event API key
 
-`WIN_ALERT_INTERNAL_SYNC_SECRET` เป็นรหัสภายในที่ WINRIDER สร้างเองสำหรับป้องกัน endpoint sync; `TAT_INTERNAL_SYNC_SECRET` ยังรองรับเป็น legacy/fallback
+`WIN_ALERT_INTERNAL_SYNC_SECRET` เป็นรหัสภายในเพียงตัวเดียวที่ WINRIDER ใช้ป้องกัน endpoint สำหรับ scheduled public-data/WIN Alert sync
 
 ## WIN Shop / Street Market
 
@@ -188,16 +188,14 @@ Financial core ใช้ integer satang และ double-entry accounting
 Top-up ปัจจุบันใช้แนวทาง:
 
 ```text
-ผู้ใช้ส่งหลักฐาน
-  → Admin ตรวจหลักฐาน
-  → ยังไม่เครดิต wallet
-  → รอ signed payment-provider confirmation
-  → server จึง finalize เงิน
+ผู้ใช้โอนเข้าบัญชีรับเงินที่แอปกำหนด
+  → ส่งสลิป
+  → Super Admin ตรวจว่ามีเงินเข้าจริง
+  → Admin อนุมัติยอด
+  → server เครดิต WIN Wallet
 ```
 
-WINRIDER ไม่ใช้ AI เพื่อยืนยันว่าเงินเข้าแล้วจากรูปสลิปเพียงอย่างเดียว
-
-Payment provider variables เป็น optional สำหรับ development/staging แต่จำเป็นเมื่อเปิด integration รับเงินจริง
+WINRIDER ไม่ใช้ AI เพื่อยืนยันว่าเงินเข้าแล้วจากรูปสลิปเพียงอย่างเดียว และไม่มี Payment Provider ภายนอกใน flow นี้
 
 ## WIN-AI / WIN Buddy
 
@@ -235,7 +233,7 @@ Admin UI ปัจจุบันรองรับ:
 
 โครงสร้างปัจจุบันใช้:
 
-- Firebase Authentication สำหรับ sensitive APIs
+- WIN Auth server sessions สำหรับ authentication และ sensitive APIs
 - Firestore deny-by-default rules
 - server-authoritative ride mutation
 - server-controlled wallet / ledger / top-up
@@ -255,7 +253,7 @@ React 19 + Vite + PWA
         │
         ├── Citizen / Knight / Merchant / Partner / Admin UI
         │
-        ├── Firebase Auth / Firestore / Storage
+        ├── WIN Auth / Firestore / Storage
         │
         ├── Express server.ts
         │     ├── Orders / Dispatch
@@ -264,7 +262,7 @@ React 19 + Vite + PWA
         │     ├── WIN Alert / Public Data
         │     ├── Shop / Market
         │     ├── External AI handoff
-        │     └── Admin / Payment webhook APIs
+        │     └── Admin / Manual top-up APIs
         │
         └── Firebase Functions
               ├── wallet / ledger
@@ -281,7 +279,7 @@ React 19 + Vite + PWA
 - Tailwind CSS 4
 - Node.js 20+
 - Express 4
-- Firebase Authentication / Firestore / Storage
+- WIN Auth / Firestore / Storage
 - Firebase Functions
 - Recharts / Lucide React / Motion
 - vite-plugin-pwa
@@ -307,25 +305,13 @@ Backend ใช้:
 
 เมื่อรัน backend นอก Google-managed environment ต้องมี Firebase Admin credentials ที่เหมาะสม เช่น application default credentials หรือ service-account configuration ที่ code รองรับ
 
-### Owner / Wallet
+### Owner
 
 - `ADMIN_OWNER_EMAIL`
-- `ADMIN_PROMPTPAY_ID`
-- `ADMIN_BANK_NAME`
-- `ADMIN_BANK_ACCOUNT_NUMBER`
-- `ADMIN_BANK_ACCOUNT_NAME`
-
-### Payment Provider
-
-- `PAYMENT_PROVIDER_WEBHOOK_SECRET`
-- `PAYMENT_PROVIDER_REFUND_URL`
-- `PAYMENT_PROVIDER_API_TOKEN`
-- `PAYMENT_PROVIDER_ALLOWED_HOST`
 
 ### Public Data Sync
 
 - `WIN_ALERT_INTERNAL_SYNC_SECRET`
-- `TAT_INTERNAL_SYNC_SECRET`
 
 **ห้าม commit secret หรือ service-account private key ลง repository**
 
@@ -379,7 +365,7 @@ WINRIDER มี PWA manifest และ service worker แบบ auto-update
 - เครื่องที่ 1: Citizen
 - เครื่องที่ 2: Knight
 
-ใช้บัญชี Firebase คนละ UID เพื่อทดสอบ dispatch จริง
+ใช้บัญชี WIN Auth คนละ UID เพื่อทดสอบ dispatch จริง
 
 หลังทดสอบผ่าน browser แล้วสามารถ Add to Home Screen เพื่อทดสอบ standalone PWA ต่อได้
 
@@ -399,7 +385,7 @@ npm run test:e2e
 npm run load:test
 ```
 
-E2E/load harness ต้องใช้ environment, Firebase tokens และ test fixtures จริงตามไฟล์ใน `scripts/` จึงไม่ควรถือว่าผ่านเพียงเพราะ script มีอยู่ใน repository
+E2E/load harness ต้องใช้ environment, authenticated tokens และ test fixtures จริงตามไฟล์ใน `scripts/` จึงไม่ควรถือว่าผ่านเพียงเพราะ script มีอยู่ใน repository
 
 ## Production Readiness
 
@@ -416,7 +402,7 @@ E2E/load harness ต้องใช้ environment, Firebase tokens และ te
 - mobile background GPS
 - offline / reconnect
 - navigation/public-data outage UX
-- real payment-provider verification
+- manual top-up / withdrawal reconciliation
 - admin role integration tests
 - security review
 - backup / restore
