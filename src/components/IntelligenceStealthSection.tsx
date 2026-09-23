@@ -71,11 +71,16 @@ export const IntelligenceStealthSection: React.FC<Props> = ({ audioEnabled }) =>
       });
 
       const data = await response.json();
-      const buddyReply = data.reply || 'รับทราบคำสั่งครับพี่อัศวิน WIN Buddy กำลังดำเนินการ';
+      let buddyReply = data.reply || 'รับทราบคำสั่งครับพี่อัศวิน';
+      if (data.externalOnly) {
+        try { await navigator.clipboard?.writeText(String(data.prompt || textToSend)); } catch {}
+        const links = Array.isArray(data.providers) ? data.providers.map((p: any) => `${p.name}: ${p.url}`).join('\n') : '';
+        buddyReply = `WIN Buddy ใช้ External AI Handoff โดยไม่ใช้ API key\nคัดลอก Prompt ให้แล้ว:\n${links}`;
+      }
       
       setBuddyMessages(prev => [
         ...prev, 
-        { sender: 'buddy', text: buddyReply, time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }), protocol: data.protocol }
+        { sender: 'buddy', text: buddyReply, time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }), protocol: data.protocol || 'external_handoff' }
       ]);
 
       if (audioEnabled) {
