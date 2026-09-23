@@ -9,72 +9,28 @@ import {
   Lock, 
   AlertCircle, 
   Loader2, 
-  Sparkles,
-  Crown,
-  ExternalLink
+  Sparkles
 } from 'lucide-react';
 
 export const AuthModalOrView: React.FC = () => {
-  const { 
-    signInWithGoogle, 
-    signInWithGoogleRedirect, 
-    signInWithEmail, 
-    signUpWithEmail, 
-    signInAsOwner,
-    signInWithAdminEmail 
-  } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showRedirectOption, setShowRedirectOption] = useState(false);
-
-  const cleanEmail = email.trim().toLowerCase();
-  const isAdminEmailTyped = cleanEmail === 'kittiinthasoi@gmail.com' || cleanEmail.includes('kittiinthasoi');
 
   const handleGoogleSignIn = async () => {
     playTactileBlip(800);
     setErrorMsg(null);
-    setShowRedirectOption(false);
     setIsLoading(true);
     try {
       await signInWithGoogle();
     } catch (err: any) {
-      console.warn('Google sign-in exception:', err);
-      const code = err?.code || '';
-      if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
-        setShowRedirectOption(true);
+      if (err?.code !== 'auth/popup-closed-by-user') {
+        setErrorMsg(translateAuthError(err?.code || err?.message));
       }
-      setErrorMsg(translateAuthError(code || err?.message));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleRedirectSignIn = async () => {
-    playTactileBlip(800);
-    setErrorMsg(null);
-    setIsLoading(true);
-    try {
-      await signInWithGoogleRedirect();
-    } catch (err: any) {
-      console.warn('Google redirect sign-in exception:', err);
-      setErrorMsg(translateAuthError(err?.code || err?.message));
-      setIsLoading(false);
-    }
-  };
-
-  const handleOwnerFastSignIn = async () => {
-    playTactileBlip(1000);
-    setErrorMsg(null);
-    setIsLoading(true);
-    try {
-      await signInAsOwner();
-    } catch (err: any) {
-      console.error('Owner fast sign-in exception:', err);
-      setErrorMsg(err?.message || 'ไม่สามารถเปิดเซสชันเจ้าของระบบได้ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setIsLoading(false);
     }
@@ -83,22 +39,6 @@ export const AuthModalOrView: React.FC = () => {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-
-    // If typing admin email, log in directly without requiring password!
-    if (isAdminEmailTyped) {
-      setIsLoading(true);
-      playTactileBlip(1000);
-      try {
-        await signInWithAdminEmail(cleanEmail);
-        return;
-      } catch (err: any) {
-        setErrorMsg(err?.message || 'เข้าสู่ระบบแอดมินไม่สำเร็จ');
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
     if (!email.trim() || !password.trim()) {
       setErrorMsg('กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน');
       return;
@@ -125,7 +65,6 @@ export const AuthModalOrView: React.FC = () => {
         await signUpWithEmail(email, password);
       }
     } catch (err: any) {
-      console.warn('Email auth exception:', err);
       setErrorMsg(translateAuthError(err?.code || err?.message));
     } finally {
       setIsLoading(false);
@@ -145,17 +84,17 @@ export const AuthModalOrView: React.FC = () => {
       case 'auth/invalid-email':
         return 'รูปแบบที่อยู่อีเมลไม่ถูกต้อง';
       case 'auth/popup-blocked':
-        return 'เบราว์เซอร์บล็อกหน้าต่าง Pop-up — กรุณากดอนุญาตป๊อปอัป หรือกดปุ่ม "เข้าสู่ระบบ Google (Redirect)" ด้านล่าง';
-      case 'auth/popup-closed-by-user':
-        return 'หน้าต่าง Google Sign-in ถูกปิดก่อนทำรายการสำเร็จ กรุณาลองใหม่อีกครั้ง';
-      case 'auth/operation-not-allowed':
-        return 'ระบบ Firebase Authentication ยังไม่ได้เปิดใช้งาน Email/Password ใน Firebase Console — กรุณาใช้ปุ่มเข้าสู่ระบบด้วย Google หรือปุ่มเจ้าของระบบ';
+        return 'เบราว์เซอร์บล็อกหน้าต่าง Pop-up กรุณาอนุญาตป๊อปอัปเพื่อลงชื่อเข้าใช้ด้วย Google';
+      case 'auth/invalid-api-key':
+        return 'Firebase Web API key ไม่ถูกต้องหรือถูกลบ กรุณาใส่ VITE_FIREBASE_API_KEY ตัวใหม่ของโปรเจกต์ก่อนเข้าสู่ระบบ';
       case 'auth/unauthorized-domain':
-        return 'โดเมนนี้ยังไม่ได้รับอนุญาตใน Firebase Console Authorized Domains — กรุณาใช้ปุ่มเข้าสู่ระบบเจ้าของระบบด้านล่าง';
+        return 'โดเมนที่เปิด WINRIDER ยังไม่ได้อยู่ใน Firebase Authentication > Authorized domains';
+      case 'auth/operation-not-allowed':
+        return 'ยังไม่ได้เปิด Google หรือ Email/Password provider ใน Firebase Authentication';
       case 'auth/network-request-failed':
-        return 'การเชื่อมต่อเครือข่ายขัดข้อง กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง';
+        return 'เชื่อมต่อ Firebase ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่';
       default:
-        return code ? `เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ (${code}) กรุณาลองใหม่อีกครั้ง` : 'เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ กรุณาลองใหม่อีกครั้ง';
+        return 'เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ กรุณาลองใหม่อีกครั้ง';
     }
   };
 
@@ -181,33 +120,8 @@ export const AuthModalOrView: React.FC = () => {
             </p>
           </div>
 
-          {/* Sovereign Owner 1-Click Fast Sign-In */}
-          <button
-            type="button"
-            onClick={handleOwnerFastSignIn}
-            disabled={isLoading}
-            className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-cyan-500/20 to-amber-500/20 hover:from-amber-500/30 hover:via-cyan-500/30 hover:to-amber-500/30 border-2 border-amber-400/50 hover:border-amber-400 text-amber-300 text-sm font-bold flex items-center justify-center gap-3 transition-all duration-200 shadow-[0_0_20px_rgba(251,191,36,0.2)] disabled:opacity-50 cursor-pointer group active:scale-[0.98]"
-          >
-            <Crown className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
-            <div className="text-left flex-1">
-              <div className="flex items-center gap-2">
-                <span>เข้าสู่ระบบทันทีในฐานะเจ้าของระบบ</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-200 border border-amber-400/40 font-mono">SUPER ADMIN</span>
-              </div>
-              <div className="text-[11px] text-amber-300/80 font-normal">kittiinthasoi@gmail.com (สิทธิ์เต็ม 5 บทบาท)</div>
-            </div>
-          </button>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-slate-800" />
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono">หรือเข้าสู่ระบบด้วยบัญชีอื่น</span>
-            <div className="flex-1 h-px bg-slate-800" />
-          </div>
-
           {/* Google Sign-in Button */}
           <button
-            type="button"
             onClick={handleGoogleSignIn}
             disabled={isLoading}
             className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-[#00D4FF]/50 text-white text-sm font-semibold flex items-center justify-center gap-3 transition-all duration-200 shadow-md disabled:opacity-50 cursor-pointer"
@@ -232,19 +146,6 @@ export const AuthModalOrView: React.FC = () => {
             </svg>
             <span>ลงชื่อเข้าใช้ด้วย Google Account</span>
           </button>
-
-          {/* Google Redirect Option (shown if popup was blocked) */}
-          {showRedirectOption && (
-            <button
-              type="button"
-              onClick={handleGoogleRedirectSignIn}
-              disabled={isLoading}
-              className="w-full py-2.5 px-3 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-500/40 text-cyan-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
-              <span>เข้าสู่ระบบ Google (โหมด Redirect เปลี่ยนหน้า)</span>
-            </button>
-          )}
 
           {/* Divider */}
           <div className="flex items-center gap-3">
@@ -289,31 +190,16 @@ export const AuthModalOrView: React.FC = () => {
           {errorMsg && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-              <span className="flex-1">{errorMsg}</span>
+              <span>{errorMsg}</span>
             </div>
           )}
 
           {/* Email / Password Form */}
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-300">
-                  อีเมล (Email)
-                </label>
-                {!isAdminEmailTyped && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail('kittiinthasoi@gmail.com');
-                      setErrorMsg(null);
-                    }}
-                    className="text-[11px] text-[#00D4FF] hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                  >
-                    <Crown className="w-3 h-3 text-amber-400" />
-                    <span>แอดมินคลิกกรอกด่วน</span>
-                  </button>
-                )}
-              </div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                อีเมล (Email)
+              </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
@@ -321,47 +207,30 @@ export const AuthModalOrView: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com หรือ kittiinthasoi@gmail.com"
-                  className={`w-full bg-slate-900 border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none transition-colors ${
-                    isAdminEmailTyped 
-                      ? 'border-amber-400 ring-1 ring-amber-400/50 bg-amber-950/20' 
-                      : 'border-slate-700 focus:border-[#00D4FF]'
-                  }`}
+                  placeholder="name@example.com"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00D4FF]"
                 />
               </div>
-
-              {/* Admin Email Notification Banner */}
-              {isAdminEmailTyped && (
-                <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-400/40 text-amber-200 text-xs flex items-start gap-2">
-                  <Crown className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
-                  <div className="leading-snug">
-                    <span className="font-bold">ตรวจพบอีเมลผู้ดูแลระบบสูงสุด: </span>
-                    <span>เพียงกดปุ่ม <strong>"เข้าสู่ระบบแอดมินทันที"</strong> ด้านล่าง โดยไม่ต้องใส่รหัสผ่าน</span>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {!isAdminEmailTyped && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  รหัสผ่าน (Password)
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="password"
-                    required={!isAdminEmailTyped}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="อย่างน้อย 6 ตัวอักษร"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00D4FF]"
-                  />
-                </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                รหัสผ่าน (Password)
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="อย่างน้อย 6 ตัวอักษร"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00D4FF]"
+                />
               </div>
-            )}
+            </div>
 
-            {!isAdminEmailTyped && authMode === 'signup' && (
+            {authMode === 'signup' && (
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   ยืนยันรหัสผ่าน (Confirm Password)
@@ -383,21 +252,12 @@ export const AuthModalOrView: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50 cursor-pointer ${
-                isAdminEmailTyped
-                  ? 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 shadow-[0_0_20px_rgba(251,191,36,0.4)]'
-                  : 'bg-[#00D4FF] hover:bg-[#00c0e8] text-slate-950 shadow-[0_0_15px_rgba(0,212,255,0.3)]'
-              }`}
+              className="w-full py-3 px-4 rounded-xl bg-[#00D4FF] hover:bg-[#00c0e8] text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(0,212,255,0.3)] disabled:opacity-50 cursor-pointer"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>กำลังดำเนินการ...</span>
-                </>
-              ) : isAdminEmailTyped ? (
-                <>
-                  <Crown className="w-4 h-4 text-slate-950" />
-                  <span>เข้าสู่ระบบแอดมินทันทีด้วยอีเมลนี้</span>
                 </>
               ) : authMode === 'signin' ? (
                 <>

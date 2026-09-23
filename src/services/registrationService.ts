@@ -82,240 +82,107 @@ export function subscribeFoundingKnightCounter(callback: (data: { count: number;
   });
 }
 
-function persistLocalAndServerUser(uid: string, userDoc: any) {
-  if (typeof window !== 'undefined' && uid) {
-    try {
-      localStorage.setItem(`WINRIDER_USER_DOC_${uid}`, JSON.stringify(userDoc));
-    } catch {}
-    fetch('/api/users/profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userDoc),
-    }).catch(() => {});
-  }
-}
-
 export async function registerKnight(payload: KnightRegistrationPayload): Promise<boolean> {
   const counterRef = doc(db, 'counters', 'foundingKnights');
   const userRef = doc(db, 'users', payload.uid);
   const knightRef = doc(db, 'knights', payload.uid);
 
-  let isFoundingKnight = false;
+  return await runTransaction(db, async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+    let count = 0;
+    let limit = 1000;
+    if (counterDoc.exists()) {
+      const cData = counterDoc.data();
+      count = Number(cData.count || 0);
+      limit = Number(cData.limit || 1000);
+    } else {
+      transaction.set(counterRef, { count: 0, limit: 1000 });
+    }
+    const isFoundingKnight = count < limit;
+    if (isFoundingKnight) transaction.update(counterRef, { count: count + 1 });
 
-  try {
-    isFoundingKnight = await runTransaction(db, async (transaction) => {
-      const counterDoc = await transaction.get(counterRef);
-      let count = 0;
-      let limit = 1000;
-      if (counterDoc.exists()) {
-        const cData = counterDoc.data();
-        count = Number(cData.count || 0);
-        limit = Number(cData.limit || 1000);
-      } else {
-        transaction.set(counterRef, { count: 0, limit: 1000 });
-      }
-      const founding = count < limit;
-      if (founding) transaction.update(counterRef, { count: count + 1 });
-
-      const userDoc = {
-        uid: payload.uid, email: payload.email, role: 'knight' as UserRole,
-        displayName: payload.displayName.trim(), name: payload.displayName.trim(),
-        phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
-        status: 'pending_review' as UserStatus,
-        level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
-        missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
-        pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      };
-      transaction.set(userRef, userDoc);
-
-      transaction.set(knightRef, {
-        ...FRESH_PROGRESSION,
-        displayName: payload.displayName.trim(), name: payload.displayName.trim(), email: payload.email.trim(),
-        phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
-        isOnline: false, vehicleType: payload.vehicleType, plateNumber: payload.plateNumber.trim(),
-        licenseNumber: payload.licenseNumber.trim(), kycStatus: 'pending', isFoundingKnight: founding,
-        equipmentPaidSatang: 0, dailyEquipmentCount: 0, certifications: [],
-        documents: { driverLicenseUrl: payload.driverLicenseUrl || '', vehiclePhotoUrl: payload.vehiclePhotoUrl || '' },
-        createdAt: serverTimestamp(),
-      });
-      return founding;
-    });
-  } catch (txErr) {
-    console.warn('Knight transaction fallback to direct setDoc:', txErr);
-    const userDoc = {
+    transaction.set(userRef, {
       uid: payload.uid, email: payload.email, role: 'knight' as UserRole,
       displayName: payload.displayName.trim(), name: payload.displayName.trim(),
       phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
       status: 'pending_review' as UserStatus,
       level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
       missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    };
-    await setDoc(userRef, userDoc, { merge: true });
-    await setDoc(knightRef, {
+      pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+
+    transaction.set(knightRef, {
       ...FRESH_PROGRESSION,
       displayName: payload.displayName.trim(), name: payload.displayName.trim(), email: payload.email.trim(),
       phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
       isOnline: false, vehicleType: payload.vehicleType, plateNumber: payload.plateNumber.trim(),
-      licenseNumber: payload.licenseNumber.trim(), kycStatus: 'pending', isFoundingKnight: false,
+      licenseNumber: payload.licenseNumber.trim(), kycStatus: 'pending', isFoundingKnight,
       equipmentPaidSatang: 0, dailyEquipmentCount: 0, certifications: [],
       documents: { driverLicenseUrl: payload.driverLicenseUrl || '', vehiclePhotoUrl: payload.vehiclePhotoUrl || '' },
-      createdAt: new Date().toISOString(),
-    }, { merge: true });
-  }
-
-  persistLocalAndServerUser(payload.uid, {
-    uid: payload.uid, email: payload.email, role: 'knight',
-    displayName: payload.displayName.trim(), phone: payload.phone.trim(),
-    province: payload.province.trim(), district: payload.district.trim(),
-    status: 'pending_review', level: 1, xp: 0, points: 0,
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      createdAt: serverTimestamp(),
+    });
+    return isFoundingKnight;
   });
-
-  return isFoundingKnight;
 }
 
 export async function registerCitizen(payload: CitizenRegistrationPayload): Promise<void> {
   const userRef = doc(db, 'users', payload.uid);
   const citizenRef = doc(db, 'citizens', payload.uid);
-
-  try {
-    await runTransaction(db, async (transaction) => {
-      transaction.set(userRef, {
-        uid: payload.uid, email: payload.email, role: 'citizen' as UserRole,
-        displayName: payload.displayName.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
-        status: 'active' as UserStatus, level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
-        missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
-        pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      });
-      transaction.set(citizenRef, {
-        ...FRESH_PROGRESSION,
-        displayName: payload.displayName.trim(), name: payload.displayName.trim(), email: payload.email.trim(),
-        phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(), savedAddresses: [],
-        emergencyContact: { name: payload.emergencyContactName.trim(), phone: payload.emergencyContactPhone.trim() }, createdAt: serverTimestamp(),
-      });
-    });
-  } catch (err) {
-    console.warn('registerCitizen transaction notice, using direct setDoc:', err);
-    await setDoc(userRef, {
+  await runTransaction(db, async (transaction) => {
+    transaction.set(userRef, {
       uid: payload.uid, email: payload.email, role: 'citizen' as UserRole,
       displayName: payload.displayName.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
       status: 'active' as UserStatus, level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
       missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    await setDoc(citizenRef, {
+      pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+    transaction.set(citizenRef, {
       ...FRESH_PROGRESSION,
       displayName: payload.displayName.trim(), name: payload.displayName.trim(), email: payload.email.trim(),
       phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(), savedAddresses: [],
-      emergencyContact: { name: payload.emergencyContactName.trim(), phone: payload.emergencyContactPhone.trim() },
-      createdAt: new Date().toISOString(),
-    }, { merge: true });
-  }
-
-  persistLocalAndServerUser(payload.uid, {
-    uid: payload.uid, email: payload.email, role: 'citizen',
-    displayName: payload.displayName.trim(), phone: payload.phone.trim(),
-    province: payload.province.trim(), district: payload.district.trim(),
-    status: 'active', level: 1, xp: 0, points: 0,
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      emergencyContact: { name: payload.emergencyContactName.trim(), phone: payload.emergencyContactPhone.trim() }, createdAt: serverTimestamp(),
+    });
   });
 }
 
 export async function registerMerchant(payload: MerchantRegistrationPayload): Promise<void> {
   const userRef = doc(db, 'users', payload.uid);
   const merchantRef = doc(db, 'merchants', payload.uid);
-
-  try {
-    await runTransaction(db, async (transaction) => {
-      transaction.set(userRef, {
-        uid: payload.uid, email: payload.email, role: 'merchant' as UserRole,
-        displayName: payload.displayName.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
-        status: 'pending_review' as UserStatus, level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
-        missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
-        pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      });
-      transaction.set(merchantRef, {
-        ...FRESH_PROGRESSION,
-        displayName: payload.displayName.trim(), name: payload.shopName.trim(), ownerName: payload.displayName.trim(),
-        email: payload.email.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
-        shopName: payload.shopName.trim(), shopType: payload.shopType.trim(), address: payload.address.trim(), gpRate: 10,
-        taxId: payload.taxId?.trim() || '', createdAt: serverTimestamp(),
-      });
-    });
-  } catch (err) {
-    console.warn('registerMerchant transaction notice, using direct setDoc:', err);
-    await setDoc(userRef, {
+  await runTransaction(db, async (transaction) => {
+    transaction.set(userRef, {
       uid: payload.uid, email: payload.email, role: 'merchant' as UserRole,
       displayName: payload.displayName.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
       status: 'pending_review' as UserStatus, level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
       missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    await setDoc(merchantRef, {
+      pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+    transaction.set(merchantRef, {
       ...FRESH_PROGRESSION,
       displayName: payload.displayName.trim(), name: payload.shopName.trim(), ownerName: payload.displayName.trim(),
       email: payload.email.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
       shopName: payload.shopName.trim(), shopType: payload.shopType.trim(), address: payload.address.trim(), gpRate: 10,
-      taxId: payload.taxId?.trim() || '', createdAt: new Date().toISOString(),
-    }, { merge: true });
-  }
-
-  persistLocalAndServerUser(payload.uid, {
-    uid: payload.uid, email: payload.email, role: 'merchant',
-    displayName: payload.displayName.trim(), phone: payload.phone.trim(),
-    province: payload.province.trim(), district: payload.district.trim(),
-    status: 'pending_review', level: 1, xp: 0, points: 0,
-    shopName: payload.shopName.trim(),
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      taxId: payload.taxId?.trim() || '', createdAt: serverTimestamp(),
+    });
   });
 }
 
 export async function registerPartner(payload: PartnerRegistrationPayload): Promise<void> {
   const userRef = doc(db, 'users', payload.uid);
   const partnerRef = doc(db, 'partners', payload.uid);
-
-  try {
-    await runTransaction(db, async (transaction) => {
-      transaction.set(userRef, {
-        uid: payload.uid, email: payload.email, role: 'partner' as UserRole,
-        displayName: payload.displayName.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
-        status: 'pending_review' as UserStatus, level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
-        missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
-        pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      });
-      transaction.set(partnerRef, {
-        ...FRESH_PROGRESSION,
-        displayName: payload.orgName.trim(), name: payload.orgName.trim(), contactPerson: payload.contactPerson.trim(),
-        contactEmail: payload.email.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
-        orgName: payload.orgName.trim(), orgType: payload.orgType.trim(), estimatedUsers: Number(payload.estimatedUsers) || 0,
-        gpRate: 10, createdAt: serverTimestamp(),
-      });
-    });
-  } catch (err) {
-    console.warn('registerPartner transaction notice, using direct setDoc:', err);
-    await setDoc(userRef, {
+  await runTransaction(db, async (transaction) => {
+    transaction.set(userRef, {
       uid: payload.uid, email: payload.email, role: 'partner' as UserRole,
       displayName: payload.displayName.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
       status: 'pending_review' as UserStatus, level: 1, xp: 0, points: 0, creditScore: 0, financialScore: 0, rideLaterCredit: 0,
       missionsCompleted: 0, missionStreak: 0, badges: [], achievements: [], questSeason: '2026-S3', questState: {},
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    await setDoc(partnerRef, {
+      pdpaConsent: { version: '1.0', acceptedAt: serverTimestamp() }, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+    transaction.set(partnerRef, {
       ...FRESH_PROGRESSION,
       displayName: payload.orgName.trim(), name: payload.orgName.trim(), contactPerson: payload.contactPerson.trim(),
       contactEmail: payload.email.trim(), phone: payload.phone.trim(), province: payload.province.trim(), district: payload.district.trim(),
       orgName: payload.orgName.trim(), orgType: payload.orgType.trim(), estimatedUsers: Number(payload.estimatedUsers) || 0,
-      gpRate: 10, createdAt: new Date().toISOString(),
-    }, { merge: true });
-  }
-
-  persistLocalAndServerUser(payload.uid, {
-    uid: payload.uid, email: payload.email, role: 'partner',
-    displayName: payload.displayName.trim(), phone: payload.phone.trim(),
-    province: payload.province.trim(), district: payload.district.trim(),
-    status: 'pending_review', level: 1, xp: 0, points: 0,
-    orgName: payload.orgName.trim(),
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      gpRate: 10, createdAt: serverTimestamp(),
+    });
   });
 }
