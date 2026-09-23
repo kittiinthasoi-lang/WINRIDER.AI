@@ -3962,22 +3962,41 @@ app.post("/api/orders/:id/completion-proof", rateLimit(10), async (req, res) => 
   }
   try {
     const orderRef = ordersCollection.doc(id);
-    const snap = await orderRef.get();
-    if (!snap.exists) return res.status(404).json({ error: "Order not found" });
-    const order = snap.data() as ServerOrder;
-    if (order.driverUserId !== user.uid) return res.status(403).json({ error: "Driver action required" });
-    if (order.status !== "in_transit") return res.status(409).json({ error: "Completion proof is only accepted while the ride is in transit" });
-    const updatedAt = new Date().toISOString();
-    const proof = {
-      completionProofUrl: proofUrl,
-      completionProofCapturedAt: updatedAt,
-      ...(Number.isFinite(latitude) && Number.isFinite(longitude) ? { completionProofLatitude: latitude, completionProofLongitude: longitude } : {})
-    };
-    await orderRef.update({ ...proof, updatedAt });
-    const updatedOrder = { ...order, ...proof, updatedAt };
-    resilientOrdersStore.set(id, updatedOrder);
+    const idempotency = rideMutationIdempotencyRef(req, "COMPLETION_PROOF", id, user.uid, { proofUrl });
+    let updatedOrder: ServerOrder | null = null;
+    await ordersDb.runTransaction(async (transaction) => {
+      const idempotencySnap = await transaction.get(idempotency.ref);
+      const snap = await transaction.get(orderRef);
+      if (!snap.exists) throw new Error("ORDER_NOT_FOUND");
+      const order = snap.data() as ServerOrder;
+      if (idempotencySnap.exists) {
+        updatedOrder = order;
+        return;
+      }
+      if (order.driverUserId !== user.uid) throw new Error("DRIVER_REQUIRED");
+      if (order.status !== "in_transit") throw new Error("PROOF_STATE_INVALID");
+      const updatedAt = new Date().toISOString();
+      const proof = {
+        completionProofUrl: proofUrl,
+        completionProofCapturedAt: updatedAt,
+        ...(Number.isFinite(latitude) && Number.isFinite(longitude) ? { completionProofLatitude: latitude, completionProofLongitude: longitude } : {})
+      };
+      updatedOrder = { ...order, ...proof, updatedAt };
+      transaction.update(orderRef, { ...proof, updatedAt });
+      transaction.create(idempotency.ref, {
+        logicalKey: idempotency.logicalKey,
+        action: "COMPLETION_PROOF",
+        rideId: id,
+        actorUid: user.uid,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+    if (updatedOrder) resilientOrdersStore.set(id, updatedOrder);
     return res.json({ success: true, order: updatedOrder });
   } catch (error: any) {
+    if (error?.message === "ORDER_NOT_FOUND") return res.status(404).json({ error: "Order not found" });
+    if (error?.message === "DRIVER_REQUIRED") return res.status(403).json({ error: "Driver action required" });
+    if (error?.message === "PROOF_STATE_INVALID") return res.status(409).json({ error: "Completion proof is only accepted while the ride is in transit" });
     console.error("[Completion Proof Error]:", error?.message);
     return res.status(503).json({ error: "ไม่สามารถบันทึกหลักฐานการส่งมอบได้" });
   }
