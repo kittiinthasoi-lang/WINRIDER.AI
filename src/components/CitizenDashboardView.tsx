@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { 
 import { auth } from '../firebase';
+import {
   Bike, 
   Package, 
   Dog, 
