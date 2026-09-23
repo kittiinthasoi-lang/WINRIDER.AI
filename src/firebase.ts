@@ -26,7 +26,6 @@ export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app)
 export const auth = getAuth(app);
 export const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.error('Unable to enable persistent Firebase session:', error);
-  throw error;
 });
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
