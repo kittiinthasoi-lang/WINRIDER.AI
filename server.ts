@@ -1137,71 +1137,8 @@ async function syncTatPublicData(kinds: PublicDataKind[]) {
   return imported;
 }
 
-function requireTatSyncSecret(req: express.Request, res: express.Response): boolean {
-  const configured = String(process.env.WIN_ALERT_INTERNAL_SYNC_SECRET || "").trim();
-  const supplied = String(req.headers["x-winrider-event-sync-secret"] || req.headers["x-winrider-tat-sync-secret"] || "").trim();
-  if (!configured) {
-    res.status(503).json({ error: "WIN_ALERT_INTERNAL_SYNC_SECRET is not configured" });
-    return false;
-  }
-  if (!supplied || supplied !== configured) {
-    res.status(401).json({ error: "Unauthorized public-data sync request" });
-    return false;
-  }
-  return true;
-}
-
-// Internal endpoint for a scheduler (for example GitHub Actions) to run source sync
-// without granting it an Admin Firebase session. The secret is never stored in source.
-app.post("/api/internal/public-data/sync-tat", rateLimit(2), async (req, res) => {
-  if (!requireTatSyncSecret(req, res)) return;
-  try {
-    const imported = await syncTatPublicData(["events", "attractions", "restaurants", "accommodations", "souvenirs"]);
-    return res.json({
-      success: true,
-      source: "TAT Data Catalog",
-      sourceDriven: true,
-      publicVisible: true,
-      imported,
-      syncedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("[TAT Internal Sync]", error instanceof Error ? error.message : error);
-    return res.status(503).json({ error: "ไม่สามารถซิงก์ข้อมูล TAT จากแหล่งต้นทางได้" });
-  }
-});
-
-
-function requireWinAlertSyncSecret(req: express.Request, res: express.Response): boolean {
-  const configured = String(process.env.WIN_ALERT_INTERNAL_SYNC_SECRET || "").trim();
-  const supplied = String(req.headers["x-winrider-event-sync-secret"] || req.headers["x-winrider-tat-sync-secret"] || "").trim();
-  if (!configured) {
-    res.status(503).json({ error: "WIN_ALERT_INTERNAL_SYNC_SECRET is not configured" });
-    return false;
-  }
-  if (!supplied || supplied !== configured) {
-    res.status(401).json({ error: "Unauthorized event sync request" });
-    return false;
-  }
-  return true;
-}
-
-app.post("/api/internal/events/sync", rateLimit(2), async (req, res) => {
-  if (!requireWinAlertSyncSecret(req, res)) return;
-  try {
-    const tat = await syncTatPublicData(["events"]);
-    dailyEventsCache.clear();
-    return res.json({
-      success: true,
-      sources: { tat },
-      syncedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("[WIN Alert Multi-source Sync]", error instanceof Error ? error.message : error);
-    return res.status(503).json({ error: "ไม่สามารถซิงก์ข้อมูล WIN Alert จากแหล่งจริงได้" });
-  }
-});
-
+// Public data sync is manual-only. Super Admin triggers source sync from
+// Admin > WIN Public Data Hub via /api/admin/public-data/import-tat.
 app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
   const eventDate = String(req.query.date || "").trim();
   const country = "TH";
@@ -1404,12 +1341,14 @@ app.post("/api/admin/public-data/import-tat", rateLimit(5), async (req, res) => 
   if (!user) return;
   if (!(await isAdminUser(user))) return res.status(403).json({ error: "Admin only" });
 
-  const requestedKind = String(req.body?.kind || "all") as PublicDataKind | "all";
-  const kinds: PublicDataKind[] = requestedKind === "all"
+  const requestedKinds = Array.isArray(req.body?.kinds)
+    ? req.body.kinds.map((value: unknown) => String(value))
+    : [String(req.body?.kind || "all")];
+  const kinds: PublicDataKind[] = requestedKinds.includes("all")
     ? ["events", "attractions", "restaurants", "accommodations", "souvenirs"]
-    : [requestedKind];
+    : requestedKinds as PublicDataKind[];
 
-  if (kinds.some((kind) => !Object.prototype.hasOwnProperty.call(TAT_PUBLIC_DATASETS, kind))) {
+  if (!kinds.length || kinds.some((kind) => !Object.prototype.hasOwnProperty.call(TAT_PUBLIC_DATASETS, kind))) {
     return res.status(400).json({ error: "Invalid public data kind" });
   }
 
