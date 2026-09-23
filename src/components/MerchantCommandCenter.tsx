@@ -16,8 +16,8 @@ import { getCurrentUserSession } from '../utils/userSession';
 import confetti from 'canvas-confetti';
 import { loadProfileCustomization } from '../services/profileService';
 import { ProfileQuickActions } from './ProfileQuickActions';
-import { 
 import { auth } from '../firebase';
+import {
   ShoppingBag, 
   Users, 
   Truck, 
