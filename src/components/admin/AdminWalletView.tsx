@@ -15,10 +15,14 @@ import {
   Loader2, 
   CheckCircle2, 
   FileText,
-  Lock
+  Lock,
+  Landmark,
+  Send,
+  XCircle
 } from 'lucide-react';
 import { getSystemWalletBreakdown, adjustWallet } from '../../services/adminService';
 import { SystemBucketsBreakdown, AdminLevel } from '../../types/admin';
+import { auth } from '../../firebase';
 
 interface AdminWalletViewProps {
   adminLevel: AdminLevel;
@@ -38,6 +42,38 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
   const [submittingAdjust, setSubmittingAdjust] = useState(false);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
+  // Super Admin system revenue payout (manual bank transfer)
+  const [systemAvailableSatang, setSystemAvailableSatang] = useState(0);
+  const [systemPayouts, setSystemPayouts] = useState<any[]>([]);
+  const [payoutAmountBaht, setPayoutAmountBaht] = useState('');
+  const [payoutBankName, setPayoutBankName] = useState('');
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
+  const [payoutAccountName, setPayoutAccountName] = useState('');
+  const [payoutBankRefs, setPayoutBankRefs] = useState<Record<string, string>>({});
+  const [payoutBusy, setPayoutBusy] = useState('');
+
+  const getAdminToken = async () => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error('เซสชัน Super Admin หมดอายุ');
+    return token;
+  };
+
+  const fetchSystemPayouts = async () => {
+    if (adminLevel !== 'super') return;
+    try {
+      const token = await getAdminToken();
+      const response = await fetch('/api/admin/system-payouts', {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'โหลดรายการถอนรายได้ไม่สำเร็จ');
+      setSystemAvailableSatang(Number(data.availableSatang || 0));
+      setSystemPayouts(data.payouts || []);
+    } catch (error) {
+      console.warn('fetchSystemPayouts error:', error);
+    }
+  };
+
   const fetchBreakdown = async () => {
     setLoading(true);
     try {
@@ -52,7 +88,78 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
 
   useEffect(() => {
     fetchBreakdown();
-  }, []);
+    void fetchSystemPayouts();
+  }, [adminLevel]);
+
+  const handleCreateSystemPayout = async () => {
+    const amount = Number(payoutAmountBaht);
+    if (!Number.isFinite(amount) || amount < 20) {
+      alert('ยอดถอนรายได้ขั้นต่ำ 20 บาท');
+      return;
+    }
+    if (Math.round(amount * 100) > systemAvailableSatang) {
+      alert('ยอดรายได้ระบบที่ถอนได้ไม่เพียงพอ');
+      return;
+    }
+    if (!payoutBankName.trim() || !payoutAccountNumber.trim() || !payoutAccountName.trim()) {
+      alert('กรุณากรอกธนาคาร เลขบัญชี และชื่อบัญชีให้ครบ');
+      return;
+    }
+    if (!confirm(`สร้างคำขอถอนรายได้ระบบ ฿${amount.toFixed(2)} เข้าบัญชี ${payoutAccountName.trim()}?`)) return;
+
+    setPayoutBusy('create');
+    try {
+      const token = await getAdminToken();
+      const response = await fetch('/api/admin/system-payout-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        body: JSON.stringify({
+          amount,
+          bankName: payoutBankName.trim(),
+          bankAccountNumber: payoutAccountNumber.trim(),
+          accountName: payoutAccountName.trim(),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'สร้างคำขอถอนรายได้ไม่สำเร็จ');
+      setSuccessNotice(data.message || 'สร้างคำขอถอนรายได้ระบบแล้ว');
+      setPayoutAmountBaht('');
+      await Promise.all([fetchSystemPayouts(), fetchBreakdown()]);
+    } catch (error: any) {
+      alert(error?.message || 'สร้างคำขอถอนรายได้ไม่สำเร็จ');
+    } finally {
+      setPayoutBusy('');
+    }
+  };
+
+  const handleSystemPayoutReview = async (payoutId: string, decision: 'PAID' | 'CANCEL') => {
+    const bankReference = (payoutBankRefs[payoutId] || '').trim();
+    if (decision === 'PAID' && !bankReference) {
+      alert('กรุณากรอกเลขอ้างอิงหลังโอนเงินจริง');
+      return;
+    }
+    if (!confirm(decision === 'PAID'
+      ? 'ยืนยันว่าได้โอนเงินจริงเข้าบัญชีปลายทางแล้ว? ระบบจะตัดรายได้จาก System Wallet และบันทึก Ledger'
+      : 'ยกเลิกคำขอนี้และปลดล็อกรายได้ระบบ?')) return;
+
+    setPayoutBusy(payoutId);
+    try {
+      const token = await getAdminToken();
+      const response = await fetch('/api/admin/system-payout-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        body: JSON.stringify({ payoutId, decision, bankReference }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'ยืนยันการถอนรายได้ไม่สำเร็จ');
+      setSuccessNotice(decision === 'PAID' ? 'ยืนยันการถอนรายได้ระบบเรียบร้อยแล้ว' : 'ยกเลิกคำขอถอนรายได้แล้ว');
+      await Promise.all([fetchSystemPayouts(), fetchBreakdown()]);
+    } catch (error: any) {
+      alert(error?.message || 'ยืนยันการถอนรายได้ไม่สำเร็จ');
+    } finally {
+      setPayoutBusy('');
+    }
+  };
 
   const formatBaht = (satang: number) => {
     return (satang / 100).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -145,6 +252,107 @@ export const AdminWalletView: React.FC<AdminWalletViewProps> = ({ adminLevel }) 
             <span>{successNotice}</span>
           </div>
         </div>
+      )}
+
+      {adminLevel === 'super' && (
+        <section className="rounded-2xl border border-amber-400/30 bg-[#0A1633] p-5 shadow-xl">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <Landmark className="h-5 w-5 text-amber-300" />
+                <h2 className="text-lg font-black text-white">ถอนรายได้ WINRIDER เข้าบัญชีธนาคาร</h2>
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                ระบบไม่โอนเงินผ่าน Payment Gateway • สร้างคำขอ → โอนเงินจริงจากบัญชีบริษัท → ใส่เลขอ้างอิง → ยืนยัน Ledger
+              </p>
+            </div>
+            <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-right">
+              <p className="text-[10px] text-emerald-200/70">รายได้ระบบที่ถอนได้</p>
+              <p className="font-mono text-lg font-black text-emerald-300">฿{formatBaht(systemAvailableSatang)}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <input
+              type="number"
+              min="20"
+              step="0.01"
+              value={payoutAmountBaht}
+              onChange={(e) => setPayoutAmountBaht(e.target.value)}
+              placeholder="จำนวนเงิน เช่น 500.00"
+              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-400/50"
+            />
+            <input
+              value={payoutBankName}
+              onChange={(e) => setPayoutBankName(e.target.value)}
+              placeholder="ธนาคารปลายทาง"
+              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-400/50"
+            />
+            <input
+              value={payoutAccountNumber}
+              onChange={(e) => setPayoutAccountNumber(e.target.value)}
+              placeholder="เลขบัญชี"
+              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-400/50"
+            />
+            <input
+              value={payoutAccountName}
+              onChange={(e) => setPayoutAccountName(e.target.value)}
+              placeholder="ชื่อบัญชี"
+              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-400/50"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void handleCreateSystemPayout()}
+            disabled={payoutBusy === 'create'}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-300 px-4 py-2.5 text-xs font-black text-slate-950 disabled:opacity-50"
+          >
+            {payoutBusy === 'create' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            สร้างคำขอถอนรายได้
+          </button>
+
+          {systemPayouts.length > 0 && (
+            <div className="mt-5 space-y-3 border-t border-white/10 pt-4">
+              <h3 className="text-sm font-black text-white">รอโอนเงินจริง ({systemPayouts.length})</h3>
+              {systemPayouts.map((item) => (
+                <div key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <div className="grid gap-1 text-xs text-slate-300 sm:grid-cols-2">
+                    <p>ยอด: <strong className="text-amber-300">฿{formatBaht(Number(item.amountSatang || 0))}</strong></p>
+                    <p>ธนาคาร: <strong>{item.bankName}</strong></p>
+                    <p>เลขบัญชี: <strong className="font-mono">{item.bankAccountNumber}</strong></p>
+                    <p>ชื่อบัญชี: <strong>{item.accountName}</strong></p>
+                  </div>
+                  <input
+                    value={payoutBankRefs[item.id] || ''}
+                    onChange={(e) => setPayoutBankRefs((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                    placeholder="เลขอ้างอิงหลังโอนเงินจริง"
+                    className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none focus:border-emerald-400/50"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleSystemPayoutReview(item.id, 'PAID')}
+                      disabled={payoutBusy === item.id}
+                      className="flex-1 rounded-xl bg-emerald-400 px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="mr-1 inline h-4 w-4" />
+                      โอนจริงแล้ว • ยืนยัน
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSystemPayoutReview(item.id, 'CANCEL')}
+                      className="rounded-xl bg-red-500/15 px-3 py-2 text-xs font-bold text-red-300"
+                    >
+                      <XCircle className="mr-1 inline h-4 w-4" />
+                      ยกเลิก
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       {/* Big Red Warning IF Ledger is Not Balanced */}

@@ -5,7 +5,10 @@ export interface WalletStateResponse {
   walletId: string;
   role: 'citizen' | 'knight' | 'merchant' | 'partner';
   balanceSatang: number;
+  lockedSatang: number;
+  availableSatang: number;
   balance: number;
+  availableBalance: number;
   systemPromptPay: {
     configured: boolean;
     promptPayId: string;
@@ -25,10 +28,32 @@ export interface WalletStateResponse {
     amountSatang: number;
     amountBaht: number;
     promptPayOrAccount: string;
+    accountName?: string;
+    bankName?: string;
     status: string;
     createdAt?: any;
   }>;
 }
+
+const emptyWallet = (role?: string): WalletStateResponse => ({
+  userId: auth.currentUser?.uid || '',
+  walletId: '',
+  role: (role as WalletStateResponse['role']) || 'citizen',
+  balanceSatang: 0,
+  lockedSatang: 0,
+  availableSatang: 0,
+  balance: 0,
+  availableBalance: 0,
+  systemPromptPay: {
+    configured: false,
+    promptPayId: '',
+    accountName: '',
+    bankName: '',
+    bankAccountNumber: '',
+  },
+  submissions: [],
+  withdrawals: [],
+});
 
 const getToken = async (): Promise<string | null> => {
   return (await auth.currentUser?.getIdToken()) || null;
@@ -36,45 +61,14 @@ const getToken = async (): Promise<string | null> => {
 
 export async function getWalletMe(role?: string): Promise<WalletStateResponse> {
   const token = await getToken();
-  if (!token) {
-    return {
-      userId: '',
-      walletId: '',
-      role: 'citizen',
-      balanceSatang: 0,
-      balance: 0.0,
-      systemPromptPay: {
-        configured: false,
-        promptPayId: '',
-        accountName: 'WINRIDER.AI SYSTEM WALLET',
-      },
-      submissions: [],
-      withdrawals: [],
-    };
-  }
+  if (!token) return emptyWallet(role);
 
   const query = role ? `?role=${encodeURIComponent(role)}` : '';
   const res = await fetch(`/api/wallet/me${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  if (!res.ok) {
-    return {
-      userId: auth.currentUser?.uid || '',
-      walletId: '',
-      role: (role as any) || 'citizen',
-      balanceSatang: 0,
-      balance: 0.0,
-      systemPromptPay: {
-        configured: false,
-        promptPayId: '',
-        accountName: '',
-      },
-      submissions: [],
-      withdrawals: [],
-    };
-  }
-
+  if (!res.ok) return emptyWallet(role);
   return await res.json();
 }
 
@@ -92,9 +86,7 @@ export async function submitTopupProof(amount: number, imageDataUrl: string) {
   });
 
   const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'ส่งสลิปไม่สำเร็จ');
-  }
+  if (!res.ok) throw new Error(data.error || 'ส่งสลิปไม่สำเร็จ');
   return data;
 }
 
@@ -117,8 +109,6 @@ export async function submitWithdrawal(params: {
   });
 
   const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'ถอนเงินไม่สำเร็จ');
-  }
+  if (!res.ok) throw new Error(data.error || 'ถอนเงินไม่สำเร็จ');
   return data;
 }
