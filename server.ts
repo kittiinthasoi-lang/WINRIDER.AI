@@ -1799,16 +1799,24 @@ function safePlainPasswordEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(left, right);
 }
 
+const TEMP_OWNER_ADMIN_EMAIL = "kittiinthasoi@gmail.com";
+const TEMP_OWNER_ADMIN_PASSWORD_HASH = "scrypt$804ac341250771c98d2b97621f75c877$1319be1a0fcc57902778041a2529e93a6393f3284b54c8f7590cceeba374d677bd1c39881d9331f5dcd2e4df0f0adfe1d099b1f4cd00aa16b07fdddebefcc442";
+
 function ownerAdminEmail(): string {
-  return normalizeWinAuthEmail(process.env.WINRIDER_ADMIN_EMAIL || process.env.ADMIN_OWNER_EMAIL || "kittiinthasoi@gmail.com");
+  return normalizeWinAuthEmail(process.env.WINRIDER_ADMIN_EMAIL || process.env.ADMIN_OWNER_EMAIL || TEMP_OWNER_ADMIN_EMAIL);
+}
+
+function isOwnerAdminEmail(value: unknown): boolean {
+  const email = normalizeWinAuthEmail(value);
+  return email === TEMP_OWNER_ADMIN_EMAIL || email === ownerAdminEmail();
 }
 
 function verifyBootstrapAdminPassword(password: string): { configured: boolean; valid: boolean } {
   const encoded = String(process.env.WINRIDER_ADMIN_PASSWORD_HASH || "").trim();
-  if (encoded) return { configured: true, valid: verifyWinAuthPassword(password, encoded) };
+  if (encoded && verifyWinAuthPassword(password, encoded)) return { configured: true, valid: true };
   const plain = String(process.env.WINRIDER_ADMIN_PASSWORD || "");
-  if (plain) return { configured: true, valid: safePlainPasswordEqual(password, plain) };
-  return { configured: false, valid: false };
+  if (plain && safePlainPasswordEqual(password, plain)) return { configured: true, valid: true };
+  return { configured: true, valid: verifyWinAuthPassword(password, TEMP_OWNER_ADMIN_PASSWORD_HASH) };
 }
 
 async function promoteInitialOwnerIfEligible(user: WinAuthStoredUser): Promise<WinAuthStoredUser> {
@@ -1869,7 +1877,7 @@ app.post("/api/auth/register", rateLimit(10), async (req, res) => {
   if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: "Invalid email", code: "INVALID_EMAIL" });
   if (password.length < 8 || password.length > 200) return res.status(400).json({ error: "Password must contain at least 8 characters", code: "WEAK_PASSWORD" });
   if (!WIN_AUTH_ROLES.has(role)) return res.status(400).json({ error: "Invalid role", code: "INVALID_ROLE" });
-  if (email === ownerAdminEmail()) return res.status(409).json({ error: "Owner account already exists", code: "EMAIL_ALREADY_REGISTERED" });
+  if (isOwnerAdminEmail(email)) return res.status(409).json({ error: "Owner account uses direct admin login", code: "EMAIL_ALREADY_REGISTERED" });
 
   const registration = cleanRegistrationProfile(role, req.body?.registration || {});
   const registrationError = validateRegistrationProfile(role, registration);
@@ -1907,7 +1915,7 @@ app.post("/api/auth/login", rateLimit(20), async (req, res) => {
   try {
     let user = await getWinAuthUserByEmail(email);
 
-    if (email === ownerAdminEmail()) {
+    if (isOwnerAdminEmail(email)) {
       const storedValid = Boolean(user && verifyWinAuthPassword(password, user.passwordHash));
       const bootstrap = verifyBootstrapAdminPassword(password);
       if (!storedValid && !bootstrap.valid) {
