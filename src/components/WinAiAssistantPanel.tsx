@@ -295,14 +295,27 @@ export const WinAiAssistantPanel: React.FC<Props> = ({ mode: propMode, onModeCha
           throw errorObj;
         }
       } else {
-        const assistantMessage: ChatMessage = {
-          id: `asst-${Date.now()}`,
-          role: 'assistant',
-          text: String(data.reply || 'ไม่พบคำตอบจากระบบ'),
-          timestamp: Date.now(),
-          source: data.source || 'gemini-3.6-flash'
-        };
-        setMessages(prev => [...prev, assistantMessage]);
+        if (data.externalOnly) {
+          try { await navigator.clipboard?.writeText(String(data.prompt || textToSend)); } catch {}
+          const links = Array.isArray(data.providers) ? data.providers.map((p: any) => `${p.name}: ${p.url}`).join('\n') : '';
+          const assistantMessage: ChatMessage = {
+            id: `asst-${Date.now()}`,
+            role: 'assistant',
+            text: `WINRIDER ไม่ส่งคำถามไป AI ภายในระบบและไม่ใช้ API key\n\nคัดลอก Prompt ให้แล้ว กรุณาเปิด AI ภายนอกที่คุณเลือก:\n${links}`,
+            timestamp: Date.now(),
+            source: 'External AI Handoff'
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+        } else {
+          const assistantMessage: ChatMessage = {
+            id: `asst-${Date.now()}`,
+            role: 'assistant',
+            text: String(data.reply || 'ไม่พบคำตอบจากระบบ'),
+            timestamp: Date.now(),
+            source: data.source || 'External AI Handoff'
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+        }
       }
     } catch (error: any) {
       clearTimeout(timeoutId);
