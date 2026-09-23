@@ -265,7 +265,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-4xl sm:text-5xl font-black tracking-tight text-[#FFD700] drop-shadow-[0_0_20px_rgba(255,215,0,0.3)]">
-              ฿{balance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ฿{availableBalance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             <span className="text-sm font-bold text-slate-300">บาท</span>
           </div>
@@ -462,13 +462,13 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
             <button
               type="button"
               onClick={handleDepositSubmit}
-              disabled={depositBusy || !proofFile || depositAmount <= 0}
+              disabled={depositBusy || !walletData?.systemPromptPay?.configured || !proofFile || depositAmount <= 0}
               className="w-full rounded-2xl bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 py-3.5 text-sm font-black text-slate-950 shadow-[0_0_20px_rgba(16,185,129,0.35)] transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {depositBusy ? (
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>กำลังส่งสลิปให้ AI ตรวจสอบ...</span>
+                  <span>กำลังส่งสลิปให้ Admin ตรวจ...</span>
                 </span>
               ) : (
                 'ยืนยันส่งสลิปเติมเงินเข้า WIN Wallet'
@@ -518,7 +518,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
             </span>
           </div>
 
-          {balance <= 0 && (
+          {availableBalance <= 0 && (
             <div className="flex items-start gap-2.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 p-3.5 text-xs text-amber-200">
               <AlertCircle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
               <div>
