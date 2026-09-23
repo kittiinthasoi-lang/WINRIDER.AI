@@ -4,22 +4,45 @@
     <script>
       // Suppress benign Vite WebSocket connection notice in sandboxed AI Studio preview
       (function() {
-        var origError = console.error;
-        var origWarn = console.warn;
-        console.error = function() {
-          var msg = arguments[0];
-          if (typeof msg === 'string' && (msg.indexOf('[vite] failed to connect') !== -1 || msg.indexOf('vite-plugin-pwa') !== -1)) {
-            return;
+        try {
+          if (typeof console === 'undefined') return;
+          var origError = typeof console.error === 'function' ? console.error : null;
+          var origWarn = typeof console.warn === 'function' ? console.warn : null;
+          var patchedError = function() {
+            var msg = arguments[0];
+            if (typeof msg === 'string' && (msg.indexOf('[vite] failed to connect') !== -1 || msg.indexOf('vite-plugin-pwa') !== -1)) {
+              return;
+            }
+            if (origError) {
+              return origError.apply(console, arguments);
+            }
+          };
+          var patchedWarn = function() {
+            var msg = arguments[0];
+            if (typeof msg === 'string' && (msg.indexOf('[vite] failed to connect') !== -1 || msg.indexOf('[vite]') !== -1)) {
+              return;
+            }
+            if (origWarn) {
+              return origWarn.apply(console, arguments);
+            }
+          };
+
+          try {
+            console.error = patchedError;
+          } catch (_) {
+            try {
+              Object.defineProperty(console, 'error', { value: patchedError, writable: true, configurable: true });
+            } catch (__) {}
           }
-          return origError.apply(console, arguments);
-        };
-        console.warn = function() {
-          var msg = arguments[0];
-          if (typeof msg === 'string' && (msg.indexOf('[vite] failed to connect') !== -1 || msg.indexOf('[vite]') !== -1)) {
-            return;
+
+          try {
+            console.warn = patchedWarn;
+          } catch (_) {
+            try {
+              Object.defineProperty(console, 'warn', { value: patchedWarn, writable: true, configurable: true });
+            } catch (__) {}
           }
-          return origWarn.apply(console, arguments);
-        };
+        } catch (_) {}
       })();
     </script>
     <meta charset="UTF-8" />

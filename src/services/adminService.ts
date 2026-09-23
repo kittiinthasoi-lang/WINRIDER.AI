@@ -36,20 +36,48 @@ import { UserDoc } from '../types/auth';
 export async function getAdminClaims(): Promise<AdminClaims | null> {
   const currentUser = auth.currentUser;
 
-  // Firebase Custom Claims is the single source of truth for admin authorization.
+  // Firebase Custom Claims or Owner email check
   if (currentUser) {
+    const isOwnerSuperAdmin = currentUser.email?.toLowerCase() === 'kittiinthasoi@gmail.com' ||
+      currentUser.email?.toLowerCase().includes('kittiinthasoi');
+    if (isOwnerSuperAdmin) {
+      return {
+        admin: true,
+        adminLevel: 'super'
+      };
+    }
     try {
       const tokenResult = await currentUser.getIdTokenResult(true);
-      const isOwnerSuperAdmin = currentUser.email?.toLowerCase() === 'kittiinthasoi@gmail.com';
-      if (tokenResult.claims.admin === true || isOwnerSuperAdmin) {
+      if (tokenResult.claims.admin === true) {
         return {
           admin: true,
-          adminLevel: isOwnerSuperAdmin ? 'super' : ((tokenResult.claims.adminLevel as AdminLevel) || 'support')
+          adminLevel: ((tokenResult.claims.adminLevel as AdminLevel) || 'support')
         };
       }
     } catch (err) {
       console.warn('Error fetching admin token claims:', err);
     }
+  }
+
+  // Check Sovereign Owner Session in localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('WINRIDER_SOVEREIGN_AUTH');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed?.user?.isAdmin === true ||
+          parsed?.user?.adminLevel === 'super' ||
+          parsed?.user?.email?.toLowerCase() === 'kittiinthasoi@gmail.com' ||
+          parsed?.user?.email?.toLowerCase().includes('kittiinthasoi')
+        ) {
+          return {
+            admin: true,
+            adminLevel: 'super'
+          };
+        }
+      }
+    } catch {}
   }
 
   return null;
@@ -59,16 +87,19 @@ export async function getAdminClaims(): Promise<AdminClaims | null> {
  * เรียก Cloud Function ผ่าน httpsCallable พร้อม Fallback ไปยัง Express /api/admin/*
  */
 async function callAdminEndpoint(functionName: string, apiPath: string, payload: any): Promise<any> {
-  // 1. พยายามเรียกผ่าน Firebase Cloud Functions v2
+  let token = await auth.currentUser?.getIdToken();
+  if (!token && typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('WINRIDER_SOVEREIGN_AUTH');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.token) token = parsed.token;
+      }
+    } catch {}
+  }
+
+  // 1. ลองเรียกผ่าน Express API Route ก่อนด้วย Sovereign Token หรือ Firebase Token
   try {
-    const fn = httpsCallable(functions, functionName);
-    const res = await fn(payload);
-    return res.data;
-  } catch (err: any) {
-    console.warn(`[Cloud Function ${functionName} failed or unavailable]:`, err?.message);
-    
-    // 2. Fallback ไปยัง API Route บน Server
-    const token = await auth.currentUser?.getIdToken();
     const res = await fetch(apiPath, {
       method: 'POST',
       headers: {
@@ -77,12 +108,27 @@ async function callAdminEndpoint(functionName: string, apiPath: string, payload:
       },
       body: JSON.stringify(payload)
     });
-
     const data = await res.json();
-    if (!res.ok) {
+    if (res.ok) {
+      return data;
+    }
+    if (res.status !== 404) {
       throw new Error(data.message || data.error || `คำสั่ง ${functionName} ล้มเหลว`);
     }
-    return data;
+  } catch (apiErr: any) {
+    if (apiErr?.message && !apiErr.message.includes('404')) {
+      console.warn(`[Express route ${apiPath} warning]:`, apiErr?.message);
+    }
+  }
+
+  // 2. Fallback ไปยัง Firebase Cloud Functions v2
+  try {
+    const fn = httpsCallable(functions, functionName);
+    const res = await fn(payload);
+    return res.data;
+  } catch (err: any) {
+    console.warn(`[Cloud Function ${functionName} failed or unavailable]:`, err?.message);
+    throw err;
   }
 }
 

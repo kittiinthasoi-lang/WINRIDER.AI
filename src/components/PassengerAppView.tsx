@@ -78,6 +78,8 @@ import {
   Bot,
   Play,
   ArrowRight,
+  ArrowLeft,
+  X,
   Headphones,
   Check,
   Sliders,
@@ -3910,11 +3912,31 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
       {showExpressAiVerifier && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-2xl max-h-[94vh] overflow-y-auto">
+          <div className="w-full max-w-2xl max-h-[94vh] overflow-y-auto space-y-2">
+            {/* Top Back / Cancel Bar */}
+            <div className="flex items-center justify-between px-1">
+              <button
+                type="button"
+                onClick={() => setShowExpressAiVerifier(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-400/40 text-xs font-bold transition shadow-md active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4 text-cyan-400" />
+                <span>ย้อนกลับ (ยกเลิกตรวจรูปพัสดุ)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowExpressAiVerifier(false)}
+                className="p-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition"
+                title="ปิด"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             <AIProductPhotoVerifier
               audioEnabled={audioEnabled}
               initialItemName="WIN Express พัสดุ"
               initialCategory="พัสดุ / สิ่งของสำหรับจัดส่ง"
+              onBack={() => setShowExpressAiVerifier(false)}
               onVerificationComplete={(result) => {
                 if (!result.isVerified) return;
                 setExpressAiVerification(result);

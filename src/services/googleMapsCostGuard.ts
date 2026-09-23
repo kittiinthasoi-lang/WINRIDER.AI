@@ -22,10 +22,18 @@ function requestKey(input: RequestInfo | URL, init?: RequestInit): string {
 }
 function cloneResponse(response: Response): Response { return response.clone(); }
 export function installGoogleMapsCostGuard(): void {
-  if (typeof window === 'undefined' || (window as any).__winriderGoogleMapsCostGuardInstalled) return;
-  (window as any).__winriderGoogleMapsCostGuardInstalled = true;
+  if (typeof window === 'undefined') return;
+  try {
+    if ((window as any).__winriderGoogleMapsCostGuardInstalled) return;
+    (window as any).__winriderGoogleMapsCostGuardInstalled = true;
+  } catch {
+    return;
+  }
+
+  if (typeof window.fetch !== 'function') return;
   const originalFetch = window.fetch.bind(window);
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+
+  const guardedFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     let pathname = '';
     try { pathname = new URL(url, window.location.href).pathname; } catch { return originalFetch(input, init); }
@@ -49,4 +57,18 @@ export function installGoogleMapsCostGuard(): void {
     inFlight.set(key, promise);
     return cloneResponse(await promise);
   };
+
+  try {
+    window.fetch = guardedFetch;
+  } catch {
+    try {
+      Object.defineProperty(window, 'fetch', {
+        value: guardedFetch,
+        writable: true,
+        configurable: true,
+      });
+    } catch {
+      // If window.fetch is completely immutable in the runtime environment, fail gracefully
+    }
+  }
 }

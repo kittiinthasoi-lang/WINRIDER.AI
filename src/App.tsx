@@ -620,6 +620,7 @@ export default function App() {
 
         {activeMode === 'admin' && (
           <AdminRoute
+            isOwnerAdmin={isOwnerAdmin}
             onRedirectHome={handleExitAdmin}
           >
             {(claims) => (

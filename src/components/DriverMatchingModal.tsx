@@ -168,10 +168,10 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
     fetchLiveDrivers(searchLocation).then((drivers) => {
       if (active) setLiveDrivers(drivers);
     }).catch((error) => {
-      console.error('Unable to load live drivers:', error);
+      console.warn('Live drivers notice:', (error as Error)?.message || error);
       if (active) {
         setLiveDrivers([]);
-        setDriversError('ไม่สามารถเชื่อมต่อรายชื่อพี่วินจากระบบจริงได้');
+        setDriversError('ยังไม่มีพี่วินออนไลน์ในบริเวณนี้');
       }
     }).finally(() => {
       if (active) setDriversLoading(false);

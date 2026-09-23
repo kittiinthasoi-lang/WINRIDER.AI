@@ -13,7 +13,8 @@ import {
   Check, 
   Image as ImageIcon,
   Layers,
-  Award
+  Award,
+  ArrowLeft
 } from 'lucide-react';
 import { playTactileBlip, playLevelUpFanfare, playRadarScan } from '../utils/audio';
 import confetti from 'canvas-confetti';
@@ -41,13 +42,15 @@ interface AIProductPhotoVerifierProps {
   audioEnabled?: boolean;
   initialItemName?: string;
   initialCategory?: string;
+  onBack?: () => void;
 }
 
 export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
   onVerificationComplete,
   audioEnabled = true,
   initialItemName = '',
-  initialCategory = ''
+  initialCategory = '',
+  onBack
 }) => {
   const [photoSource, setPhotoSource] = useState<'camera' | 'upload' | 'sample'>('upload');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -147,30 +150,53 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
   return (
     <div className="p-4 rounded-2xl bg-[#040A18] border-2 border-cyan-500/50 shadow-[0_0_25px_rgba(0,210,255,0.15)] space-y-4">
       {/* Header Banner */}
-      <div className="flex items-center justify-between pb-2 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
+      <div className="flex items-center justify-between pb-2 border-b border-white/10 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="p-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-cyan-300 border border-cyan-400/40 hover:border-cyan-300 transition shrink-0 flex items-center justify-center shadow-md active:scale-95"
+              title="ย้อนกลับ"
+              aria-label="ย้อนกลับ"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shrink-0">
             <Cpu className="w-4 h-4 animate-pulse" />
           </div>
-          <div>
-            <h4 className="text-xs font-black text-white flex items-center gap-1.5">
+          <div className="min-w-0">
+            <h4 className="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
               <span>AI VISION GUARD: ยืนยันรูปถ่ายสินค้าทุกครั้ง</span>
               <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-400/20 text-[#FFD700] border border-amber-400/40">
                 MANDATORY RULE
               </span>
             </h4>
-            <p className="text-[10px] text-slate-400 font-mono">
+            <p className="text-[10px] text-slate-400 font-mono truncate">
               ระบบวิเคราะห์ภาพสินค้าจริงด้วย WIN Photo Review • ผล AI ไม่ใช่การรับประกันความแท้ 100%
             </p>
           </div>
         </div>
 
-        {verificationResult?.isVerified && (
-          <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 text-[10px] font-mono font-bold flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>AI VERIFIED</span>
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {verificationResult?.isVerified && (
+            <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 text-[10px] font-mono font-bold flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>AI VERIFIED</span>
+            </span>
+          )}
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/15 text-[11px] font-bold transition flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>กลับ</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Photo Selector Controls */}
@@ -334,6 +360,18 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
         >
           <Sparkles className="w-4 h-4" />
           <span>{isScanning ? 'กำลังวิเคราะห์ด้วย AI Vision...' : 'เริ่มสแกนและยืนยันรูปภาพด้วย AI ✨'}</span>
+        </button>
+      )}
+
+      {/* Optional Back / Cancel Button */}
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 text-slate-400 hover:text-white bg-slate-900/60 hover:bg-slate-800 border border-slate-700/60 transition active:scale-98"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
+          <span>ย้อนกลับ (ยกเลิกการถ่ายรูปเช็คของ)</span>
         </button>
       )}
     </div>

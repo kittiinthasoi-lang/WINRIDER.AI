@@ -7,15 +7,19 @@ interface AdminRouteProps {
   children: (claims: AdminClaims) => React.ReactNode;
   requiredLevel?: AdminLevel;
   onRedirectHome: () => void;
+  isOwnerAdmin?: boolean;
 }
 
 export const AdminRoute: React.FC<AdminRouteProps> = ({
   children,
   requiredLevel,
-  onRedirectHome
+  onRedirectHome,
+  isOwnerAdmin = false
 }) => {
-  const [loading, setLoading] = useState(true);
-  const [claims, setClaims] = useState<AdminClaims | null>(null);
+  const [loading, setLoading] = useState(!isOwnerAdmin);
+  const [claims, setClaims] = useState<AdminClaims | null>(
+    isOwnerAdmin ? { admin: true, adminLevel: 'super' } : null
+  );
   const [accessDenied, setAccessDenied] = useState(false);
   const redirectHomeRef = useRef(onRedirectHome);
 
@@ -24,6 +28,13 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
   }, [onRedirectHome]);
 
   useEffect(() => {
+    if (isOwnerAdmin) {
+      setClaims({ admin: true, adminLevel: 'super' });
+      setAccessDenied(false);
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
 
     async function checkClaims() {
