@@ -53,7 +53,7 @@ There is no Ticketmaster developer key or paid event-provider key requirement.
 
 Required deployment/GitHub configuration:
 - `WINRIDER_APP_URL`
-- `WIN_ALERT_INTERNAL_SYNC_SECRET` (or legacy `TAT_INTERNAL_SYNC_SECRET`)
+- `WIN_ALERT_INTERNAL_SYNC_SECRET`
 
 ## Source acceptance rules
 
