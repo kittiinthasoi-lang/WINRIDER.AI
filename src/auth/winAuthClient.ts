@@ -102,6 +102,14 @@ export async function signInWinAuth(email: string, password: string) {
   return storeSession(payload);
 }
 
+export async function enterTemporaryAdminAccess() {
+  const payload = await request('/api/auth/temporary-admin-access', {
+    method: 'POST',
+    body: '{}',
+  });
+  return storeSession(payload);
+}
+
 export async function registerWinAuth(email: string, password: string, role: UserRole, registration: RegistrationProfile) {
   const payload = await request('/api/auth/register', {
     method: 'POST',
