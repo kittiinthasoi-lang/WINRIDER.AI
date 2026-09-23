@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { RegistrationProfile, UserDoc, UserRole } from '../types/auth';
 import {
   WinAuthUser,
+  enterTemporaryAdminAccess,
   refreshWinAuthProfile,
   registerWinAuth,
   restoreWinAuthSession,
@@ -15,6 +16,7 @@ interface AuthContextType {
   userData: UserDoc | null;
   role: UserRole | null;
   loading: boolean;
+  enterTemporaryAdmin: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, role: UserRole, registration: RegistrationProfile) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -51,6 +53,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       active = false;
     };
   }, []);
+
+  const enterTemporaryAdmin = async () => {
+    setLoading(true);
+    try {
+      const { user, profile } = await enterTemporaryAdminAccess();
+      setFirebaseUser(user);
+      setUserData(profile);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const signInWithEmail = async (email: string, password: string) => {
     setLoading(true);
@@ -110,6 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userData,
         role: userData?.role ?? null,
         loading,
+        enterTemporaryAdmin,
         signInWithEmail,
         signUpWithEmail,
         resetPassword,
