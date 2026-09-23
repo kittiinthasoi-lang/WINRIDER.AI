@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { browserLocalPersistence, getAuth, setPersistence } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import fallbackConfig from '../firebase-applet-config.json';
@@ -24,10 +24,11 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 export const auth = getAuth(app);
+export const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Unable to enable persistent Firebase session:', error);
+});
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Prevent accidental Google Maps/Places/Routes request loops in the browser.
 // This is an optimization/safety layer; Cloud billing quotas remain authoritative.

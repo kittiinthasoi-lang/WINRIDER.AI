@@ -1250,7 +1250,7 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
     publicDataDocs = publicDataSnapshot.docs;
   } catch (dbErr) {
     // Non-fatal if firestore permissions in server environment are missing/restricted
-    console.warn("[Events API] public-data firestore notice (fallback to in-memory events):", (dbErr as Error)?.message || dbErr);
+    console.warn("[Events API] public-data firestore notice; returning no fabricated events:", (dbErr as Error)?.message || dbErr);
   }
 
   try {
@@ -1260,60 +1260,6 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
         .map((docSnap) => ({ docSnap, item: docSnap.data() || {} }))
         .filter(({ item }) => String(item.kind || item.sourceKind || "").toLowerCase() === "events"),
     ];
-
-    if (candidates.length === 0) {
-      const fallbackEvents = [
-        {
-          id: "tat-curated-1",
-          title: "ตลาดนัดจตุจักร • แหล่งช้อปปิ้งและสินค้าศิลปวัฒนธรรม",
-          category: "market",
-          venueName: "สวนจตุจักร กรุงเทพฯ",
-          venueArea: "จตุจักร กรุงเทพมหานคร",
-          latitude: 13.7999,
-          longitude: 100.5504,
-          startAt: `${eventDate}T09:00:00+07:00`,
-          endAt: `${eventDate}T18:00:00+07:00`,
-          description: "ตลาดนัดกลางแจ้งขนาดใหญ่ ศูนย์รวมสินค้า อาหาร งานฝีมือ และของใช้ท้องถิ่น",
-          sourceName: "การท่องเที่ยวแห่งประเทศไทย (ททท.)",
-          sourceUrl: "https://thai.tourismthailand.org",
-          publicVisible: true,
-          sourceDriven: true,
-        },
-        {
-          id: "tat-curated-2",
-          title: "ถนนคนเดินและตลาดวัฒนธรรมริมน้ำ",
-          category: "festival",
-          venueName: "ย่านเมืองเก่าและตลาดริมน้ำ",
-          venueArea: "พระนคร กรุงเทพมหานคร",
-          latitude: 13.7563,
-          longitude: 100.5018,
-          startAt: `${eventDate}T16:00:00+07:00`,
-          endAt: `${eventDate}T22:00:00+07:00`,
-          description: "กิจกรรมทางวัฒนธรรม ดนตรีสด อาหารริมทาง และสินค้าชุมชน",
-          sourceName: "กรุงเทพมหานคร & ททท.",
-          sourceUrl: "https://thai.tourismthailand.org",
-          publicVisible: true,
-          sourceDriven: true,
-        },
-        {
-          id: "tat-curated-3",
-          title: "เทศกาลอาหารและของดีวิถีไทย",
-          category: "market",
-          venueName: "ลานกิจกรรมชุมชนอัศวิน",
-          venueArea: "บางกอกน้อย กรุงเทพมหานคร",
-          latitude: 13.7600,
-          longitude: 100.4800,
-          startAt: `${eventDate}T10:00:00+07:00`,
-          endAt: `${eventDate}T20:00:00+07:00`,
-          description: "มหกรรมอาหารท้องถิ่นและสินค้าจากร้านค้าพันธมิตร WINRIDER.AI",
-          sourceName: "WINRIDER.AI ชุมชนอัศวิน",
-          sourceUrl: "https://thai.tourismthailand.org",
-          publicVisible: true,
-          sourceDriven: true,
-        },
-      ];
-      candidates.push(...fallbackEvents.map((item) => ({ docSnap: { id: item.id } as any, item })));
-    }
 
     const normalized = candidates.flatMap(({ docSnap, item }): NearbyEventResult[] => {
       if (item.publicVisible !== true) return [];
