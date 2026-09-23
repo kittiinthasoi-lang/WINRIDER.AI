@@ -1960,6 +1960,185 @@ app.post("/api/admin/auth/users/:uid/status", rateLimit(30), async (req, res) =>
   }
 });
 
+type VerificationStatus = "pending_review" | "approved" | "rejected";
+type VerificationSubjectType = "market_listing" | "service_completion" | "express_package" | "kyc_document" | "general_evidence";
+
+function validEvidenceImageUrl(value: unknown): string | null {
+  const url = String(value || "").trim();
+  if (!url || url.length > 2500 || !/^https:\/\//i.test(url)) return null;
+  return url;
+}
+
+async function createAdminVerification(input: {
+  submittedBy: string;
+  submittedRole?: string;
+  category: string;
+  subjectType: VerificationSubjectType;
+  subjectId: string;
+  imageUrl: string;
+  note?: string;
+  latitude?: number;
+  longitude?: number;
+  metadata?: Record<string, unknown>;
+}) {
+  const ref = ordersDb.collection("adminVerificationQueue").doc();
+  const now = new Date().toISOString();
+  const record = {
+    id: ref.id,
+    status: "pending_review" as VerificationStatus,
+    submittedBy: input.submittedBy,
+    submittedRole: String(input.submittedRole || ""),
+    category: String(input.category || "หลักฐาน").slice(0, 100),
+    subjectType: input.subjectType,
+    subjectId: String(input.subjectId || "").slice(0, 200),
+    imageUrl: input.imageUrl,
+    note: String(input.note || "").slice(0, 1000),
+    ...(Number.isFinite(input.latitude) && Number.isFinite(input.longitude)
+      ? { latitude: Number(input.latitude), longitude: Number(input.longitude) }
+      : {}),
+    metadata: input.metadata || {},
+    createdAt: now,
+    updatedAt: now,
+    serverCreatedAt: FieldValue.serverTimestamp(),
+  };
+  await ref.create(record);
+  return record;
+}
+
+app.post("/api/verifications/evidence", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const imageUrl = validEvidenceImageUrl(req.body?.imageUrl);
+  const subjectType = String(req.body?.subjectType || "general_evidence") as VerificationSubjectType;
+  const allowedSubjectTypes = new Set<VerificationSubjectType>(["market_listing", "service_completion", "express_package", "kyc_document", "general_evidence"]);
+  if (!imageUrl || !allowedSubjectTypes.has(subjectType)) {
+    return res.status(400).json({ error: "ข้อมูลหลักฐานไม่ถูกต้อง", code: "INVALID_EVIDENCE" });
+  }
+  try {
+    const record = await createAdminVerification({
+      submittedBy: user.uid,
+      submittedRole: String((user as any).role || ""),
+      category: String(req.body?.category || "หลักฐานทั่วไป"),
+      subjectType,
+      subjectId: String(req.body?.subjectId || user.uid),
+      imageUrl,
+      note: String(req.body?.note || ""),
+      latitude: Number(req.body?.latitude),
+      longitude: Number(req.body?.longitude),
+      metadata: req.body?.metadata && typeof req.body.metadata === "object" ? req.body.metadata : {},
+    });
+    return res.status(201).json({ verification: record, pendingAdminReview: true });
+  } catch (error: any) {
+    console.error("[Verification Evidence]", error?.message);
+    return res.status(503).json({ error: "ส่งหลักฐานให้แอดมินไม่สำเร็จ" });
+  }
+});
+
+app.get("/api/admin/verifications", rateLimit(40), async (req, res) => {
+  const admin = await requireWinAuthAdmin(req, res);
+  if (!admin) return;
+  const requestedStatus = String(req.query.status || "pending_review");
+  const status = ["pending_review", "approved", "rejected", "all"].includes(requestedStatus) ? requestedStatus : "pending_review";
+  try {
+    let snapshot;
+    if (status === "all") {
+      snapshot = await ordersDb.collection("adminVerificationQueue").limit(300).get();
+    } else {
+      snapshot = await ordersDb.collection("adminVerificationQueue").where("status", "==", status).limit(300).get();
+    }
+    const records = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    return res.json({ records });
+  } catch (error: any) {
+    console.error("[Admin Verification List]", error?.message);
+    return res.status(503).json({ error: "โหลดคิวตรวจหลักฐานไม่สำเร็จ", records: [] });
+  }
+});
+
+app.post("/api/admin/verifications/:id/review", rateLimit(40), async (req, res) => {
+  const admin = await requireWinAuthAdmin(req, res);
+  if (!admin) return;
+  const approved = req.body?.approved === true;
+  const reason = String(req.body?.reason || "").trim().slice(0, 1000);
+  const verificationId = String(req.params.id || "").trim();
+  if (!verificationId) return res.status(400).json({ error: "Invalid verification id" });
+
+  try {
+    const ref = ordersDb.collection("adminVerificationQueue").doc(verificationId);
+    let reviewed: any = null;
+    await ordersDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error("VERIFICATION_NOT_FOUND");
+      const record: any = snap.data() || {};
+      if (record.status !== "pending_review") throw new Error("VERIFICATION_ALREADY_REVIEWED");
+
+      const now = new Date().toISOString();
+      const nextStatus: VerificationStatus = approved ? "approved" : "rejected";
+      const reviewPatch = {
+        status: nextStatus,
+        reviewReason: reason,
+        reviewedBy: admin.uid,
+        reviewedAt: now,
+        updatedAt: now,
+      };
+      tx.update(ref, reviewPatch);
+
+      if (record.subjectType === "market_listing" && record.subjectId) {
+        const listingRef = ordersDb.collection("marketListings").doc(String(record.subjectId));
+        const listingSnap = await tx.get(listingRef);
+        if (listingSnap.exists) {
+          tx.update(listingRef, {
+            status: approved ? "active" : "rejected",
+            adminReviewStatus: nextStatus,
+            adminReviewedBy: admin.uid,
+            adminReviewedAt: now,
+            adminReviewReason: reason,
+            updatedAt: now,
+          });
+        }
+      }
+
+      if (record.subjectType === "service_completion" && record.subjectId) {
+        const orderRef = ordersCollection.doc(String(record.subjectId));
+        const orderSnap = await tx.get(orderRef);
+        if (orderSnap.exists) {
+          tx.update(orderRef, {
+            completionProofStatus: nextStatus,
+            ...(approved ? {
+              completionProofUrl: record.imageUrl,
+              completionProofLatitude: record.latitude ?? null,
+              completionProofLongitude: record.longitude ?? null,
+              completionProofApprovedAt: now,
+            } : {}),
+            completionProofReviewedBy: admin.uid,
+            completionProofReviewedAt: now,
+            completionProofReviewReason: reason,
+            updatedAt: now,
+          });
+        }
+      }
+
+      tx.set(ordersDb.collection("audit_logs").doc(), {
+        action: approved ? "VERIFICATION_APPROVED" : "VERIFICATION_REJECTED",
+        verificationId,
+        subjectType: String(record.subjectType || ""),
+        subjectId: String(record.subjectId || ""),
+        actorUid: admin.uid,
+        reason,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      reviewed = { id: verificationId, ...record, ...reviewPatch };
+    });
+    return res.json({ ok: true, verification: reviewed });
+  } catch (error: any) {
+    if (error?.message === "VERIFICATION_NOT_FOUND") return res.status(404).json({ error: "ไม่พบหลักฐาน" });
+    if (error?.message === "VERIFICATION_ALREADY_REVIEWED") return res.status(409).json({ error: "หลักฐานนี้ถูกตรวจแล้ว" });
+    console.error("[Admin Verification Review]", error?.message);
+    return res.status(503).json({ error: "บันทึกผลตรวจหลักฐานไม่สำเร็จ" });
+  }
+});
+
 async function releaseRideWalletHoldInTransaction(
   tx: any,
   orderRef: any,
