@@ -3,7 +3,6 @@ import {
   Wallet,
   ArrowDownLeft,
   ArrowUpRight,
-  QrCode,
   CheckCircle2,
   AlertCircle,
   Loader2,
