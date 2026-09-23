@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { WIN_IMAGES } from '../data/imageRegistry';
-import { getAuth } from 'firebase/auth';
 import { 
+import { auth } from '../firebase';
   Radio, 
   Navigation, 
   Layers, 
@@ -136,7 +136,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
     void (async () => {
       setPlacesLoading(true); setPlacesError('');
       try {
-        const user = getAuth().currentUser;
+        const user = auth.currentUser;
         if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนเปิดเรดาร์');
         const token = await user.getIdToken();
         const directoryResponse = await fetch('/api/shop/directory', { headers: { Authorization: `Bearer ${token}` } });
