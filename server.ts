@@ -1760,10 +1760,10 @@ function getManualSettlementConfig() {
   // Public transfer details may be overridden by environment variables later,
   // but the app never needs to embed or generate a top-up QR.
   const promptPayId = "";
-  const bankName = String(process.env.ADMIN_BANK_NAME || "กสิกรไทย").trim();
-  const bankAccountNumber = String(process.env.ADMIN_BANK_ACCOUNT_NUMBER || "0931530151").trim();
-  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "กิตติอินทะสร้อย").trim();
-  const lineContact = String(process.env.WINRIDER_LINE_CONTACT || "0837583169").trim();
+  const bankName = "กสิกรไทย";
+  const bankAccountNumber = "0931530151";
+  const accountName = "กิตติอินทะสร้อย";
+  const lineContact = "0837583169";
   const configured = Boolean(bankName && bankAccountNumber && accountName && lineContact);
   return { configured, promptPayId, bankName, bankAccountNumber, accountName, lineContact };
 }
