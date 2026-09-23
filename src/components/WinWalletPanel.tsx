@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Copy,
   RefreshCw,
   Building2,
   ShieldCheck,
@@ -14,13 +15,6 @@ import {
 import { getWalletMe, submitWithdrawal, WalletStateResponse } from '../services/walletService';
 import { getPaymentProfile } from '../services/paymentProfileService';
 import { playTactileBlip, playPaymentSuccessChime } from '../utils/audio';
-
-const WIN_WALLET_TOPUP_ACCOUNT = {
-  bankName: 'กสิกรไทย',
-  accountNumber: '0931530151',
-  accountName: 'กิตติอินทะสร้อย',
-  lineContact: '0837583169',
-} as const;
 
 interface WinWalletPanelProps {
   role?: 'citizen' | 'knight' | 'merchant' | 'partner';
@@ -46,6 +40,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
   const [depositAmount, setDepositAmount] = useState<number>(200);
   const [depositMessage, setDepositMessage] = useState('');
   const [depositError, setDepositError] = useState('');
+  const [copiedTopupDetails, setCopiedTopupDetails] = useState(false);
 
   const [withdrawAmount, setWithdrawAmount] = useState<number>(100);
   const [withdrawDestination, setWithdrawDestination] = useState('');
@@ -97,6 +92,10 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
   const balance = walletData?.balance ?? 0;
   const availableBalance = walletData?.availableBalance ?? balance;
   const lockedBalance = (walletData?.lockedSatang ?? 0) / 100;
+  const systemBankName = walletData?.systemPromptPay?.bankName || 'กสิกรไทย';
+  const systemBankAccountNumber = walletData?.systemPromptPay?.bankAccountNumber || '0931530151';
+  const systemAccountName = walletData?.systemPromptPay?.accountName || 'กิตติอินทะสร้อย';
+  const lineContact = walletData?.systemPromptPay?.lineContact || '0837583169';
 
   const topupMessage = useMemo(() => {
     const amount = Number.isFinite(depositAmount) && depositAmount > 0 ? depositAmount.toFixed(2) : '0.00';
@@ -105,13 +104,13 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
       `WIN Wallet ID: ${walletData?.walletId || '-'}`,
       `บทบาท: ${roleLabelMap[role] || role}`,
       `ยอดโอน: ฿${amount}`,
-      `ธนาคาร: ${WIN_WALLET_TOPUP_ACCOUNT.bankName}`,
-      `เลขบัญชี: ${WIN_WALLET_TOPUP_ACCOUNT.accountNumber}`,
-      `ชื่อเจ้าของบัญชี: ${WIN_WALLET_TOPUP_ACCOUNT.accountName}`,
-      `LINE ส่งสลิป: ${WIN_WALLET_TOPUP_ACCOUNT.lineContact}`,
-      'ส่งสลิปพร้อม WIN Wallet ID เพื่อให้ Admin ตรวจเงินจริงก่อนเติมยอด',
+      `ธนาคาร: ${systemBankName}`,
+      `เลขบัญชี: ${systemBankAccountNumber}`,
+      `ชื่อเจ้าของบัญชี: ${systemAccountName}`,
+      `LINE ส่งสลิป: ${lineContact}`,
+      'กรุณาแนบสลิปพร้อมข้อความนี้ เพื่อให้ Admin ตรวจเงินจริงและเติมยอด WIN Wallet',
     ].join('\n');
-  }, [depositAmount, role, walletData?.walletId]);
+  }, [depositAmount, role, walletData?.walletId, systemBankName, systemBankAccountNumber, systemAccountName, lineContact]);
 
   const copyText = async (text: string) => {
     if (!navigator.clipboard) return false;
@@ -123,7 +122,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
     }
   };
 
-  const handleCopyTopupInstructions = async () => {
+  const handleCopyTopupDetails = async () => {
     setDepositError('');
     setDepositMessage('');
 
@@ -137,12 +136,14 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
     }
 
     const copied = await copyText(topupMessage);
-    setDepositMessage(
-      copied
-        ? `คัดลอกข้อมูลแล้ว หลังโอนเงินให้ส่งสลิปทาง LINE: ${WIN_WALLET_TOPUP_ACCOUNT.lineContact}`
-        : `หลังโอนเงินให้ส่งสลิปพร้อม WIN Wallet ID ทาง LINE: ${WIN_WALLET_TOPUP_ACCOUNT.lineContact}`
-    );
-    if (audioEnabled) playTactileBlip(950);
+    setCopiedTopupDetails(copied);
+    if (copied) {
+      setDepositMessage(`คัดลอกข้อมูลแล้ว กรุณาโอนเข้าบัญชี ${systemBankAccountNumber} และส่งสลิปทาง LINE: ${lineContact}`);
+      if (audioEnabled) playTactileBlip(950);
+      setTimeout(() => setCopiedTopupDetails(false), 2000);
+    } else {
+      setDepositError('คัดลอกข้อมูลไม่สำเร็จ กรุณาจด WIN Wallet ID และส่งสลิปทาง LINE ด้วยตนเอง');
+    }
   };
 
   const handleWithdrawSubmit = async () => {
@@ -268,7 +269,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
               เติมเงินเข้าบัญชีบริษัท
             </h4>
             <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-              ทุกบทบาทใช้ขั้นตอนเดียวกัน: โอนเงินจริง → ส่งสลิปทาง LINE → Admin ตรวจเงินเข้าจริง → เติมยอด WIN Wallet ตามเงินจริง
+              ทุกบทบาทใช้บัญชีเดียวกันในการเติมเงิน ไม่มี QR ฝังในหน้านี้: โอนเงินจริง → ส่งสลิปทาง LINE → Admin ตรวจเงินจริง → เติมยอด WIN Wallet
             </p>
           </div>
 
@@ -301,13 +302,12 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
           />
 
           <div className="rounded-2xl border border-amber-400/30 bg-amber-500/5 p-4 space-y-2">
-            <p className="text-sm font-black text-amber-200">ข้อมูลโอนเงินสำหรับเติม WIN Wallet</p>
-            <p className="text-sm text-white">ชื่อธนาคาร: <strong>{WIN_WALLET_TOPUP_ACCOUNT.bankName}</strong></p>
-            <p className="text-base font-mono font-black text-emerald-300">เลขบัญชี: {WIN_WALLET_TOPUP_ACCOUNT.accountNumber}</p>
-            <p className="text-sm text-white">ชื่อเจ้าของบัญชี: <strong>{WIN_WALLET_TOPUP_ACCOUNT.accountName}</strong></p>
-            <p className="text-sm text-white">
-              LINE ส่งสลิป: <strong className="font-mono text-[#06C755]">{WIN_WALLET_TOPUP_ACCOUNT.lineContact}</strong>
-            </p>
+            <p className="text-sm font-black text-amber-200">ข้อมูลโอนเงินเข้า WIN Wallet</p>
+            <p className="text-sm text-white">ชื่อธนาคาร: <strong>{systemBankName}</strong></p>
+            <p className="text-base font-mono font-black text-emerald-300">เลขบัญชี: {systemBankAccountNumber}</p>
+            <p className="text-sm text-white">ชื่อเจ้าของบัญชี: <strong>{systemAccountName}</strong></p>
+            <p className="text-sm text-white">LINE ส่งสลิป: <strong className="font-mono text-[#06C755]">{lineContact}</strong></p>
+            <p className="pt-1 text-[11px] text-slate-400">หน้านี้แสดงข้อมูลเป็นตัวหนังสือเท่านั้น และไม่สร้าง/ฝัง QR สำหรับการเติมเงิน</p>
           </div>
 
           <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-xs text-slate-300">
@@ -317,12 +317,13 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
 
           <button
             type="button"
-            onClick={() => void handleCopyTopupInstructions()}
-            disabled={!walletData?.walletId || depositAmount <= 0}
+            onClick={() => void handleCopyTopupDetails()}
+            disabled={depositAmount <= 0 || !walletData?.walletId}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#06C755] py-3.5 text-sm font-black text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <MessageCircle className="h-5 w-5" />
-            คัดลอกข้อมูลสำหรับส่งสลิป LINE
+            {copiedTopupDetails ? <CheckCircle2 className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+            {copiedTopupDetails ? 'คัดลอกข้อมูลแล้ว' : 'คัดลอกข้อมูลสำหรับส่งสลิปทาง LINE'}
+            <MessageCircle className="h-4 w-4" />
           </button>
           {depositError && (
             <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/15 p-3 text-xs text-rose-200">
