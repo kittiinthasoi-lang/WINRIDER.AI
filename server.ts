@@ -1845,66 +1845,72 @@ async function requireWinAuthAdmin(req: express.Request, res: express.Response) 
   }
 }
 
-app.post("/api/auth/register", rateLimit(10), async (req, res) => {
-  const email = normalizeWinAuthEmail(req.body?.email);
-  const password = String(req.body?.password || "");
-  const role = String(req.body?.role || "") as WinAuthRole;
+const TEMPORARY_OPEN_ADMIN_ACCESS = true;
 
-  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: "Invalid email", code: "INVALID_EMAIL" });
-  if (password.length < 8 || password.length > 200) return res.status(400).json({ error: "Password must contain at least 8 characters", code: "WEAK_PASSWORD" });
-  if (!WIN_AUTH_ROLES.has(role)) return res.status(400).json({ error: "Invalid role", code: "INVALID_ROLE" });
-  if (isOwnerAdminEmail(email)) return res.status(409).json({ error: "Owner account uses direct admin login", code: "EMAIL_ALREADY_REGISTERED" });
-
-  const registration = cleanRegistrationProfile(role, req.body?.registration || {});
-  const registrationError = validateRegistrationProfile(role, registration);
-  if (registrationError) {
-    return res.status(400).json({ error: "Registration details are incomplete", code: registrationError });
+app.post("/api/auth/temporary-admin-access", rateLimit(20), async (_req, res) => {
+  if (!TEMPORARY_OPEN_ADMIN_ACCESS) {
+    return res.status(404).json({ error: "Temporary admin access is disabled", code: "TEMP_ADMIN_DISABLED" });
   }
 
   try {
-    const user = await createWinAuthUser({
-      email,
-      password,
-      role,
-      displayName: registration.fullName,
-      phone: registration.phone,
-      registration,
-      status: "pending_review",
-    });
-    await mirrorWinAuthUser(user);
-    const token = await createWinAuthSession(user.uid);
-    return res.status(201).json({ token, user: publicWinAuthUser(user), approvalRequired: true });
-  } catch (error: any) {
-    if (error?.code === "EMAIL_ALREADY_REGISTERED" || error?.message === "EMAIL_ALREADY_REGISTERED") {
-      return res.status(409).json({ error: "Email already registered", code: "EMAIL_ALREADY_REGISTERED" });
+    const email = ownerAdminEmail();
+    let user = await getWinAuthUserByEmail(email);
+
+    if (!user) {
+      user = await createWinAuthUser({
+        email,
+        password: crypto.randomBytes(32).toString("base64url"),
+        role: "knight",
+        displayName: "กิตติ อินทะสร้อย",
+        phone: "",
+        status: "active",
+        isAdmin: true,
+        adminLevel: "super",
+      });
+    } else {
+      user = await saveWinAuthUser({
+        ...user,
+        role: "knight",
+        status: "active",
+        displayName: user.displayName || "กิตติ อินทะสร้อย",
+        isAdmin: true,
+        adminLevel: "super",
+        approvedAt: user.approvedAt || new Date().toISOString(),
+        approvedBy: user.approvedBy || "TEMPORARY_OPEN_ADMIN_ACCESS",
+      });
     }
-    console.error("[WIN Auth Register]", error?.message);
-    return res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+
+    await mirrorWinAuthUser(user);
+    await ensureApprovedRoleProfile(user).catch(() => undefined);
+    const token = await createWinAuthSession(user.uid);
+
+    return res.json({
+      token,
+      user: publicWinAuthUser(user),
+      temporaryOpenAccess: true,
+      warning: "Authentication is temporarily bypassed for admin access",
+    });
+  } catch (error: any) {
+    console.error("[Temporary Admin Access]", error?.message);
+    return res.status(503).json({
+      error: "ไม่สามารถเปิดโหมดแอดมินชั่วคราวได้",
+      code: error?.code || "TEMP_ADMIN_ACCESS_FAILED",
+    });
   }
 });
 
-app.post("/api/auth/login", rateLimit(20), async (req, res) => {
-  const email = normalizeWinAuthEmail(req.body?.email);
-  const password = String(req.body?.password || "");
-  if (!email || !password) return res.status(400).json({ error: "Email and password required", code: "INVALID_CREDENTIALS" });
+app.post("/api/auth/login", rateLimit(20), async (_req, res) => {
+  return res.status(503).json({
+    error: "ระบบล็อกอินถูกพักชั่วคราว กรุณาใช้ปุ่มเข้าแอปในฐานะแอดมิน",
+    code: "AUTH_TEMPORARILY_DISABLED",
+  });
+});
 
-  try {
-    let user = await getWinAuthUserByEmail(email);
-    if (!user || !verifyWinAuthPassword(password, user.passwordHash)) {
-      return res.status(401).json({ error: "Invalid credentials", code: "INVALID_CREDENTIALS" });
-    }
-    if (user.status === "suspended" && !isOwnerAdminEmail(user.email)) {
-      return res.status(403).json({ error: "Account suspended", code: "ACCOUNT_SUSPENDED" });
-    }
-
-    user = await promoteAuthenticatedOwner(user);
-
-    const token = await createWinAuthSession(user.uid);
-    return res.json({ token, user: publicWinAuthUser(user), approvalRequired: user.status === "pending_review" });
-  } catch (error: any) {
-    console.error("[WIN Auth Login]", error?.message);
-    return res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
-  }
+app.post("/api/auth/register", rateLimit(10), async (_req, res) => {
+  return res.status(503).json({
+    error: "ระบบลงทะเบียนถูกพักชั่วคราว",
+    code: "REGISTRATION_TEMPORARILY_DISABLED",
+  });
 });
 
 app.get("/api/auth/me", rateLimit(60), async (req, res) => {
