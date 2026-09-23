@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { emitQuestMetric } from '../services/questService';
-import { 
 import { auth } from '../firebase';
+import {
   PartnerProfile, 
   PartnerCategory, 
   PartnerEvent, 
