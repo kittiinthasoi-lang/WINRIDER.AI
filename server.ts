@@ -1872,24 +1872,12 @@ app.post("/api/payments/qr/verify", rateLimit(20), async (req, res) => {
       });
     }
 
-    if (parsed.kind === "promptpay" && parsed.promptPayId) {
-      const normalized = parsed.promptPayId.replace(/^0066/, "0").replace(/[^0-9]/g, "");
-      const snap = await ordersDb.collection("payment_profiles")
-        .where("promptPayId", "==", normalized)
-        .where("status", "==", "verified")
-        .limit(1)
-        .get();
-      if (snap.empty) return res.status(404).json({ error: "VERIFIED_PAYMENT_OWNER_NOT_FOUND" });
-      const profile = snap.docs[0].data() || {};
-      if (String(profile.userId || "") === user.uid) return res.status(422).json({ error: "SELF_PAYMENT_NOT_ALLOWED" });
-      return res.json({
-        ok: true,
+    if (parsed.kind === "promptpay") {
+      return res.status(422).json({
+        error: "WIN_WALLET_ONLY",
         kind: parsed.kind,
-        amountBaht: effectiveAmount,
-        owner: { userId: String(profile.userId), role: String(profile.role || ""), accountName: String(profile.accountName || ""), promptPayId: normalized },
-        settlementMode: "EXTERNAL_PROMPTPAY",
         canExecute: false,
-        message: "QR และเจ้าของช่องทางรับเงินผ่านการตรวจสอบแล้ว แต่การตัดเงินจากธนาคารต้องเกิดในระบบธนาคาร/ผู้ให้บริการชำระเงินจริง"
+        message: "การจ่ายเงินภายใน WINRIDER ต้องใช้ WIN Wallet เท่านั้น กรุณาเติมเงินเข้า WIN Wallet ก่อนชำระ"
       });
     }
 
@@ -1897,6 +1885,33 @@ app.post("/api/payments/qr/verify", rateLimit(20), async (req, res) => {
   } catch (error) {
     console.error("QR verification failed:", error);
     return res.status(500).json({ error: "QR_SERVER_VERIFY_FAILED" });
+  }
+});
+
+app.get("/api/wallet/recipient/:userId", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const targetUserId = String(req.params.userId || "").trim();
+  const requestedRole = String(req.query?.role || "").trim();
+  if (!targetUserId || targetUserId.length > 160) return res.status(400).json({ error: "INVALID_RECIPIENT" });
+
+  try {
+    const targetUserSnap = await ordersDb.collection("users").doc(targetUserId).get();
+    if (!targetUserSnap.exists && targetUserId !== user.uid) {
+      return res.status(404).json({ error: "RECIPIENT_NOT_FOUND" });
+    }
+    const targetData = targetUserSnap.data() || {};
+    const identity = await ensureWalletIdentityId(targetUserId, requestedRole);
+    return res.json({
+      userId: targetUserId,
+      walletId: identity.walletId,
+      role: identity.role,
+      displayName: String(targetData.displayName || targetData.name || ""),
+      ownWallet: targetUserId === user.uid,
+    });
+  } catch (error) {
+    console.error("recipient wallet lookup failed:", error);
+    return res.status(503).json({ error: "RECIPIENT_WALLET_UNAVAILABLE" });
   }
 });
 
@@ -3706,6 +3721,7 @@ app.post("/api/admin/ops/ride-action", rateLimit(20), distributedRateLimit("admi
         });
         result = { ...ride, offeredDriverId: null, offerExpiresAt: null, dispatchCandidateIndex: -1, updatedAt: now };
       } else {
+        await releaseRideWalletHoldInTransaction(tx, ref, ride as ServerOrder, "admin_operations_cancelled");
         tx.update(ref, {
           status: "cancelled",
           cancellationReason: "admin_operations_cancelled",
@@ -4436,9 +4452,16 @@ app.post("/api/orders/:id/step", rateLimit(30), distributedRateLimit("ride_step"
       if ((tipAmount !== undefined || ratingGiven !== undefined || reviewComment !== undefined) && !isPassenger) throw new Error("PASSENGER_REQUIRED");
       if ((ratingGiven !== undefined || reviewComment !== undefined) && order.status !== "completed") throw new Error("RIDE_NOT_COMPLETED");
 
+      if (status && String(status) === "cancelled") {
+        await releaseRideWalletHoldInTransaction(transaction, orderRef, order, "participant_cancelled");
+      }
+
       updatedOrder = {
         ...order,
         ...(status ? { status: String(status) } : {}),
+        ...(status && String(status) === "cancelled" && order.walletHoldStatus === "HELD"
+          ? { walletHoldStatus: "RELEASED" as const, walletHoldReleaseReason: "participant_cancelled" }
+          : {}),
         ...(tipAmount !== undefined ? { tipAmount: Number(tipAmount) } : {}),
         ...(ratingGiven !== undefined ? { ratingGiven: Number(ratingGiven) } : {}),
         ...(reviewComment !== undefined ? { reviewComment: String(reviewComment).slice(0, 1000) } : {}),
