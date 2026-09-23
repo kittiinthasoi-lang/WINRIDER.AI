@@ -85,7 +85,7 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
 
   const handleStartAIVerification = async () => {
     if (!selectedImage) {
-      alert('กรุณาถ่ายรูปหรืออัปโหลดรูปภาพสินค้าก่อนเริ่มการตรวจสอบด้วย AI');
+      alert('กรุณาถ่ายรูปหรืออัปโหลดรูปภาพสินค้าก่อนเริ่มการส่งตรวจข้อมูล');
       return;
     }
     const user = getAuth().currentUser;
@@ -97,7 +97,7 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
     if (audioEnabled) playRadarScan();
     setIsScanning(true);
     setScanProgress(15);
-    setScanStepLabel('กำลังส่งภาพสินค้าจริงให้ WIN-AI Vision ตรวจสอบ...');
+    setScanStepLabel('กำลังส่งภาพสินค้าจริงให้ WIN Photo Review ตรวจสอบ...');
 
     try {
       const response = await fetch('/api/ai/product-photo-verify', {
@@ -111,11 +111,11 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
       });
       const payload = await response.json();
       if (!response.ok || !payload.result) {
-        throw new Error(payload.error || 'AI ตรวจสอบสินค้าไม่สำเร็จ');
+        throw new Error(payload.error || 'ระบบตรวจหลักฐานสินค้าไม่สำเร็จ');
       }
 
       setScanProgress(100);
-      setScanStepLabel('WIN-AI Vision ตรวจสอบภาพจริงเสร็จแล้ว');
+      setScanStepLabel('WIN Photo Review ตรวจสอบภาพจริงเสร็จแล้ว');
       let storedImageUrl = selectedImage;
       try {
         const responseBlob = await fetch(selectedImage);
@@ -160,7 +160,7 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
               </span>
             </h4>
             <p className="text-[10px] text-slate-400 font-mono">
-              ระบบวิเคราะห์ภาพสินค้าจริงด้วย WIN-AI Vision • ผล AI ไม่ใช่การรับประกันความแท้ 100%
+              ระบบวิเคราะห์ภาพสินค้าจริงด้วย WIN Photo Review • ผล AI ไม่ใช่การรับประกันความแท้ 100%
             </p>
           </div>
         </div>
