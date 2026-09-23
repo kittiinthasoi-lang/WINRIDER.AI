@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
 import { auth } from '../firebase';
+import {
   Activity, AlertCircle, Building, ChevronRight, Clock, Crosshair,
   Dog, ExternalLink, Heart, Loader2, MapPin, Phone, RefreshCw,
   ShieldCheck, Star,
