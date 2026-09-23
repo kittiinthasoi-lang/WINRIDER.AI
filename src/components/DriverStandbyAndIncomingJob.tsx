@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { playTactileBlip, playRadarScan, playEngineRev, playLevelUpFanfare, speakThaiText } from '../utils/audio';
 import confetti from 'canvas-confetti';
-import { getAuth } from 'firebase/auth';
 import {
+import { auth } from '../firebase';
   Radio,
   MapPin,
   Clock,
@@ -139,7 +139,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
   // Live Order Listener (Real-Time Passenger <-> Driver Cross-Screen Sync)
   useEffect(() => {
     const unsubscribe = subscribeToLiveOrders((order, type) => {
-      const currentUserId = getAuth().currentUser?.uid;
+      const currentUserId = auth.currentUser?.uid;
       if (
         type === 'created'
         && order.status === 'pending'
@@ -278,7 +278,7 @@ distanceKm: pending.distanceKm,
     let cancelled = false;
     const recover = async () => {
       try {
-        const userId = getAuth().currentUser?.uid;
+        const userId = auth.currentUser?.uid;
         const orders = await fetchMyOrders();
         let active = orders.find((order) => order.driverUserId === userId && ['accepted', 'heading_pickup', 'picked_up', 'in_transit'].includes(order.status));
         if (!active || cancelled) return;
