@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { UserDoc, UserRole } from '../types/auth';
+import { RegistrationProfile, UserDoc, UserRole } from '../types/auth';
 import {
   WinAuthUser,
   refreshWinAuthProfile,
@@ -16,7 +16,7 @@ interface AuthContextType {
   role: UserRole | null;
   loading: boolean;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string, role: UserRole) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, role: UserRole, registration: RegistrationProfile) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUserData: () => Promise<void>;
@@ -65,10 +65,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUpWithEmail = async (email: string, password: string, role: UserRole) => {
+  const signUpWithEmail = async (email: string, password: string, role: UserRole, registration: RegistrationProfile) => {
     setLoading(true);
     try {
-      const { user, profile } = await registerWinAuth(email, password, role);
+      const { user, profile } = await registerWinAuth(email, password, role, registration);
       setFirebaseUser(user);
       setUserData(profile);
     } catch (error) {
