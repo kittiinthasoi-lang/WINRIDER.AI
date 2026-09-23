@@ -1046,6 +1046,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
           {activeJob?.pickupCoord && (driverLegPhase === 'to_pickup' ? Boolean(activeJob?.dropoffCoord) : Boolean(selectedDestination.lat && selectedDestination.lng)) ? <GoogleMapsNavigationScreen
             role="driver"
             initialPhase={driverLegPhase === 'to_pickup' ? 'approaching' : 'in_transit'}
+            rideId={activeJob?.id}
             driverName={activeVehicle?.name || 'พี่วินอัศวิน'}
             driverAvatar={activeVehicle?.imageEmoji || '🛵'}
             driverPlate={(activeVehicle as any)?.plateNumber || ''}
