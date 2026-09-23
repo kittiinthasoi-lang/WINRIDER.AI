@@ -42,18 +42,17 @@ The response:
 - optionally sorts by straight-line distance from the user's real GPS
 - returns source attribution and source URLs
 
-## Scheduled sync
+## Manual admin sync
 
-The internal event sync endpoint is:
+TAT/Public Data is synchronized only when a logged-in Admin uses the
+**WIN Public Data Hub** and presses the sync button.
 
-`POST /api/internal/events/sync`
+Admin endpoint:
 
-It synchronizes TAT/Public Data sources using the internal scheduler secret.
-There is no Ticketmaster developer key or paid event-provider key requirement.
+`POST /api/admin/public-data/import-tat`
 
-Required deployment/GitHub configuration:
-- `WINRIDER_APP_URL`
-- `WIN_ALERT_INTERNAL_SYNC_SECRET`
+The endpoint requires an authenticated Admin session. There is no scheduled
+sync job, no sync secret, and no paid event-provider API key requirement.
 
 ## Source acceptance rules
 
