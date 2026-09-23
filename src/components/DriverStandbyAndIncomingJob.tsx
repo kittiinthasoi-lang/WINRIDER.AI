@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { playTactileBlip, playRadarScan, playEngineRev, playLevelUpFanfare, speakThaiText } from '../utils/audio';
 import confetti from 'canvas-confetti';
-import {
 import { auth } from '../firebase';
+import {
   Radio,
   MapPin,
   Clock,
