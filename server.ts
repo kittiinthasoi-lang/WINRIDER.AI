@@ -3989,12 +3989,13 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       for (const stale of stalePending) {
         try {
           await ordersDb.runTransaction(async (tx) => {
-            const staleSnap = await tx.get(stale.ref);
+            const staleRef = ordersCollection.doc(String(stale.id));
+            const staleSnap = await tx.get(staleRef);
             if (!staleSnap.exists) return;
             const staleOrder = staleSnap.data() as ServerOrder;
             if (String(staleOrder.status) !== "pending") return;
-            await releaseRideWalletHoldInTransaction(tx, stale.ref, staleOrder, "dispatch_timeout_no_driver");
-            tx.update(stale.ref, {
+            await releaseRideWalletHoldInTransaction(tx, staleRef, staleOrder, "dispatch_timeout_no_driver");
+            tx.update(staleRef, {
               status: "cancelled",
               cancellationReason: "dispatch_timeout_no_driver",
               updatedAt: new Date().toISOString(),
