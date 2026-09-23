@@ -9,6 +9,9 @@ export interface WalletStateResponse {
   availableSatang: number;
   balance: number;
   availableBalance: number;
+  withdrawalLimitPerDay: number;
+  withdrawalsToday: number;
+  withdrawalsRemainingToday: number;
   systemPromptPay: {
     configured: boolean;
     promptPayId: string;
@@ -45,6 +48,9 @@ const emptyWallet = (role?: string): WalletStateResponse => ({
   availableSatang: 0,
   balance: 0,
   availableBalance: 0,
+  withdrawalLimitPerDay: 3,
+  withdrawalsToday: 0,
+  withdrawalsRemainingToday: 3,
   systemPromptPay: {
     configured: false,
     promptPayId: '',
