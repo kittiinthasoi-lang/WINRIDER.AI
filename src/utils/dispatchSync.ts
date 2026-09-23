@@ -2,8 +2,8 @@ import { buildWebhookPayload, dispatchToWebhook, isAutoDispatchEnabled } from '.
 import { emitQuestMetric } from '../services/questService';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
 import { calculateAppFare, FareAddons } from '../core/serverFare';
+import { auth } from '../firebase';
 
 export interface LiveRideOrder {
   id: string;
@@ -87,7 +87,7 @@ function isValidLiveOrder(value: unknown): value is LiveRideOrder {
 }
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
-  const user = getAuth().currentUser;
+  const user = auth.currentUser;
   if (user) {
     try {
       const token = await user.getIdToken();
@@ -209,7 +209,7 @@ export function saveLocalLiveOrders(orders: LiveRideOrder[]): void {
 export async function fetchAvailableOrdersForDriver(): Promise<LiveRideOrder[]> {
   try {
     const headers = await getAuthHeaders();
-    const currentUserId = getAuth().currentUser?.uid;
+    const currentUserId = auth.currentUser?.uid;
     const res = await fetch('/api/orders?scope=dispatch', { headers });
     if (res.ok) {
       const data = await res.json();
@@ -254,7 +254,7 @@ export async function createLiveOrder(orderInput: {
   expressPackagePhotoUrl?: string;
   expressAiCertificateId?: string;
 }): Promise<LiveRideOrder> {
-  let authenticatedUid = getAuth().currentUser?.uid;
+  let authenticatedUid = auth.currentUser?.uid;
   if (!authenticatedUid && typeof window !== 'undefined') {
     try {
       const raw = localStorage.getItem('WINRIDER_SOVEREIGN_AUTH');
@@ -557,7 +557,7 @@ export async function fetchMyOrders(): Promise<LiveRideOrder[]> {
  * จึงต้องกรองที่หน้าจอผู้โดยสารเอง)
  */
 export async function fetchMyPassengerOrders(): Promise<LiveRideOrder[]> {
-  const uid = getAuth().currentUser?.uid;
+  const uid = auth.currentUser?.uid;
   if (!uid) return [];
   const orders = await fetchMyOrders();
   return orders.filter((order) => order.passengerUserId === uid);

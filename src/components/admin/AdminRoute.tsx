@@ -87,7 +87,7 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
           <KeyRound className="w-4 h-4 text-[#FFC93C] absolute" />
         </div>
         <h2 className="text-xl font-bold font-mono text-white mb-1">กำลังตรวจสอบสิทธิ์ความปลอดภัย</h2>
-        <p className="text-sm text-cyan-300/70 font-mono">Verifying Firebase Custom Claims...</p>
+        <p className="text-sm text-cyan-300/70 font-mono">Verifying WIN Auth Admin Session...</p>
       </div>
     );
   }

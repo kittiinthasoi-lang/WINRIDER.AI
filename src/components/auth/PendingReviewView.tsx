@@ -41,7 +41,7 @@ export const PendingReviewView: React.FC = () => {
               <Clock className="w-10 h-10" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-thai">
-              เอกสารอยู่ระหว่างการตรวจสอบ
+              บัญชีอยู่ระหว่างรออนุมัติ
             </h1>
             <p className="text-sm text-slate-300">
               ยินดีต้อนรับคุณ <span className="text-[#00D4FF] font-semibold">{userData?.displayName}</span> ในฐานะ <span className="text-[#FFC93C] font-semibold">{getRoleLabel()}</span>
@@ -56,12 +56,12 @@ export const PendingReviewView: React.FC = () => {
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
               </span>
               <div>
-                <div className="text-xs text-slate-400">สถานะการตรวจสอบ (Status)</div>
-                <div className="text-sm font-bold text-amber-400">อยู่ระหว่างตรวจสอบ (Pending Review)</div>
+                <div className="text-xs text-slate-400">สถานะบัญชี (Status)</div>
+                <div className="text-sm font-bold text-amber-400">รอแอดมินอนุมัติ (Pending Review)</div>
               </div>
             </div>
             <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/40 text-amber-300 font-semibold">
-              รอเจ้าหน้าที่อนุมัติภายใน 24 ชม.
+              รอ Super Admin ตรวจสอบและอนุมัติ
             </span>
           </div>
 
@@ -76,7 +76,7 @@ export const PendingReviewView: React.FC = () => {
               <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-800/80">
                 <div className="flex items-center gap-2 text-slate-200">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>ข้อมูลบัญชีและการยินยอม PDPA</span>
+                  <span>ข้อมูลบัญชีและบทบาทที่สมัคร</span>
                 </div>
                 <span className="text-emerald-400 font-medium">บันทึกสำเร็จ (v1.0)</span>
               </div>
@@ -84,9 +84,9 @@ export const PendingReviewView: React.FC = () => {
               <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-800/80">
                 <div className="flex items-center gap-2 text-slate-200">
                   <Clock className="w-4 h-4 text-amber-400" />
-                  <span>การตรวจสอบเอกสารสิทธิ์ / ใบอนุญาตขับขี่สาธารณะ</span>
+                  <span>การอนุมัติสิทธิ์เข้าใช้งานโดยแอดมิน</span>
                 </div>
-                <span className="text-amber-400 font-medium">รอการตรวจ (Pending)</span>
+                <span className="text-amber-400 font-medium">รออนุมัติ (Pending)</span>
               </div>
 
               <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-800/80">

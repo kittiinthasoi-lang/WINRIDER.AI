@@ -34,7 +34,7 @@ export const ProtectedRoute: React.FC<Props> = ({
     );
   }
 
-  // 1. Not signed in to Firebase -> Show Auth
+  // 1. Not signed in to WIN Auth -> Show Auth
   if (!firebaseUser) {
     return <AuthModalOrView />;
   }
@@ -45,17 +45,16 @@ export const ProtectedRoute: React.FC<Props> = ({
     userData?.isAdmin === true ||
     userData?.adminLevel === 'super';
 
-  // เจ้าของระบบใช้ Firebase UID เดียวเพื่อควบคุมแอปและเปิดทุกบทบาท
-  // ไม่บังคับให้มี users/{uid} หรือสมัครบทบาทใหม่ จึงไม่ติดโควต้าลงทะเบียน
+  // เจ้าของระบบใช้ WIN Auth UID เดียวเพื่อควบคุมแอปและเปิดทุกบทบาท
   if (isOwnerAdmin) return <>{children}</>;
 
-  // 2. Signed in, but no user document in users/{uid} yet -> Show Role Selection & Registration
+  // 2. Compatibility guard for an incomplete legacy profile
   if (!userData || !userData.role) {
     return <RoleSelectionAndRegistration />;
   }
 
-  // 3. Status is pending_review (and not citizen) -> Show Pending Review
-  if (userData.status === 'pending_review' && userData.role !== 'citizen' && !allowCustomerView) {
+  // 3. Every new registration requires admin approval, including Citizen.
+  if (userData.status === 'pending_review' && !allowCustomerView) {
     return <PendingReviewView />;
   }
 

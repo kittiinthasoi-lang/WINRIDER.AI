@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { getAuth } from 'firebase/auth';
+import { auth } from '../firebase';
 import {
   Activity, AlertCircle, Building, ChevronRight, Clock, Crosshair,
   Dog, ExternalLink, Heart, Loader2, MapPin, Phone, RefreshCw,
@@ -56,7 +56,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
     setLoading(true);
     setErrorMessage('');
     try {
-      const user = getAuth().currentUser;
+      const user = auth.currentUser;
       if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนค้นหาสถานพยาบาลสัตว์ใกล้คุณ');
       const response = await fetch('/api/pet-care/nearby', {
         method: 'POST',

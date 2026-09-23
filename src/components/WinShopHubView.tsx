@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { emitQuestMetric } from '../services/questService';
-import { getAuth } from 'firebase/auth';
+import { auth } from '../firebase';
 import {
   Building2, ChevronRight, Clock3, ExternalLink, Loader2, MapPin, Navigation,
   Package, Percent, Phone, Search, ShieldCheck, ShoppingBag, Store, Tag, UserRound, X
@@ -67,7 +67,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
       setLoading(true);
       setErrorMessage('');
       try {
-        const user = getAuth().currentUser;
+        const user = auth.currentUser;
         if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนเปิด WIN Shop');
         const response = await fetch('/api/shop/directory', { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
         const payload = await response.json() as { profiles?: ShopProfile[]; error?: string };
@@ -104,7 +104,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
     let cancelled = false;
     void (async () => {
       try {
-        const user = getAuth().currentUser;
+        const user = auth.currentUser;
         if (!user) return;
         const response = await fetch('/api/places/resolve-routes', {
           method: 'POST',

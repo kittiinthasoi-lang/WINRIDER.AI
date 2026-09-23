@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Camera, CheckCircle2, MapPin, Upload, X, Loader2 } from 'lucide-react';
-import { getAuth } from 'firebase/auth';
 import { uploadServiceCompletionPhoto } from '../utils/imageUpload';
 import { playTactileBlip } from '../utils/audio';
+import { auth } from '../firebase';
 
 interface ServicePhotoVerificationModalProps {
   type: 'express_delivery' | 'family_arrival';
@@ -51,7 +51,7 @@ export const ServicePhotoVerificationModal: React.FC<ServicePhotoVerificationMod
 
   const confirm = async () => {
     if (!file) { setError('ต้องถ่ายหรือเลือกรูปหลักฐานก่อนยืนยันจบงาน'); return; }
-    const user = getAuth().currentUser;
+    const user = auth.currentUser;
     if (!user) { setError('ต้องเข้าสู่ระบบก่อนบันทึกหลักฐาน'); return; }
     if (!orderId) { setError('ไม่พบเลขออเดอร์จริง จึงยังบันทึกหลักฐานไม่ได้'); return; }
     setSaving(true); setError('');

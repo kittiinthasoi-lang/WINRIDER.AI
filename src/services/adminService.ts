@@ -13,8 +13,7 @@ import {
   serverTimestamp,
   Timestamp 
 } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions, auth } from '../firebase';
+import { db, auth } from '../firebase';
 import { 
   AdminClaims, 
   AdminLevel, 
@@ -59,31 +58,35 @@ export async function getAdminClaims(): Promise<AdminClaims | null> {
  * เรียก Cloud Function ผ่าน httpsCallable พร้อม Fallback ไปยัง Express /api/admin/*
  */
 async function callAdminEndpoint(functionName: string, apiPath: string, payload: any): Promise<any> {
-  // 1. พยายามเรียกผ่าน Firebase Cloud Functions v2
-  try {
-    const fn = httpsCallable(functions, functionName);
-    const res = await fn(payload);
-    return res.data;
-  } catch (err: any) {
-    console.warn(`[Cloud Function ${functionName} failed or unavailable]:`, err?.message);
-    
-    // 2. Fallback ไปยัง API Route บน Server
-    const token = await auth.currentUser?.getIdToken();
-    const res = await fetch(apiPath, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify(payload)
-    });
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(apiPath, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(payload)
+  });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || data.error || `คำสั่ง ${functionName} ล้มเหลว`);
-    }
-    return data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || data.error || `คำสั่ง ${functionName} ล้มเหลว`);
   }
+  return data;
+}
+
+async function callWinAuthAdmin(apiPath: string, init: RequestInit = {}): Promise<any> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('กรุณาเข้าสู่ระบบ Super Admin ใหม่');
+  const headers = new Headers(init.headers || {});
+  headers.set('Accept', 'application/json');
+  if (init.body) headers.set('Content-Type', 'application/json');
+  headers.set('Authorization', `Bearer ${token}`);
+  const res = await fetch(apiPath, { ...init, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+  return data;
 }
 
 /**
@@ -156,52 +159,30 @@ export async function rejectKyc(uid: string, reason: string, detail: string) {
  * 3. suspendUser
  */
 export async function suspendUser(uid: string, reason: string) {
-  const result = await callAdminEndpoint('suspendUser', '/api/admin/suspend-user', { uid, reason });
-  try {
-    await updateDoc(doc(db, 'users', uid), {
-      status: 'suspended',
-      suspendedReason: reason,
-      updatedAt: serverTimestamp()
-    });
-    await addDoc(collection(db, 'audit_logs'), {
-      adminUid: auth.currentUser?.uid || 'ADMIN',
-      adminEmail: auth.currentUser?.email || 'kittiinthasoi@gmail.com',
-      action: 'SUSPEND_USER',
-      targetUid: uid,
-      targetCollection: 'users',
-      reason,
-      createdAt: serverTimestamp()
-    });
-  } catch (e) {
-    console.warn('Direct Firestore suspend write note:', e);
-  }
-  return result;
+  return callWinAuthAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status: 'suspended', reason })
+  });
 }
 
 /**
  * 4. unsuspendUser
  */
 export async function unsuspendUser(uid: string, reason: string) {
-  const result = await callAdminEndpoint('unsuspendUser', '/api/admin/unsuspend-user', { uid, reason });
-  try {
-    await updateDoc(doc(db, 'users', uid), {
-      status: 'active',
-      suspendedReason: null,
-      updatedAt: serverTimestamp()
-    });
-    await addDoc(collection(db, 'audit_logs'), {
-      adminUid: auth.currentUser?.uid || 'ADMIN',
-      adminEmail: auth.currentUser?.email || 'kittiinthasoi@gmail.com',
-      action: 'UNSUSPEND_USER',
-      targetUid: uid,
-      targetCollection: 'users',
-      reason,
-      createdAt: serverTimestamp()
-    });
-  } catch (e) {
-    console.warn('Direct Firestore unsuspend write note:', e);
-  }
-  return result;
+  return callWinAuthAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status: 'active', reason })
+  });
+}
+
+/**
+ * อนุมัติบัญชีที่สมัครใหม่ใน WIN Auth
+ */
+export async function approveRegistration(uid: string) {
+  return callWinAuthAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/approve`, {
+    method: 'POST',
+    body: '{}'
+  });
 }
 
 /**
@@ -597,25 +578,36 @@ export async function getUserFullProfileAndLedger(uid: string) {
  * ดึงรายชื่อผู้ใช้ทั้งหมดสำหรับหน้า Admin Users View
  */
 export async function getAllUsers(): Promise<AdminUserSummary[]> {
-  const users = await getUsersList('', 'all', 'all');
-  return users.map((user) => ({
-    ...user,
-    uid: String(user.uid || ''),
-    displayName: String(user.displayName || 'ผู้ใช้งาน'),
-    email: String(user.email || ''),
-    phone: String(user.phone || ''),
-    role: ['knight', 'citizen', 'merchant', 'partner', 'admin'].includes(user.role) ? user.role : 'citizen',
-    status: ['active', 'pending_review', 'suspended'].includes(user.status) ? user.status : 'active',
-    walletBalanceSatang: Number(user.walletBalanceSatang || 0)
-  })) as AdminUserSummary[];
+  try {
+    const data = await callWinAuthAdmin('/api/admin/auth/users', { method: 'GET' });
+    const users = Array.isArray(data?.users) ? data.users : [];
+    return users.map((user: any) => ({
+      ...user,
+      uid: String(user.uid || ''),
+      displayName: String(user.displayName || 'ผู้ใช้งาน'),
+      email: String(user.email || ''),
+      phone: String(user.phone || ''),
+      role: ['knight', 'citizen', 'merchant', 'partner', 'admin'].includes(user.role) ? user.role : 'citizen',
+      status: ['active', 'pending_review', 'suspended'].includes(user.status) ? user.status : 'active',
+      walletBalanceSatang: Number(user.walletBalanceSatang || 0)
+    })) as AdminUserSummary[];
+  } catch (error) {
+    console.warn('getAllUsers via WIN Auth failed:', error);
+    return [];
+  }
 }
 
 /**
  * ดึงประวัติ Ledger ของผู้ใช้
  */
 export async function getUserLedgerHistory(uid: string): Promise<LedgerTransaction[]> {
-  const res = await getUserFullProfileAndLedger(uid);
-  return (res.ledger || []) as LedgerTransaction[];
+  try {
+    const data = await callWinAuthAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/ledger`, { method: 'GET' });
+    return Array.isArray(data?.ledger) ? data.ledger as LedgerTransaction[] : [];
+  } catch (error) {
+    console.warn('getUserLedgerHistory via server failed:', error);
+    return [];
+  }
 }
 
 /**

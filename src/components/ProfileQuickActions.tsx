@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { getAuth } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Mail, Phone, UserRound, X } from 'lucide-react';
@@ -7,6 +6,7 @@ import { playTactileBlip } from '../utils/audio';
 import { WalletTopUpPanel } from './WalletTopUpPanel';
 import { WinAiAssistantPanel } from './WinAiAssistantPanel';
 import { PaymentReceiverSettingsPanel } from './PaymentReceiverSettingsPanel';
+import { auth } from '../firebase';
 
 type ProfileTool = 'wallet' | 'payment' | 'assistant' | 'quests' | 'contact';
 interface ProfileQuickActionsProps { role?: 'knight' | 'citizen' | 'merchant' | 'partner'; userId?: string; userName?: string; audioEnabled?: boolean; questContent?: React.ReactNode; questEmptyText?: string; }
@@ -21,7 +21,7 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({ role =
     if (tool !== 'contact' || contactData) return;
     setContactLoading(true);
     try {
-      const authUser = getAuth().currentUser;
+      const authUser = auth.currentUser;
       const uid = userId || authUser?.uid;
       if (!uid) throw new Error('ไม่พบบัญชีผู้ใช้');
       const userSnap = await getDoc(doc(db, 'users', uid));
