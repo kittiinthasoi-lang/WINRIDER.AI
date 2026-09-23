@@ -1763,13 +1763,20 @@ app.post("/api/auth/register", rateLimit(10), async (req, res) => {
   if (!WIN_AUTH_ROLES.has(role)) return res.status(400).json({ error: "Invalid role", code: "INVALID_ROLE" });
   if (email === ownerAdminEmail()) return res.status(409).json({ error: "Owner account already exists", code: "EMAIL_ALREADY_REGISTERED" });
 
+  const registration = cleanRegistrationProfile(role, req.body?.registration || {});
+  const registrationError = validateRegistrationProfile(role, registration);
+  if (registrationError) {
+    return res.status(400).json({ error: "Registration details are incomplete", code: registrationError });
+  }
+
   try {
     const user = await createWinAuthUser({
       email,
       password,
       role,
-      displayName: String(req.body?.displayName || "").trim() || email.split("@")[0],
-      phone: String(req.body?.phone || "").trim(),
+      displayName: registration.fullName,
+      phone: registration.phone,
+      registration,
       status: "pending_review",
     });
     await mirrorWinAuthUser(user);
