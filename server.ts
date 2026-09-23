@@ -792,9 +792,13 @@ interface NearbyEventResult {
   endAt?: string;
   description?: string;
   sourceName: string;
+  source?: string;
+  sourceUrl?: string;
+  ticketUrl?: string;
   providerEventId?: string;
   attendance?: number;
   rank?: number;
+  lastSourceSyncAt?: string;
 }
 
 const TAT_CKAN_API_BASE = "https://datacatalog.tat.or.th/api/3/action/package_show";
@@ -978,6 +982,166 @@ async function fetchTatDatasetRows(kind: PublicDataKind): Promise<{
   };
 }
 
+
+async function syncTicketmasterEvents() {
+  const apiKey = String(process.env.TICKETMASTER_DISCOVERY_API_KEY || "").trim();
+  if (!apiKey) {
+    return { source: "Ticketmaster Discovery API", skipped: true, reason: "TICKETMASTER_DISCOVERY_API_KEY_NOT_CONFIGURED" };
+  }
+
+  const now = new Date();
+  const startDateTime = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const endDateTime = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const allEvents: any[] = [];
+
+  for (let page = 0; page < 5; page += 1) {
+    const url = new URL("https://app.ticketmaster.com/discovery/v2/events.json");
+    url.searchParams.set("apikey", apiKey);
+    url.searchParams.set("countryCode", "TH");
+    url.searchParams.set("size", "200");
+    url.searchParams.set("page", String(page));
+    url.searchParams.set("sort", "date,asc");
+    url.searchParams.set("startDateTime", startDateTime);
+    url.searchParams.set("endDateTime", endDateTime);
+
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(45_000),
+    });
+    if (response.status === 404 && page === 0) {
+      return { source: "Ticketmaster Discovery API", skipped: true, reason: "NO_THAILAND_EVENTS_RETURNED" };
+    }
+    if (!response.ok) throw new Error("TICKETMASTER_DISCOVERY_" + response.status);
+
+    const payload = await response.json();
+    const pageEvents = Array.isArray(payload?._embedded?.events) ? payload._embedded.events : [];
+    allEvents.push(...pageEvents);
+
+    const totalPages = Number(payload?.page?.totalPages || 0);
+    if (!pageEvents.length || !Number.isFinite(totalPages) || page + 1 >= totalPages) break;
+  }
+
+  const normalized = allEvents.flatMap((item: any): any[] => {
+    const eventId = String(item?.id || "").trim();
+    const title = String(item?.name || "").trim();
+    if (!eventId || !title) return [];
+
+    const venue = Array.isArray(item?._embedded?.venues) ? item._embedded.venues[0] : undefined;
+    const latitude = Number(venue?.location?.latitude);
+    const longitude = Number(venue?.location?.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
+
+    const startRaw = item?.dates?.start?.dateTime
+      || (item?.dates?.start?.localDate ? item.dates.start.localDate + "T12:00:00+07:00" : "");
+    const startAt = parseThaiOrIsoDate(startRaw);
+    if (!startAt) return [];
+
+    const endRaw = item?.dates?.end?.dateTime
+      || (item?.dates?.end?.localDate ? item.dates.end.localDate + "T23:59:59+07:00" : "");
+    const endAt = parseThaiOrIsoDate(endRaw) || undefined;
+
+    const classifications = Array.isArray(item?.classifications) ? item.classifications : [];
+    const labels = classifications.flatMap((classification: any) => [
+      classification?.segment?.name,
+      classification?.genre?.name,
+      classification?.subGenre?.name,
+      classification?.type?.name,
+    ]).filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0);
+
+    const category = classifyPublicEvent(labels.join(" "), title, labels);
+    const sourceUrl = typeof item?.url === "string" ? item.url : "";
+    const stableId = crypto.createHash("sha256").update("ticketmaster:" + eventId).digest("hex").slice(0, 32);
+
+    return [{
+      id: "ticketmaster-event-" + stableId,
+      kind: "events",
+      title,
+      name: title,
+      category,
+      venueName: String(venue?.name || "").trim(),
+      venueArea: String(venue?.city?.name || venue?.state?.name || "Thailand").trim(),
+      province: String(venue?.state?.name || "").trim(),
+      address: [venue?.address?.line1, venue?.city?.name].filter(Boolean).join(", "),
+      latitude,
+      longitude,
+      startAt,
+      endAt,
+      description: String(item?.info || item?.pleaseNote || "").trim() || undefined,
+      source: "Ticketmaster Discovery API",
+      sourceName: "Ticketmaster Discovery API",
+      sourceUrl: sourceUrl || undefined,
+      ticketUrl: sourceUrl || undefined,
+      providerRecordId: eventId,
+      sourceDriven: true,
+      publicVisible: true,
+      status: "active",
+      labels,
+      importedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }];
+  });
+
+  const existingSnapshot = await ordersDb.collection("winAlertEvents")
+    .where("source", "==", "Ticketmaster Discovery API")
+    .get();
+  const existingIds = new Set(existingSnapshot.docs.map((doc) => doc.id));
+  const incomingIds = new Set(normalized.map((record) => record.id));
+
+  let written = 0;
+  for (let offset = 0; offset < normalized.length; offset += FIRESTORE_BATCH_LIMIT) {
+    const batch = ordersDb.batch();
+    const chunk = normalized.slice(offset, offset + FIRESTORE_BATCH_LIMIT);
+    for (const record of chunk) {
+      batch.set(ordersDb.collection("winAlertEvents").doc(record.id), {
+        ...record,
+        lastSourceSyncAt: new Date().toISOString(),
+      }, { merge: true });
+    }
+    await batch.commit();
+    written += chunk.length;
+  }
+
+  const staleIds = [...existingIds].filter((id) => !incomingIds.has(id));
+  let removed = 0;
+  for (let offset = 0; offset < staleIds.length; offset += FIRESTORE_BATCH_LIMIT) {
+    const batch = ordersDb.batch();
+    const chunk = staleIds.slice(offset, offset + FIRESTORE_BATCH_LIMIT);
+    for (const id of chunk) batch.delete(ordersDb.collection("winAlertEvents").doc(id));
+    await batch.commit();
+    removed += chunk.length;
+  }
+
+  dailyEventsCache.clear();
+  return {
+    source: "Ticketmaster Discovery API",
+    skipped: false,
+    sourceRows: allEvents.length,
+    written,
+    removed,
+    sourceDriven: true,
+    publicVisible: true,
+  };
+}
+
+function dedupeWinAlertEvents(events: NearbyEventResult[]) {
+  const seen = new Map<string, NearbyEventResult>();
+  for (const event of events) {
+    const day = String(event.startAt || "").slice(0, 10);
+    const normalizedTitle = event.title.toLowerCase().replace(/[^a-z0-9ก-๙]+/gi, " ").trim();
+    const normalizedVenue = event.venueName.toLowerCase().replace(/[^a-z0-9ก-๙]+/gi, " ").trim();
+    const key = [day, normalizedTitle, normalizedVenue].join("|");
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, event);
+      continue;
+    }
+    const existingScore = (existing.description ? 1 : 0) + (existing.sourceUrl ? 1 : 0) + (existing.ticketUrl ? 1 : 0);
+    const nextScore = (event.description ? 1 : 0) + (event.sourceUrl ? 1 : 0) + (event.ticketUrl ? 1 : 0);
+    if (nextScore > existingScore) seen.set(key, event);
+  }
+  return [...seen.values()].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+}
+
 async function syncTatPublicData(kinds: PublicDataKind[]) {
   const imported: Array<Record<string, unknown>> = [];
 
@@ -1084,37 +1248,73 @@ app.post("/api/internal/public-data/sync-tat", rateLimit(2), async (req, res) =>
   }
 });
 
+
+function requireWinAlertSyncSecret(req: express.Request, res: express.Response): boolean {
+  const configured = String(process.env.WIN_ALERT_INTERNAL_SYNC_SECRET || process.env.TAT_INTERNAL_SYNC_SECRET || "").trim();
+  const supplied = String(req.headers["x-winrider-event-sync-secret"] || req.headers["x-winrider-tat-sync-secret"] || "").trim();
+  if (!configured) {
+    res.status(503).json({ error: "WIN_ALERT_INTERNAL_SYNC_SECRET is not configured" });
+    return false;
+  }
+  if (!supplied || supplied !== configured) {
+    res.status(401).json({ error: "Unauthorized event sync request" });
+    return false;
+  }
+  return true;
+}
+
+app.post("/api/internal/events/sync", rateLimit(2), async (req, res) => {
+  if (!requireWinAlertSyncSecret(req, res)) return;
+  try {
+    const [tat, ticketmaster] = await Promise.all([
+      syncTatPublicData(["events"]),
+      syncTicketmasterEvents(),
+    ]);
+    dailyEventsCache.clear();
+    return res.json({
+      success: true,
+      sources: { tat, ticketmaster },
+      syncedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("[WIN Alert Multi-source Sync]", error instanceof Error ? error.message : error);
+    return res.status(503).json({ error: "ไม่สามารถซิงก์ข้อมูล WIN Alert จากแหล่งจริงได้" });
+  }
+});
+
 app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
   const eventDate = String(req.query.date || "").trim();
   const country = "TH";
+  const days = Math.min(Math.max(Number(req.query.days) || 1, 1), 30);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
     return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง", events: [] });
   }
 
-  const cacheKey = country + ":" + eventDate;
+  const cacheKey = country + ":" + eventDate + ":" + days;
   const cached = dailyEventsCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return res.json({
       events: cached.value,
-      source: "WINRIDER.AI • Direct TAT Public Data",
+      source: "WINRIDER.AI • Multi-source Event Intelligence",
+      sources: [...new Set(cached.value.map((event) => event.sourceName))],
       sourceDriven: true,
       fetchedAt: new Date().toISOString(),
       eventDate,
+      days,
       country,
       cached: true,
     });
   }
 
-  const dayStart = new Date(eventDate + "T00:00:00+07:00");
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+  const rangeStart = new Date(eventDate + "T00:00:00+07:00");
+  const rangeEnd = new Date(rangeStart.getTime() + days * 24 * 60 * 60 * 1000 - 1);
 
   try {
     const snapshot = await ordersDb.collection("winAlertEvents")
-      .where("source", "==", "TAT Data Catalog")
       .where("sourceDriven", "==", true)
       .get();
 
-    const events = snapshot.docs.flatMap((docSnap): NearbyEventResult[] => {
+    const rawEvents = snapshot.docs.flatMap((docSnap): NearbyEventResult[] => {
       const item = docSnap.data() || {};
       if (item.publicVisible !== true) return [];
 
@@ -1122,7 +1322,7 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
       const endAt = parseThaiOrIsoDate(item.endAt || item.end) || startAt;
       const startMs = startAt ? Date.parse(startAt) : NaN;
       const endMs = endAt ? Date.parse(endAt) : startMs;
-      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < dayStart.getTime() || startMs > dayEnd.getTime()) return [];
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < rangeStart.getTime() || startMs > rangeEnd.getTime()) return [];
 
       const latitude = Number(item.latitude ?? item.lat);
       const longitude = Number(item.longitude ?? item.lng ?? item.lon);
@@ -1138,31 +1338,39 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
         ? categoryValue as EventCategory
         : classifyPublicEvent(categoryValue, title, Array.isArray(item.labels) ? item.labels : []);
 
+      const source = String(item.source || "Public Source").trim();
       return [{
-        id: "tat-event-" + id,
+        id,
         title,
         category,
-        venueName: String(item.venueName || item.venue || "").trim(),
+        venueName: String(item.venueName || item.venue || item.address || "").trim(),
         venueArea: String(item.venueArea || item.area || item.province || "").trim(),
         latitude,
         longitude,
         startAt,
         endAt: endAt || undefined,
         description: typeof item.description === "string" ? item.description : undefined,
-        sourceName: "WINRIDER.AI • Direct TAT Public Data",
+        source,
+        sourceName: String(item.sourceName || source || "Public Source").trim(),
+        sourceUrl: typeof item.sourceUrl === "string" ? item.sourceUrl : undefined,
+        ticketUrl: typeof item.ticketUrl === "string" ? item.ticketUrl : undefined,
         providerEventId: String(item.providerRecordId || id),
         attendance: Number.isFinite(Number(item.attendance)) && Number(item.attendance) > 0 ? Number(item.attendance) : undefined,
         rank: Number.isFinite(Number(item.rank)) ? Number(item.rank) : undefined,
+        lastSourceSyncAt: typeof item.lastSourceSyncAt === "string" ? item.lastSourceSyncAt : undefined,
       }];
-    }).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+    });
 
+    const events = dedupeWinAlertEvents(rawEvents);
     dailyEventsCache.set(cacheKey, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
     return res.json({
       events,
-      source: "WINRIDER.AI • Direct TAT Public Data",
+      source: "WINRIDER.AI • Multi-source Event Intelligence",
+      sources: [...new Set(events.map((event) => event.sourceName))],
       sourceDriven: true,
       fetchedAt: new Date().toISOString(),
       eventDate,
+      days,
       country,
       cached: false,
     });
