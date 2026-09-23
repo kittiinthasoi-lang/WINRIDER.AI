@@ -101,8 +101,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     },
     { 
       id: 'topups', 
-      label: 'อนุมัติสลิปเติมเงิน', 
-      icon: <img src={WIN_IMAGES.admin.topupReview} alt="อนุมัติสลิปเติมเงิน" className="w-5 h-5 rounded-md object-cover ring-1 ring-emerald-400/50 shadow-sm" /> 
+      label: 'เงินเข้า / ถอนเงิน', 
+      icon: <img src={WIN_IMAGES.admin.topupReview} alt="เงินเข้าและถอนเงิน" className="w-5 h-5 rounded-md object-cover ring-1 ring-emerald-400/50 shadow-sm" /> 
     },
     { 
       id: 'fees', 
