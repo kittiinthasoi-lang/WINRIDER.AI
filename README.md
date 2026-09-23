@@ -152,9 +152,8 @@ WIN Alert แสดง event/public activity จาก source-driven public data
 - เก็บ source attribution
 - เปิด source / แผนที่ภายนอก
 - เลือก event เป็นปลายทางเรียกรถได้
-- TAT/public-data sync ใช้ internal sync secret ไม่ใช่ paid event API key
-
-`WIN_ALERT_INTERNAL_SYNC_SECRET` เป็นรหัสภายในเพียงตัวเดียวที่ WINRIDER ใช้ป้องกัน endpoint สำหรับ scheduled public-data/WIN Alert sync
+- TAT/public-data sync เป็นแบบ **Super Admin กดซิงก์เอง** จาก WIN Public Data Hub
+- ไม่มี scheduled sync และไม่ต้องตั้ง sync secret
 
 ## WIN Shop / Street Market
 
@@ -308,10 +307,6 @@ Backend ใช้:
 ### Owner
 
 - `ADMIN_OWNER_EMAIL`
-
-### Public Data Sync
-
-- `WIN_ALERT_INTERNAL_SYNC_SECRET`
 
 **ห้าม commit secret หรือ service-account private key ลง repository**
 
