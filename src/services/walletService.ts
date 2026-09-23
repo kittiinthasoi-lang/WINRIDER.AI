@@ -79,6 +79,24 @@ export async function getWalletMe(role?: string): Promise<WalletStateResponse> {
   return await res.json();
 }
 
+export async function getRecipientWallet(userId: string, role?: string): Promise<{
+  userId: string;
+  walletId: string;
+  role: string;
+  displayName?: string;
+  ownWallet?: boolean;
+}> {
+  const token = await getToken();
+  if (!token) throw new Error('กรุณาเข้าสู่ระบบก่อนดู WIN Wallet ผู้รับ');
+  const query = role ? `?role=${encodeURIComponent(role)}` : '';
+  const res = await fetch(`/api/wallet/recipient/${encodeURIComponent(userId)}${query}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'ไม่พบ WIN Wallet ของผู้รับ');
+  return data;
+}
+
 export async function submitWithdrawal(params: {
   amount: number;
   promptPayOrAccount: string;
