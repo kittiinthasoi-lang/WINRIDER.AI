@@ -1811,6 +1811,37 @@ function verifyBootstrapAdminPassword(password: string): { configured: boolean; 
   return { configured: false, valid: false };
 }
 
+async function promoteInitialOwnerIfEligible(user: WinAuthStoredUser): Promise<WinAuthStoredUser> {
+  if (user.isAdmin === true && user.adminLevel === "super" && user.status === "active") {
+    return user;
+  }
+
+  const users = await listWinAuthUsers();
+  const superAdmins = users.filter((candidate) => candidate.isAdmin === true && candidate.adminLevel === "super");
+  const isOnlyRegisteredAccount = users.length === 1 && users[0]?.uid === user.uid;
+
+  if (!isOnlyRegisteredAccount || superAdmins.length > 0) {
+    return user;
+  }
+
+  const now = new Date().toISOString();
+  const promoted = await saveWinAuthUser({
+    ...user,
+    status: "active",
+    isAdmin: true,
+    adminLevel: "super",
+    approvedAt: user.approvedAt || now,
+    approvedBy: user.approvedBy || "INITIAL_OWNER_BOOTSTRAP",
+  });
+
+  await mirrorWinAuthUser(promoted);
+  await ensureApprovedRoleProfile(promoted).catch((error) => {
+    console.warn("[Initial Owner Bootstrap Profile]", error instanceof Error ? error.message : error);
+  });
+  console.info("[WIN Auth] Initial owner account promoted to Super Admin:", promoted.uid);
+  return promoted;
+}
+
 async function requireWinAuthAdmin(req: express.Request, res: express.Response) {
   const token = rawBearerToken(req);
   if (!token) {
@@ -1918,6 +1949,7 @@ app.post("/api/auth/login", rateLimit(20), async (req, res) => {
       if (user.status === "suspended") {
         return res.status(403).json({ error: "Account suspended", code: "ACCOUNT_SUSPENDED" });
       }
+      user = await promoteInitialOwnerIfEligible(user);
     }
 
     const token = await createWinAuthSession(user.uid);
@@ -1932,8 +1964,9 @@ app.get("/api/auth/me", rateLimit(60), async (req, res) => {
   const token = rawBearerToken(req);
   if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
   try {
-    const user = await getWinAuthSessionUser(token);
+    let user = await getWinAuthSessionUser(token);
     if (!user) return res.status(401).json({ error: "Invalid session", code: "INVALID_SESSION" });
+    user = await promoteInitialOwnerIfEligible(user);
     return res.json({ user: publicWinAuthUser(user), approvalRequired: user.status === "pending_review" });
   } catch (error: any) {
     return res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
