@@ -47,7 +47,13 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid) || isAdmin();
-      allow update: if isOwner(uid) || isAdmin();
+      allow update: if isAdmin() || (
+        isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role', 'status', 'admin', 'isAdmin', 'adminLevel', 'level', 'xp', 'points',
+          'creditScore', 'financialScore', 'rideLaterCredit', 'foundingNumber', 'isFoundingKnight'
+        ])
+      );
       allow delete: if isAdmin();
     }
 
@@ -55,7 +61,13 @@ service cloud.firestore {
     match /knights/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid) || isAdmin();
-      allow update: if isOwner(uid) || isAdmin();
+      allow update: if isAdmin() || (
+        isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'kycStatus', 'status', 'level', 'activeRideId', 'dispatchJobsAccepted',
+          'ownerManagedDriver', 'isFoundingKnight', 'foundingNumber'
+        ])
+      );
       allow delete: if isAdmin();
     }
 
@@ -128,7 +140,8 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Rides are accessible to passengers and drivers, with durable client persistence fallback.
+    // Ride documents are server-authoritative. Clients may read only rides they
+    // participate in; every create/state mutation goes through authenticated APIs.
     match /rides/{rideId} {
       allow read: if isAdmin() || (
         signedIn() && (
@@ -137,24 +150,7 @@ service cloud.firestore {
           || resource.data.offeredDriverId == request.auth.uid
         )
       );
-
-      // Allow authenticated passenger to create their own ride document
-      // (ensures zero data loss across all services and deploy configurations)
-      allow create: if signedIn()
-        && request.resource.data.passengerUserId == request.auth.uid
-        && request.resource.data.fare is number
-        && request.resource.data.fare >= 10;
-
-      // Allow updates by admin, or by assigned driver/passenger for valid state transitions
-      allow update: if isAdmin() || (
-        signedIn() && (
-          resource.data.driverUserId == request.auth.uid
-          || resource.data.offeredDriverId == request.auth.uid
-          || resource.data.passengerUserId == request.auth.uid
-        )
-      );
-
-      allow delete: if isAdmin();
+      allow create, update, delete: if false;
     }
 
     // Driver GPS is backend-ingested only; clients cannot forge or delete location history.

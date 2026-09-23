@@ -287,31 +287,14 @@ export async function createLiveOrder(orderInput: {
       const failure = await createResponse.json().catch(() => ({})) as { error?: string; code?: string; activeOrderId?: string };
       const reason = failure.code || failure.error || `HTTP_${createResponse.status}`;
       
-      // If server store is unavailable (e.g. during fresh deploy or ADC sync), fall back to client Firestore directly
-      if (createResponse.status === 503 || reason.includes('ORDER_STORE_UNAVAILABLE')) {
-        console.warn('[Dispatch] Server store unavailable, falling back to direct Firestore & local dispatch sync');
-        persistedOrder = { ...newOrder, clientFallbackCreated: true } as any;
-      } else {
-        throw new Error(`ORDER_CREATE_FAILED:${reason}${failure.activeOrderId ? `:${failure.activeOrderId}` : ''}`);
-      }
+      throw new Error(`ORDER_CREATE_FAILED:${reason}${failure.activeOrderId ? `:${failure.activeOrderId}` : ''}`);
     }
   } catch (err: any) {
     if (err?.message?.startsWith('ORDER_CREATE_FAILED:')) {
       throw err;
     }
-    console.warn('[Dispatch] Network/Server order dispatch error, falling back to direct client persistence:', err);
-    persistedOrder = { ...newOrder, clientFallbackCreated: true } as any;
-  }
-
-  // Dual sync: Persist directly to client Firestore so the document is always safely stored
-  try {
-    const rideRef = doc(db, 'rides', persistedOrder.id);
-    await setDoc(rideRef, {
-      ...persistedOrder,
-      clientSyncedAt: new Date().toISOString(),
-    }, { merge: true });
-  } catch (firestoreClientErr) {
-    console.warn('[Client Firestore Sync]:', firestoreClientErr);
+    console.error('[Dispatch] Network/Server order dispatch error:', err);
+    throw new Error('ORDER_CREATE_FAILED:SERVER_UNAVAILABLE');
   }
 
   const orders = getLocalLiveOrders();
@@ -564,18 +547,6 @@ export async function completeLiveOrder(
   const completedOrder = payload.order as LiveRideOrder;
   orders[orderIndex] = completedOrder;
   saveLocalLiveOrders(orders);
-
-  // Mirror the authoritative completed order into rides/{id} so the server-side
-  // onTripCompleted trigger can settle the exact fare + tip exactly once.
-  try {
-    await setDoc(doc(db, 'rides', completedOrder.id), {
-      ...completedOrder,
-      updatedAt: new Date().toISOString(),
-      clientSettlementSyncAt: new Date().toISOString(),
-    }, { merge: true });
-  } catch (firestoreSyncErr) {
-    console.warn('[Completed Ride Settlement Sync]:', firestoreSyncErr);
-  }
 
   broadcastEvent(completedOrder, 'completed');
 
