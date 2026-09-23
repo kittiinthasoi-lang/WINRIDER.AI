@@ -1576,6 +1576,9 @@ function publicWinAuthUser(user: WinAuthStoredUser) {
     role: user.role,
     displayName: user.displayName,
     phone: user.phone,
+    province: user.registration?.province || "",
+    district: user.registration?.district || "",
+    registration: user.registration,
     status: user.status,
     isAdmin: user.isAdmin === true,
     adminLevel: user.adminLevel,
@@ -1593,6 +1596,119 @@ async function mirrorWinAuthUser(user: WinAuthStoredUser) {
     authProvider: "win_auth",
     updatedAt: new Date().toISOString(),
   }, { merge: true });
+}
+
+function cleanRegistrationProfile(role: WinAuthRole, raw: any): WinAuthRegistrationProfile {
+  const phone = String(raw?.phone || "").replace(/\s+/g, "");
+  const profile: WinAuthRegistrationProfile = {
+    fullName: String(raw?.fullName || "").trim().slice(0, 120),
+    phone,
+    province: String(raw?.province || "").trim().slice(0, 100),
+    district: String(raw?.district || "").trim().slice(0, 100),
+    pdpaAccepted: raw?.pdpaAccepted === true,
+    gpsConsent: raw?.gpsConsent === true,
+    termsAccepted: raw?.termsAccepted === true,
+  };
+  if (role === "citizen") {
+    profile.emergencyContactName = String(raw?.emergencyContactName || "").trim().slice(0, 120);
+    profile.emergencyContactPhone = String(raw?.emergencyContactPhone || "").replace(/\s+/g, "").slice(0, 20);
+  } else if (role === "knight") {
+    profile.winStation = String(raw?.winStation || "").trim().slice(0, 160);
+    profile.vestNumber = String(raw?.vestNumber || "").trim().slice(0, 40);
+    profile.plateNumber = String(raw?.plateNumber || "").trim().slice(0, 40);
+    profile.publicLicenseNumber = String(raw?.publicLicenseNumber || "").trim().slice(0, 80);
+    profile.vehicleModel = String(raw?.vehicleModel || "").trim().slice(0, 120);
+    profile.yellowPlateConfirmed = raw?.yellowPlateConfirmed === true;
+  } else if (role === "merchant") {
+    profile.shopName = String(raw?.shopName || "").trim().slice(0, 160);
+    profile.shopType = String(raw?.shopType || "").trim().slice(0, 120);
+    profile.shopAddress = String(raw?.shopAddress || "").trim().slice(0, 300);
+    profile.taxId = String(raw?.taxId || "").trim().slice(0, 40);
+  } else if (role === "partner") {
+    profile.orgName = String(raw?.orgName || "").trim().slice(0, 180);
+    profile.orgType = String(raw?.orgType || "").trim().slice(0, 120);
+    profile.contactPerson = String(raw?.contactPerson || "").trim().slice(0, 120);
+    profile.orgAddress = String(raw?.orgAddress || "").trim().slice(0, 300);
+    profile.estimatedUsers = Math.max(1, Math.min(1_000_000, Number(raw?.estimatedUsers) || 1));
+  }
+  return profile;
+}
+
+function validateRegistrationProfile(role: WinAuthRole, profile: WinAuthRegistrationProfile): string | null {
+  if (profile.fullName.length < 2) return "REGISTRATION_FULL_NAME_REQUIRED";
+  if (!/^0\d{9}$/.test(profile.phone)) return "REGISTRATION_PHONE_INVALID";
+  if (!profile.province || !profile.district) return "REGISTRATION_AREA_REQUIRED";
+  if (!profile.pdpaAccepted || !profile.gpsConsent || !profile.termsAccepted) return "REGISTRATION_CONSENT_REQUIRED";
+  if (role === "citizen") {
+    if (!profile.emergencyContactName || !/^0\d{9}$/.test(String(profile.emergencyContactPhone || ""))) return "REGISTRATION_EMERGENCY_CONTACT_REQUIRED";
+  }
+  if (role === "knight") {
+    if (!profile.winStation || !profile.vestNumber || !profile.plateNumber || !profile.publicLicenseNumber || !profile.vehicleModel) return "REGISTRATION_KNIGHT_DETAILS_REQUIRED";
+    if (profile.yellowPlateConfirmed !== true) return "REGISTRATION_YELLOW_PLATE_REQUIRED";
+  }
+  if (role === "merchant") {
+    if (!profile.shopName || !profile.shopType || !profile.shopAddress) return "REGISTRATION_MERCHANT_DETAILS_REQUIRED";
+  }
+  if (role === "partner") {
+    if (!profile.orgName || !profile.orgType || !profile.contactPerson || !profile.orgAddress) return "REGISTRATION_PARTNER_DETAILS_REQUIRED";
+  }
+  return null;
+}
+
+async function ensureApprovedRoleProfile(user: WinAuthStoredUser) {
+  const p = user.registration;
+  if (!p) return;
+  const base = {
+    displayName: user.displayName,
+    name: user.displayName,
+    email: user.email,
+    phone: user.phone,
+    province: p.province,
+    district: p.district,
+    level: user.isAdmin ? 100 : 1,
+    xp: 0,
+    updatedAt: new Date().toISOString(),
+  };
+  if (user.role === "citizen") {
+    await ordersDb.collection("citizens").doc(user.uid).set({
+      ...base,
+      savedAddresses: [],
+      emergencyContact: { name: p.emergencyContactName || "", phone: p.emergencyContactPhone || "" },
+    }, { merge: true });
+  } else if (user.role === "knight") {
+    await ordersDb.collection("knights").doc(user.uid).set({
+      ...base,
+      isOnline: false,
+      vehicleType: "motorcycle",
+      vehicleModel: p.vehicleModel || "",
+      plateNumber: p.plateNumber || "",
+      licenseNumber: p.publicLicenseNumber || "",
+      winStation: p.winStation || "",
+      vestNumber: p.vestNumber || "",
+      yellowPlateConfirmed: p.yellowPlateConfirmed === true,
+      kycStatus: "verified",
+      certifications: [],
+    }, { merge: true });
+  } else if (user.role === "merchant") {
+    await ordersDb.collection("merchants").doc(user.uid).set({
+      ...base,
+      shopName: p.shopName || "",
+      shopType: p.shopType || "",
+      address: p.shopAddress || "",
+      taxId: p.taxId || "",
+      gpRate: 10,
+    }, { merge: true });
+  } else if (user.role === "partner") {
+    await ordersDb.collection("partners").doc(user.uid).set({
+      ...base,
+      orgName: p.orgName || "",
+      orgType: p.orgType || "",
+      contactPerson: p.contactPerson || "",
+      address: p.orgAddress || "",
+      estimatedUsers: Number(p.estimatedUsers || 1),
+      gpRate: 10,
+    }, { merge: true });
+  }
 }
 
 function rawBearerToken(req: express.Request): string {
