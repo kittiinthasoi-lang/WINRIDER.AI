@@ -245,7 +245,7 @@ describe('Double-Entry Accounting & Wallet Invariants', () => {
       citizenWalletLocked: 0,
       knightWalletBalance: 10000,
       knightWalletLocked: 0,
-      idempotencyKey: 'founding_knight_trip_01',
+      idempotencyKey: 'idem-test-01',
     });
 
     assert.strictEqual(res.balanced, true);
