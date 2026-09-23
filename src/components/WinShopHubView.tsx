@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { emitQuestMetric } from '../services/questService';
-import {
 import { auth } from '../firebase';
+import {
   Building2, ChevronRight, Clock3, ExternalLink, Loader2, MapPin, Navigation,
   Package, Percent, Phone, Search, ShieldCheck, ShoppingBag, Store, Tag, UserRound, X
 } from 'lucide-react';
