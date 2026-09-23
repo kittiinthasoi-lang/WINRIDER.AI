@@ -947,16 +947,21 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setShowDriverMatchingModal(true);
   };
 
-  const handleConfirmMatch = (driver: MatchedDriver | null) => {
+  const handleConfirmMatch = async (driver: MatchedDriver | null) => {
     setCurrentMatchedDriver(driver);
     setShowDriverMatchingModal(false);
-    setShowBookingModal(true);
+    if (!selectedDestination?.trim()) {
+      setBookingError('กรุณาระบุปลายทางก่อนจับคู่');
+      setShowDriverMatchingModal(true);
+      return;
+    }
     if (audioEnabled) {
       playRadarScan();
       speakThaiText(driver
-        ? `ระบบจะส่งคำขอถึง ${driver.name} ก่อน หากไม่ตอบรับจะส่งต่ออัตโนมัติ กรุณายืนยันการเดินทาง`
-        : 'ระบบจะจับคู่พี่วินที่ใกล้ที่สุดและผ่านเงื่อนไขบริการ กรุณายืนยันการเดินทาง');
+        ? `จับคู่ ${driver.name} แล้ว กำลังคำนวณค่าโดยสารจากตำแหน่งปัจจุบันไปยังปลายทาง`
+        : 'จับคู่อัตโนมัติแล้ว กำลังคำนวณค่าโดยสารจากตำแหน่งปัจจุบันไปยังปลายทาง');
     }
+    await calculateDestinationRoute(selectedDestination.trim(), selectedDestination.trim(), false);
   };
 
   const findReferencePlace = (query: string) => {
@@ -1135,9 +1140,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setIsCreatingRide(true);
     setBookingError(null);
     try {
-      const familyPickupLocation = activeServiceId === 'family'
-        ? preMatchingData?.family?.pickupSpecificPoint.trim()
-        : '';
       const currentPosition = await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
         if (typeof navigator === 'undefined' || !navigator.geolocation) {
           reject(new Error('GPS_UNAVAILABLE'));
@@ -1149,34 +1151,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
         );
       });
-      let pickupCoord = currentPosition;
-      let pickupLocation = `GPS ${currentPosition.lat.toFixed(5)}, ${currentPosition.lng.toFixed(5)}`;
-      if (familyPickupLocation) {
-        const refPickup = findReferencePlace(familyPickupLocation);
-        if (refPickup) {
-          pickupCoord = { lat: refPickup.lat, lng: refPickup.lng };
-          pickupLocation = refPickup.address || familyPickupLocation;
-        } else {
-          try {
-            const response = await fetch('/api/places/resolve-routes', {
-              method: 'POST', headers: await getAuthHeaders(),
-              body: JSON.stringify({ latitude: currentPosition.lat, longitude: currentPosition.lng, places: [{ key: 'family-pickup', query: `${familyPickupLocation} ประเทศไทย` }] }),
-            });
-            if (response.ok) {
-              const payload = await response.json() as { routes?: Array<{ latitude: number; longitude: number; address: string }> };
-              const resolved = payload.routes?.[0];
-              if (resolved) {
-                pickupCoord = { lat: resolved.latitude, lng: resolved.longitude };
-                pickupLocation = resolved.address || familyPickupLocation;
-              }
-            } else {
-              pickupLocation = familyPickupLocation;
-            }
-          } catch {
-            pickupLocation = familyPickupLocation;
-          }
-        }
-      }
+      const pickupCoord = currentPosition;
+      const pickupLocation = `ตำแหน่ง GPS ปัจจุบัน ${currentPosition.lat.toFixed(5)}, ${currentPosition.lng.toFixed(5)}`;
 
       let dropoffCoord: { lat: number; lng: number } | undefined = undefined;
       let dropoffLocation = selectedDestination || 'ปลายทางที่ระบุ';
@@ -1230,7 +1206,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         serviceId: activeServiceId || 'knight',
         serviceTitle: selectedService ? `WIN ${selectedService.toUpperCase()}` : 'WIN KNIGHT',
         serviceIconEmoji: selectedDreamRide?.icon || '🛵',
-        // createLiveOrder binds ownership to the verified Firebase UID.
+        // createLiveOrder binds ownership to the verified WIN Auth UID.
         // This profile ID is informational only and is never trusted by the server.
         passengerUserId: currentUserSession.id,
         passengerName: `${pName} (${currentUserSession.level ? `LV.${currentUserSession.level}` : 'Citizen'})`,
@@ -1573,9 +1549,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   <button 
                     onClick={() => {
                       if (audioEnabled) playTactileBlip(850);
-                      if (searchQuery) {
-                        setSelectedDestination(searchQuery);
-                        setShowBookingModal(true);
+                      if (searchQuery.trim()) {
+                        setSelectedDestination(searchQuery.trim());
+                        setShowBookingModal(false);
+                        setShowDriverMatchingModal(true);
                       }
                     }}
                     style={{ 
