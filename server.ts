@@ -14,9 +14,12 @@ dotenv.config();
 
 const app = express();
 
-// In AI Studio and Cloud Run sandboxed environments, nginx routes external
-// traffic exclusively to port 3000. Port 3000 is hardcoded by infrastructure.
-const PORT = 3000;
+// Cloud Run injects PORT for the ingress container. Google AI Studio/local
+// preview can fall back to 3000 when PORT is not provided.
+const runtimePort = Number(process.env.PORT);
+const PORT = Number.isInteger(runtimePort) && runtimePort > 0 && runtimePort <= 65535
+  ? runtimePort
+  : 3000;
 
 app.use(express.json({ limit: "6mb" }));
 
