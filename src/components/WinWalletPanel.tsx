@@ -18,7 +18,7 @@ import { playTactileBlip, playPaymentSuccessChime } from '../utils/audio';
 const WIN_WALLET_TOPUP_ACCOUNT = {
   bankName: 'กสิกรไทย',
   accountNumber: '0931530151',
-  accountName: 'กิตติ อินทะสร้อย',
+  accountName: 'กิตติอินทะสร้อย',
   lineContact: '0837583169',
 } as const;
 
@@ -308,7 +308,6 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
             <p className="text-sm text-white">
               LINE ส่งสลิป: <strong className="font-mono text-[#06C755]">{WIN_WALLET_TOPUP_ACCOUNT.lineContact}</strong>
             </p>
-            <p className="pt-1 text-[11px] text-slate-400">หน้าเติมเงินไม่แสดงหรือสร้าง QR ชำระเงิน</p>
           </div>
 
           <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-xs text-slate-300">
