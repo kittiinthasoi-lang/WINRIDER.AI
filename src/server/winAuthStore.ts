@@ -1,7 +1,35 @@
 import crypto from "crypto";
+import type { Firestore } from "firebase-admin/firestore";
 
 export type WinAuthRole = "citizen" | "knight" | "merchant" | "partner";
 export type WinAuthStatus = "pending_review" | "active" | "suspended";
+
+export interface WinAuthRegistrationProfile {
+  fullName: string;
+  phone: string;
+  province: string;
+  district: string;
+  pdpaAccepted: boolean;
+  gpsConsent: boolean;
+  termsAccepted: boolean;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  winStation?: string;
+  vestNumber?: string;
+  plateNumber?: string;
+  publicLicenseNumber?: string;
+  vehicleModel?: string;
+  yellowPlateConfirmed?: boolean;
+  shopName?: string;
+  shopType?: string;
+  shopAddress?: string;
+  taxId?: string;
+  orgName?: string;
+  orgType?: string;
+  contactPerson?: string;
+  orgAddress?: string;
+  estimatedUsers?: number;
+}
 
 export interface WinAuthStoredUser {
   uid: string;
@@ -11,6 +39,7 @@ export interface WinAuthStoredUser {
   status: WinAuthStatus;
   displayName: string;
   phone: string;
+  registration?: WinAuthRegistrationProfile;
   isAdmin?: boolean;
   adminLevel?: "super" | "reviewer" | "support";
   createdAt: string;
@@ -20,55 +49,44 @@ export interface WinAuthStoredUser {
   rejectionReason?: string;
 }
 
-const PREFIX = "winrider:auth";
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
+const SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+let storeDb: Firestore | null = null;
 
-function redisConfig() {
-  const url = String(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "").replace(/\/$/, "");
-  const token = String(process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "");
-  if (!url || !token) {
+export function configureWinAuthStore(db: Firestore) {
+  storeDb = db;
+}
+
+function authDb(): Firestore {
+  if (!storeDb) {
     const error = new Error("WIN_AUTH_STORE_NOT_CONFIGURED");
     (error as any).code = "WIN_AUTH_STORE_NOT_CONFIGURED";
     throw error;
   }
-  return { url, token };
+  return storeDb;
 }
 
-async function redisCommand<T = unknown>(args: Array<string | number>): Promise<T> {
-  const { url, token } = redisConfig();
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(args.map((value) => String(value))),
-  });
-  const payload = await response.json().catch(() => ({})) as { result?: T; error?: string };
-  if (!response.ok || payload.error) {
-    const error = new Error(payload.error || `WIN_AUTH_STORE_HTTP_${response.status}`);
-    (error as any).code = "WIN_AUTH_STORE_ERROR";
-    throw error;
-  }
-  return payload.result as T;
+function usersCollection() {
+  return authDb().collection("winAuthUsers");
+}
+
+function emailIndexCollection() {
+  return authDb().collection("winAuthEmailIndex");
+}
+
+function sessionsCollection() {
+  return authDb().collection("winAuthSessions");
 }
 
 export function normalizeWinAuthEmail(value: unknown): string {
   return String(value || "").trim().toLowerCase();
 }
 
-function emailIndexKey(email: string): string {
-  const digest = crypto.createHash("sha256").update(normalizeWinAuthEmail(email)).digest("hex");
-  return `${PREFIX}:email:${digest}`;
+function emailIndexId(email: string): string {
+  return crypto.createHash("sha256").update(normalizeWinAuthEmail(email)).digest("hex");
 }
 
-function userKey(uid: string): string {
-  return `${PREFIX}:user:${uid}`;
-}
-
-function sessionKey(rawToken: string): string {
-  const digest = crypto.createHash("sha256").update(rawToken).digest("hex");
-  return `${PREFIX}:session:${digest}`;
+function sessionId(rawToken: string): string {
+  return crypto.createHash("sha256").update(rawToken).digest("hex");
 }
 
 export function hashWinAuthPassword(password: string): string {
@@ -85,17 +103,16 @@ export function verifyWinAuthPassword(password: string, encodedHash: string): bo
 }
 
 export async function getWinAuthUserById(uid: string): Promise<WinAuthStoredUser | null> {
-  const raw = await redisCommand<string | null>(["GET", userKey(uid)]);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as WinAuthStoredUser;
-  } catch {
-    return null;
-  }
+  const snap = await usersCollection().doc(uid).get();
+  return snap.exists ? snap.data() as WinAuthStoredUser : null;
 }
 
 export async function getWinAuthUserByEmail(email: string): Promise<WinAuthStoredUser | null> {
-  const uid = await redisCommand<string | null>(["GET", emailIndexKey(email)]);
+  const normalized = normalizeWinAuthEmail(email);
+  if (!normalized) return null;
+  const indexSnap = await emailIndexCollection().doc(emailIndexId(normalized)).get();
+  if (!indexSnap.exists) return null;
+  const uid = String(indexSnap.data()?.uid || "");
   return uid ? getWinAuthUserById(uid) : null;
 }
 
@@ -105,20 +122,14 @@ export async function createWinAuthUser(input: {
   role: WinAuthRole;
   displayName?: string;
   phone?: string;
+  registration?: WinAuthRegistrationProfile;
   status?: WinAuthStatus;
   isAdmin?: boolean;
   adminLevel?: "super" | "reviewer" | "support";
 }): Promise<WinAuthStoredUser> {
+  const db = authDb();
   const email = normalizeWinAuthEmail(input.email);
   const uid = `WIN-${crypto.randomUUID()}`;
-  const emailKey = emailIndexKey(email);
-  const claimed = await redisCommand<string | null>(["SET", emailKey, uid, "NX"]);
-  if (claimed !== "OK") {
-    const error = new Error("EMAIL_ALREADY_REGISTERED");
-    (error as any).code = "EMAIL_ALREADY_REGISTERED";
-    throw error;
-  }
-
   const now = new Date().toISOString();
   const user: WinAuthStoredUser = {
     uid,
@@ -126,52 +137,84 @@ export async function createWinAuthUser(input: {
     passwordHash: hashWinAuthPassword(input.password),
     role: input.role,
     status: input.status || "pending_review",
-    displayName: String(input.displayName || email.split("@")[0] || "ผู้สมัครใหม่").slice(0, 120),
-    phone: String(input.phone || "").slice(0, 40),
+    displayName: String(input.displayName || input.registration?.fullName || email.split("@")[0] || "ผู้สมัครใหม่").slice(0, 120),
+    phone: String(input.phone || input.registration?.phone || "").slice(0, 40),
+    registration: input.registration,
     isAdmin: input.isAdmin === true,
     adminLevel: input.adminLevel,
     createdAt: now,
     updatedAt: now,
   };
 
-  try {
-    await redisCommand(["SET", userKey(uid), JSON.stringify(user)]);
-    await redisCommand(["SADD", `${PREFIX}:users`, uid]);
-    return user;
-  } catch (error) {
-    await redisCommand(["DEL", emailKey]).catch(() => undefined);
-    throw error;
-  }
+  const userRef = usersCollection().doc(uid);
+  const emailRef = emailIndexCollection().doc(emailIndexId(email));
+  await db.runTransaction(async (tx) => {
+    const emailSnap = await tx.get(emailRef);
+    if (emailSnap.exists) {
+      const error = new Error("EMAIL_ALREADY_REGISTERED");
+      (error as any).code = "EMAIL_ALREADY_REGISTERED";
+      throw error;
+    }
+    tx.create(userRef, user);
+    tx.create(emailRef, { uid, email, createdAt: now });
+  });
+  return user;
 }
 
 export async function saveWinAuthUser(user: WinAuthStoredUser): Promise<WinAuthStoredUser> {
-  const next = { ...user, email: normalizeWinAuthEmail(user.email), updatedAt: new Date().toISOString() };
-  await redisCommand(["SET", userKey(user.uid), JSON.stringify(next)]);
-  await redisCommand(["SET", emailIndexKey(next.email), next.uid]);
-  await redisCommand(["SADD", `${PREFIX}:users`, next.uid]);
+  const db = authDb();
+  const next: WinAuthStoredUser = {
+    ...user,
+    email: normalizeWinAuthEmail(user.email),
+    updatedAt: new Date().toISOString(),
+  };
+  const userRef = usersCollection().doc(next.uid);
+  const emailRef = emailIndexCollection().doc(emailIndexId(next.email));
+  await db.runTransaction(async (tx) => {
+    const emailSnap = await tx.get(emailRef);
+    if (emailSnap.exists && String(emailSnap.data()?.uid || "") !== next.uid) {
+      const error = new Error("EMAIL_ALREADY_REGISTERED");
+      (error as any).code = "EMAIL_ALREADY_REGISTERED";
+      throw error;
+    }
+    tx.set(userRef, next, { merge: true });
+    tx.set(emailRef, { uid: next.uid, email: next.email, updatedAt: next.updatedAt }, { merge: true });
+  });
   return next;
 }
 
 export async function listWinAuthUsers(): Promise<WinAuthStoredUser[]> {
-  const ids = await redisCommand<string[]>(["SMEMBERS", `${PREFIX}:users`]);
-  if (!Array.isArray(ids) || !ids.length) return [];
-  const users = await Promise.all(ids.map((uid) => getWinAuthUserById(uid)));
-  return users.filter((user): user is WinAuthStoredUser => Boolean(user));
+  const snapshot = await usersCollection().limit(500).get();
+  return snapshot.docs.map((doc) => doc.data() as WinAuthStoredUser);
 }
 
 export async function createWinAuthSession(uid: string): Promise<string> {
   const rawToken = crypto.randomBytes(32).toString("base64url");
-  await redisCommand(["SET", sessionKey(rawToken), uid, "EX", SESSION_TTL_SECONDS]);
+  const now = Date.now();
+  await sessionsCollection().doc(sessionId(rawToken)).set({
+    uid,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + SESSION_TTL_MS).toISOString(),
+  });
   return rawToken;
 }
 
 export async function getWinAuthSessionUser(rawToken: string): Promise<WinAuthStoredUser | null> {
   if (!rawToken || rawToken.length < 20) return null;
-  const uid = await redisCommand<string | null>(["GET", sessionKey(rawToken)]);
+  const ref = sessionsCollection().doc(sessionId(rawToken));
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  const data = snap.data() || {};
+  const expiresAt = Date.parse(String(data.expiresAt || ""));
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    await ref.delete().catch(() => undefined);
+    return null;
+  }
+  const uid = String(data.uid || "");
   return uid ? getWinAuthUserById(uid) : null;
 }
 
 export async function deleteWinAuthSession(rawToken: string): Promise<void> {
   if (!rawToken) return;
-  await redisCommand(["DEL", sessionKey(rawToken)]);
+  await sessionsCollection().doc(sessionId(rawToken)).delete().catch(() => undefined);
 }

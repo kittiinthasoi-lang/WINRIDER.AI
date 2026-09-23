@@ -37,6 +37,7 @@ import { AdminSystemHealthView } from './AdminSystemHealthView';
 import { AdminPaymentProfilesView } from './AdminPaymentProfilesView';
 import { AdminPublicDataView } from './AdminPublicDataView';
 import { AdminOperationsView } from './AdminOperationsView';
+import { AdminVerificationQueueView } from './AdminVerificationQueueView';
 
 interface AdminLayoutProps {
   adminLevel: AdminLevel;
@@ -53,9 +54,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onSwitchAdminLevel,
   onSelectOwnerPersona
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'operations' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'operations' | 'health' | 'verification' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
 
-  const tabs: { id: 'dashboard' | 'operations' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
+  const tabs: { id: 'dashboard' | 'operations' | 'health' | 'verification' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
     { 
       id: 'dashboard', 
       label: 'ภาพรวมระบบ', 
@@ -70,6 +71,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       id: 'health', 
       label: 'System Health', 
       icon: <img src={WIN_IMAGES.admin.systemHealth} alt="System Health" className="w-5 h-5 rounded-md object-cover ring-1 ring-emerald-400/50 shadow-sm" /> 
+    },
+    {
+      id: 'verification',
+      label: 'คิวตรวจหลักฐาน',
+      icon: <FileCheck2 className="w-5 h-5 text-cyan-300" />,
+      badge: 'ADMIN'
     },
     { 
       id: 'kyc', 
@@ -230,7 +237,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                   <h2 className="text-sm font-black text-white">ศูนย์โปรไฟล์ 4 บทบาท</h2>
                   <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-300">REAL ACCOUNT</span>
                 </div>
-                <p className="mt-1 text-[10px] text-slate-400">เปิดใช้งานโปรไฟล์จริงของบัญชีแอดมินด้วย Firebase UID เดิม ไม่สร้างข้อมูลผู้ใช้จำลอง</p>
+                <p className="mt-1 text-[10px] text-slate-400">เปิดใช้งานโปรไฟล์จริงของบัญชีแอดมินด้วย WIN Auth UID เดิม ไม่สร้างข้อมูลผู้ใช้จำลอง</p>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {([
@@ -265,6 +272,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         )}
         {activeTab === 'operations' && <AdminOperationsView onOpenTopups={() => setActiveTab('topups')} />}
         {activeTab === 'health' && <AdminSystemHealthView />}
+        {activeTab === 'verification' && <AdminVerificationQueueView />}
         {activeTab === 'kyc' && (
           <AdminKycView adminLevel={adminLevel} />
         )}

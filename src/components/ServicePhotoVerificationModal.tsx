@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { Camera, CheckCircle2, MapPin, Upload, X, Loader2 } from 'lucide-react';
-import { uploadServiceCompletionPhoto } from '../utils/imageUpload';
 import { playTactileBlip } from '../utils/audio';
 import { auth } from '../firebase';
 
@@ -56,15 +55,28 @@ export const ServicePhotoVerificationModal: React.FC<ServicePhotoVerificationMod
     if (!orderId) { setError('ไม่พบเลขออเดอร์จริง จึงยังบันทึกหลักฐานไม่ได้'); return; }
     setSaving(true); setError('');
     try {
-      const imageUrl = await uploadServiceCompletionPhoto(user.uid, orderId, file);
+      const imageDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('อ่านรูปไม่สำเร็จ'));
+        reader.readAsDataURL(file);
+      });
       const token = await user.getIdToken();
+      const uploadResponse = await fetch('/api/evidence/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ imageDataUrl, category: 'service-completion' })
+      });
+      const uploadPayload = await uploadResponse.json().catch(() => ({}));
+      if (!uploadResponse.ok || !uploadPayload.imageUrl) throw new Error(uploadPayload.error || 'อัปโหลดรูปไม่สำเร็จ');
+      const imageUrl = String(uploadPayload.imageUrl);
       const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/completion-proof`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ proofUrl: imageUrl, latitude: gps?.lat, longitude: gps?.lng })
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'บันทึกหลักฐานไม่สำเร็จ');
+      if (!response.ok) throw new Error(payload.error || 'ส่งหลักฐานให้แอดมินตรวจไม่สำเร็จ');
       if (audioEnabled) playTactileBlip(1100);
       onConfirm?.(imageUrl);
       onClose();
@@ -105,11 +117,11 @@ export const ServicePhotoVerificationModal: React.FC<ServicePhotoVerificationMod
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={() => inputRef.current?.click()} className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 py-3 text-xs font-black text-cyan-200 flex items-center justify-center gap-2"><Camera className="h-4 w-4" /> ถ่าย/เลือกใหม่</button>
           <button type="button" disabled={!file || saving} onClick={confirm} className="rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 py-3 text-xs font-black text-slate-950 disabled:opacity-40 flex items-center justify-center gap-2">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} ยืนยันหลักฐาน
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} ส่งให้แอดมินตรวจ
           </button>
         </div>
         {error && <div role="alert" className="rounded-xl border border-rose-400/30 bg-rose-500/10 p-3 text-xs font-bold text-rose-200">{error}</div>}
-        <p className="text-[10px] leading-relaxed text-slate-500">หลักฐานถูกอัปโหลดเข้า Firebase Storage และผูกกับออเดอร์จริงก่อนจบงาน ระบบไม่สร้างข้อความว่า AI ตรวจผ่านจนกว่าจะมีภาพจริง</p>
+        <p className="text-[10px] leading-relaxed text-slate-500">รูปจะถูกเก็บเป็นหลักฐานของออเดอร์พร้อมเวลาและ GPS แล้วเข้าคิว Admin Verification แอดมินเป็นผู้อนุมัติหรือปฏิเสธ ไม่มี AI ตัดสิน</p>
       </div>
     </div>
   );

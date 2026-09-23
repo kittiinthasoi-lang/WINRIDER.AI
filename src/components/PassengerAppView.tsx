@@ -25,7 +25,7 @@ import { REAL_BANGKOK_LOCATIONS, RealBangkokLocation } from '../data/realBangkok
 import { POPULAR_BANGKOK_DESTINATIONS } from '../services/googleRoutesService';
 import { BANGKOK_TRANSIT_STATIONS } from '../data/transitData';
 import { playTactileBlip, playRadarScan, playEngineRev, playLevelUpFanfare, speakThaiText } from '../utils/audio';
-import { AIProductPhotoVerifier, AIVerificationResult } from './AIProductPhotoVerifier';
+import { AdminPhotoEvidencePicker, PhotoEvidenceResult } from './AdminPhotoEvidencePicker';
 import { SpecializedServicePreMatchingModal, SpecializedPreMatchingData } from './SpecializedServicePreMatchingModal';
 import { ServicePhotoVerificationModal } from './ServicePhotoVerificationModal';
 import { CustomerPaymentQrCodeModal } from './CustomerPaymentQrCodeModal';
@@ -630,8 +630,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [preMatchingServiceId, setPreMatchingServiceId] = useState<string>('express');
   const [preMatchingData, setPreMatchingData] = useState<SpecializedPreMatchingData | null>(null);
   const [serviceAddonFee, setServiceAddonFee] = useState<number>(0);
-  const [showExpressAiVerifier, setShowExpressAiVerifier] = useState(false);
-  const [expressAiVerification, setExpressAiVerification] = useState<AIVerificationResult | null>(null);
+  const [showExpressPhotoPicker, setShowExpressPhotoPicker] = useState(false);
+  const [expressPhotoEvidence, setExpressPhotoEvidence] = useState<PhotoEvidenceResult | null>(null);
   const [showPhotoVerificationModal, setShowPhotoVerificationModal] = useState(false);
   const [photoVerificationType, setPhotoVerificationType] = useState<'express_delivery' | 'family_arrival'>('express_delivery');
 
@@ -656,7 +656,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   const [newItemCondition, setNewItemCondition] = useState<'มือหนึ่ง' | 'มือสอง'>('มือสอง');
   const [newItemDescription, setNewItemDescription] = useState('');
   const [newItemIcon, setNewItemIcon] = useState('📦');
-  const [passengerAiVerified, setPassengerAiVerified] = useState<AIVerificationResult | null>(null);
+  const [passengerPhotoEvidence, setPassengerPhotoEvidence] = useState<PhotoEvidenceResult | null>(null);
   const [earnings, setEarnings] = useState(0);
 
   // 8 Pillars Core Services Array with Neon Contrast Color IDs & Outer Glowing Icons
@@ -878,11 +878,11 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       return;
     }
 
-    // WIN Express is gated by a real package photo + WIN-AI Vision certificate before dispatch.
+    // WIN Express requires a real package photo. The photo is reviewed by Admin, not AI.
     if (svc.id === 'express') {
-      setExpressAiVerification(null);
-      setShowExpressAiVerifier(true);
-      if (audioEnabled) speakThaiText('ก่อนเรียกพี่วิน WIN Express กรุณาถ่ายรูปพัสดุจริงให้ WIN-AI ตรวจสอบก่อนค่ะ');
+      setExpressPhotoEvidence(null);
+      setShowExpressPhotoPicker(true);
+      if (audioEnabled) speakThaiText('ก่อนเรียกพี่วิน WIN Express กรุณาถ่ายรูปพัสดุจริงเพื่อส่งให้แอดมินตรวจค่ะ');
       return;
     }
 
@@ -907,12 +907,12 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
   };
 
   const handlePreMatchingSubmit = (data: SpecializedPreMatchingData, addonFee: number) => {
-    if (data.serviceId === 'express' && !expressAiVerification?.isVerified) {
-      setShowExpressAiVerifier(true);
+    if (data.serviceId === 'express' && !expressPhotoEvidence?.imageUrl) {
+      setShowExpressPhotoPicker(true);
       return;
     }
-    if (data.serviceId === 'express' && expressAiVerification?.isVerified) {
-      data = { ...data, express: { ...data.express!, packagePhotoUrl: expressAiVerification.imageUrl, aiCertificateId: expressAiVerification.certificateId } } as SpecializedPreMatchingData;
+    if (data.serviceId === 'express' && expressPhotoEvidence?.imageUrl) {
+      data = { ...data, express: { ...data.express!, packagePhotoUrl: expressPhotoEvidence.imageUrl } } as SpecializedPreMatchingData;
     }
     setPreMatchingData(data);
     setServiceAddonFee(addonFee);
@@ -947,16 +947,21 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setShowDriverMatchingModal(true);
   };
 
-  const handleConfirmMatch = (driver: MatchedDriver | null) => {
+  const handleConfirmMatch = async (driver: MatchedDriver | null) => {
     setCurrentMatchedDriver(driver);
     setShowDriverMatchingModal(false);
-    setShowBookingModal(true);
+    if (!selectedDestination?.trim()) {
+      setBookingError('กรุณาระบุปลายทางก่อนจับคู่');
+      setShowDriverMatchingModal(true);
+      return;
+    }
     if (audioEnabled) {
       playRadarScan();
       speakThaiText(driver
-        ? `ระบบจะส่งคำขอถึง ${driver.name} ก่อน หากไม่ตอบรับจะส่งต่ออัตโนมัติ กรุณายืนยันการเดินทาง`
-        : 'ระบบจะจับคู่พี่วินที่ใกล้ที่สุดและผ่านเงื่อนไขบริการ กรุณายืนยันการเดินทาง');
+        ? `จับคู่ ${driver.name} แล้ว กำลังคำนวณค่าโดยสารจากตำแหน่งปัจจุบันไปยังปลายทาง`
+        : 'จับคู่อัตโนมัติแล้ว กำลังคำนวณค่าโดยสารจากตำแหน่งปัจจุบันไปยังปลายทาง');
     }
+    await calculateDestinationRoute(selectedDestination.trim(), selectedDestination.trim(), false);
   };
 
   const findReferencePlace = (query: string) => {
@@ -1135,9 +1140,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setIsCreatingRide(true);
     setBookingError(null);
     try {
-      const familyPickupLocation = activeServiceId === 'family'
-        ? preMatchingData?.family?.pickupSpecificPoint.trim()
-        : '';
       const currentPosition = await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
         if (typeof navigator === 'undefined' || !navigator.geolocation) {
           reject(new Error('GPS_UNAVAILABLE'));
@@ -1149,34 +1151,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
           { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
         );
       });
-      let pickupCoord = currentPosition;
-      let pickupLocation = `GPS ${currentPosition.lat.toFixed(5)}, ${currentPosition.lng.toFixed(5)}`;
-      if (familyPickupLocation) {
-        const refPickup = findReferencePlace(familyPickupLocation);
-        if (refPickup) {
-          pickupCoord = { lat: refPickup.lat, lng: refPickup.lng };
-          pickupLocation = refPickup.address || familyPickupLocation;
-        } else {
-          try {
-            const response = await fetch('/api/places/resolve-routes', {
-              method: 'POST', headers: await getAuthHeaders(),
-              body: JSON.stringify({ latitude: currentPosition.lat, longitude: currentPosition.lng, places: [{ key: 'family-pickup', query: `${familyPickupLocation} ประเทศไทย` }] }),
-            });
-            if (response.ok) {
-              const payload = await response.json() as { routes?: Array<{ latitude: number; longitude: number; address: string }> };
-              const resolved = payload.routes?.[0];
-              if (resolved) {
-                pickupCoord = { lat: resolved.latitude, lng: resolved.longitude };
-                pickupLocation = resolved.address || familyPickupLocation;
-              }
-            } else {
-              pickupLocation = familyPickupLocation;
-            }
-          } catch {
-            pickupLocation = familyPickupLocation;
-          }
-        }
-      }
+      const pickupCoord = currentPosition;
+      const pickupLocation = `ตำแหน่ง GPS ปัจจุบัน ${currentPosition.lat.toFixed(5)}, ${currentPosition.lng.toFixed(5)}`;
 
       let dropoffCoord: { lat: number; lng: number } | undefined = undefined;
       let dropoffLocation = selectedDestination || 'ปลายทางที่ระบุ';
@@ -1230,7 +1206,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         serviceId: activeServiceId || 'knight',
         serviceTitle: selectedService ? `WIN ${selectedService.toUpperCase()}` : 'WIN KNIGHT',
         serviceIconEmoji: selectedDreamRide?.icon || '🛵',
-        // createLiveOrder binds ownership to the verified Firebase UID.
+        // createLiveOrder binds ownership to the verified WIN Auth UID.
         // This profile ID is informational only and is never trusted by the server.
         passengerUserId: currentUserSession.id,
         passengerName: `${pName} (${currentUserSession.level ? `LV.${currentUserSession.level}` : 'Citizen'})`,
@@ -1245,7 +1221,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         estMinutes: destinationEtaMinutes || Math.max(3, Math.ceil(resolvedDistanceKm * 3.5)),
         customerGender,
         preferredDriverId: currentMatchedDriver?.id,
-        ...(activeServiceId === 'express' && expressAiVerification?.isVerified ? { expressPackagePhotoUrl: expressAiVerification.imageUrl, expressAiCertificateId: expressAiVerification.certificateId } : {}),
+        ...(activeServiceId === 'express' && expressPhotoEvidence?.imageUrl ? { expressPackagePhotoUrl: expressPhotoEvidence.imageUrl } : {}),
       });
       setActiveLiveOrder(liveOrder);
       setBookingConfirmed(true);
@@ -1334,125 +1310,50 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
   const handleAddC2c = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemName || !newItemPrice) return;
-
-    if (!passengerAiVerified) {
-      alert('⚠️ ข้อบังคับตลาดประชาชน: กรุณาถ่ายรูปสินค้าให้ AI Vision Guard ตรวจสอบยืนยันก่อนลงขายทุกครั้ง');
+    if (!newItemName.trim() || !newItemPrice || !passengerPhotoEvidence) {
+      alert('กรุณากรอกชื่อ ราคา และถ่ายรูปสินค้าจริงก่อนส่งให้แอดมินตรวจ');
       return;
     }
 
-    const priceNum = parseFloat(newItemPrice) || 100;
     const uid = auth.currentUser?.uid;
-    if (!uid) {
+    const token = await auth.currentUser?.getIdToken();
+    if (!uid || !token) {
       alert('กรุณาเข้าสู่ระบบก่อนลงขายสินค้า');
       return;
     }
 
-    const listingId = `c2c-${uid}-${Date.now()}`;
-    const newItem = {
-      id: listingId,
-      sellerUid: uid,
-      name: newItemName,
-      price: priceNum,
-      rating: 5.0,
-      sales: 0,
-      tag: newItemTag || 'General',
-      icon: passengerAiVerified.imageIcon || newItemIcon || '📦',
-      imageUrl: passengerAiVerified.imageUrl,
-      isAiVerified: true
-    };
-    const token = await auth.currentUser?.getIdToken();
-    if (!token) {
-      alert('เซสชันเข้าสู่ระบบหมดอายุ กรุณาเข้าสู่ระบบใหม่');
-      return;
-    }
-    const listingResponse = await fetch('/api/shop/listings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        title: newItem.name,
-        price: newItem.price,
-        stock: 1,
-        category: newItem.tag,
-        categoryLabel: newItem.tag,
-        condition: newItemCondition || 'used',
-        conditionLabel: newItemCondition || 'มือสองสภาพดี',
-        description: newItemDescription,
-        imageIcon: newItem.icon,
-        imageUrl: newItem.imageUrl,
-        isAiVerified: true,
-        aiCertificateId: passengerAiVerified.certificateId,
-        aiQualityScore: passengerAiVerified.qualityScore,
-        tags: ['AI Verified ✨', 'C2C พลเมืองขายเอง', newItem.tag],
-      }),
-    });
-    if (!listingResponse.ok) {
-      const payload = await listingResponse.json().catch(() => ({}));
-      throw new Error(payload?.error || 'บันทึกสินค้าไม่สำเร็จ');
-    }
-    const savedPayload = await listingResponse.json() as { listing?: any };
-    const savedListing = savedPayload.listing;
-    const persistedItem = {
-      ...newItem,
-      id: String(savedListing?.id || newItem.id),
-      sellerUid: uid,
-    };
-    setC2cItems(prev => [persistedItem, ...prev.filter(item => item.id !== persistedItem.id)]);
-
-    if (onAddNewCustomerItem) {
-      onAddNewCustomerItem({
-        id: `c2c-${Date.now()}`,
-        title: newItemName,
-        name: newItemName,
-        price: priceNum,
-        seller: passengerProfileData.displayName || currentUserSession.name || 'พลเมือง WIN',
-        sellerName: passengerProfileData.displayName || currentUserSession.name || 'พลเมือง WIN',
-        sellerType: 'citizen',
-        sellerAvatar: passengerProfileData.avatarEmoji || '👤',
-        sellerAvatarUrl: passengerProfileData.avatarUrl || '',
-        sellerUid: uid,
-        sellerLocationLabel: passengerProfileData.locationLabel || '',
-        sellerLatitude: Number.isFinite(passengerProfileData.latitude) ? passengerProfileData.latitude : undefined,
-        sellerLongitude: Number.isFinite(passengerProfileData.longitude) ? passengerProfileData.longitude : undefined,
-        sellerRole: 'customer',
-        sellerLevel: citizenLevel,
-        sellerRating: 5.0,
-        category: (newItemTag as any) || 'second_hand',
-        categoryLabel: newItemTag || 'ของมือสอง & ทั่วไป',
-        condition: (newItemCondition as any) || 'used',
-        conditionLabel: newItemCondition || 'มือสองสภาพดี',
-        imageEmoji: passengerAiVerified.imageIcon || newItemIcon || '📦',
-        imageIcon: passengerAiVerified.imageIcon || newItemIcon || '📦',
-        imageUrl: passengerAiVerified.imageUrl,
-        isAiVerified: true,
-        aiCertificateId: passengerAiVerified.certificateId,
-        aiQualityScore: passengerAiVerified.qualityScore,
-        aiVerifiedDate: new Date().toLocaleDateString('th-TH'),
-        rating: 5.0,
-        reviewsCount: 1,
-        salesCount: 0,
-        stock: 1,
-        distanceKm: undefined,
-        location: passengerProfileData.locationLabel || 'ตำแหน่งที่ผู้ขายบันทึกไว้ในโปรไฟล์',
-        description: newItemDescription || 'สินค้าคุณภาพจากพลเมืองพร้อมจัดส่งด่วนด้วย WIN Knight',
-        tags: ['AI Verified ✨', 'C2C พลเมืองขายเอง', newItemTag || 'ของทั่วไป', 'พร้อมส่งด่วน'],
-        inStock: 1,
-        featured: true,
-        isCustomerListed: true
+    try {
+      const listingResponse = await fetch('/api/shop/listings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: newItemName.trim(),
+          price: parseFloat(newItemPrice),
+          stock: 1,
+          category: newItemTag || 'second_hand',
+          categoryLabel: newItemTag || 'ของทั่วไป',
+          condition: newItemCondition || 'used',
+          conditionLabel: newItemCondition || 'มือสอง',
+          description: newItemDescription.trim(),
+          imageIcon: passengerPhotoEvidence.imageIcon || '📸',
+          imageUrl: passengerPhotoEvidence.imageUrl,
+          location: passengerProfileData.locationLabel || 'ตำแหน่งผู้ขาย',
+          tags: ['C2C พลเมืองขายเอง', newItemTag || 'ของทั่วไป'],
+        }),
       });
-    }
+      const payload = await listingResponse.json().catch(() => ({})) as { error?: string };
+      if (!listingResponse.ok) throw new Error(payload.error || 'ส่งสินค้าให้แอดมินตรวจไม่สำเร็จ');
 
-    setNewItemName('');
-    setNewItemPrice('');
-    setNewItemDescription('');
-    setPassengerAiVerified(null);
-    setShowAddC2cModal(false);
-    handleGainCitizenXp(150, "ลงขายสินค้า C2C ที่ผ่านการยืนยันโดย AI สำเร็จ");
-    if (audioEnabled) playTactileBlip(1100);
-    confetti({ particleCount: 45, spread: 65, colors: ['#00D2FF', '#FFD700', '#10B981'] });
+      setNewItemName('');
+      setNewItemPrice('');
+      setNewItemDescription('');
+      setPassengerPhotoEvidence(null);
+      setShowAddC2cModal(false);
+      alert('ส่งรูปและรายการสินค้าให้แอดมินตรวจแล้ว เมื่ออนุมัติจึงจะแสดงใน WIN Street Market');
+      if (audioEnabled) playTactileBlip(1100);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'ส่งสินค้าให้แอดมินตรวจไม่สำเร็จ');
+    }
   };
 
   return (
@@ -1648,9 +1549,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   <button 
                     onClick={() => {
                       if (audioEnabled) playTactileBlip(850);
-                      if (searchQuery) {
-                        setSelectedDestination(searchQuery);
-                        setShowBookingModal(true);
+                      if (searchQuery.trim()) {
+                        setSelectedDestination(searchQuery.trim());
+                        setShowBookingModal(false);
+                        setShowDriverMatchingModal(true);
                       }
                     }}
                     style={{ 
@@ -3571,32 +3473,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
             </div>
 
             <div className="space-y-2.5 text-xs">
-              {/* Mandatory AI Photo Verification Section */}
-              <div className="p-3.5 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-cyan-300 font-bold">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>AI Vision Guard (ข้อบังคับการลงรูปขาย)</span>
-                  </div>
-                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">
-                    Mandatory AI Scan
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-300">
-                  ถ่ายรูปสินค้าจริงเพื่อวิเคราะห์สภาพสินค้า ความปลอดภัย และออกใบรับรอง AI Guard Certificate
-                </p>
-
-                <AIProductPhotoVerifier
-                  audioEnabled={audioEnabled}
-                  onVerificationComplete={(result) => {
-                    setPassengerAiVerified(result);
-                    if (!newItemName) setNewItemName(result.suggestedTitle);
-                    if (!newItemPrice) setNewItemPrice(result.estimatedPriceRange.min.toString());
-                    if (!newItemDescription) setNewItemDescription(result.detectedFeatures.join(', '));
-                  }}
-                  onReset={() => setPassengerAiVerified(null)}
-                />
-              </div>
+              <AdminPhotoEvidencePicker
+                category="citizen-market-item"
+                title="รูปสินค้าจริง"
+                description="ไม่ใช้ AI ตรวจ รูปและรายการจะเข้าคิวให้แอดมินอนุมัติก่อนแสดงขาย"
+                onPhotoReady={setPassengerPhotoEvidence}
+                onReset={() => setPassengerPhotoEvidence(null)}
+              />
 
               {/* Product catalog is populated from real merchant data. */}
 
@@ -3739,14 +3622,14 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={!passengerAiVerified}
+                disabled={!passengerPhotoEvidence}
                 className={`flex-1 py-2.5 rounded-xl font-black text-xs transition-all ${
-                  passengerAiVerified
+                  passengerPhotoEvidence
                     ? 'bg-gradient-to-r from-[#FFD700] via-amber-400 to-orange-400 hover:brightness-110 text-slate-950 shadow-md active:scale-95 cursor-pointer'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5'
                 }`}
               >
-                {passengerAiVerified ? '🚀 โพสต์ขายทันที (+150 XP)' : 'กรุณาถ่ายรูปให้ AI ยืนยันก่อน'}
+                {passengerPhotoEvidence ? 'ส่งให้แอดมินตรวจ' : 'กรุณาถ่ายรูปจริงก่อนส่งตรวจ'}
               </button>
             </div>
           </form>
@@ -3908,41 +3791,29 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
         />
       )}
 
-      {showExpressAiVerifier && (
+      {showExpressPhotoPicker && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-2xl max-h-[94vh] overflow-y-auto space-y-2">
-            {/* Top Back / Cancel Bar */}
-            <div className="flex items-center justify-between px-1">
-              <button
-                type="button"
-                onClick={() => setShowExpressAiVerifier(false)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-400/40 text-xs font-bold transition shadow-md active:scale-95"
-              >
-                <ArrowLeft className="w-4 h-4 text-cyan-400" />
-                <span>ย้อนกลับ (ยกเลิกตรวจรูปพัสดุ)</span>
+          <div className="w-full max-w-2xl max-h-[94vh] overflow-y-auto space-y-3 rounded-3xl border border-cyan-400/30 bg-[#08152E] p-4">
+            <div className="flex items-center justify-between">
+              <button type="button" onClick={() => setShowExpressPhotoPicker(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 text-cyan-300 border border-cyan-400/40 text-xs font-bold">
+                <ArrowLeft className="w-4 h-4" />ย้อนกลับ
               </button>
-              <button
-                type="button"
-                onClick={() => setShowExpressAiVerifier(false)}
-                className="p-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition"
-                title="ปิด"
-              >
+              <button type="button" onClick={() => setShowExpressPhotoPicker(false)} className="p-1.5 rounded-xl bg-slate-800 text-slate-400 border border-slate-700">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <AIProductPhotoVerifier
-              audioEnabled={audioEnabled}
-              initialItemName="WIN Express พัสดุ"
-              initialCategory="พัสดุ / สิ่งของสำหรับจัดส่ง"
-              onBack={() => setShowExpressAiVerifier(false)}
-              onVerificationComplete={(result) => {
-                if (!result.isVerified) return;
-                setExpressAiVerification(result);
-                setShowExpressAiVerifier(false);
+            <AdminPhotoEvidencePicker
+              category="express-package"
+              title="รูปพัสดุก่อนรับงาน"
+              description="ถ่ายรูปพัสดุจริงเพื่อบันทึกหลักฐานและส่งเข้าคิว Admin Verification ไม่มี AI ตัดสิน"
+              onPhotoReady={(result) => {
+                setExpressPhotoEvidence(result);
+                setShowExpressPhotoPicker(false);
                 setPreMatchingServiceId('express');
                 setShowPreMatchingModal(true);
-                if (audioEnabled) speakThaiText('ตรวจสอบพัสดุผ่านแล้ว กรุณากรอกข้อมูลผู้รับและปลายทางเพื่อเรียกพี่วินค่ะ');
+                if (audioEnabled) speakThaiText('บันทึกรูปพัสดุแล้ว กรุณากรอกข้อมูลผู้รับและปลายทางค่ะ');
               }}
+              onReset={() => setExpressPhotoEvidence(null)}
             />
           </div>
         </div>

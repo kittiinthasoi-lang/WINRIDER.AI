@@ -10,6 +10,7 @@ import { getStorage } from "firebase-admin/storage";
 import { calculateAppFare } from "./src/core/serverFare";
 import { parseQrPayload } from "./src/utils/qrPayload";
 import {
+  configureWinAuthStore,
   createWinAuthSession,
   createWinAuthUser,
   deleteWinAuthSession,
@@ -21,6 +22,7 @@ import {
   normalizeWinAuthEmail,
   saveWinAuthUser,
   verifyWinAuthPassword,
+  type WinAuthRegistrationProfile,
   type WinAuthRole,
   type WinAuthStoredUser,
 } from "./src/server/winAuthStore";
@@ -669,6 +671,56 @@ app.put("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"
   }
 });
 
+app.post("/api/shop/profile-content/product-submissions", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
+  if (String(userData.role || (user as any).role || "") !== "merchant") {
+    return res.status(403).json({ error: "เฉพาะบัญชีร้านค้าที่อนุมัติแล้วเท่านั้น" });
+  }
+
+  const input = req.body || {};
+  const imageUrl = validEvidenceImageUrl(input.imageUrl);
+  const title = String(input.title || "").trim().slice(0, 160);
+  const price = Number(input.price);
+  const stock = Math.max(1, Math.min(100000, Math.floor(Number(input.stock) || 1)));
+  if (!imageUrl || title.length < 2 || !Number.isFinite(price) || price <= 0) {
+    return res.status(400).json({ error: "กรุณากรอกชื่อ ราคา และรูปสินค้าจริงให้ครบ" });
+  }
+
+  const product = {
+    id: `prod-${crypto.randomUUID()}`,
+    title,
+    category: String(input.category || "สินค้าทั่วไป").slice(0, 120),
+    price,
+    originalPrice: Number.isFinite(Number(input.originalPrice)) ? Number(input.originalPrice) : price,
+    imageIcon: "📸",
+    imageUrl,
+    description: String(input.description || "").trim().slice(0, 2000),
+    stock,
+    soldCount: 0,
+    isFlashSale: input.isFlashSale === true,
+    adminVerified: true,
+  };
+
+  try {
+    const verification = await createAdminVerification({
+      submittedBy: user.uid,
+      submittedRole: "merchant",
+      category: "ตรวจรูปและสินค้าหน้าร้าน",
+      subjectType: "merchant_product",
+      subjectId: product.id,
+      imageUrl,
+      note: title,
+      metadata: { merchantUid: user.uid, product },
+    });
+    return res.status(202).json({ pendingAdminReview: true, verification, product });
+  } catch (error: any) {
+    console.error("[Merchant Product Submission]", error?.message);
+    return res.status(503).json({ error: "ส่งสินค้าให้แอดมินตรวจไม่สำเร็จ" });
+  }
+});
+
 app.get("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
@@ -726,21 +778,22 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
   const title = String(input.title || "").trim();
   const price = Number(input.price);
   const stock = Number(input.stock ?? 1);
-  if (title.length < 3 || !Number.isFinite(price) || price <= 0 || !Number.isFinite(stock) || stock < 1) {
-    return res.status(400).json({ error: "ข้อมูลสินค้าไม่ถูกต้อง" });
+  const imageUrl = validEvidenceImageUrl(input.imageUrl);
+  if (title.length < 3 || !Number.isFinite(price) || price <= 0 || !Number.isFinite(stock) || stock < 1 || !imageUrl) {
+    return res.status(400).json({ error: "กรุณากรอกข้อมูลสินค้าและแนบรูปสินค้าจริงให้ครบ" });
   }
   try {
     const userSnapshot = await ordersDb.collection("users").doc(user.uid).get();
     const userData = userSnapshot.data() || {};
     const sellerProfile = (userData.profileCustomization || {}) as Record<string, unknown>;
-    const sellerRole = String(userData.role || "citizen").trim();
+    const sellerRole = String(userData.role || (user as any).role || "citizen").trim();
     const sellerWallet = await ensureWalletIdentityId(user.uid, WALLET_ROLE_PREFIX[sellerRole] ? sellerRole : "citizen");
     const id = `listing-${crypto.randomUUID()}`;
     const now = new Date().toISOString();
     const listing = {
       id,
       sellerUserId: user.uid,
-      sellerType: userData.role === "merchant" ? "merchant" : "citizen",
+      sellerType: sellerRole === "merchant" ? "merchant" : "citizen",
       sellerName: String(sellerProfile.displayName || userData.displayName || user.name || "ผู้ขาย WIN"),
       sellerWalletId: sellerWallet.walletId,
       sellerWalletRole: sellerWallet.role,
@@ -755,29 +808,53 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
       category: String(input.category || "second_hand"),
       categoryLabel: String(input.categoryLabel || "สินค้าทั่วไป"),
       condition: String(input.condition || "used"),
-      conditionLabel: String(input.conditionLabel || "สภาพดี"),
+      conditionLabel: String(input.conditionLabel || "ผู้ขายระบุสภาพสินค้า"),
       description: String(input.description || "").trim(),
-      imageIcon: String(input.imageIcon || "📦"),
-      imageUrl: String(input.imageUrl || ""),
-      isAiVerified: input.isAiVerified === true,
-      aiCertificateId: input.isAiVerified === true ? String(input.aiCertificateId || "") : "",
-      aiQualityScore: input.isAiVerified === true && Number.isFinite(Number(input.aiQualityScore)) ? Number(input.aiQualityScore) : null,
+      imageIcon: String(input.imageIcon || "📸"),
+      imageUrl,
+      isAiVerified: false,
+      adminReviewStatus: "pending_review",
       location: sellerProfile.locationEnabled === true
         ? String(sellerProfile.locationLabel || "ตำแหน่งที่ผู้ขายบันทึกไว้ในโปรไฟล์")
         : String(input.location || userData.locationLabel || userData.address || "").trim(),
       stock,
       tags: Array.isArray(input.tags) ? input.tags.filter((tag: unknown) => typeof tag === "string").slice(0, 10) : [],
-      status: "active",
+      status: "pending_review",
       salesCount: 0,
       createdAt: now,
       updatedAt: now,
       serverCreatedAt: FieldValue.serverTimestamp(),
     };
-    await ordersDb.collection("marketListings").doc(id).create(listing);
-    return res.status(201).json({ listing });
+
+    const listingRef = ordersDb.collection("marketListings").doc(id);
+    const verificationRef = ordersDb.collection("adminVerificationQueue").doc();
+    await ordersDb.runTransaction(async (tx) => {
+      tx.create(listingRef, listing);
+      tx.create(verificationRef, {
+        id: verificationRef.id,
+        status: "pending_review",
+        submittedBy: user.uid,
+        submittedRole: sellerRole,
+        category: "ตรวจรูปและรายการสินค้าก่อนลงขาย",
+        subjectType: "market_listing",
+        subjectId: id,
+        imageUrl,
+        note: [title, String(input.description || "")].filter(Boolean).join(" • ").slice(0, 1000),
+        metadata: { price, category: String(input.category || "second_hand"), location: listing.location },
+        createdAt: now,
+        updatedAt: now,
+        serverCreatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+    return res.status(202).json({
+      listing,
+      verificationId: verificationRef.id,
+      pendingAdminReview: true,
+      message: "ส่งรายการสินค้าให้แอดมินตรวจแล้ว",
+    });
   } catch (error) {
     console.error("[Shop Listings POST]", error instanceof Error ? error.message : error);
-    return res.status(503).json({ error: "บันทึกสินค้าไม่สำเร็จ" });
+    return res.status(503).json({ error: "บันทึกสินค้าเพื่อรอแอดมินตรวจไม่สำเร็จ" });
   }
 });
 
@@ -1499,6 +1576,8 @@ interface ServerOrder {
   walletHoldCreatedAt?: string;
   walletHoldReleasedAt?: string;
   walletHoldReleaseReason?: string;
+  expressPackagePhotoUrl?: string;
+  expressPackageVerificationId?: string;
 }
 
 function getAdminDb() {
@@ -1563,6 +1642,7 @@ function getAdminDb() {
 }
 
 const ordersDb = getAdminDb();
+configureWinAuthStore(ordersDb);
 
 const WIN_AUTH_ROLES = new Set<WinAuthRole>(["citizen", "knight", "merchant", "partner"]);
 
@@ -1573,6 +1653,9 @@ function publicWinAuthUser(user: WinAuthStoredUser) {
     role: user.role,
     displayName: user.displayName,
     phone: user.phone,
+    province: user.registration?.province || "",
+    district: user.registration?.district || "",
+    registration: user.registration,
     status: user.status,
     isAdmin: user.isAdmin === true,
     adminLevel: user.adminLevel,
@@ -1590,6 +1673,119 @@ async function mirrorWinAuthUser(user: WinAuthStoredUser) {
     authProvider: "win_auth",
     updatedAt: new Date().toISOString(),
   }, { merge: true });
+}
+
+function cleanRegistrationProfile(role: WinAuthRole, raw: any): WinAuthRegistrationProfile {
+  const phone = String(raw?.phone || "").replace(/\s+/g, "");
+  const profile: WinAuthRegistrationProfile = {
+    fullName: String(raw?.fullName || "").trim().slice(0, 120),
+    phone,
+    province: String(raw?.province || "").trim().slice(0, 100),
+    district: String(raw?.district || "").trim().slice(0, 100),
+    pdpaAccepted: raw?.pdpaAccepted === true,
+    gpsConsent: raw?.gpsConsent === true,
+    termsAccepted: raw?.termsAccepted === true,
+  };
+  if (role === "citizen") {
+    profile.emergencyContactName = String(raw?.emergencyContactName || "").trim().slice(0, 120);
+    profile.emergencyContactPhone = String(raw?.emergencyContactPhone || "").replace(/\s+/g, "").slice(0, 20);
+  } else if (role === "knight") {
+    profile.winStation = String(raw?.winStation || "").trim().slice(0, 160);
+    profile.vestNumber = String(raw?.vestNumber || "").trim().slice(0, 40);
+    profile.plateNumber = String(raw?.plateNumber || "").trim().slice(0, 40);
+    profile.publicLicenseNumber = String(raw?.publicLicenseNumber || "").trim().slice(0, 80);
+    profile.vehicleModel = String(raw?.vehicleModel || "").trim().slice(0, 120);
+    profile.yellowPlateConfirmed = raw?.yellowPlateConfirmed === true;
+  } else if (role === "merchant") {
+    profile.shopName = String(raw?.shopName || "").trim().slice(0, 160);
+    profile.shopType = String(raw?.shopType || "").trim().slice(0, 120);
+    profile.shopAddress = String(raw?.shopAddress || "").trim().slice(0, 300);
+    profile.taxId = String(raw?.taxId || "").trim().slice(0, 40);
+  } else if (role === "partner") {
+    profile.orgName = String(raw?.orgName || "").trim().slice(0, 180);
+    profile.orgType = String(raw?.orgType || "").trim().slice(0, 120);
+    profile.contactPerson = String(raw?.contactPerson || "").trim().slice(0, 120);
+    profile.orgAddress = String(raw?.orgAddress || "").trim().slice(0, 300);
+    profile.estimatedUsers = Math.max(1, Math.min(1_000_000, Number(raw?.estimatedUsers) || 1));
+  }
+  return profile;
+}
+
+function validateRegistrationProfile(role: WinAuthRole, profile: WinAuthRegistrationProfile): string | null {
+  if (profile.fullName.length < 2) return "REGISTRATION_FULL_NAME_REQUIRED";
+  if (!/^0\d{9}$/.test(profile.phone)) return "REGISTRATION_PHONE_INVALID";
+  if (!profile.province || !profile.district) return "REGISTRATION_AREA_REQUIRED";
+  if (!profile.pdpaAccepted || !profile.gpsConsent || !profile.termsAccepted) return "REGISTRATION_CONSENT_REQUIRED";
+  if (role === "citizen") {
+    if (!profile.emergencyContactName || !/^0\d{9}$/.test(String(profile.emergencyContactPhone || ""))) return "REGISTRATION_EMERGENCY_CONTACT_REQUIRED";
+  }
+  if (role === "knight") {
+    if (!profile.winStation || !profile.vestNumber || !profile.plateNumber || !profile.publicLicenseNumber || !profile.vehicleModel) return "REGISTRATION_KNIGHT_DETAILS_REQUIRED";
+    if (profile.yellowPlateConfirmed !== true) return "REGISTRATION_YELLOW_PLATE_REQUIRED";
+  }
+  if (role === "merchant") {
+    if (!profile.shopName || !profile.shopType || !profile.shopAddress) return "REGISTRATION_MERCHANT_DETAILS_REQUIRED";
+  }
+  if (role === "partner") {
+    if (!profile.orgName || !profile.orgType || !profile.contactPerson || !profile.orgAddress) return "REGISTRATION_PARTNER_DETAILS_REQUIRED";
+  }
+  return null;
+}
+
+async function ensureApprovedRoleProfile(user: WinAuthStoredUser) {
+  const p = user.registration;
+  if (!p) return;
+  const base = {
+    displayName: user.displayName,
+    name: user.displayName,
+    email: user.email,
+    phone: user.phone,
+    province: p.province,
+    district: p.district,
+    level: user.isAdmin ? 100 : 1,
+    xp: 0,
+    updatedAt: new Date().toISOString(),
+  };
+  if (user.role === "citizen") {
+    await ordersDb.collection("citizens").doc(user.uid).set({
+      ...base,
+      savedAddresses: [],
+      emergencyContact: { name: p.emergencyContactName || "", phone: p.emergencyContactPhone || "" },
+    }, { merge: true });
+  } else if (user.role === "knight") {
+    await ordersDb.collection("knights").doc(user.uid).set({
+      ...base,
+      isOnline: false,
+      vehicleType: "motorcycle",
+      vehicleModel: p.vehicleModel || "",
+      plateNumber: p.plateNumber || "",
+      licenseNumber: p.publicLicenseNumber || "",
+      winStation: p.winStation || "",
+      vestNumber: p.vestNumber || "",
+      yellowPlateConfirmed: p.yellowPlateConfirmed === true,
+      kycStatus: "verified",
+      certifications: [],
+    }, { merge: true });
+  } else if (user.role === "merchant") {
+    await ordersDb.collection("merchants").doc(user.uid).set({
+      ...base,
+      shopName: p.shopName || "",
+      shopType: p.shopType || "",
+      address: p.shopAddress || "",
+      taxId: p.taxId || "",
+      gpRate: 10,
+    }, { merge: true });
+  } else if (user.role === "partner") {
+    await ordersDb.collection("partners").doc(user.uid).set({
+      ...base,
+      orgName: p.orgName || "",
+      orgType: p.orgType || "",
+      contactPerson: p.contactPerson || "",
+      address: p.orgAddress || "",
+      estimatedUsers: Number(p.estimatedUsers || 1),
+      gpRate: 10,
+    }, { merge: true });
+  }
 }
 
 function rawBearerToken(req: express.Request): string {
@@ -1644,13 +1840,20 @@ app.post("/api/auth/register", rateLimit(10), async (req, res) => {
   if (!WIN_AUTH_ROLES.has(role)) return res.status(400).json({ error: "Invalid role", code: "INVALID_ROLE" });
   if (email === ownerAdminEmail()) return res.status(409).json({ error: "Owner account already exists", code: "EMAIL_ALREADY_REGISTERED" });
 
+  const registration = cleanRegistrationProfile(role, req.body?.registration || {});
+  const registrationError = validateRegistrationProfile(role, registration);
+  if (registrationError) {
+    return res.status(400).json({ error: "Registration details are incomplete", code: registrationError });
+  }
+
   try {
     const user = await createWinAuthUser({
       email,
       password,
       role,
-      displayName: String(req.body?.displayName || "").trim() || email.split("@")[0],
-      phone: String(req.body?.phone || "").trim(),
+      displayName: registration.fullName,
+      phone: registration.phone,
+      registration,
       status: "pending_review",
     });
     await mirrorWinAuthUser(user);
@@ -1802,6 +2005,7 @@ app.post("/api/admin/auth/users/:uid/approve", rateLimit(30), async (req, res) =
       rejectionReason: undefined,
     });
     await mirrorWinAuthUser(next);
+    await ensureApprovedRoleProfile(next);
     return res.json({ ok: true, user: publicWinAuthUser(next) });
   } catch (error: any) {
     return res.status(503).json({ error: "Approval failed", code: error?.code || "WIN_AUTH_STORE_ERROR" });
@@ -1826,9 +2030,203 @@ app.post("/api/admin/auth/users/:uid/status", rateLimit(30), async (req, res) =>
       ...(status === "active" ? { approvedAt: new Date().toISOString(), approvedBy: admin.uid } : {}),
     });
     await mirrorWinAuthUser(next);
+    if (status === "active") await ensureApprovedRoleProfile(next);
     return res.json({ ok: true, user: publicWinAuthUser(next) });
   } catch (error: any) {
     return res.status(503).json({ error: "Account status update failed", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+  }
+});
+
+type VerificationStatus = "pending_review" | "approved" | "rejected";
+type VerificationSubjectType = "market_listing" | "merchant_product" | "service_completion" | "express_package" | "kyc_document" | "general_evidence";
+
+function validEvidenceImageUrl(value: unknown): string | null {
+  const url = String(value || "").trim();
+  if (!url || url.length > 2500 || !/^https:\/\//i.test(url)) return null;
+  return url;
+}
+
+async function createAdminVerification(input: {
+  submittedBy: string;
+  submittedRole?: string;
+  category: string;
+  subjectType: VerificationSubjectType;
+  subjectId: string;
+  imageUrl: string;
+  note?: string;
+  latitude?: number;
+  longitude?: number;
+  metadata?: Record<string, unknown>;
+}) {
+  const ref = ordersDb.collection("adminVerificationQueue").doc();
+  const now = new Date().toISOString();
+  const record = {
+    id: ref.id,
+    status: "pending_review" as VerificationStatus,
+    submittedBy: input.submittedBy,
+    submittedRole: String(input.submittedRole || ""),
+    category: String(input.category || "หลักฐาน").slice(0, 100),
+    subjectType: input.subjectType,
+    subjectId: String(input.subjectId || "").slice(0, 200),
+    imageUrl: input.imageUrl,
+    note: String(input.note || "").slice(0, 1000),
+    ...(Number.isFinite(input.latitude) && Number.isFinite(input.longitude)
+      ? { latitude: Number(input.latitude), longitude: Number(input.longitude) }
+      : {}),
+    metadata: input.metadata || {},
+    createdAt: now,
+    updatedAt: now,
+    serverCreatedAt: FieldValue.serverTimestamp(),
+  };
+  await ref.create(record);
+  return record;
+}
+
+app.post("/api/verifications/evidence", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const imageUrl = validEvidenceImageUrl(req.body?.imageUrl);
+  const subjectType = String(req.body?.subjectType || "general_evidence") as VerificationSubjectType;
+  const allowedSubjectTypes = new Set<VerificationSubjectType>(["market_listing", "merchant_product", "service_completion", "express_package", "kyc_document", "general_evidence"]);
+  if (!imageUrl || !allowedSubjectTypes.has(subjectType)) {
+    return res.status(400).json({ error: "ข้อมูลหลักฐานไม่ถูกต้อง", code: "INVALID_EVIDENCE" });
+  }
+  try {
+    const record = await createAdminVerification({
+      submittedBy: user.uid,
+      submittedRole: String((user as any).role || ""),
+      category: String(req.body?.category || "หลักฐานทั่วไป"),
+      subjectType,
+      subjectId: String(req.body?.subjectId || user.uid),
+      imageUrl,
+      note: String(req.body?.note || ""),
+      latitude: Number(req.body?.latitude),
+      longitude: Number(req.body?.longitude),
+      metadata: req.body?.metadata && typeof req.body.metadata === "object" ? req.body.metadata : {},
+    });
+    return res.status(201).json({ verification: record, pendingAdminReview: true });
+  } catch (error: any) {
+    console.error("[Verification Evidence]", error?.message);
+    return res.status(503).json({ error: "ส่งหลักฐานให้แอดมินไม่สำเร็จ" });
+  }
+});
+
+app.get("/api/admin/verifications", rateLimit(40), async (req, res) => {
+  const admin = await requireWinAuthAdmin(req, res);
+  if (!admin) return;
+  const requestedStatus = String(req.query.status || "pending_review");
+  const status = ["pending_review", "approved", "rejected", "all"].includes(requestedStatus) ? requestedStatus : "pending_review";
+  try {
+    let snapshot;
+    if (status === "all") {
+      snapshot = await ordersDb.collection("adminVerificationQueue").limit(300).get();
+    } else {
+      snapshot = await ordersDb.collection("adminVerificationQueue").where("status", "==", status).limit(300).get();
+    }
+    const records = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    return res.json({ records });
+  } catch (error: any) {
+    console.error("[Admin Verification List]", error?.message);
+    return res.status(503).json({ error: "โหลดคิวตรวจหลักฐานไม่สำเร็จ", records: [] });
+  }
+});
+
+app.post("/api/admin/verifications/:id/review", rateLimit(40), async (req, res) => {
+  const admin = await requireWinAuthAdmin(req, res);
+  if (!admin) return;
+  const approved = req.body?.approved === true;
+  const reason = String(req.body?.reason || "").trim().slice(0, 1000);
+  const verificationId = String(req.params.id || "").trim();
+  if (!verificationId) return res.status(400).json({ error: "Invalid verification id" });
+
+  try {
+    const ref = ordersDb.collection("adminVerificationQueue").doc(verificationId);
+    let reviewed: any = null;
+    await ordersDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error("VERIFICATION_NOT_FOUND");
+      const record: any = snap.data() || {};
+      if (record.status !== "pending_review") throw new Error("VERIFICATION_ALREADY_REVIEWED");
+
+      const now = new Date().toISOString();
+      const nextStatus: VerificationStatus = approved ? "approved" : "rejected";
+      const reviewPatch = {
+        status: nextStatus,
+        reviewReason: reason,
+        reviewedBy: admin.uid,
+        reviewedAt: now,
+        updatedAt: now,
+      };
+      tx.update(ref, reviewPatch);
+
+      if (record.subjectType === "market_listing" && record.subjectId) {
+        const listingRef = ordersDb.collection("marketListings").doc(String(record.subjectId));
+        const listingSnap = await tx.get(listingRef);
+        if (listingSnap.exists) {
+          tx.update(listingRef, {
+            status: approved ? "active" : "rejected",
+            adminReviewStatus: nextStatus,
+            adminReviewedBy: admin.uid,
+            adminReviewedAt: now,
+            adminReviewReason: reason,
+            updatedAt: now,
+          });
+        }
+      }
+
+      if (record.subjectType === "merchant_product" && record.subjectId) {
+        const merchantUid = String(record.metadata?.merchantUid || record.submittedBy || "");
+        const product = record.metadata?.product;
+        if (merchantUid && product && typeof product === "object") {
+          const merchantRef = ordersDb.collection("merchants").doc(merchantUid);
+          if (approved) {
+            tx.set(merchantRef, {
+              products: FieldValue.arrayUnion(product),
+              updatedAt: now,
+            }, { merge: true });
+          }
+        }
+      }
+
+      if (record.subjectType === "service_completion" && record.subjectId) {
+        const orderRef = ordersCollection.doc(String(record.subjectId));
+        const orderSnap = await tx.get(orderRef);
+        if (orderSnap.exists) {
+          tx.update(orderRef, {
+            completionProofStatus: nextStatus,
+            ...(approved ? {
+              completionProofUrl: record.imageUrl,
+              completionProofLatitude: record.latitude ?? null,
+              completionProofLongitude: record.longitude ?? null,
+              completionProofApprovedAt: now,
+            } : {}),
+            completionProofReviewedBy: admin.uid,
+            completionProofReviewedAt: now,
+            completionProofReviewReason: reason,
+            updatedAt: now,
+          });
+        }
+      }
+
+      tx.set(ordersDb.collection("audit_logs").doc(), {
+        action: approved ? "VERIFICATION_APPROVED" : "VERIFICATION_REJECTED",
+        verificationId,
+        subjectType: String(record.subjectType || ""),
+        subjectId: String(record.subjectId || ""),
+        actorUid: admin.uid,
+        reason,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      reviewed = { id: verificationId, ...record, ...reviewPatch };
+    });
+    return res.json({ ok: true, verification: reviewed });
+  } catch (error: any) {
+    if (error?.message === "VERIFICATION_NOT_FOUND") return res.status(404).json({ error: "ไม่พบหลักฐาน" });
+    if (error?.message === "VERIFICATION_ALREADY_REVIEWED") return res.status(409).json({ error: "หลักฐานนี้ถูกตรวจแล้ว" });
+    console.error("[Admin Verification Review]", error?.message);
+    return res.status(503).json({ error: "บันทึกผลตรวจหลักฐานไม่สำเร็จ" });
   }
 });
 
@@ -1894,6 +2292,40 @@ function decodeImageDataUrl(value: unknown) {
   if (buffer.length < 100 || buffer.length > 4 * 1024 * 1024) return null;
   return { mimeType, buffer };
 }
+
+app.post("/api/evidence/upload", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const image = decodeImageDataUrl(req.body?.imageDataUrl);
+  if (!image) {
+    return res.status(400).json({ error: "รูปต้องเป็น JPG, PNG หรือ WEBP และมีขนาดไม่เกิน 4 MB", code: "INVALID_IMAGE" });
+  }
+  const category = String(req.body?.category || "evidence").replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "evidence";
+  const extension = image.mimeType === "image/png" ? "png" : image.mimeType === "image/webp" ? "webp" : "jpg";
+  const objectPath = `evidence/${user.uid}/${category}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const token = crypto.randomUUID();
+
+  try {
+    const bucket = getStorage().bucket();
+    const file = bucket.file(objectPath);
+    await file.save(image.buffer, {
+      resumable: false,
+      contentType: image.mimeType,
+      metadata: {
+        cacheControl: "private,max-age=3600",
+        metadata: {
+          firebaseStorageDownloadTokens: token,
+          uploadedBy: user.uid,
+        },
+      },
+    });
+    const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+    return res.status(201).json({ imageUrl, objectPath });
+  } catch (error: any) {
+    console.error("[Evidence Upload]", error?.message);
+    return res.status(503).json({ error: "อัปโหลดรูปหลักฐานไม่สำเร็จ", code: "EVIDENCE_UPLOAD_FAILED" });
+  }
+});
 
 // โมเดลกลุ่ม Free Tier ของ Google AI Studio (ลำดับ fallback อัตโนมัติ)
 const externalAiProviders = [
@@ -4103,6 +4535,9 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       ...(input.customerGender === "female" || input.customerGender === "male" ? { customerGender: input.customerGender } : {}),
       ...(typeof input.preferredDriverId === "string" && input.preferredDriverId ? { preferredDriverId: input.preferredDriverId } : {}),
       dispatchMode: input.preferredDriverId ? "preferred" : "automatic",
+      ...(normalizedServiceId === "express" && validEvidenceImageUrl((input as any).expressPackagePhotoUrl)
+        ? { expressPackagePhotoUrl: validEvidenceImageUrl((input as any).expressPackagePhotoUrl)! }
+        : {}),
     };
     const candidateIds = await buildDispatchCandidates(normalizedOrder);
     const firstDriverId = candidateIds[0] || null;
@@ -4148,8 +4583,29 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
           updatedAt: FieldValue.serverTimestamp()
         }, { merge: true });
 
+        let expressVerificationId: string | undefined;
+        if (newOrder.serviceId === "express" && newOrder.expressPackagePhotoUrl) {
+          const verificationRef = ordersDb.collection("adminVerificationQueue").doc();
+          expressVerificationId = verificationRef.id;
+          transaction.create(verificationRef, {
+            id: verificationRef.id,
+            status: "pending_review",
+            submittedBy: user.uid,
+            submittedRole: String(passenger.role || (user as any).role || "citizen"),
+            category: "ตรวจรูปพัสดุก่อนรับงาน WIN Express",
+            subjectType: "express_package",
+            subjectId: newOrder.id,
+            imageUrl: newOrder.expressPackagePhotoUrl,
+            note: newOrder.dropoffLocation,
+            metadata: { rideId: newOrder.id, serviceId: "express" },
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+            serverCreatedAt: FieldValue.serverTimestamp(),
+          });
+        }
         transaction.create(orderRef, {
           ...newOrder,
+          ...(expressVerificationId ? { expressPackageVerificationId: expressVerificationId } : {}),
           serverCreatedAt: FieldValue.serverTimestamp(),
         });
       });
@@ -4372,51 +4828,74 @@ app.post("/api/orders/:id/completion-proof", rateLimit(10), distributedRateLimit
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const { id } = req.params;
-  const proofUrl = String(req.body?.proofUrl || "").trim();
+  const proofUrl = validEvidenceImageUrl(req.body?.proofUrl);
   const latitude = Number(req.body?.latitude);
   const longitude = Number(req.body?.longitude);
-  if (!proofUrl || proofUrl.length > 2000 || !/^https?:\/\//i.test(proofUrl)) {
+  if (!proofUrl) {
     return res.status(400).json({ error: "หลักฐานรูปถ่ายไม่ถูกต้อง", code: "INVALID_PROOF" });
   }
+
   try {
     const orderRef = ordersCollection.doc(id);
-    const idempotency = rideMutationIdempotencyRef(req, "COMPLETION_PROOF", id, user.uid, { proofUrl });
-    let updatedOrder: ServerOrder | null = null;
+    const verificationRef = ordersDb.collection("adminVerificationQueue").doc();
+    let verification: any = null;
     await ordersDb.runTransaction(async (transaction) => {
-      const idempotencySnap = await transaction.get(idempotency.ref);
       const snap = await transaction.get(orderRef);
       if (!snap.exists) throw new Error("ORDER_NOT_FOUND");
-      const order = snap.data() as ServerOrder;
-      if (idempotencySnap.exists) {
-        updatedOrder = order;
-        return;
-      }
+      const order = snap.data() as ServerOrder & { completionProofStatus?: string; completionProofVerificationId?: string };
       if (order.driverUserId !== user.uid) throw new Error("DRIVER_REQUIRED");
       if (order.status !== "in_transit") throw new Error("PROOF_STATE_INVALID");
-      const updatedAt = new Date().toISOString();
-      const proof = {
-        completionProofUrl: proofUrl,
-        completionProofCapturedAt: updatedAt,
-        ...(Number.isFinite(latitude) && Number.isFinite(longitude) ? { completionProofLatitude: latitude, completionProofLongitude: longitude } : {})
+      if (order.completionProofStatus === "pending_review" && order.completionProofVerificationId) {
+        verification = { id: order.completionProofVerificationId, status: "pending_review" };
+        return;
+      }
+
+      const now = new Date().toISOString();
+      verification = {
+        id: verificationRef.id,
+        status: "pending_review",
+        submittedBy: user.uid,
+        submittedRole: "knight",
+        category: "หลักฐานส่งงาน / ถึงปลายทาง",
+        subjectType: "service_completion",
+        subjectId: id,
+        imageUrl: proofUrl,
+        note: String(req.body?.note || "").slice(0, 1000),
+        ...(Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : {}),
+        metadata: { rideStatus: order.status, serviceId: order.serviceId },
+        createdAt: now,
+        updatedAt: now,
+        serverCreatedAt: FieldValue.serverTimestamp(),
       };
-      updatedOrder = { ...order, ...proof, updatedAt };
-      transaction.update(orderRef, { ...proof, updatedAt });
-      transaction.create(idempotency.ref, {
-        logicalKey: idempotency.logicalKey,
-        action: "COMPLETION_PROOF",
+      transaction.create(verificationRef, verification);
+      transaction.update(orderRef, {
+        completionProofStatus: "pending_review",
+        completionProofVerificationId: verificationRef.id,
+        completionProofSubmittedUrl: proofUrl,
+        completionProofSubmittedAt: now,
+        updatedAt: now,
+      });
+      transaction.set(ordersDb.collection("audit_logs").doc(), {
+        action: "COMPLETION_PROOF_SUBMITTED",
         rideId: id,
+        verificationId: verificationRef.id,
         actorUid: user.uid,
         createdAt: FieldValue.serverTimestamp(),
       });
     });
-    if (updatedOrder) resilientOrdersStore.set(id, updatedOrder);
-    return res.json({ success: true, order: updatedOrder });
+
+    return res.status(202).json({
+      success: true,
+      pendingAdminReview: true,
+      verificationId: verification?.id,
+      status: "pending_review",
+    });
   } catch (error: any) {
     if (error?.message === "ORDER_NOT_FOUND") return res.status(404).json({ error: "Order not found" });
     if (error?.message === "DRIVER_REQUIRED") return res.status(403).json({ error: "Driver action required" });
     if (error?.message === "PROOF_STATE_INVALID") return res.status(409).json({ error: "Completion proof is only accepted while the ride is in transit" });
     console.error("[Completion Proof Error]:", error?.message);
-    return res.status(503).json({ error: "ไม่สามารถบันทึกหลักฐานการส่งมอบได้" });
+    return res.status(503).json({ error: "ไม่สามารถส่งหลักฐานให้แอดมินตรวจได้" });
   }
 });
 

@@ -1,6 +1,33 @@
 export type UserRole = 'knight' | 'citizen' | 'merchant' | 'partner';
 export type UserStatus = 'pending_review' | 'active' | 'suspended';
 
+export interface RegistrationProfile {
+  fullName: string;
+  phone: string;
+  province: string;
+  district: string;
+  pdpaAccepted: boolean;
+  gpsConsent: boolean;
+  termsAccepted: boolean;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  winStation?: string;
+  vestNumber?: string;
+  plateNumber?: string;
+  publicLicenseNumber?: string;
+  vehicleModel?: string;
+  yellowPlateConfirmed?: boolean;
+  shopName?: string;
+  shopType?: string;
+  shopAddress?: string;
+  taxId?: string;
+  orgName?: string;
+  orgType?: string;
+  contactPerson?: string;
+  orgAddress?: string;
+  estimatedUsers?: number;
+}
+
 export interface PdpaConsent {
   version: string;
   acceptedAt: any;
@@ -14,6 +41,7 @@ export interface UserDoc {
   phone: string;
   province?: string;
   district?: string;
+  registration?: RegistrationProfile;
   status: UserStatus;
   isAdmin?: boolean;
   adminLevel?: string;

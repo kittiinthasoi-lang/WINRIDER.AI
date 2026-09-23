@@ -449,7 +449,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                 </span>
               </h3>
               <p className="text-[11px] text-slate-300 font-mono flex items-center gap-1">
-                <span>{matchingStarted ? 'กำลังจับคู่จากข้อมูลจริง' : destinationRequiredBeforeMatching ? 'กรอกปลายทางก่อนเริ่มจับคู่' : 'ระบุปลายทางได้ภายหลัง'}</span>
+                <span>{matchingStarted ? 'กำลังจับคู่จาก GPS จริง' : 'จุดรับใช้ GPS ปัจจุบัน • ใส่แค่ปลายทาง'}</span>
               </p>
             </div>
           </div>
@@ -504,9 +504,7 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
             </button>
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            {destinationRequiredBeforeMatching
-              ? 'บริการนี้ต้องระบุปลายทางจริงก่อนค้นหาพี่วิน และระบบจะไม่ใส่ข้อมูลตัวอย่างให้'
-              : 'บริการนี้เริ่มจับคู่ได้ทันที โดยเลือกสถานที่หรือระบุปลายทางภายหลังได้'}
+            ระบบใช้ตำแหน่ง GPS ปัจจุบันของลูกค้าเป็นจุดรับอัตโนมัติ หลังจับคู่แล้วจะคำนวณระยะและค่าโดยสารก่อนให้กดยืนยัน
           </p>
         </div>
 
@@ -733,7 +731,6 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                   {candidateDrivers.map((driver) => {
                     const isSelected = selectedDriver?.id === driver.id;
                     const dreamMatch = checkDreamRideMatch(driver.vehicleModel, selectedDreamRide);
-                    const pickupSurcharge = calculatePickupDistanceSurcharge(driver.distanceKm);
 
                     return (
                       <div
@@ -803,11 +800,6 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
                                 </span>
                                 <span>• {driver.totalTrips.toLocaleString()} เที่ยว</span>
                                 <span className="text-emerald-400">• ห่าง {driver.distanceKm} กม. ({driver.etaMinutes} นาที)</span>
-                                {pickupSurcharge > 0 && (
-                                  <span className="text-amber-300 font-bold bg-amber-500/10 px-1 rounded border border-amber-500/30">
-                                    +฿{pickupSurcharge} ค่าเดินทางรับเกิน 1 กม.
-                                  </span>
-                                )}
                               </div>
                             </div>
                           </div>
@@ -1243,60 +1235,38 @@ export const DriverMatchingModal: React.FC<DriverMatchingModalProps> = ({
           </div>
         )}
 
-        {/* Total Fare & Confirmation Button */}
-        {(() => {
-          const driverPickupSurcharge = selectedDriver ? calculatePickupDistanceSurcharge(selectedDriver.distanceKm) : 0;
-          const finalFareWithPickup = totalCalculatedFare + driverPickupSurcharge;
+        {/* Matching confirmation. Fare is calculated only after a driver match using live pickup GPS -> destination. */}
+        <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div>
+            <span className="text-[10px] text-slate-400 block font-mono">จุดรับ</span>
+            <div className="text-sm font-black text-cyan-300">GPS ปัจจุบันของลูกค้า</div>
+            <div className="text-[10px] text-slate-400 mt-1">หลังจับคู่ ระบบจะคำนวณค่าโดยสารจากจุดรับจริงไปยังปลายทาง แล้วค่อยให้ยืนยัน</div>
+          </div>
 
-          return (
-            <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div>
-                <span className="text-[10px] text-slate-400 block font-mono">
-                  ยอดรวมค่าโดยสาร (คิดตามระยะทางเริ่ม 15฿ + กองทุนคุ้มครอง 5฿):
-                </span>
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="text-lg font-black text-[#FFD700] font-mono">
-                    ฿{finalFareWithPickup.toFixed(2)}
-                  </span>
-                  {selectedDreamRide.priceAddon === 0 ? (
-                    <span className="text-[10px] text-emerald-400 font-mono">(รถประหยัดสุด +฿0)</span>
-                  ) : (
-                    <span className="text-[10px] text-cyan-300 font-mono">(รวมค่ารถในฝัน +฿{selectedDreamRide.priceAddon})</span>
-                  )}
-                  {driverPickupSurcharge > 0 && (
-                    <span className="text-[10px] text-amber-300 font-mono font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
-                      (+฿{driverPickupSurcharge} ระยะรับเกิน 1 กม.)
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-2 w-full sm:w-auto">
-                <button
-                  onClick={onClose}
-                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 font-semibold text-xs transition-all"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDriver(null)}
-                  className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${!selectedDriver ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300' : 'border-white/15 bg-white/5 text-slate-300'}`}
-                >
-                  จับคู่อัตโนมัติใกล้ที่สุด
-                </button>
-                <button
-                  onClick={handleConfirm}
-                  disabled={!matchingStarted || driversLoading}
-                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>{selectedDriver ? `ส่งคำขอถึง ${selectedDriver.nickname}` : 'ยืนยันจับคู่อัตโนมัติ'}</span>
-                </button>
-              </div>
-            </div>
-          );
-        })()}
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              onClick={onClose}
+              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 font-semibold text-xs transition-all"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDriver(null)}
+              className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${!selectedDriver ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300' : 'border-white/15 bg-white/5 text-slate-300'}`}
+            >
+              จับคู่อัตโนมัติใกล้ที่สุด
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={!matchingStarted || driversLoading}
+              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>{selectedDriver ? `จับคู่ ${selectedDriver.nickname}` : 'จับคู่อัตโนมัติ'}</span>
+            </button>
+          </div>
+        </div>
 
 
       </div>
