@@ -1832,6 +1832,27 @@ app.get("/api/admin/auth/users", rateLimit(30), async (req, res) => {
   }
 });
 
+app.get("/api/admin/auth/users/:uid/ledger", rateLimit(30), async (req, res) => {
+  const admin = await requireWinAuthAdmin(req, res);
+  if (!admin) return;
+  const uid = String(req.params.uid || "").trim();
+  if (!uid) return res.status(400).json({ error: "Invalid user id", code: "INVALID_USER_ID" });
+  try {
+    const snapshot = await ordersDb.collection("ledger").where("referenceId", "==", uid).limit(50).get();
+    const ledger = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a: any, b: any) => {
+        const av = a?.createdAt?.toMillis?.() ?? Date.parse(String(a?.createdAt || "")) || 0;
+        const bv = b?.createdAt?.toMillis?.() ?? Date.parse(String(b?.createdAt || "")) || 0;
+        return bv - av;
+      });
+    return res.json({ ledger });
+  } catch (error: any) {
+    console.warn("[WIN Auth Admin Ledger]", error?.message);
+    return res.status(503).json({ error: "Unable to load ledger", code: "LEDGER_UNAVAILABLE" });
+  }
+});
+
 app.post("/api/admin/auth/users/:uid/approve", rateLimit(30), async (req, res) => {
   const admin = await requireWinAuthAdmin(req, res);
   if (!admin) return;
