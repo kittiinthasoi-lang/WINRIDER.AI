@@ -2609,120 +2609,6 @@ app.post("/api/admin/payments/refund", rateLimit(10), distributedRateLimit("admi
   }
 });
 
-const SOVEREIGN_AUTH_SECRET = process.env.SESSION_SECRET || "winrider-sovereign-auth-key-" + (process.env.VITE_FIREBASE_PROJECT_ID || "decoded-robot-6lkcn");
-
-function createSovereignOwnerToken(user: { uid: string; email: string; displayName: string }) {
-  const payload = {
-    uid: user.uid,
-    sub: user.uid,
-    email: user.email,
-    name: user.displayName,
-    displayName: user.displayName,
-    admin: true,
-    isAdmin: true,
-    adminLevel: "super",
-    role: "admin",
-    exp: Math.floor(Date.now() / 1000) + (30 * 24 * 3600), // 30 days
-    iat: Math.floor(Date.now() / 1000),
-  };
-  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sig = crypto.createHmac("sha256", SOVEREIGN_AUTH_SECRET).update(`${header}.${body}`).digest("base64url");
-  return `${header}.${body}.${sig}`;
-}
-
-function verifySovereignOwnerToken(token: string) {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const [header, body, sig] = parts;
-    const expectedSig = crypto.createHmac("sha256", SOVEREIGN_AUTH_SECRET).update(`${header}.${body}`).digest("base64url");
-    if (sig !== expectedSig) return null;
-    const payload = JSON.parse(Buffer.from(body, "base64url").toString());
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-app.post("/api/auth/owner-session", async (_req, res) => {
-  try {
-    const ownerData = {
-      uid: "owner-kittiinthasoi-superadmin",
-      email: "kittiinthasoi@gmail.com",
-      displayName: "กิตติ อินทะสร้อย",
-      role: "admin",
-      isAdmin: true,
-      adminLevel: "super",
-      level: 100,
-      xp: 99999,
-      rating: 5.0,
-      status: "active",
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: new Date().toISOString(),
-    };
-
-    try {
-      await ordersDb.collection("users").doc(ownerData.uid).set(ownerData, { merge: true });
-    } catch (dbErr) {
-      console.warn("[Owner Session] Firestore sync warning:", dbErr);
-    }
-
-    const token = createSovereignOwnerToken(ownerData);
-    return res.json({
-      success: true,
-      token,
-      user: ownerData,
-    });
-  } catch (error: any) {
-    console.error("[Owner Session] Error:", error);
-    return res.status(500).json({ error: "Could not create owner session", message: error?.message });
-  }
-});
-
-app.post("/api/auth/admin-email-login", async (req, res) => {
-  try {
-    const requestedEmail = String(req.body?.email || "").trim().toLowerCase();
-    const ownerEmail = String(process.env.ADMIN_OWNER_EMAIL || "kittiinthasoi@gmail.com").trim().toLowerCase();
-    
-    if (requestedEmail !== ownerEmail && requestedEmail !== "kittiinthasoi@gmail.com" && !requestedEmail.includes("kittiinthasoi")) {
-      return res.status(403).json({ error: "อีเมลนี้ไม่ใช่บัญชีผู้ดูแลระบบสูงสุด", code: "NOT_ADMIN_EMAIL" });
-    }
-
-    const ownerData = {
-      uid: "owner-kittiinthasoi-superadmin",
-      email: "kittiinthasoi@gmail.com",
-      displayName: "กิตติ อินทะสร้อย",
-      role: "admin",
-      isAdmin: true,
-      adminLevel: "super",
-      level: 100,
-      xp: 99999,
-      rating: 5.0,
-      status: "active",
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: new Date().toISOString(),
-    };
-
-    try {
-      await ordersDb.collection("users").doc(ownerData.uid).set(ownerData, { merge: true });
-    } catch (dbErr) {
-      console.warn("[Admin Email Login] Firestore sync warning:", dbErr);
-    }
-
-    const token = createSovereignOwnerToken(ownerData);
-    return res.json({
-      success: true,
-      token,
-      user: ownerData,
-    });
-  } catch (error: any) {
-    console.error("[Admin Email Login] Error:", error);
-    return res.status(500).json({ error: "เข้าสู่ระบบผู้ดูแลระบบไม่สำเร็จ", message: error?.message });
-  }
-});
-
 app.post("/api/users/profile", async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
@@ -2780,10 +2666,6 @@ async function requireFirebaseUser(req: express.Request, res: express.Response) 
   try {
     return await adminAuth.verifyIdToken(token);
   } catch {
-    const sovereignUser = verifySovereignOwnerToken(token);
-    if (sovereignUser) {
-      return sovereignUser;
-    }
     res.status(401).json({ error: "Invalid authentication token" });
     return null;
   }
@@ -2796,8 +2678,6 @@ async function requireFirebaseUserOptional(req: express.Request) {
   try {
     return await adminAuth.verifyIdToken(token);
   } catch {
-    const sovereignUser = verifySovereignOwnerToken(token);
-    if (sovereignUser) return sovereignUser;
     return null;
   }
 }
