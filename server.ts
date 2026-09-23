@@ -10,6 +10,7 @@ import { getStorage } from "firebase-admin/storage";
 import { calculateAppFare } from "./src/core/serverFare";
 import { parseQrPayload } from "./src/utils/qrPayload";
 import {
+  configureWinAuthStore,
   createWinAuthSession,
   createWinAuthUser,
   deleteWinAuthSession,
@@ -21,6 +22,7 @@ import {
   normalizeWinAuthEmail,
   saveWinAuthUser,
   verifyWinAuthPassword,
+  type WinAuthRegistrationProfile,
   type WinAuthRole,
   type WinAuthStoredUser,
 } from "./src/server/winAuthStore";
@@ -1563,6 +1565,7 @@ function getAdminDb() {
 }
 
 const ordersDb = getAdminDb();
+configureWinAuthStore(ordersDb);
 
 const WIN_AUTH_ROLES = new Set<WinAuthRole>(["citizen", "knight", "merchant", "partner"]);
 
