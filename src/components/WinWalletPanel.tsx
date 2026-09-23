@@ -265,7 +265,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-4xl sm:text-5xl font-black tracking-tight text-[#FFD700] drop-shadow-[0_0_20px_rgba(255,215,0,0.3)]">
-              ฿{availableBalance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ฿{balance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             <span className="text-sm font-bold text-slate-300">บาท</span>
           </div>
@@ -514,7 +514,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
           <div className="flex items-center justify-between rounded-2xl bg-black/40 border border-white/10 p-3.5 text-xs">
             <span className="text-slate-400">ยอดที่สามารถถอนได้ปัจจุบัน:</span>
             <span className="font-mono font-black text-lg text-[#FFD700]">
-              ฿{balance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ฿{availableBalance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
 
@@ -522,7 +522,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
             <div className="flex items-start gap-2.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 p-3.5 text-xs text-amber-200">
               <AlertCircle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
               <div>
-                <strong className="block font-bold">ยอดเงินใน WIN Wallet คือ ฿0.00</strong>
+                <strong className="block font-bold">ยอดที่สามารถถอนได้ขณะนี้คือ ฿0.00</strong>
                 <span>ไม่สามารถทำรายการถอนได้ในขณะนี้ กรุณาฝากเงินหรือรับงาน/ขายของเพื่อสะสมยอดก่อนทำการถอน</span>
               </div>
             </div>
