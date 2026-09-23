@@ -4679,51 +4679,74 @@ app.post("/api/orders/:id/completion-proof", rateLimit(10), distributedRateLimit
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const { id } = req.params;
-  const proofUrl = String(req.body?.proofUrl || "").trim();
+  const proofUrl = validEvidenceImageUrl(req.body?.proofUrl);
   const latitude = Number(req.body?.latitude);
   const longitude = Number(req.body?.longitude);
-  if (!proofUrl || proofUrl.length > 2000 || !/^https?:\/\//i.test(proofUrl)) {
+  if (!proofUrl) {
     return res.status(400).json({ error: "หลักฐานรูปถ่ายไม่ถูกต้อง", code: "INVALID_PROOF" });
   }
+
   try {
     const orderRef = ordersCollection.doc(id);
-    const idempotency = rideMutationIdempotencyRef(req, "COMPLETION_PROOF", id, user.uid, { proofUrl });
-    let updatedOrder: ServerOrder | null = null;
+    const verificationRef = ordersDb.collection("adminVerificationQueue").doc();
+    let verification: any = null;
     await ordersDb.runTransaction(async (transaction) => {
-      const idempotencySnap = await transaction.get(idempotency.ref);
       const snap = await transaction.get(orderRef);
       if (!snap.exists) throw new Error("ORDER_NOT_FOUND");
-      const order = snap.data() as ServerOrder;
-      if (idempotencySnap.exists) {
-        updatedOrder = order;
-        return;
-      }
+      const order = snap.data() as ServerOrder & { completionProofStatus?: string; completionProofVerificationId?: string };
       if (order.driverUserId !== user.uid) throw new Error("DRIVER_REQUIRED");
       if (order.status !== "in_transit") throw new Error("PROOF_STATE_INVALID");
-      const updatedAt = new Date().toISOString();
-      const proof = {
-        completionProofUrl: proofUrl,
-        completionProofCapturedAt: updatedAt,
-        ...(Number.isFinite(latitude) && Number.isFinite(longitude) ? { completionProofLatitude: latitude, completionProofLongitude: longitude } : {})
+      if (order.completionProofStatus === "pending_review" && order.completionProofVerificationId) {
+        verification = { id: order.completionProofVerificationId, status: "pending_review" };
+        return;
+      }
+
+      const now = new Date().toISOString();
+      verification = {
+        id: verificationRef.id,
+        status: "pending_review",
+        submittedBy: user.uid,
+        submittedRole: "knight",
+        category: "หลักฐานส่งงาน / ถึงปลายทาง",
+        subjectType: "service_completion",
+        subjectId: id,
+        imageUrl: proofUrl,
+        note: String(req.body?.note || "").slice(0, 1000),
+        ...(Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : {}),
+        metadata: { rideStatus: order.status, serviceId: order.serviceId },
+        createdAt: now,
+        updatedAt: now,
+        serverCreatedAt: FieldValue.serverTimestamp(),
       };
-      updatedOrder = { ...order, ...proof, updatedAt };
-      transaction.update(orderRef, { ...proof, updatedAt });
-      transaction.create(idempotency.ref, {
-        logicalKey: idempotency.logicalKey,
-        action: "COMPLETION_PROOF",
+      transaction.create(verificationRef, verification);
+      transaction.update(orderRef, {
+        completionProofStatus: "pending_review",
+        completionProofVerificationId: verificationRef.id,
+        completionProofSubmittedUrl: proofUrl,
+        completionProofSubmittedAt: now,
+        updatedAt: now,
+      });
+      transaction.set(ordersDb.collection("audit_logs").doc(), {
+        action: "COMPLETION_PROOF_SUBMITTED",
         rideId: id,
+        verificationId: verificationRef.id,
         actorUid: user.uid,
         createdAt: FieldValue.serverTimestamp(),
       });
     });
-    if (updatedOrder) resilientOrdersStore.set(id, updatedOrder);
-    return res.json({ success: true, order: updatedOrder });
+
+    return res.status(202).json({
+      success: true,
+      pendingAdminReview: true,
+      verificationId: verification?.id,
+      status: "pending_review",
+    });
   } catch (error: any) {
     if (error?.message === "ORDER_NOT_FOUND") return res.status(404).json({ error: "Order not found" });
     if (error?.message === "DRIVER_REQUIRED") return res.status(403).json({ error: "Driver action required" });
     if (error?.message === "PROOF_STATE_INVALID") return res.status(409).json({ error: "Completion proof is only accepted while the ride is in transit" });
     console.error("[Completion Proof Error]:", error?.message);
-    return res.status(503).json({ error: "ไม่สามารถบันทึกหลักฐานการส่งมอบได้" });
+    return res.status(503).json({ error: "ไม่สามารถส่งหลักฐานให้แอดมินตรวจได้" });
   }
 });
 
