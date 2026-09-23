@@ -1009,32 +1009,28 @@ export {
 /**
  * Daily internal payment reconciliation.
  *
- * WINRIDER currently supports manual bank settlement as the no-gateway path.
+ * LINE/manual bank top-ups are the primary no-gateway settlement path.
  * Legacy provider-confirmed entries are still reconciled for historical compatibility.
  */
 export const reconcilePaymentsDaily = onSchedule(
   { schedule: "15 3 * * *", timeZone: "Asia/Bangkok", retryCount: 1 },
   async () => {
     const [manualTopupsSnap, providerTopupsSnap, refundsSnap] = await Promise.all([
-      db.collection("topup_submissions").where("status", "==", "MANUAL_CONFIRMED").limit(2000).get(),
+      db.collection("manual_topups").where("status", "==", "CONFIRMED").limit(2000).get(),
       db.collection("topup_submissions").where("status", "==", "PROVIDER_CONFIRMED").limit(2000).get(),
       db.collection("refund_requests").where("status", "==", "REFUNDED").limit(2000).get(),
     ]);
-    const topupDocs = [...manualTopupsSnap.docs, ...providerTopupsSnap.docs];
 
     const mismatches: Array<Record<string, unknown>> = [];
     let matchedTopups = 0;
     let matchedRefunds = 0;
 
-    for (const doc of topupDocs) {
+    for (const doc of manualTopupsSnap.docs) {
       const topup = doc.data() || {};
       const amountSatang = Number(topup.amountSatang || 0);
-      const expectedLedgerType = String(topup.status) === "MANUAL_CONFIRMED"
-        ? "TOP_UP_MANUAL_BANK_CONFIRMED"
-        : "TOP_UP_PROVIDER_VERIFIED";
       const ledgerSnap = await db.collection("ledger_entries")
-        .where("submissionId", "==", doc.id)
-        .where("type", "==", expectedLedgerType)
+        .where("manualTopupId", "==", doc.id)
+        .where("type", "==", "TOP_UP_LINE_BANK_CONFIRMED")
         .limit(3)
         .get();
       const ledgers = ledgerSnap.docs.map((ledgerDoc) => ledgerDoc.data() || {});
@@ -1045,10 +1041,34 @@ export const reconcilePaymentsDaily = onSchedule(
         && Number(ledgers[0].totalCreditSatang || 0) === amountSatang;
       if (valid) matchedTopups++;
       else mismatches.push({
-        kind: "TOPUP",
-        settlementMode: String(topup.status || ""),
-        submissionId: doc.id,
+        kind: "LINE_MANUAL_TOPUP",
+        manualTopupId: doc.id,
+        walletId: String(topup.walletId || ""),
         bankReference: String(topup.bankReference || ""),
+        expectedAmountSatang: amountSatang,
+        ledgerCount: ledgers.length,
+        ledgerAmounts: ledgers.map((l) => Number(l.amountSatang || 0)),
+      });
+    }
+
+    for (const doc of providerTopupsSnap.docs) {
+      const topup = doc.data() || {};
+      const amountSatang = Number(topup.amountSatang || 0);
+      const ledgerSnap = await db.collection("ledger_entries")
+        .where("submissionId", "==", doc.id)
+        .where("type", "==", "TOP_UP_PROVIDER_VERIFIED")
+        .limit(3)
+        .get();
+      const ledgers = ledgerSnap.docs.map((ledgerDoc) => ledgerDoc.data() || {});
+      const valid = ledgers.length === 1
+        && Number(ledgers[0].amountSatang || 0) === amountSatang
+        && ledgers[0].balanced === true
+        && Number(ledgers[0].totalDebitSatang || 0) === amountSatang
+        && Number(ledgers[0].totalCreditSatang || 0) === amountSatang;
+      if (valid) matchedTopups++;
+      else mismatches.push({
+        kind: "LEGACY_PROVIDER_TOPUP",
+        submissionId: doc.id,
         providerTransactionId: String(topup.providerTransactionId || ""),
         expectedAmountSatang: amountSatang,
         ledgerCount: ledgers.length,
@@ -1088,7 +1108,7 @@ export const reconcilePaymentsDaily = onSchedule(
     await db.collection("reconciliation_reports").doc(dateKey).set({
       dateKey,
       checkedAt: FieldValue.serverTimestamp(),
-      manualConfirmedTopups: manualTopupsSnap.size,
+      lineManualTopups: manualTopupsSnap.size,
       providerConfirmedTopups: providerTopupsSnap.size,
       refundedRequests: refundsSnap.size,
       matchedTopups,
@@ -1101,7 +1121,7 @@ export const reconcilePaymentsDaily = onSchedule(
     if (mismatches.length) {
       console.error("[Payment Reconciliation] mismatches", JSON.stringify(mismatches.slice(0, 20)));
     } else {
-      console.log("[Payment Reconciliation] manual/provider settlements match balanced ledgers");
+      console.log("[Payment Reconciliation] LINE/manual and provider settlements match balanced ledgers");
     }
   }
 );
