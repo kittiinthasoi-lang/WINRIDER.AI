@@ -1,0 +1,13 @@
+{
+  "name": "WINRIDER.AI Codespaces",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "WINRIDER.AI",
+      "onAutoForward": "notify",
+      "protocol": "http"
+    }
+  },
+  "postCreateCommand": "npm install",
+  "postStartCommand": "bash scripts/codespace-start.sh"
+}
