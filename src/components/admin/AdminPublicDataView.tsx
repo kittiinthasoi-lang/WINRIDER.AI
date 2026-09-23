@@ -42,9 +42,9 @@ export const AdminPublicDataView:React.FC = () => {
     try {
       const result=await api('/api/admin/public-data/import-tat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kinds:kind==='all'?DATASETS.map(x=>x[0]):[kind]})});
       const failed=Object.entries(result.results||{}).filter(([,v]:any)=>!v?.ok);
-      setMessage(failed.length ? 'บางชุดนำเข้าไม่สำเร็จ: '+failed.map(([k,v]:any)=>k+' ('+v.error+')').join(', ') : 'นำเข้าแล้ว และส่งเข้าคิว Admin Verify เรียบร้อย');
+      setMessage(failed.length ? 'บางชุดนำเข้าไม่สำเร็จ: '+failed.map(([k,v]:any)=>k+' ('+v.error+')').join(', ') : 'ซิงก์ข้อมูลจาก TAT เรียบร้อยแล้ว');
       await loadPending();
-    } catch(e){setMessage(e instanceof Error?e.message:'นำเข้าข้อมูลไม่สำเร็จ');}
+    } catch(e){setMessage(e instanceof Error?e.message:'ซิงก์ข้อมูลไม่สำเร็จ');}
     finally{setImporting(null);}
   };
 
@@ -59,13 +59,13 @@ export const AdminPublicDataView:React.FC = () => {
   return <div className="space-y-5">
     <section className="rounded-3xl border border-cyan-400/20 bg-[#0A1633] p-5 shadow-xl">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div><div className="flex items-center gap-2"><Database className="h-5 w-5 text-cyan-300"/><h1 className="text-xl font-black text-white">WIN Public Data Hub</h1><span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-300">FREE + ADMIN VERIFY</span></div><p className="mt-1 text-xs text-slate-400">ข้อมูลสาธารณะไทยเข้ามาเป็นข้อมูลรอตรวจเท่านั้น ลูกค้าจะเห็นเมื่อแอดมินอนุมัติ</p></div>
-        <div className="flex gap-2"><button onClick={()=>void importData('all')} disabled={!!importing} className="flex items-center gap-2 rounded-xl bg-cyan-400 px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-50"><Download className="h-4 w-4"/>{importing==='all'?'กำลังนำเข้า...':'นำเข้าทุกชุด'}</button><button onClick={()=>void loadPending()} disabled={loading} className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold text-slate-200"><RefreshCw className={`h-4 w-4 ${loading?'animate-spin':''}`}/>รีเฟรช</button></div>
+        <div><div className="flex items-center gap-2"><Database className="h-5 w-5 text-cyan-300"/><h1 className="text-xl font-black text-white">WIN Public Data Hub</h1><span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-300">FREE • MANUAL SYNC</span></div><p className="mt-1 text-xs text-slate-400">ข้อมูลสาธารณะซิงก์เมื่อ Super Admin กดเอง ไม่มี Scheduled Sync และไม่ต้องใช้ Secret เพิ่ม</p></div>
+        <div className="flex gap-2"><button onClick={()=>void importData('all')} disabled={!!importing} className="flex items-center gap-2 rounded-xl bg-cyan-400 px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-50"><Download className="h-4 w-4"/>{importing==='all'?'กำลังซิงก์...':'ซิงก์ข้อมูลทั้งหมด'}</button><button onClick={()=>void loadPending()} disabled={loading} className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold text-slate-200"><RefreshCw className={`h-4 w-4 ${loading?'animate-spin':''}`}/>รีเฟรช</button></div>
       </div>
       {message&&<div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">{message}</div>}
     </section>
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-      {DATASETS.map(([kind,label,description])=><button key={kind} onClick={()=>void importData(kind)} disabled={!!importing} className="rounded-2xl border border-slate-800 bg-[#0A1633] p-4 text-left hover:border-cyan-400/40 disabled:opacity-50"><div className="flex items-center gap-2 text-sm font-black text-white"><Database className="h-4 w-4 text-cyan-300"/>{label}</div><p className="mt-2 text-[10px] leading-4 text-slate-400">{description}</p><span className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold text-cyan-300"><Download className="h-3 w-3"/>นำเข้าเพื่อรอตรวจ</span></button>)}
+      {DATASETS.map(([kind,label,description])=><button key={kind} onClick={()=>void importData(kind)} disabled={!!importing} className="rounded-2xl border border-slate-800 bg-[#0A1633] p-4 text-left hover:border-cyan-400/40 disabled:opacity-50"><div className="flex items-center gap-2 text-sm font-black text-white"><Database className="h-4 w-4 text-cyan-300"/>{label}</div><p className="mt-2 text-[10px] leading-4 text-slate-400">{description}</p><span className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold text-cyan-300"><Download className="h-3 w-3"/>ซิงก์ชุดนี้</span></button>)}
     </div>
     <section className="rounded-3xl border border-slate-800 bg-[#0A1633] p-5">
       <div className="mb-3 flex items-center gap-2"><Database className="h-4 w-4 text-cyan-300"/><h2 className="text-sm font-black text-white">แหล่งข้อมูลสาธารณะที่คัดแล้ว</h2></div>
