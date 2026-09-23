@@ -87,6 +87,42 @@ function rateLimitKey(req: express.Request): string {
   return "ip:" + String(req.ip || "unknown");
 }
 
+function distributedRateLimit(scope: string, maxRequests: number) {
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const now = Date.now();
+    const principal = rateLimitKey(req);
+    const docId = crypto.createHash("sha256").update(scope + ":" + principal).digest("hex");
+    const ref = ordersDb.collection("_distributed_rate_limits").doc(docId);
+    try {
+      let allowed = true;
+      await ordersDb.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const data = snap.data() || {};
+        const windowStart = Number(data.windowStart || 0);
+        const count = Number(data.count || 0);
+        if (!windowStart || now - windowStart >= RATE_WINDOW_MS) {
+          tx.set(ref, { scope, principalHash: docId, windowStart: now, count: 1, updatedAt: FieldValue.serverTimestamp() });
+          return;
+        }
+        if (count >= maxRequests) {
+          allowed = false;
+          return;
+        }
+        tx.update(ref, { count: count + 1, updatedAt: FieldValue.serverTimestamp() });
+      });
+      if (!allowed) {
+        res.setHeader("Retry-After", "60");
+        return res.status(429).json({ error: "Too many requests", code: "DISTRIBUTED_RATE_LIMIT" });
+      }
+      return next();
+    } catch (error: any) {
+      console.error("[Distributed Rate Limit]", scope, error?.message);
+      return res.status(503).json({ error: "Rate-limit service unavailable" });
+    }
+  };
+}
+
+
 function rateLimit(maxRequests: number) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const now = Date.now();
