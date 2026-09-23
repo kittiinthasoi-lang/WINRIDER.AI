@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { WIN_IMAGES } from '../data/imageRegistry';
+import { LIFESTYLE_PLACES } from '../data/lifestyleData';
 import { getAuth } from 'firebase/auth';
 import { MatchedDriver, DreamRideVehicle, LifestylePlace } from '../types';
 import { fetchLiveDrivers } from '../services/liveDriversService';

@@ -39,7 +39,7 @@ export async function searchDestinationsFromGps(params: { latitude: number; long
   if (!isFiniteCoord(params.latitude, params.longitude) || !params.query.trim()) return [];
   const query = params.query.trim().toLowerCase();
   const references = [...POPULAR_BANGKOK_DESTINATIONS, ...REAL_BANGKOK_LOCATIONS.map((loc) => ({ id: loc.id, name: loc.thaiName || loc.name, nameEn: loc.name, category: loc.zoneTitle, lat: loc.lat, lng: loc.lng, address: loc.addressTh, landmark: loc.landmarkNote }))];
-  const local = references.filter((place) => `${place.name} ${place.nameEn} ${place.address} ${place.landmark} ${place.category}`.toLowerCase().includes(query)).map((place) => ({ ...place, distanceKm: haversineKm({ lat: params.latitude, lng: params.longitude }, place), etaMinutes: null }));
+  const local: ResolvedDestinationSearch[] = references.filter((place) => `${place.name} ${place.nameEn} ${place.address} ${place.landmark} ${place.category}`.toLowerCase().includes(query)).map((place) => ({ ...place, distanceKm: haversineKm({ lat: params.latitude, lng: params.longitude }, place), etaMinutes: null }));
   try {
     const response = await fetch(`/api/public-data/places?kind=attractions&query=${encodeURIComponent(params.query)}&limit=20`, { headers: { Accept: 'application/json' } });
     if (response.ok) {

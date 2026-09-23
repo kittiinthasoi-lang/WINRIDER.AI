@@ -683,6 +683,23 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
 // TAT's tourism activity dataset is public, JSON, Open Data Common, nationwide,
 // and the catalog currently identifies an annual minimum update frequency.
 type PublicDataKind = "attractions" | "restaurants" | "accommodations" | "souvenirs" | "events";
+type EventCategory = "sale" | "market" | "concert" | "sports" | "festival" | "community" | "other";
+interface NearbyEventResult {
+  id: string;
+  title: string;
+  category: EventCategory;
+  venueName: string;
+  venueArea: string;
+  latitude: number;
+  longitude: number;
+  startAt: string;
+  endAt?: string;
+  description?: string;
+  sourceName: string;
+  providerEventId?: string;
+  attendance?: number;
+  rank?: number;
+}
 
 const TAT_CKAN_API_BASE = "https://datacatalog.tat.or.th/api/3/action/package_show";
 const TAT_DATASET_PAGE_BASE = "https://datacatalog.tat.or.th/dataset";
@@ -1350,6 +1367,20 @@ function isSuperAdminToken(user: any) {
   return user?.admin === true || user?.adminLevel === "super" || user?.role === "admin"
     || email === "kittiinthasoi@gmail.com"
     || (ownerEmail && email === ownerEmail);
+}
+
+async function isAdminUser(user: any): Promise<boolean> {
+  return isSuperAdminToken(user);
+}
+
+async function requireSuperAdmin(req: express.Request, res: express.Response) {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return null;
+  if (!isSuperAdminToken(user)) {
+    res.status(403).json({ error: "Super Admin access required" });
+    return null;
+  }
+  return user;
 }
 
 function decodeImageDataUrl(value: unknown) {
