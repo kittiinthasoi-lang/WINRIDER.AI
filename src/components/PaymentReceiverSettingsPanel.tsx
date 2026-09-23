@@ -194,12 +194,12 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
 
       setExistingProfile(saved);
       if (saved.qrCodeDataUrl) setPreviewQr(saved.qrCodeDataUrl);
-      setStatusMessage(receiverType === 'win_wallet' ? 'บันทึก WIN Wallet ID สำหรับรับเงินแล้ว' : 'บันทึกข้อมูลเรียบร้อยแล้ว สถานะถูกตั้งเป็น "รอตรวจสอบ" อัตโนมัติ เพื่อให้ Super Admin ตรวจสอบก่อนเปิดแสดง QR');
+      setStatusMessage(receiverType === 'win_wallet' ? 'บันทึก WIN Wallet ID ของบทบาทแล้ว' : 'บันทึกข้อมูลเรียบร้อยแล้ว สถานะถูกตั้งเป็น "รอตรวจสอบ" อัตโนมัติ เพื่อให้ Super Admin ตรวจสอบก่อนเปิดแสดง QR');
       
       if (audioEnabled) playLevelUpFanfare();
       if (onSaved) onSaved(saved);
     } catch (err: any) {
-      setErrorMessage(err?.message || 'บันทึกข้อมูลช่องทางรับเงินไม่สำเร็จ');
+      setErrorMessage(err?.message || 'บันทึกข้อมูลบัญชีถอนเงินไม่สำเร็จ');
     } finally {
       setSaving(false);
     }
@@ -211,7 +211,7 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
         return (
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>ยืนยันแล้ว (พร้อมรับเงินจริง)</span>
+            <span>ยืนยันแล้ว (พร้อมรับเงินถอน)</span>
           </div>
         );
       case 'needs_correction':
@@ -256,13 +256,13 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-lg sm:text-xl font-black text-white">ตั้งค่าช่องทางรับเงิน (WIN Wallet / PromptPay)</h3>
+              <h3 className="text-lg sm:text-xl font-black text-white">ตั้งค่าบัญชีถอนเงิน</h3>
               <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-cyan-300 font-mono font-bold">
-                0% GP Direct P2P
+                PAYOUT ONLY
               </span>
             </div>
             <p className="text-sm text-slate-400">
-              สำหรับ {roleLabel} • รับเงินตรงเข้าบัญชีคุณ ไร้ตัวกลาง
+              สำหรับ {roleLabel} • ใช้เป็นปลายทางถอนเงินจาก WIN Wallet เท่านั้น
             </p>
           </div>
         </div>
@@ -279,10 +279,14 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
         )}
       </div>
 
+      <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 p-3.5 text-xs leading-relaxed text-amber-100">
+        ข้อมูลหน้านี้ใช้สำหรับ <strong>ถอนเงินออกจาก WIN Wallet เท่านั้น</strong> การซื้อสินค้า ค่าโดยสาร และการจ่ายในแอปต้องใช้ WIN Wallet ห้ามรับ PromptPay/เงินสดตรงแทนการชำระในระบบ
+      </div>
+
       {/* Current Status Card */}
       <div className="p-4 rounded-2xl bg-black/40 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="space-y-1">
-          <div className="text-[11px] text-slate-400 font-mono">สถานะช่องทางรับเงินปัจจุบัน:</div>
+          <div className="text-[11px] text-slate-400 font-mono">สถานะบัญชีถอนเงินปัจจุบัน:</div>
           <div>{statusBadge(existingProfile?.status)}</div>
         </div>
 
@@ -329,7 +333,7 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
 
         {/* Receiver Type Selector */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-200">ช่องทางรับเงิน *</label>
+          <label className="text-xs font-bold text-slate-200">บัญชีปลายทางสำหรับถอนเงิน *</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { id: 'citizen_phone' as const, label: 'เบอร์มือถือ', sub: '10 หลัก', icon: Smartphone },
@@ -361,7 +365,7 @@ export const PaymentReceiverSettingsPanel: React.FC<PaymentReceiverSettingsPanel
 
         {receiverType === 'win_wallet' ? (
           <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 space-y-2">
-            <div className="text-xs font-bold text-emerald-200">WIN Wallet ID สำหรับรับเงิน</div>
+            <div className="text-xs font-bold text-emerald-200">WIN Wallet ID ของบทบาท</div>
             <div className="flex items-center gap-2">
               <Wallet className="w-5 h-5 text-emerald-300" />
               <span className="rounded-xl border border-emerald-400/30 bg-black/30 px-3 py-2 font-mono font-black text-emerald-300">{walletId || 'กำลังจัดสรร…'}</span>
