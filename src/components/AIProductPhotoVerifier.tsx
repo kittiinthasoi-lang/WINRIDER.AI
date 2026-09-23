@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { 
 import { auth } from '../firebase';
+import {
   Camera, 
   Upload, 
   Sparkles, 
