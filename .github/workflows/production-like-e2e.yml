@@ -1,0 +1,63 @@
+name: Production-like E2E Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: HTTPS staging/production-like base URL
+        required: true
+        type: string
+      run_load:
+        description: Run configured concurrency scenario
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  ride-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-like
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Ride state E2E
+        env:
+          E2E_BASE_URL: ${{ inputs.base_url }}
+          E2E_PASSENGER_TOKEN: ${{ secrets.E2E_PASSENGER_TOKEN }}
+          E2E_PASSENGER_UID: ${{ secrets.E2E_PASSENGER_UID }}
+          E2E_DRIVER_TOKEN: ${{ secrets.E2E_DRIVER_TOKEN }}
+          E2E_DRIVER_UID: ${{ secrets.E2E_DRIVER_UID }}
+          E2E_COMPLETION_PROOF_URL: ${{ secrets.E2E_COMPLETION_PROOF_URL }}
+          E2E_DECLINE_RIDE_ID: ${{ secrets.E2E_DECLINE_RIDE_ID }}
+        run: npm run test:e2e
+
+  load:
+    if: ${{ inputs.run_load }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-like
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Write protected load scenario
+        env:
+          LOAD_SCENARIO_JSON: ${{ secrets.LOAD_SCENARIO_JSON }}
+        run: |
+          test -n "$LOAD_SCENARIO_JSON"
+          printf '%s' "$LOAD_SCENARIO_JSON" > /tmp/load-scenario.json
+      - name: Concurrent mutation load test
+        env:
+          LOAD_TEST_BASE_URL: ${{ inputs.base_url }}
+          LOAD_TEST_SCENARIO_FILE: /tmp/load-scenario.json
+          LOAD_TEST_CONCURRENCY: "20"
+          LOAD_DRIVER_TOKEN: ${{ secrets.LOAD_DRIVER_TOKEN }}
+          LOAD_PASSENGER_TOKEN: ${{ secrets.LOAD_PASSENGER_TOKEN }}
+        run: npm run load:test
