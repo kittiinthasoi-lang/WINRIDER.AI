@@ -2227,6 +2227,40 @@ function decodeImageDataUrl(value: unknown) {
   return { mimeType, buffer };
 }
 
+app.post("/api/evidence/upload", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const image = decodeImageDataUrl(req.body?.imageDataUrl);
+  if (!image) {
+    return res.status(400).json({ error: "รูปต้องเป็น JPG, PNG หรือ WEBP และมีขนาดไม่เกิน 4 MB", code: "INVALID_IMAGE" });
+  }
+  const category = String(req.body?.category || "evidence").replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "evidence";
+  const extension = image.mimeType === "image/png" ? "png" : image.mimeType === "image/webp" ? "webp" : "jpg";
+  const objectPath = `evidence/${user.uid}/${category}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const token = crypto.randomUUID();
+
+  try {
+    const bucket = getStorage().bucket();
+    const file = bucket.file(objectPath);
+    await file.save(image.buffer, {
+      resumable: false,
+      contentType: image.mimeType,
+      metadata: {
+        cacheControl: "private,max-age=3600",
+        metadata: {
+          firebaseStorageDownloadTokens: token,
+          uploadedBy: user.uid,
+        },
+      },
+    });
+    const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+    return res.status(201).json({ imageUrl, objectPath });
+  } catch (error: any) {
+    console.error("[Evidence Upload]", error?.message);
+    return res.status(503).json({ error: "อัปโหลดรูปหลักฐานไม่สำเร็จ", code: "EVIDENCE_UPLOAD_FAILED" });
+  }
+});
+
 // โมเดลกลุ่ม Free Tier ของ Google AI Studio (ลำดับ fallback อัตโนมัติ)
 const externalAiProviders = [
   { id: "chatgpt", name: "ChatGPT", url: "https://chatgpt.com/" },
