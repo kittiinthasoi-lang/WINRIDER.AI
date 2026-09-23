@@ -1,3 +1,5 @@
+import type { RegistrationProfile } from './auth';
+
 export type AdminLevel = 'super' | 'reviewer' | 'support';
 
 export interface AdminClaims {
@@ -80,6 +82,7 @@ export interface AdminUserSummary {
   gpRate?: number;
   createdAt: any;
   updatedAt?: any;
+  registration?: RegistrationProfile;
 }
 
 export interface LedgerLeg {
