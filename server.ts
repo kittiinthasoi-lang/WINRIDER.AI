@@ -2563,7 +2563,7 @@ app.get("/api/admin/system-payouts", rateLimit(20), async (req, res) => {
     ordersDb.collection("system_payout_requests").where("status", "==", "WAITING_BANK_TRANSFER").limit(30).get()
   ]);
   const pool = poolSnap.data() || {};
-  const systemSatang = Number(pool.system || 0);
+  const systemSatang = Number(pool.buckets?.system || 0);
   const lockedSatang = Math.max(0, Number(pool.systemPayoutLockedSatang || 0));
   return res.json({
     systemSatang,
@@ -2596,7 +2596,7 @@ app.post("/api/admin/system-payout-request", rateLimit(10), async (req, res) => 
       const poolRef = ordersDb.collection("wallets").doc("SYSTEM_POOLS");
       const poolSnap = await tx.get(poolRef);
       const pool = poolSnap.data() || {};
-      const systemSatang = Number(pool.system || 0);
+      const systemSatang = Number(pool.buckets?.system || 0);
       const lockedSatang = Math.max(0, Number(pool.systemPayoutLockedSatang || 0));
       const availableSatang = Math.max(0, systemSatang - lockedSatang);
       if (availableSatang < amountSatang) throw new Error("INSUFFICIENT_SYSTEM_REVENUE");
@@ -2659,7 +2659,7 @@ app.post("/api/admin/system-payout-review", rateLimit(10), async (req, res) => {
       const poolRef = ordersDb.collection("wallets").doc("SYSTEM_POOLS");
       const poolSnap = await tx.get(poolRef);
       const pool = poolSnap.data() || {};
-      const systemSatang = Number(pool.system || 0);
+      const systemSatang = Number(pool.buckets?.system || 0);
       const lockedSatang = Math.max(0, Number(pool.systemPayoutLockedSatang || 0));
       if (!Number.isSafeInteger(amountSatang) || amountSatang <= 0 || lockedSatang < amountSatang) {
         throw new Error("SYSTEM_PAYOUT_HOLD_MISMATCH");
@@ -2686,11 +2686,11 @@ app.post("/api/admin/system-payout-review", rateLimit(10), async (req, res) => {
       if (bankRefSnap.exists) throw new Error("BANK_REFERENCE_REUSED");
 
       const ledgerRef = ordersDb.collection("ledger_entries").doc();
-      tx.set(poolRef, {
-        system: systemSatang - amountSatang,
+      tx.update(poolRef, {
+        "buckets.system": systemSatang - amountSatang,
         systemPayoutLockedSatang: lockedSatang - amountSatang,
         updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
+      });
       tx.create(ledgerRef, {
         userId: user.uid,
         amountSatang: -amountSatang,
