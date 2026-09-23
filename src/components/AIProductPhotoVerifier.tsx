@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { 
+import { auth } from '../firebase';
   Camera, 
   Upload, 
   Sparkles, 
@@ -18,7 +19,6 @@ import {
 } from 'lucide-react';
 import { playTactileBlip, playLevelUpFanfare, playRadarScan } from '../utils/audio';
 import confetti from 'canvas-confetti';
-import { getAuth } from 'firebase/auth';
 import { uploadProductImage } from '../utils/imageUpload';
 
 export interface AIVerificationResult {
@@ -91,7 +91,7 @@ export const AIProductPhotoVerifier: React.FC<AIProductPhotoVerifierProps> = ({
       alert('กรุณาถ่ายรูปหรืออัปโหลดรูปภาพสินค้าก่อนเริ่มการส่งตรวจข้อมูล');
       return;
     }
-    const user = getAuth().currentUser;
+    const user = auth.currentUser;
     if (!user) {
       alert('กรุณาเข้าสู่ระบบก่อนตรวจสอบสินค้า');
       return;
