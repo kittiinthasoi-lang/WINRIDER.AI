@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { WIN_IMAGES } from '../data/imageRegistry';
-import { 
 import { auth } from '../firebase';
+import {
   Radio, 
   Navigation, 
   Layers, 
