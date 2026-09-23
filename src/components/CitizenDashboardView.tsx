@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
+import { auth } from '../firebase';
   Bike, 
   Package, 
   Dog, 
@@ -24,8 +25,6 @@ import { defaultMapProvider, defaultNotifyProvider } from '../adapters/defaultPr
 import { globalFeeEngine, FeeBreakdown } from '../core/feeEngine';
 import { calculateBaseFareBaht } from '../core/serverFare';
 import { createLiveOrder, fetchMyPassengerOrders, LiveRideOrder } from '../utils/dispatchSync';
-import { getAuth } from 'firebase/auth';
-
 interface CitizenDashboardViewProps {
   userName?: string;
   onSwitchRole?: () => void;
@@ -67,7 +66,7 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
 
   const handleRequestTrip = async () => {
     if (isSearchingKnight || activeTrip) return;
-    const user = getAuth().currentUser;
+    const user = auth.currentUser;
     if (!user) {
       window.alert('กรุณาเข้าสู่ระบบก่อนเรียกรถ');
       return;
