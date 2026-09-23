@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, RefreshCw, CheckCircle2, ShieldCheck, Sparkles, Scan, AlertCircle, Zap, UserCheck, X } from 'lucide-react';
 import { playTactileBlip, playRadarScan, playNfcSyncSound } from '../utils/audio';
-import { getAuth } from 'firebase/auth';
 import { uploadProfileImage } from '../utils/imageUpload';
+import { auth } from '../firebase';
 
 export interface BiometricScanResult {
   faceImageUrl: string;
@@ -93,7 +93,7 @@ export const AIFaceBiometricScanner: React.FC<AIFaceBiometricScannerProps> = ({
       setCameraError('ต้องเปิดกล้องจริงก่อนเริ่มตรวจใบหน้า');
       return;
     }
-    const user = getAuth().currentUser;
+    const user = auth.currentUser;
     if (!user) {
       setCameraError('กรุณาเข้าสู่ระบบก่อนตรวจใบหน้า');
       return;
