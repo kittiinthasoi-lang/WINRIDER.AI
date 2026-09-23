@@ -1258,7 +1258,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       const message = reason.startsWith('GPS_')
         ? 'ไม่สามารถอ่านตำแหน่ง GPS ได้ กรุณาอนุญาต Location แล้วลองใหม่'
         : reason === 'DESTINATION_NOT_RESOLVED'
-          ? 'ค้นหาปลายทางไม่ได้ โปรดตรวจ GOOGLE_MAPS_API_KEY และการตั้งค่า Places API (New)'
+          ? 'ค้นหาปลายทางไม่ได้จากข้อมูลสาธารณะ กรุณาระบุชื่อสถานที่หรือเลือกจุดที่มีพิกัด'
           : reason === 'PICKUP_LOCATION_NOT_RESOLVED'
             ? 'ค้นหาจุดรับจริงไม่ได้ กรุณาระบุชื่อสถานที่และพื้นที่ให้ชัดเจน'
             : reason.includes('ACTIVE_ORDER_EXISTS')
