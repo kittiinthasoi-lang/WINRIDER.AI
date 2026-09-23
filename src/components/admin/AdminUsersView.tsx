@@ -22,7 +22,7 @@ import {
   Loader2,
   Crown
 } from 'lucide-react';
-import { getAllUsers, getUserLedgerHistory, suspendUser, unsuspendUser, setAdminRole } from '../../services/adminService';
+import { approveRegistration, getAllUsers, getUserLedgerHistory, suspendUser, unsuspendUser, setAdminRole } from '../../services/adminService';
 import { AdminUserSummary, AdminLevel, LedgerTransaction } from '../../types/admin';
 
 interface AdminUsersViewProps {
@@ -111,6 +111,21 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
     });
   }, [users, searchTerm, roleFilter, statusFilter]);
 
+  const handleApproveRegistration = async (u: AdminUserSummary) => {
+    if (!window.confirm(`อนุมัติบัญชี "${u.displayName}" (${u.email}) ให้เข้าใช้งาน WINRIDER ใช่หรือไม่?`)) return;
+    setActionLoading(true);
+    try {
+      await approveRegistration(u.uid);
+      await fetchUsers();
+      setSelectedUser(prev => prev?.uid === u.uid ? { ...prev, status: 'active' } : prev);
+      alert(`อนุมัติบัญชี ${u.displayName} เรียบร้อยแล้ว`);
+    } catch (err: any) {
+      alert(`อนุมัติบัญชีไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleConfirmSuspend = async () => {
     if (!selectedUser || !suspendReason.trim()) return;
     setActionLoading(true);
@@ -177,7 +192,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
             จัดการบัญชีผู้ใช้งานและบทบาท
           </h1>
           <p className="text-xs text-slate-300 mt-1">
-            ค้นหา, ตรวจสอบสถานะ, ส่องประวัติ Ledger 50 รายการล่าสุด และควบคุมสิทธิ์
+            ผู้สมัครใหม่จะอยู่สถานะ Pending Review จน Super Admin กดอนุมัติ พร้อมค้นหาและตรวจสอบบัญชีทั้งหมด
           </p>
         </div>
 
@@ -340,15 +355,29 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectUser(u);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-[#00D4FF]/20 text-[#00D4FF] border border-slate-700 hover:border-[#00D4FF]/40 text-[11px] transition-all"
-                        >
-                          ดูประวัติ
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          {u.status === 'pending_review' && adminLevel === 'super' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleApproveRegistration(u);
+                              }}
+                              disabled={actionLoading}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold transition-all disabled:opacity-50"
+                            >
+                              อนุมัติ
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectUser(u);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-[#00D4FF]/20 text-[#00D4FF] border border-slate-700 hover:border-[#00D4FF]/40 text-[11px] transition-all"
+                          >
+                            ดูประวัติ
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
