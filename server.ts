@@ -1756,13 +1756,16 @@ app.post("/api/ai/test-ping", rateLimit(10), async (_req, res) => {
 });
 
 function getManualSettlementConfig() {
-  const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "").trim();
-  const bankName = String(process.env.ADMIN_BANK_NAME || "").trim();
-  const bankAccountNumber = String(process.env.ADMIN_BANK_ACCOUNT_NUMBER || "").trim();
-  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
-  const lineUrl = String(process.env.WINRIDER_LINE_URL || "").trim();
-  const configured = Boolean(accountName && (promptPayId || bankAccountNumber));
-  return { configured, promptPayId, bankName, bankAccountNumber, accountName, lineUrl };
+  // Canonical manual top-up destination for every WIN Wallet role.
+  // Public transfer details may be overridden by environment variables later,
+  // but the app never needs to embed or generate a top-up QR.
+  const promptPayId = "";
+  const bankName = String(process.env.ADMIN_BANK_NAME || "กสิกรไทย").trim();
+  const bankAccountNumber = String(process.env.ADMIN_BANK_ACCOUNT_NUMBER || "0931530151").trim();
+  const accountName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "กิตติอินทะสร้อย").trim();
+  const lineContact = String(process.env.WINRIDER_LINE_CONTACT || "0837583169").trim();
+  const configured = Boolean(bankName && bankAccountNumber && accountName && lineContact);
+  return { configured, promptPayId, bankName, bankAccountNumber, accountName, lineContact };
 }
 
 function getWithdrawalDailyLimit() {
