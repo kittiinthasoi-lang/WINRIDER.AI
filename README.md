@@ -2,184 +2,334 @@
 
 **Thailand is Home 🇹🇭 — รับหน้าบ้าน**
 
-WINRIDER.AI เป็นเว็บแอป Mobility / Super App ที่รวมงานรับส่งผู้โดยสาร งานส่งพัสดุ บริการเฉพาะทาง ระบบแผนที่ การชำระเงิน กระเป๋าเงิน และเครื่องมือ AI/การจัดการไว้ในแพลตฟอร์มเดียว
+WINRIDER.AI คือ Mobility / Local Service Super App สำหรับผู้โดยสาร พี่วิน ร้านค้า องค์กรพาร์ทเนอร์ และผู้ดูแลระบบ โดยยึดหลักว่า **ข้อมูลปฏิบัติการต้องมาจากผู้ใช้จริง งานจริง และ GPS จริง** ไม่สร้างงานจำลองขึ้นมาให้ระบบดูเหมือนมีผู้ใช้งาน
 
-> เอกสารนี้อธิบายสถานะของ repository ตามโค้ดที่มีอยู่จริง ไม่ใช่ roadmap หรือโครงสร้างสมมติ
+> README นี้อธิบายสถานะของโค้ดที่อยู่ใน `main` ปัจจุบัน ไม่ใช่ roadmap และไม่ถือว่า feature ที่ยังไม่ผ่าน production-like verification พร้อมเปิดใช้งานจริงโดยอัตโนมัติ
 
-## สถานะสำคัญ
+## สถานะปัจจุบัน
 
-ระบบ dispatch ใน production mode ใช้ **คำสั่งงานจริงจากผู้โดยสาร** เป็นแหล่งกำเนิดงาน
+ระบบอยู่ในระดับ **พร้อมทดสอบแบบ controlled staging / production-like** แต่ยังไม่ควรประกาศว่า production-ready 100% จนกว่าจะผ่าน release gates ที่เหลือใน `docs/PRODUCTION_READINESS.md`
 
-- ไม่มีการสร้างงานผู้โดยสารปลอมเพื่อให้พี่วินรับงาน
-- ไม่มี fallback ที่สร้างตัวตนพี่วินปลอมตอนรับงาน
+สิ่งที่ repository ตรวจผ่านด้วย CI แล้วครอบคลุม TypeScript, unit tests, integration tests, production build, Cloud Functions build, dependency audit และ secret scan ส่วนการทดสอบที่ยังต้องทำกับ environment จริง เช่น authenticated ride E2E, concurrent load, mobile/background GPS, reconnect, real payment provider, backup/restore, monitoring และ independent security review
+
+## บทบาทผู้ใช้
+
+บัญชีหลักของระบบแบ่งเป็น 4 บทบาท:
+
+| Role | ชื่อในแอป | หน้าที่หลัก |
+| --- | --- | --- |
+| `citizen` | พลเมืองอัศวิน | ผู้โดยสาร / ผู้ใช้บริการ |
+| `knight` | อัศวินไรเดอร์ | พี่วิน / ผู้ให้บริการเดินทาง |
+| `merchant` | ร้านค้าพันธมิตร | ร้านค้าและผู้ขาย |
+| `partner` | องค์กรพาร์ทเนอร์ | องค์กร / B2B / บริการพันธมิตร |
+
+Knight, Merchant และ Partner มีสถานะตรวจสอบ `pending_review` ก่อนเปิดสิทธิ์เต็ม ส่วน Citizen ไม่ถูกบล็อกด้วยหน้ารอตรวจแบบเดียวกัน
+
+ระบบยังมี **Owner / Super Admin** ซึ่งสามารถเข้าศูนย์ Admin และสลับมุมมอง Customer / Driver / Merchant / Partner จากบัญชีเจ้าของเดียวกันตามสิทธิ์ที่ backend อนุญาต
+
+## App Modes
+
+โหมดหลักที่มีในโค้ดปัจจุบัน:
+
+- `passenger` — แอปผู้โดยสาร
+- `driver` — แอปพี่วิน
+- `merchant` — ศูนย์ร้านค้า
+- `partner` — ศูนย์องค์กรพาร์ทเนอร์
+- `market` — WIN Street Market
+- `hospital` — Emergency / Hospital Command Center
+- `codex` — WINRIDER Codex
+- `admin` — Admin Command Center
+
+Passenger มีแท็บ `home`, `dreamRide`, `petCare`, `ride`, `shop`, `profile`
+
+## Ride / Dispatch จริง
+
+Production dispatch ใช้ order จริงจากผู้โดยสารเท่านั้น
+
+```text
+Citizen
+  │
+  │ สร้าง order จริง
+  ▼
+WINRIDER Server / Firestore
+  │
+  │ status = pending
+  ▼
+Dispatch ไปยัง Knight ที่มีสิทธิ์และ online
+  │
+  │ Knight รับงาน
+  ▼
+accepted
+  ▼
+heading_pickup
+  ▼
+picked_up
+  ▼
+in_transit
+  ▼
+completed
+```
+
+หลักสำคัญ:
+
+- ไม่มี fake passenger / fake driver / fake order เพื่อทำให้หน้ารับงานดูมีงาน
 - การรับงานต้องอ้างอิง order ที่มีอยู่จริง
-- ข้อมูลพี่วินที่ส่งไปยังระบบต้องมาจาก session/account ของพี่วิน
-- การ sync ระหว่างหน้าจอใช้ order event และ Firestore/server ตาม implementation ปัจจุบัน
-- ฟังก์ชัน/หน้าจอที่เป็น testing simulator บางส่วนยังอาจมีอยู่ใน repository แต่ไม่ถูกใช้เป็นกลไก dispatch production
+- Server เป็นผู้ควบคุม state transition ของทริป
+- การรับงานใช้ transactional acceptance เพื่อป้องกันพี่วินหลายคนรับงานเดียวกัน
+- มี idempotency สำหรับ mutation สำคัญ
+- มี GPS authorization, stale-driver cutoff และ outlier rejection
+- การทดสอบจำลองอนุญาตเฉพาะ test harness ที่แยกจากข้อมูล production
 
-## Free Thai Public Data Layer
+## Live Location A / B / C
 
-WINRIDER.AI includes a **WIN Public Data Hub** for carefully selected public Thai datasets. The current production sources include the Tourism Authority of Thailand (TAT) Data Catalog for tourism activities, attractions, restaurants, accommodations, and souvenir shops. Source records are staged as `pending_admin_review` and are **never customer-visible until an administrator verifies them**. The app does not use PredictHQ or Google Places/Routes runtime APIs for this layer.
+WINRIDER ไม่ฝัง paid map provider ในหน้าทริปหลัก
 
-The Thai government open-data portal `data.go.th` is tracked as an additional source for future curated integrations such as public health, safety, air quality, transport, and city data; datasets are added only when their schema, freshness, license, and relevance are verified.
+จอ Live Location ใช้:
+
+- **A = พี่วิน**
+- **B = ลูกค้า / จุดรับ**
+- **C = ปลายทาง**
+
+ตำแหน่งสดถูก sync ผ่าน backend ของ order และ endpoint อ่านตำแหน่งถูกจำกัดให้ผู้โดยสารหรือพี่วินที่อยู่ในทริปนั้น
+
+ระยะทางในแอปเป็น **ค่าประมาณจากพิกัด** ไม่ใช่ระยะทางถนนจริงและไม่ใช่ traffic ETA
+
+เมื่อต้องการ turn-by-turn navigation แอปจะเปิดภายนอก เช่น:
+
+- Google Maps
+- Apple Maps
+- Waze
+
+ดังนั้น runtime ปัจจุบันไม่ต้องใช้ Google Maps / Places / Routes API key
+
+## WIN Public Radar
+
+Radar ใช้ GPS จริงของผู้ใช้เป็นจุดศูนย์กลาง และดึงสถานที่ใกล้เคียงจาก:
+
+- WIN Public Data
+- OpenStreetMap-compatible public data
+
+กลุ่มข้อมูลที่แสดงได้ เช่น ร้านค้า ร้านอาหาร คาเฟ่ ตลาด จุดขนส่ง สถานศึกษา โรงพยาบาล คลินิก ศาสนสถาน โรงแรม และสถานที่ท่องเที่ยวตามข้อมูลสาธารณะที่หาได้จริง
+
+ระยะทางที่แสดงเป็นระยะเส้นตรงอ้างอิง และการนำทางเต็มรูปแบบเปิดในแอปแผนที่ภายนอก
+
+## WIN Pet Care
+
+WIN Pet Care ใช้ GPS จริงเพื่อค้นหาสถานพยาบาลสัตว์ใกล้เคียงจากข้อมูลสาธารณะ
+
+Flow หลัก:
+
+```text
+GPS ผู้ใช้
+  → /api/pet-care/nearby
+  → รายชื่อคลินิก/โรงพยาบาลสัตว์จริง
+  → เลือกสถานที่
+  → ใช้เป็นปลายทางสำหรับการเดินทาง / เปิดแผนที่ภายนอก
+```
+
+ระบบไม่สร้าง rating, จำนวนรีวิว, เวลาเปิด หรือ ETA ปลอม หากแหล่งข้อมูลไม่มีค่าเหล่านั้น
+
+## Emergency / Hospital Command Center
+
+ศูนย์ฉุกเฉินใช้ GPS จริงและ public data เพื่อแสดงสถานที่ใกล้เคียง เช่น:
+
+- โรงพยาบาล / คลินิก
+- สถานีตำรวจ
+- สถานีดับเพลิง
+
+มีทางลัดหมายเลขฉุกเฉิน และลิงก์นำทางภายนอก
+
+หน้าจอนี้เป็น **directory / command interface** เท่านั้น ไม่กล่าวอ้างว่ามีหน่วยฉุกเฉินกำลังเดินทาง หากไม่มีเหตุการณ์ตอบรับจริงจากระบบ
+
+## WIN Alert
+
+WIN Alert แสดง event/public activity จาก source-driven public data ที่ผ่านกติกาของระบบ
+
+ความสามารถปัจจุบัน:
+
+- กรองตามวัน
+- ใช้ GPS จริงเพื่อคำนวณระยะเส้นตรงและเรียงใกล้ก่อน
+- เก็บ source attribution
+- เปิด source / แผนที่ภายนอก
+- เลือก event เป็นปลายทางเรียกรถได้
+- TAT/public-data sync ใช้ internal sync secret ไม่ใช่ paid event API key
+
+`WIN_ALERT_INTERNAL_SYNC_SECRET` เป็นรหัสภายในที่ WINRIDER สร้างเองสำหรับป้องกัน endpoint sync; `TAT_INTERNAL_SYNC_SECRET` ยังรองรับเป็น legacy/fallback
+
+## WIN Shop / Street Market
+
+ระบบ Commerce มี:
+
+- WIN Shop directory
+- Merchant profile
+- Partner profile
+- WIN Street Market
+- publish / unpublish listing แบบ owner-authorized
+- audit trail สำหรับการเปลี่ยนสถานะสำคัญ
+
+Customer/Driver สามารถดู profile ฝั่ง Merchant/Partner ผ่าน customer-facing view โดยไม่มีสิทธิ์แก้ข้อมูลของเจ้าของร้านหรือองค์กร
+
+ส่วน lifecycle เต็มของ order / stock / promotion ยังต้องผ่าน production-like audit ก่อนเปิดใช้งานเชิงพาณิชย์จริง
+
+## Wallet / Payment
+
+Financial core ใช้ integer satang และ double-entry accounting
+
+มี test ครอบคลุมแนวคิดสำคัญ เช่น:
+
+- Tiered Knight fee
+- Founding Knight fee
+- Citizen fee buckets
+- Merchant GP
+- wallet debit / credit invariant
+- balance protection
+- idempotency
+
+Top-up ปัจจุบันใช้แนวทาง:
+
+```text
+ผู้ใช้ส่งหลักฐาน
+  → Admin ตรวจหลักฐาน
+  → ยังไม่เครดิต wallet
+  → รอ signed payment-provider confirmation
+  → server จึง finalize เงิน
+```
+
+WINRIDER ไม่ใช้ AI เพื่อยืนยันว่าเงินเข้าแล้วจากรูปสลิปเพียงอย่างเดียว
+
+Payment provider variables เป็น optional สำหรับ development/staging แต่จำเป็นเมื่อเปิด integration รับเงินจริง
+
+## WIN-AI / WIN Buddy
+
+WIN-AI และ WIN Buddy ใช้ **External AI Handoff**
+
+WINRIDER จะ:
+
+1. เตรียม prompt จากข้อมูลที่ผู้ใช้พิมพ์
+2. คัดลอก/แสดง prompt ให้ผู้ใช้
+3. ให้ผู้ใช้เลือกเปิด ChatGPT, Gemini หรือ Copilot ภายนอก
+
+WINRIDER **ไม่ส่ง prompt หรือรูปไปยัง AI provider อัตโนมัติ** และ runtime ปัจจุบันไม่ต้องใช้ Gemini/OpenAI model API key
+
+## Admin Command Center
+
+Admin UI ปัจจุบันรองรับ:
+
+- ภาพรวมระบบ
+- Operations / active rides
+- System Health
+- KYC review
+- User management
+- Payment profiles
+- Public Data moderation
+- Wallet / Ledger
+- Top-up review
+- Fee rules / GP
+- Audit logs
+- SOS incident management
+- dispatch intervention สำหรับ Super Admin
+
+สิทธิ์สำคัญต้องตรวจที่ backend / Firebase rules / Firebase Functions ไม่พึ่งการซ่อนปุ่มใน UI เพียงอย่างเดียว
+
+## Security Baseline
+
+โครงสร้างปัจจุบันใช้:
+
+- Firebase Authentication สำหรับ sensitive APIs
+- Firestore deny-by-default rules
+- server-authoritative ride mutation
+- server-controlled wallet / ledger / top-up
+- role / status / privilege field protection
+- API rate limiting
+- distributed Firestore rate buckets สำหรับ mutation สำคัญ
+- audit logging
+- CI secret scanning
+- dependency vulnerability scan
+
+สิ่งที่ยังต้องทำก่อน production เต็มรูปแบบ ได้แก่ edge/WAF rate limiting, independent IDOR/privilege review, recovery drills และ production monitoring
 
 ## Architecture
 
 ```text
-React 19 + Vite
-       │
-       ├── UI / Customer / Driver / Admin
-       │
-       ├── Firebase Auth / Firestore
-       │
-       ├── Express server.ts
-       │     ├── Orders API
-       │     ├── GPS / Public Data endpoints
-       │     ├── External AI handoff
-       │     └── Webhook / Notification endpoints
-       │
-       └── Firebase Functions
-             ├── wallet / ledger
-             ├── KYC / admin
-             ├── trip settlement
-             └── backend business logic
+React 19 + Vite + PWA
+        │
+        ├── Citizen / Knight / Merchant / Partner / Admin UI
+        │
+        ├── Firebase Auth / Firestore / Storage
+        │
+        ├── Express server.ts
+        │     ├── Orders / Dispatch
+        │     ├── Live GPS A/B/C
+        │     ├── Radar / Pet Care / Emergency
+        │     ├── WIN Alert / Public Data
+        │     ├── Shop / Market
+        │     ├── External AI handoff
+        │     └── Admin / Payment webhook APIs
+        │
+        └── Firebase Functions
+              ├── wallet / ledger
+              ├── KYC / admin
+              ├── trip settlement
+              └── backend business logic
 ```
 
 ## Technology Stack
 
-- **Frontend:** React 19, TypeScript, Vite 6
-- **Styling:** Tailwind CSS 4
-- **Backend:** Node.js 20+, Express 4
-- **Database/Auth:** Firebase / Firestore / Firebase Authentication
-- **Serverless:** Firebase Functions
-- **Maps/Places:** WIN Public Data + OpenStreetMap-compatible public data; no paid Maps/Places/Routes API key is required. Turn-by-turn navigation opens externally.
-- **AI:** External AI handoff. WINRIDER prepares/copies prompts and lets the user open the AI service directly; no AI-provider API key is required by WINRIDER.
-- **Charts/UI:** Recharts, Lucide React, Motion
-- **PWA:** vite-plugin-pwa
-- **Tests:** Node test runner ผ่าน `tsx`
-
-## Repository Structure
-
-```text
-WINRIDER.AI/
-├── src/
-│   ├── components/       # UI และ feature screens
-│   ├── core/             # business logic และ unit tests
-│   ├── services/         # service integrations
-│   ├── adapters/         # provider adapters
-│   ├── hooks/            # React hooks
-│   ├── utils/            # dispatch, notifications, integrations
-│   ├── data/             # domain/reference data
-│   └── types/            # TypeScript types
-├── functions/             # Firebase Functions
-├── server.ts              # Express application/server + GPS/Public Data endpoints
-├── scripts/               # build/generation scripts
-├── public/                # static assets
-├── package.json
-└── README.md
-```
-
-## Real Dispatch Flow
-
-```text
-Passenger
-   │
-   │ createLiveOrder()
-   ▼
-Firestore / server order
-   │
-   │ status = pending
-   ▼
-Live dispatch event
-   │
-   ▼
-Online verified WINRIDER
-   │
-   │ accepts the existing order
-   ▼
-status = accepted
-   │
-   ▼
-heading_pickup
-   │
-   ▼
-picked_up
-   │
-   ▼
-in_transit
-   │
-   ▼
-completed
-```
-
-หากไม่มี order จริง ระบบจะ **ไม่สร้างงานขึ้นมาเอง** เพื่อสาธิตการรับงาน
-
-## Financial Core
-
-ระบบมี financial engine แบบ integer satang และ double-entry ledger
-
-แนวคิดที่มี test รองรับ ได้แก่:
-
-- Tiered Knight fee
-- Founding Knight fee
-- Equipment contribution
-- Citizen fee buckets
-- Merchant GP
-- Debit/Credit balance invariant
-- Idempotency
-- Wallet available-balance constraints
-
-ชุดทดสอบหลักอยู่ใน:
-
-```text
-src/core/feeEngine.test.ts
-src/core/walletDoubleEntry.test.ts
-```
-
-## Admin / Security
-
-Firebase Functions รองรับงาน เช่น:
-
-- KYC approval / rejection
-- User suspension / unsuspension
-- Wallet adjustment
-- Fee rule versioning
-- Admin role management
-- Audit logging
-
-Admin levels ที่มีในโค้ด:
-
-```text
-super
-reviewer
-support
-```
-
-สิทธิ์จริงต้องตรวจที่ backend/Firebase Functions ไม่ควรพึ่ง UI อย่างเดียว
-
-## AI
-
-WIN-AI และ WIN Buddy ใช้ **External AI Handoff**:
-- WINRIDER เตรียม prompt จากสิ่งที่ผู้ใช้พิมพ์
-- ไม่ส่ง prompt หรือรูปไป AI provider อัตโนมัติ
-- ไม่มี AI-provider credential สำหรับการเรียกโมเดลจากเซิร์ฟเวอร์ WINRIDER
-- ผู้ใช้เลือกเปิด ChatGPT, Gemini หรือ Copilot ภายนอกด้วยตนเอง
-
-## Maps / Live Location
-
-WINRIDER ใช้ GPS จริงและข้อมูลสาธารณะโดยไม่ฝัง paid map provider:
-- ทริปใช้จอ A/B/C: A = พี่วิน, B = ลูกค้า/จุดรับ, C = ปลายทาง
-- ตำแหน่งสดซิงก์ผ่าน order backend ของ WINRIDER
-- ระยะทางในแอปเป็นค่าประมาณจากพิกัด
-- Radar / WIN Pet Care / ศูนย์พยาบาลใช้ WIN Public Data + OpenStreetMap contributors
-- Turn-by-turn, traffic และเส้นทางถนนเปิดใน Google Maps / Apple Maps / Waze ภายนอก
-- ไม่มี Maps/Places/Routes provider credential หรือ paid routing API ใน runtime
+- React 19
+- TypeScript
+- Vite 6
+- Tailwind CSS 4
+- Node.js 20+
+- Express 4
+- Firebase Authentication / Firestore / Storage
+- Firebase Functions
+- Recharts / Lucide React / Motion
+- vite-plugin-pwa
+- Node test runner ผ่าน `tsx`
 
 ## Environment Variables
 
-Secrets/config ที่ยังจำเป็นต้องเก็บผ่าน environment / secret management ได้แก่ Firebase, payment provider และ internal scheduler configuration. `VITE_FIREBASE_API_KEY` ยังคงเป็น Firebase Web config ที่จำเป็นสำหรับ Authentication/Firestore; ไม่ใช่ Maps/AI provider key.
+ค่าตัวอย่างอยู่ใน `.env.example`
 
-## Development
+### Firebase
+
+Frontend ต้องมี Firebase Web config ที่ถูกต้อง โดยเฉพาะ:
+
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+
+Backend ใช้:
+
+- `FIREBASE_PROJECT_ID`
+- `FIRESTORE_DATABASE_ID`
+- `FIREBASE_STORAGE_BUCKET`
+
+เมื่อรัน backend นอก Google-managed environment ต้องมี Firebase Admin credentials ที่เหมาะสม เช่น application default credentials หรือ service-account configuration ที่ code รองรับ
+
+### Owner / Wallet
+
+- `ADMIN_OWNER_EMAIL`
+- `ADMIN_PROMPTPAY_ID`
+- `ADMIN_BANK_NAME`
+- `ADMIN_BANK_ACCOUNT_NUMBER`
+- `ADMIN_BANK_ACCOUNT_NAME`
+
+### Payment Provider
+
+- `PAYMENT_PROVIDER_WEBHOOK_SECRET`
+- `PAYMENT_PROVIDER_REFUND_URL`
+- `PAYMENT_PROVIDER_API_TOKEN`
+- `PAYMENT_PROVIDER_ALLOWED_HOST`
+
+### Public Data Sync
+
+- `WIN_ALERT_INTERNAL_SYNC_SECRET`
+- `TAT_INTERNAL_SYNC_SECRET`
+
+**ห้าม commit secret หรือ service-account private key ลง repository**
+
+## Run Locally
 
 ต้องใช้ Node.js 20 ขึ้นไป
 
@@ -188,53 +338,131 @@ npm install
 npm run dev
 ```
 
-Build:
+Server ใช้ `process.env.PORT` ถ้ามี และ fallback เป็น port `3000`
+
+Health check:
+
+```text
+/api/health
+/health
+/healthz
+```
+
+Build และ run แบบ production:
 
 ```bash
 npm run build
 npm start
 ```
 
-Type check:
+## GitHub Codespaces
+
+Repository มี `.devcontainer/devcontainer.json` สำหรับ Codespaces
+
+เมื่อสร้างหรือ rebuild Codespace:
+
+1. dependencies จะถูกติดตั้งอัตโนมัติ
+2. WINRIDER dev server จะพยายามเริ่มอัตโนมัติ
+3. port `3000` ถูก forward เป็น HTTP service
+4. GitHub จะสร้าง HTTPS forwarded URL ให้ภายนอก
+
+สำหรับการทดสอบด้วยมือถืออีกเครื่อง ให้เปลี่ยน Visibility ของ port `3000` จาก **Private → Public**
+
+ถ้าพอร์ตยังไม่ active หลัง Codespace เก่าถูกสร้างมาก่อน config นี้ ให้ใช้ **Rebuild Container** เพื่อให้ devcontainer config ล่าสุดทำงาน
+
+## PWA / Mobile Test
+
+WINRIDER มี PWA manifest และ service worker แบบ auto-update
+
+สำหรับ controlled staging สามารถเปิด HTTPS URL บนมือถือ 2 เครื่อง:
+
+- เครื่องที่ 1: Citizen
+- เครื่องที่ 2: Knight
+
+ใช้บัญชี Firebase คนละ UID เพื่อทดสอบ dispatch จริง
+
+หลังทดสอบผ่าน browser แล้วสามารถ Add to Home Screen เพื่อทดสอบ standalone PWA ต่อได้
+
+## Tests
 
 ```bash
 npm run lint
+npm test
+npm run test:integration
+npm run build
 ```
 
-Tests:
+Production-like harness:
 
 ```bash
-npm test
+npm run test:e2e
+npm run load:test
 ```
 
-## Production Notes
+E2E/load harness ต้องใช้ environment, Firebase tokens และ test fixtures จริงตามไฟล์ใน `scripts/` จึงไม่ควรถือว่าผ่านเพียงเพราะ script มีอยู่ใน repository
 
-ก่อน production deployment ควรตรวจเพิ่มเติม:
+## Production Readiness
 
-1. Secret/API key exposure
-2. Firestore security rules
-3. Firebase Authentication claims
-4. Webhook SSRF protection / domain allowlist
-5. Rate limiting
-6. Persistent order consistency across multiple server instances
-7. Payment verification with a real payment provider
-8. Real GPS / routing availability
-9. Monitoring and audit logs
-10. Legal and regulatory requirements for mobility services in Thailand
+รายละเอียด release gate อยู่ที่:
+
+`docs/PRODUCTION_READINESS.md`
+
+ก่อนเปิดให้ผู้ใช้ทั่วไปหรือรับเงินจริง ต้องตรวจอย่างน้อย:
+
+- authenticated ride E2E
+- concurrent dispatch/load
+- persistence ทุกบทบาท
+- re-login / reinstall recovery
+- mobile background GPS
+- offline / reconnect
+- navigation/public-data outage UX
+- real payment-provider verification
+- admin role integration tests
+- security review
+- backup / restore
+- monitoring / alerting
+- privacy / consent / retention review
 
 ## Testing / Simulation Policy
 
-Repository นี้เคยมี component และ data สำหรับ demo/testing หลายส่วน
+WINRIDER production flow ต้องไม่ใช้:
 
-ตั้งแต่ production dispatch flow นี้เป็นต้นไป:
+- simulated passenger
+- simulated driver
+- fake ride/job
+- fabricated operational status
+- fabricated public event/place data
 
-**ห้ามใช้ simulated passenger / simulated driver / fake order เพื่อเปลี่ยนสถานะงานจริง**
+Test fixtures สามารถมีได้เฉพาะใน automated test / staging ที่แยกจากข้อมูลใช้งานจริง
 
-ถ้าต้องการทดสอบระบบ ควรใช้ test environment หรือ automated tests ที่แยกจาก production data
+## Repository Structure
+
+```text
+WINRIDER.AI/
+├── .devcontainer/        # Codespaces configuration
+├── src/
+│   ├── components/       # UI / feature screens
+│   ├── core/             # business logic + tests
+│   ├── services/         # integrations / client services
+│   ├── adapters/
+│   ├── hooks/
+│   ├── utils/
+│   ├── data/
+│   └── types/
+├── functions/            # Firebase Functions
+├── docs/                 # security / readiness / provider docs
+├── scripts/              # E2E, load, Codespaces startup
+├── public/               # PWA/static assets
+├── server.ts             # Express backend + Vite integration
+├── firebase.json
+├── firestore.rules
+├── package.json
+└── README.md
+```
 
 ## License
 
-Repository ใช้ proprietary `LICENSE` และ `package.json` ระบุ `UNLICENSED`
+Repository นี้เป็น proprietary software และ `package.json` ระบุ `UNLICENSED`
 
 ---
 
