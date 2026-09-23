@@ -1928,6 +1928,7 @@ app.post("/api/admin/auth/users/:uid/approve", rateLimit(30), async (req, res) =
       rejectionReason: undefined,
     });
     await mirrorWinAuthUser(next);
+    await ensureApprovedRoleProfile(next);
     return res.json({ ok: true, user: publicWinAuthUser(next) });
   } catch (error: any) {
     return res.status(503).json({ error: "Approval failed", code: error?.code || "WIN_AUTH_STORE_ERROR" });
@@ -1952,6 +1953,7 @@ app.post("/api/admin/auth/users/:uid/status", rateLimit(30), async (req, res) =>
       ...(status === "active" ? { approvedAt: new Date().toISOString(), approvedBy: admin.uid } : {}),
     });
     await mirrorWinAuthUser(next);
+    if (status === "active") await ensureApprovedRoleProfile(next);
     return res.json({ ok: true, user: publicWinAuthUser(next) });
   } catch (error: any) {
     return res.status(503).json({ error: "Account status update failed", code: error?.code || "WIN_AUTH_STORE_ERROR" });
