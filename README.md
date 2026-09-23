@@ -34,8 +34,8 @@ React 19 + Vite
        │
        ├── Express server.ts
        │     ├── Orders API
-       │     ├── Google Routes proxy
-       │     ├── WIN Buddy AI
+       │     ├── GPS / Public Data endpoints
+       │     ├── External AI handoff
        │     └── Webhook / Notification endpoints
        │
        └── Firebase Functions
@@ -52,8 +52,8 @@ React 19 + Vite
 - **Backend:** Node.js 20+, Express 4
 - **Database/Auth:** Firebase / Firestore / Firebase Authentication
 - **Serverless:** Firebase Functions
-- **Maps:** Google Places/Routes are called server-side with API-key protection, request caching/throttling, and configurable daily application safety caps; Google Maps is opened externally for turn-by-turn navigation
-- **AI:** Google GenAI
+- **Maps/Places:** WIN Public Data + OpenStreetMap-compatible public data; no paid Maps/Places/Routes API key is required. Turn-by-turn navigation opens externally.
+- **AI:** External AI handoff. WINRIDER prepares/copies prompts and lets the user open the AI service directly; no AI-provider API key is required by WINRIDER.
 - **Charts/UI:** Recharts, Lucide React, Motion
 - **PWA:** vite-plugin-pwa
 - **Tests:** Node test runner ผ่าน `tsx`
@@ -72,7 +72,7 @@ WINRIDER.AI/
 │   ├── data/             # domain/reference data
 │   └── types/            # TypeScript types
 ├── functions/             # Firebase Functions
-├── server.ts              # Express application/server + Google Maps cost guard
+├── server.ts              # Express application/server + GPS/Public Data endpoints
 ├── scripts/               # build/generation scripts
 ├── public/                # static assets
 ├── package.json
@@ -159,57 +159,25 @@ support
 
 ## AI
 
-`server.ts` มี WIN Buddy AI ซึ่งใช้ Google GenAI เมื่อมี `GEMINI_API_KEY` และมี local response engine สำหรับกรณีที่ AI provider ไม่พร้อม
+WIN-AI และ WIN Buddy ใช้ **External AI Handoff**:
+- WINRIDER เตรียม prompt จากสิ่งที่ผู้ใช้พิมพ์
+- ไม่ส่ง prompt หรือรูปไป AI provider อัตโนมัติ
+- ไม่มี `GEMINI_API_KEY` / OpenAI provider key ในระบบ
+- ผู้ใช้เลือกเปิด ChatGPT, Gemini หรือ Copilot ภายนอกด้วยตนเอง
 
-## Google Maps Cost Control
+## Maps / Live Location
 
-WINRIDER.AI ใช้ **REAL GOOGLE + COST CONTROL** แทน FREE-ONLY lock:
-
-- GOOGLE_MAPS_API_KEY อยู่ฝั่ง server เท่านั้น ไม่ส่งไป browser
-- Google Places/Routes ถูกเรียกผ่าน backend proxy
-- Client มี cache + in-flight deduplication + burst throttling
-- Server มี daily application safety caps ที่ปรับได้ด้วย GOOGLE_PLACES_DAILY_HARD_LIMIT และ GOOGLE_ROUTES_DAILY_HARD_LIMIT
-- ค่าเริ่มต้นของ safety cap คือ 250 Google calls ต่อ API type ต่อ server instance ต่อวัน
-- Production ควรตั้ง **Google Cloud quota limit** เพิ่มอีกชั้น เพราะเป็น project-wide hard cap ที่ป้องกันค่าใช้จ่ายได้จริง
-- Budget alert ใช้สำหรับแจ้งเตือน ไม่ใช่ hard spending cap
-
-## Maps
-
-ระบบมี integration กับ Google Maps Platform Routes API ผ่าน backend endpoint:
-
-```text
-POST /api/routes/compute
-```
-
-Frontend ใช้ service:
-
-```text
-src/services/googleRoutesService.ts
-```
-
-> สำหรับ production navigation ควรใช้ผล route จาก provider จริง และไม่ควรนำข้อมูลจำลองไปตีความเป็นตำแหน่งหรือเส้นทางจริง
+WINRIDER ใช้ GPS จริงและข้อมูลสาธารณะโดยไม่ฝัง paid map provider:
+- ทริปใช้จอ A/B/C: A = พี่วิน, B = ลูกค้า/จุดรับ, C = ปลายทาง
+- ตำแหน่งสดซิงก์ผ่าน order backend ของ WINRIDER
+- ระยะทางในแอปเป็นค่าประมาณจากพิกัด
+- Radar / WIN Pet Care / ศูนย์พยาบาลใช้ WIN Public Data + OpenStreetMap contributors
+- Turn-by-turn, traffic และเส้นทางถนนเปิดใน Google Maps / Apple Maps / Waze ภายนอก
+- ไม่มี `GOOGLE_MAPS_API_KEY`, `VITE_GOOGLE_MAPS_API_KEY` หรือ Routes/Places paid API ใน runtime
 
 ## Environment Variables
 
-Secrets ต้องเก็บผ่าน environment / secret management และ **ห้าม commit secret จริงลง repository**
-
-ตัวแปรที่โค้ดอ้างถึง ได้แก่:
-
-```env
-GEMINI_API_KEY=
-GOOGLE_MAPS_API_KEY=
-VITE_GOOGLE_MAPS_API_KEY=
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-FIRESTORE_DATABASE_ID=
-PORT=
-CONTROL_PLANE_PORT=
-DEFAULT_APP_PORT=
-```
-
-ค่าจริงขึ้นอยู่กับ deployment environment
+Secrets/config ที่ยังจำเป็นต้องเก็บผ่าน environment / secret management ได้แก่ Firebase, payment provider และ internal scheduler configuration. `VITE_FIREBASE_API_KEY` ยังคงเป็น Firebase Web config ที่จำเป็นสำหรับ Authentication/Firestore; ไม่ใช่ Maps/AI provider key.
 
 ## Development
 
@@ -266,7 +234,7 @@ Repository นี้เคยมี component และ data สำหรับ 
 
 ## License
 
-ยังไม่มี license ที่ระบุอย่างเป็นทางการใน repository
+Repository ใช้ proprietary `LICENSE` และ `package.json` ระบุ `UNLICENSED`
 
 ---
 
