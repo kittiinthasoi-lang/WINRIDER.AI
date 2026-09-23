@@ -85,6 +85,14 @@ export const AuthModalOrView: React.FC = () => {
         return 'รูปแบบที่อยู่อีเมลไม่ถูกต้อง';
       case 'auth/popup-blocked':
         return 'เบราว์เซอร์บล็อกหน้าต่าง Pop-up กรุณาอนุญาตป๊อปอัปเพื่อลงชื่อเข้าใช้ด้วย Google';
+      case 'auth/invalid-api-key':
+        return 'Firebase Web API key ไม่ถูกต้องหรือถูกลบ กรุณาใส่ VITE_FIREBASE_API_KEY ตัวใหม่ของโปรเจกต์ก่อนเข้าสู่ระบบ';
+      case 'auth/unauthorized-domain':
+        return 'โดเมนที่เปิด WINRIDER ยังไม่ได้อยู่ใน Firebase Authentication > Authorized domains';
+      case 'auth/operation-not-allowed':
+        return 'ยังไม่ได้เปิด Google หรือ Email/Password provider ใน Firebase Authentication';
+      case 'auth/network-request-failed':
+        return 'เชื่อมต่อ Firebase ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่';
       default:
         return 'เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ กรุณาลองใหม่อีกครั้ง';
     }
