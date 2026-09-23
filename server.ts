@@ -3970,15 +3970,24 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       return data.status === "pending" && Date.parse(String(data.createdAt || "")) < pendingExpiry;
     });
     if (stalePending.length) {
-      try {
-        const batch = ordersDb.batch();
-        stalePending.forEach((doc) => batch.update(doc.ref, {
-          status: "cancelled",
-          cancellationReason: "dispatch_timeout_no_driver",
-          updatedAt: new Date().toISOString(),
-        }));
-        await batch.commit();
-      } catch (ignore) {}
+      for (const stale of stalePending) {
+        try {
+          await ordersDb.runTransaction(async (tx) => {
+            const staleSnap = await tx.get(stale.ref);
+            if (!staleSnap.exists) return;
+            const staleOrder = staleSnap.data() as ServerOrder;
+            if (String(staleOrder.status) !== "pending") return;
+            await releaseRideWalletHoldInTransaction(tx, stale.ref, staleOrder, "dispatch_timeout_no_driver");
+            tx.update(stale.ref, {
+              status: "cancelled",
+              cancellationReason: "dispatch_timeout_no_driver",
+              updatedAt: new Date().toISOString(),
+            });
+          });
+        } catch (cleanupError: any) {
+          console.warn("[Orders stale hold cleanup warning]:", cleanupError?.message);
+        }
+      }
     }
     const activeRideDoc = existingRideDocs.find((doc) => {
       if (stalePending.some((stale) => stale.id === doc.id)) return false;
@@ -4029,6 +4038,10 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       distanceSource: estimate.distanceSource,
       etaSource: estimate.etaSource,
       fareBasis: "WINRIDER_APP_FARE_RULE",
+      paymentMethod: "WIN_WALLET",
+      walletHoldSatang: Math.round(fare * 100) + 500,
+      walletHoldStatus: "HELD",
+      walletHoldCreatedAt: now.toISOString(),
       welfareFund2Baht,
       fareAddons: authoritativeQuote.addons,
       netFare: Math.max(0, fare - welfareFund2Baht),
@@ -4054,10 +4067,36 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
     let persistedToFirestore = false;
     try {
       await ordersDb.runTransaction(async (transaction) => {
-        const existing = await transaction.get(orderRef);
+        const passengerWalletRef = ordersDb.collection("wallets").doc(user.uid);
+        const [existing, walletSnap] = await Promise.all([
+          transaction.get(orderRef),
+          transaction.get(passengerWalletRef)
+        ]);
         if (existing.exists) {
           throw new Error("ORDER_ALREADY_EXISTS");
         }
+
+        const wallet = walletSnap.data() || {};
+        const balanceSatang = Number(wallet.balanceSatang || 0);
+        const lockedSatang = Math.max(0, Number(wallet.lockedSatang || 0));
+        const availableSatang = Math.max(0, balanceSatang - lockedSatang);
+        const holdSatang = Math.round(Number(newOrder.walletHoldSatang || 0));
+        if (!Number.isSafeInteger(holdSatang) || holdSatang <= 0) {
+          throw new Error("INVALID_WALLET_HOLD");
+        }
+        if (availableSatang < holdSatang) {
+          throw new Error("INSUFFICIENT_WIN_WALLET");
+        }
+
+        const nextLocked = lockedSatang + holdSatang;
+        transaction.set(passengerWalletRef, {
+          userId: user.uid,
+          balanceSatang,
+          lockedSatang: nextLocked,
+          availableSatang: balanceSatang - nextLocked,
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+
         transaction.create(orderRef, {
           ...newOrder,
           serverCreatedAt: FieldValue.serverTimestamp(),
@@ -4086,10 +4125,21 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
         }
         return res.status(409).json({ error: "Order already exists" });
       }
-      console.warn("[Orders DB Admin Warning - using resilient store]:", dbError?.message);
+      if (dbError?.message === "INSUFFICIENT_WIN_WALLET") {
+        return res.status(402).json({
+          error: "ยอด WIN Wallet ไม่เพียงพอ กรุณาเติมเงินก่อนเรียกรถ",
+          code: "INSUFFICIENT_WIN_WALLET",
+          requiredSatang: Number(newOrder.walletHoldSatang || 0)
+        });
+      }
+      if (dbError?.message === "INVALID_WALLET_HOLD") {
+        return res.status(500).json({ error: "ไม่สามารถคำนวณยอดกันเงินสำหรับทริปได้", code: "INVALID_WALLET_HOLD" });
+      }
+      console.error("[Orders DB Admin Error]:", dbError?.message);
+      return res.status(503).json({ error: "ไม่สามารถกันยอด WIN Wallet เพื่อสร้างงานได้", code: "WALLET_HOLD_UNAVAILABLE" });
     }
 
-    // Store in resilient in-memory store
+    // Firestore + WIN Wallet hold are authoritative for real orders.
     resilientOrdersStore.set(newOrder.id, newOrder);
 
     return res.status(201).json({
