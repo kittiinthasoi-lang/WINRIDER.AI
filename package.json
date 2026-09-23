@@ -16,7 +16,8 @@
     "test": "tsx --test src/core/*.test.ts",
     "test:unit": "tsx --test src/core/*.test.ts",
     "test:integration": "tsx --test src/core/serverFare.test.ts src/core/tripStateMachine.test.ts",
-    "load:test": "node scripts/load-test.mjs"
+    "load:test": "node scripts/load-test.mjs",
+    "test:e2e": "node scripts/e2e-ride.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
