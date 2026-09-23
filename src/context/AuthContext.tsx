@@ -105,12 +105,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    // Super/Admin accounts are intentionally kept signed in on the device.
+    // Admin accounts are intentionally kept signed in on the device.
     // Firebase Auth still remains authoritative and may invalidate the session
     // if credentials are revoked, the account is disabled, or browser data is cleared.
-    if (userData?.isAdmin === true || userData?.adminLevel === 'super') {
-      return;
+    let protectedAdmin = userData?.isAdmin === true || userData?.adminLevel === 'super';
+    if (!protectedAdmin && firebaseUser) {
+      try {
+        const tokenResult = await firebaseUser.getIdTokenResult();
+        protectedAdmin = tokenResult.claims.admin === true || tokenResult.claims.adminLevel === 'super';
+      } catch {
+        // If claims cannot be refreshed, fall through to the normal sign-out path.
+      }
     }
+    if (protectedAdmin) return;
 
     setLoading(true);
     try {
