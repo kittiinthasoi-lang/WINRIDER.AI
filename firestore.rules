@@ -206,6 +206,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Per-account UI/profile preferences. Only the authenticated owner may
+    // read/write the document that matches their UID.
+    match /account_preferences/{uid} {
+      allow read, create, update, delete: if isOwner(uid);
+    }
+
     // Connection-test collection is disabled in production.
     match /_connection_test/{docId} {
       allow read, write: if false;
