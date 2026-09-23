@@ -1,27 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  QrCode, 
-  Copy, 
-  CheckCircle2, 
-  Download, 
-  Share2, 
-  Sparkles, 
-  Coins, 
-  ShieldCheck, 
-  X, 
-  Check, 
-  Zap, 
-  Wallet,
-  DollarSign,
-  Tag,
-  ShoppingBag,
-  Store,
-  ArrowLeft,
-  RefreshCw,
-  FileText
-} from 'lucide-react';
-import { playTactileBlip } from '../utils/audio';
+import React, { useEffect, useState } from 'react';
+import { ArrowLeft, Check, Copy, Loader2, QrCode, ShieldCheck, Wallet, X } from 'lucide-react';
 import QRCode from 'qrcode';
+import { playTactileBlip } from '../utils/audio';
 import { getWalletMe } from '../services/walletService';
 
 interface CustomerPaymentQrCodeModalProps {
@@ -39,349 +19,136 @@ interface CustomerPaymentQrCodeModalProps {
 export const CustomerPaymentQrCodeModal: React.FC<CustomerPaymentQrCodeModalProps> = ({
   isOpen,
   onClose,
-  customerName = 'คุณลูกค้า (ผู้ขายชุมชน C2C)',
-  defaultItemTitle = 'สินค้าจาก วันนี้มีของมาขาย',
+  customerName = 'ผู้ขายใน WINRIDER',
+  defaultItemTitle = 'สินค้า',
   defaultAmount = 150,
-  customerPromptPay = '',
   customerWalletId = '',
   audioEnabled = true,
-  onPaymentSuccess
 }) => {
-  const [customAmount, setCustomAmount] = useState<number>(defaultAmount);
-  const [itemNote, setItemNote] = useState<string>(defaultItemTitle);
-  const [sellerName, setSellerName] = useState<string>(customerName);
-  const [promptPayNumber, setPromptPayNumber] = useState<string>(customerPromptPay);
-  const [copied, setCopied] = useState<boolean>(false);
-  const [qrType, setQrType] = useState<'win_pay'>('win_pay');
-  const [walletQrDataUrl, setWalletQrDataUrl] = useState<string>('');
-  const [walletLoading, setWalletLoading] = useState(false);
+  const [amount, setAmount] = useState(Math.max(0, defaultAmount));
+  const [itemTitle, setItemTitle] = useState(defaultItemTitle);
   const [resolvedWalletId, setResolvedWalletId] = useState('');
-  const [itemEmoji, setItemEmoji] = useState<string>('🛍️');
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
+    setLoading(true);
+    setError('');
+
     void (async () => {
       try {
-        const wallet = customerWalletId ? null : await getWalletMe();
+        const wallet = customerWalletId ? null : await getWalletMe('citizen');
         const walletId = customerWalletId || wallet?.walletId || '';
+        if (!/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(walletId)) throw new Error('NO_WALLET');
         if (!cancelled) setResolvedWalletId(walletId);
-        if (!/^WIN-[CKMP]-[A-Z2-9]{8}$/.test(walletId)) throw new Error('ไม่มี WIN Wallet ID จริง');
-        const payload = JSON.stringify({ type: 'WIN_WALLET_PAYMENT', walletId, amount: customAmount > 0 ? customAmount : undefined, item: itemNote });
-        const url = await QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 2, width: 280 });
-        if (!cancelled) setWalletQrDataUrl(url);
       } catch {
-        if (!cancelled) setWalletQrDataUrl('');
+        if (!cancelled) {
+          setResolvedWalletId('');
+          setError('ยังไม่พบ WIN Wallet จริงของผู้ขาย');
+        }
       } finally {
-        if (!cancelled) setWalletLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
-  }, [isOpen, customerWalletId, customAmount, itemNote]);
 
-  // Handle ESC key to dismiss
+    return () => { cancelled = true; };
+  }, [isOpen, customerWalletId]);
+
   useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (audioEnabled) playTactileBlip(700);
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, audioEnabled]);
+    if (!resolvedWalletId) {
+      setQrDataUrl('');
+      return;
+    }
+    const payload = JSON.stringify({
+      type: 'WIN_WALLET_PAYMENT',
+      walletId: resolvedWalletId,
+      ...(amount > 0 ? { amount } : {}),
+      item: itemTitle,
+    });
+    void QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 2, width: 280 })
+      .then(setQrDataUrl)
+      .catch(() => setError('สร้าง WIN Wallet QR ไม่สำเร็จ'));
+  }, [resolvedWalletId, amount, itemTitle]);
 
   if (!isOpen) return null;
 
-  const handleCopy = () => {
-    if (audioEnabled) playTactileBlip(900);
-    const textToCopy = qrType === 'promptpay' ? promptPayNumber : customerWalletId;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(textToCopy);
+  const handleCopy = async () => {
+    if (!resolvedWalletId || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(resolvedWalletId);
+      setCopied(true);
+      if (audioEnabled) playTactileBlip(900);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setError('คัดลอก WIN Wallet ID ไม่สำเร็จ');
     }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
   };
 
-
-
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          if (audioEnabled) playTactileBlip(700);
-          onClose();
-        }
-      }}
-    >
-      <div className="relative w-full max-w-md max-h-[95vh] overflow-y-auto rounded-3xl bg-gradient-to-b from-[#1C1402] via-[#0F1424] to-[#060A14] border-2 border-[#FFD700] shadow-[0_0_50px_rgba(255,215,0,0.35)] text-slate-100 p-5 space-y-4">
-        
-        {/* TOP MODAL HEADER WITH BACK & CLOSE BUTTON */}
-        <div className="flex items-center justify-between pb-3 border-b border-white/10">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(700);
-                onClose();
-              }}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white border border-white/15 flex items-center gap-1 text-xs font-mono font-bold transition-all active:scale-95 shadow-sm"
-              title="ย้อนกลับ"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>กลับ</span>
-            </button>
-
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FFD700] to-amber-500 flex items-center justify-center text-slate-950 font-black shadow-[0_0_12px_#FFD700]">
-                <QrCode className="w-4 h-4 text-slate-950" />
-              </div>
-              <div>
-                <h3 className="text-xs font-black text-white flex items-center gap-1">
-                  <span>QR CODE ลูกค้า (วันนี้มีของมาขาย)</span>
-                  <span className="text-[8px] px-1.5 py-0.2 rounded-full bg-amber-400/20 text-[#FFD700] border border-amber-400/40 font-mono">
-                    C2C ตลาดนัด
-                  </span>
-                </h3>
-                <p className="text-[9px] text-slate-400 font-mono truncate max-w-[180px]">
-                  {sellerName} • 0% ค่าธรรมเนียม
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={() => {
-              if (audioEnabled) playTactileBlip(700);
-              onClose();
-            }}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-red-500/30 text-slate-300 hover:text-red-300 flex items-center justify-center transition-colors border border-white/10"
-            title="ปิดหน้าต่าง QR"
-          >
-            <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-md" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-md space-y-4 rounded-3xl border-2 border-[#FFD700] bg-gradient-to-b from-[#1C1402] via-[#0F1424] to-[#060A14] p-5 text-slate-100 shadow-[0_0_50px_rgba(255,215,0,0.35)]">
+        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+          <button type="button" onClick={onClose} className="flex items-center gap-1 rounded-xl bg-slate-800 px-2.5 py-1.5 text-xs font-bold text-amber-300">
+            <ArrowLeft className="h-4 w-4" /> กลับ
           </button>
+          <div className="text-center">
+            <h3 className="text-sm font-black text-white">รับเงินด้วย WIN Wallet</h3>
+            <p className="text-[10px] text-slate-400">{customerName}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full bg-white/10 p-2 text-slate-300"><X className="h-4 w-4" /></button>
         </div>
 
-
-
-        {/* TOGGLE PROMPTPAY VS WIN WALLET */}
-        <div className="grid grid-cols-1 gap-2 bg-black/50 p-1 rounded-2xl border border-white/10 font-mono text-xs">
-          <button
-            onClick={() => {
-              if (audioEnabled) playTactileBlip(800);
-              setQrType('win_pay');
-            }}
-            className={`py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
-              qrType === 'promptpay'
-                ? 'bg-gradient-to-r from-[#FFD700] via-amber-400 to-orange-400 text-slate-950 shadow-[0_0_12px_rgba(255,215,0,0.5)]'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            <span>WIN Wallet จริง</span>
-          </button>
-
-          <button
-            onClick={() => {
-              if (audioEnabled) playTactileBlip(800);
-              setQrType('win_pay');
-            }}
-            className={`py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
-              qrType === 'win_pay'
-                ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-[0_0_12px_rgba(0,210,255,0.5)]'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Wallet className="w-3.5 h-3.5" />
-            <span>WIN Wallet ลูกค้า</span>
-          </button>
+        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-xs text-emerald-100">
+          <ShieldCheck className="mr-1 inline h-4 w-4 text-emerald-300" />
+          ผู้ซื้อต้องเติมเงินเข้า WIN Wallet ก่อน จึงจะชำระสินค้าภายในแอปได้
         </div>
 
-        {/* 🎛️ CUSTOM AMOUNT INPUT BOX (ช่องระบุจำนวนเงินเอง) */}
-        <div className="p-3.5 rounded-2xl bg-black/60 border border-amber-400/40 space-y-2.5 font-mono text-xs shadow-inner">
-          <div className="flex items-center justify-between">
-            <label className="text-amber-300 font-bold flex items-center gap-1.5 text-xs">
-              <DollarSign className="w-4 h-4 text-[#FFD700]" />
-              <span>ระบุจำนวนเงินที่ต้องการรับเอง (฿):</span>
-            </label>
-            <button 
-              type="button"
-              onClick={() => {
-                if (audioEnabled) playTactileBlip(750);
-                setCustomAmount(0);
-              }}
-              className="text-[10px] text-slate-400 hover:text-amber-300 underline transition-colors"
-            >
-              ล้างค่า (สแกนระบุยอดอิสระ)
-            </button>
+        <input
+          value={itemTitle}
+          onChange={(e) => setItemTitle(e.target.value)}
+          placeholder="ชื่อสินค้า / รายการ"
+          className="w-full rounded-xl border border-white/15 bg-black/40 p-3 text-sm text-white outline-none focus:border-amber-400"
+        />
+
+        <input
+          type="number"
+          min="0.01"
+          step="0.01"
+          value={amount || ''}
+          onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
+          placeholder="ยอดเงิน"
+          className="w-full rounded-xl border border-white/15 bg-black/40 p-3 text-sm font-bold text-white outline-none focus:border-amber-400"
+        />
+
+        {loading ? (
+          <div className="flex min-h-52 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-amber-300" /></div>
+        ) : qrDataUrl ? (
+          <div className="rounded-3xl bg-white p-4 text-center text-slate-900">
+            <img src={qrDataUrl} alt="WIN Wallet QR" className="mx-auto h-52 w-52 object-contain" />
+            <p className="mt-2 text-xs font-bold text-slate-500">WIN Wallet ผู้ขาย</p>
+            <p className="font-mono text-sm font-black">{resolvedWalletId}</p>
+            {amount > 0 && <p className="mt-1 text-2xl font-black">฿{amount.toFixed(2)}</p>}
           </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 font-black text-base">฿</span>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                placeholder="ระบุจำนวนเงิน เช่น 50, 150, 300..."
-                value={customAmount === 0 ? '' : customAmount}
-                onChange={(e) => {
-                  const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value) || 0);
-                  setCustomAmount(val);
-                }}
-                className="w-full pl-8 pr-3 py-2 bg-slate-900/90 border-2 border-amber-400/60 rounded-xl text-white font-mono font-black text-base focus:outline-none focus:border-[#FFD700] focus:shadow-[0_0_15px_rgba(255,215,0,0.4)] placeholder:text-slate-600 transition-all"
-              />
-            </div>
-            {/* Quick addition chips */}
-            <div className="flex items-center gap-1">
-              {[+10, +50, +100, +500].map((inc) => (
-                <button
-                  key={inc}
-                  type="button"
-                  onClick={() => {
-                    if (audioEnabled) playTactileBlip(800);
-                    setCustomAmount(prev => prev + inc);
-                  }}
-                  className="px-2 py-2 rounded-xl bg-white/5 hover:bg-amber-500/20 border border-white/10 text-amber-300 hover:border-amber-400 text-xs font-bold transition-all"
-                  title={`เพิ่มอีก ${inc} บาท`}
-                >
-                  +{inc}
-                </button>
-              ))}
-            </div>
+        ) : (
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-5 text-center text-xs text-amber-200">
+            ไม่มี WIN Wallet จริง จึงไม่เปิดช่องทางชำระอื่นแทน
           </div>
+        )}
 
-          {/* Quick Item Presets */}
-          <div className="space-y-1.5 pt-1">
-            <span className="text-[10px] text-slate-400 block">ราคาสินค้า C2C ยอดนิยม:</span>
-            <div className="grid grid-cols-6 gap-1 text-xs">
-              {[35, 60, 100, 150, 250, 500].map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => {
-                    if (audioEnabled) playTactileBlip(850);
-                    setCustomAmount(amt);
-                  }}
-                  className={`py-1 rounded-xl border font-bold text-center transition-all ${
-                    customAmount === amt
-                      ? 'bg-amber-500/30 text-[#FFD700] border-amber-400 shadow-[0_0_10px_rgba(255,215,0,0.3)]'
-                      : 'bg-black/40 text-slate-300 border-white/10 hover:border-white/30'
-                  }`}
-                >
-                  ฿{amt}
-                </button>
-              ))}
-            </div>
-          </div>
+        {error && <p className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
 
-          {/* Item Note & Emoji Selection */}
-          <div className="pt-2 border-t border-white/10 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] text-slate-300 font-bold flex items-center gap-1">
-                <FileText className="w-3 h-3 text-cyan-400" />
-                <span>บันทึกชื่อสินค้า / ข้อความช่วยจำ:</span>
-              </label>
-              <div className="flex gap-1">
-                {['🛍️', '🍪', '📷', '👗', '🍊', '📚', '💊'].map(em => (
-                  <button
-                    key={em}
-                    type="button"
-                    onClick={() => {
-                      if (audioEnabled) playTactileBlip(750);
-                      setItemEmoji(em);
-                    }}
-                    className={`w-6 h-6 rounded-md text-xs flex items-center justify-center transition-all ${
-                      itemEmoji === em ? 'bg-amber-400 text-slate-950 scale-110 shadow-sm' : 'bg-black/40 text-white hover:bg-white/10'
-                    }`}
-                  >
-                    {em}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <input 
-              type="text"
-              placeholder="เช่น คุกกี้อบสด, เสื้อยืดวินเทจ, ค่าขนส่งพัสดุ C2C..."
-              value={itemNote}
-              onChange={(e) => setItemNote(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-900/80 border border-white/15 rounded-xl text-white text-xs focus:border-amber-400 focus:outline-none"
-            />
-          </div>
-        </div>
+        <button type="button" onClick={() => void handleCopy()} disabled={!resolvedWalletId} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-black text-slate-200 disabled:opacity-40">
+          {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+          {copied ? 'คัดลอกแล้ว' : 'คัดลอก WIN Wallet ID'}
+        </button>
 
-        {/* QR CODE CARD BOX */}
-        <div className="p-4 rounded-3xl bg-white text-slate-900 text-center space-y-3 shadow-2xl relative">
-          <div className="flex items-center justify-between border-b pb-2 text-xs font-mono">
-            <div className="text-left">
-              <span className="text-[10px] text-slate-500 font-bold uppercase">
-                {false ? 'THAI QR PAYMENT (PROMPTPAY)' : 'WIN CUSTOMER WALLET'}
-              </span>
-              <p className="font-black text-slate-900 truncate max-w-[180px]">{sellerName}</p>
-            </div>
-            <div className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
-              ✓ วันนี้มีของมาขาย
-            </div>
-          </div>
-
-          {/* Real QR generated from the recipient WIN Wallet ID */}
-          <div className="relative mx-auto w-48 h-48 sm:w-52 sm:h-52 bg-white p-3 rounded-2xl shadow-inner flex items-center justify-center border-4 border-amber-400">
-            {walletQrDataUrl ? <img src={walletQrDataUrl} alt="WIN Wallet QR" className="h-full w-full object-contain" /> : <span className="text-center text-xs font-bold text-slate-500">{walletLoading ? 'กำลังสร้าง QR จาก WIN Wallet จริง…' : 'ไม่พบ WIN Wallet ID จริง'}</span>}
-          </div>
-
-          <div className="font-mono">
-            {customAmount > 0 ? (
-              <div>
-                <span className="text-[11px] text-slate-500">ยอดเงินที่ระบุ:</span>
-                <p className="text-2xl font-black text-slate-950">฿{customAmount}.00</p>
-                {itemNote && (
-                  <p className="text-[10px] text-amber-700 font-bold truncate max-w-[240px] mx-auto">
-                    📝 {itemNote}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div>
-                <span className="text-xs font-bold text-slate-700">สแกนระบุจำนวนเงินได้เองอย่างอิสระ</span>
-                {itemNote && (
-                  <p className="text-[10px] text-slate-500 truncate max-w-[240px] mx-auto mt-0.5">
-                    📝 {itemNote}
-                  </p>
-                )}
-              </div>
-            )}
-            <p className="text-[10px] text-slate-400 mt-1">
-              {qrType === 'promptpay' ? promptPayNumber : `WIN Wallet: ${resolvedWalletId || customerWalletId}`}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 pt-2 border-t border-white/10 font-mono text-xs">
-          <button
-            onClick={handleCopy}
-            className="py-2.5 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 flex items-center justify-center gap-1.5 transition-colors"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? 'คัดลอกแล้ว!' : 'คัดลอก WIN Wallet ID'}</span>
-          </button>
-
-        </div>
-
-        <div className="space-y-1.5 pt-1">
-          <button
-            onClick={() => {
-              if (audioEnabled) playTactileBlip(700);
-              onClose();
-            }}
-            className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-amber-300 hover:text-white text-xs font-mono font-bold border border-amber-500/30 hover:border-amber-400 transition-all flex items-center justify-center gap-2 shadow-md active:scale-98"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>← ย้อนกลับสู่ตลาดนัด / ปิดหน้าจอ QR Code</span>
-          </button>
-          <p className="text-[10px] text-center text-slate-500 font-mono">
-            แตะปุ่มกลับ, ปุ่ม ✕ หรือแตะพื้นหลังเพื่อปิดหน้าต่าง
-          </p>
+        <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500">
+          <Wallet className="h-3.5 w-3.5" />
+          WIN Wallet only • ไม่มีเงินสดหรือ PromptPay Direct
         </div>
       </div>
     </div>
