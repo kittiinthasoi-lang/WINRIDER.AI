@@ -1543,6 +1543,12 @@ interface ServerOrder {
   distanceSource?: string;
   etaSource?: string;
   fareBasis?: string;
+  paymentMethod?: "WIN_WALLET";
+  walletHoldSatang?: number;
+  walletHoldStatus?: "HELD" | "RELEASED" | "CONSUMED";
+  walletHoldCreatedAt?: string;
+  walletHoldReleasedAt?: string;
+  walletHoldReleaseReason?: string;
 }
 
 function getAdminDb() {
@@ -1607,6 +1613,35 @@ function getAdminDb() {
 }
 
 const ordersDb = getAdminDb();
+
+async function releaseRideWalletHoldInTransaction(
+  tx: any,
+  orderRef: any,
+  order: ServerOrder,
+  reason: string
+) {
+  const holdSatang = Math.round(Number(order.walletHoldSatang || 0));
+  if (order.walletHoldStatus !== "HELD" || holdSatang <= 0 || !order.passengerUserId) return;
+
+  const walletRef = ordersDb.collection("wallets").doc(String(order.passengerUserId));
+  const walletSnap = await tx.get(walletRef);
+  const wallet = walletSnap.data() || {};
+  const balanceSatang = Number(wallet.balanceSatang || 0);
+  const lockedSatang = Math.max(0, Number(wallet.lockedSatang || 0));
+  if (lockedSatang < holdSatang) throw new Error("RIDE_WALLET_HOLD_MISMATCH");
+
+  const nextLocked = lockedSatang - holdSatang;
+  tx.set(walletRef, {
+    lockedSatang: nextLocked,
+    availableSatang: balanceSatang - nextLocked,
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+  tx.update(orderRef, {
+    walletHoldStatus: "RELEASED",
+    walletHoldReleasedAt: new Date().toISOString(),
+    walletHoldReleaseReason: reason
+  });
+}
 
 const adminAuth = getAuth();
 
