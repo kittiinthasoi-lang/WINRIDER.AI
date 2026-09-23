@@ -26,8 +26,6 @@
  * 8. ฟังก์ชันหลัก calculateFees(input) คืน object ที่แตกเป็น 5 bucket: system, insurance, pension, helmet, equipment
  */
 
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
 
 // 5 ถังเงินหลักของระบบ WINRIDER.AI (หน่วย: สตางค์ integer)
 export interface FeeBucketsSatang {
@@ -150,6 +148,12 @@ let cachedFirestoreRules: FeeRulesConfig | null = null;
 export async function getFeeRulesFromFirestore(): Promise<FeeRulesConfig> {
   if (cachedFirestoreRules) return cachedFirestoreRules;
   try {
+    // Keep the pure fee engine importable in Node tests without bootstrapping
+    // Firebase Auth. Firestore is loaded only when this persistence adapter is used.
+    const [{ doc, getDoc, collection, getDocs }, { db }] = await Promise.all([
+      import('firebase/firestore'),
+      import('../firebase'),
+    ]);
     const configDocRef = doc(db, 'fee_rules', 'current_rules');
     const docSnap = await getDoc(configDocRef);
     if (docSnap.exists()) {
