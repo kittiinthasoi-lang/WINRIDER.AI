@@ -1576,6 +1576,8 @@ interface ServerOrder {
   walletHoldCreatedAt?: string;
   walletHoldReleasedAt?: string;
   walletHoldReleaseReason?: string;
+  expressPackagePhotoUrl?: string;
+  expressPackageVerificationId?: string;
 }
 
 function getAdminDb() {
@@ -4533,6 +4535,9 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
       ...(input.customerGender === "female" || input.customerGender === "male" ? { customerGender: input.customerGender } : {}),
       ...(typeof input.preferredDriverId === "string" && input.preferredDriverId ? { preferredDriverId: input.preferredDriverId } : {}),
       dispatchMode: input.preferredDriverId ? "preferred" : "automatic",
+      ...(normalizedServiceId === "express" && validEvidenceImageUrl((input as any).expressPackagePhotoUrl)
+        ? { expressPackagePhotoUrl: validEvidenceImageUrl((input as any).expressPackagePhotoUrl)! }
+        : {}),
     };
     const candidateIds = await buildDispatchCandidates(normalizedOrder);
     const firstDriverId = candidateIds[0] || null;
@@ -4578,8 +4583,29 @@ app.post("/api/orders", rateLimit(20), async (req, res) => {
           updatedAt: FieldValue.serverTimestamp()
         }, { merge: true });
 
+        let expressVerificationId: string | undefined;
+        if (newOrder.serviceId === "express" && newOrder.expressPackagePhotoUrl) {
+          const verificationRef = ordersDb.collection("adminVerificationQueue").doc();
+          expressVerificationId = verificationRef.id;
+          transaction.create(verificationRef, {
+            id: verificationRef.id,
+            status: "pending_review",
+            submittedBy: user.uid,
+            submittedRole: String(passenger.role || (user as any).role || "citizen"),
+            category: "ตรวจรูปพัสดุก่อนรับงาน WIN Express",
+            subjectType: "express_package",
+            subjectId: newOrder.id,
+            imageUrl: newOrder.expressPackagePhotoUrl,
+            note: newOrder.dropoffLocation,
+            metadata: { rideId: newOrder.id, serviceId: "express" },
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+            serverCreatedAt: FieldValue.serverTimestamp(),
+          });
+        }
         transaction.create(orderRef, {
           ...newOrder,
+          ...(expressVerificationId ? { expressPackageVerificationId: expressVerificationId } : {}),
           serverCreatedAt: FieldValue.serverTimestamp(),
         });
       });
