@@ -671,6 +671,56 @@ app.put("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"
   }
 });
 
+app.post("/api/shop/profile-content/product-submissions", rateLimit(20), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
+  if (String(userData.role || (user as any).role || "") !== "merchant") {
+    return res.status(403).json({ error: "เฉพาะบัญชีร้านค้าที่อนุมัติแล้วเท่านั้น" });
+  }
+
+  const input = req.body || {};
+  const imageUrl = validEvidenceImageUrl(input.imageUrl);
+  const title = String(input.title || "").trim().slice(0, 160);
+  const price = Number(input.price);
+  const stock = Math.max(1, Math.min(100000, Math.floor(Number(input.stock) || 1)));
+  if (!imageUrl || title.length < 2 || !Number.isFinite(price) || price <= 0) {
+    return res.status(400).json({ error: "กรุณากรอกชื่อ ราคา และรูปสินค้าจริงให้ครบ" });
+  }
+
+  const product = {
+    id: `prod-${crypto.randomUUID()}`,
+    title,
+    category: String(input.category || "สินค้าทั่วไป").slice(0, 120),
+    price,
+    originalPrice: Number.isFinite(Number(input.originalPrice)) ? Number(input.originalPrice) : price,
+    imageIcon: "📸",
+    imageUrl,
+    description: String(input.description || "").trim().slice(0, 2000),
+    stock,
+    soldCount: 0,
+    isFlashSale: input.isFlashSale === true,
+    adminVerified: true,
+  };
+
+  try {
+    const verification = await createAdminVerification({
+      submittedBy: user.uid,
+      submittedRole: "merchant",
+      category: "ตรวจรูปและสินค้าหน้าร้าน",
+      subjectType: "merchant_product",
+      subjectId: product.id,
+      imageUrl,
+      note: title,
+      metadata: { merchantUid: user.uid, product },
+    });
+    return res.status(202).json({ pendingAdminReview: true, verification, product });
+  } catch (error: any) {
+    console.error("[Merchant Product Submission]", error?.message);
+    return res.status(503).json({ error: "ส่งสินค้าให้แอดมินตรวจไม่สำเร็จ" });
+  }
+});
+
 app.get("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
@@ -1986,7 +2036,7 @@ app.post("/api/admin/auth/users/:uid/status", rateLimit(30), async (req, res) =>
 });
 
 type VerificationStatus = "pending_review" | "approved" | "rejected";
-type VerificationSubjectType = "market_listing" | "service_completion" | "express_package" | "kyc_document" | "general_evidence";
+type VerificationSubjectType = "market_listing" | "merchant_product" | "service_completion" | "express_package" | "kyc_document" | "general_evidence";
 
 function validEvidenceImageUrl(value: unknown): string | null {
   const url = String(value || "").trim();
@@ -2035,7 +2085,7 @@ app.post("/api/verifications/evidence", rateLimit(20), async (req, res) => {
   if (!user) return;
   const imageUrl = validEvidenceImageUrl(req.body?.imageUrl);
   const subjectType = String(req.body?.subjectType || "general_evidence") as VerificationSubjectType;
-  const allowedSubjectTypes = new Set<VerificationSubjectType>(["market_listing", "service_completion", "express_package", "kyc_document", "general_evidence"]);
+  const allowedSubjectTypes = new Set<VerificationSubjectType>(["market_listing", "merchant_product", "service_completion", "express_package", "kyc_document", "general_evidence"]);
   if (!imageUrl || !allowedSubjectTypes.has(subjectType)) {
     return res.status(400).json({ error: "ข้อมูลหลักฐานไม่ถูกต้อง", code: "INVALID_EVIDENCE" });
   }
@@ -2121,6 +2171,20 @@ app.post("/api/admin/verifications/:id/review", rateLimit(40), async (req, res) 
             adminReviewReason: reason,
             updatedAt: now,
           });
+        }
+      }
+
+      if (record.subjectType === "merchant_product" && record.subjectId) {
+        const merchantUid = String(record.metadata?.merchantUid || record.submittedBy || "");
+        const product = record.metadata?.product;
+        if (merchantUid && product && typeof product === "object") {
+          const merchantRef = ordersDb.collection("merchants").doc(merchantUid);
+          if (approved) {
+            tx.set(merchantRef, {
+              products: FieldValue.arrayUnion(product),
+              updatedAt: now,
+            }, { merge: true });
+          }
         }
       }
 
