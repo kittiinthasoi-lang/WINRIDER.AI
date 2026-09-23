@@ -843,6 +843,21 @@ function parseThaiOrIsoDate(value: unknown): string | null {
     : null;
 }
 
+function publicHaversineKm(
+  originLat: number,
+  originLng: number,
+  destinationLat: number,
+  destinationLng: number,
+): number {
+  const r = 6371;
+  const toRad = (value: number) => value * Math.PI / 180;
+  const dLat = toRad(destinationLat - originLat);
+  const dLng = toRad(destinationLng - originLng);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(originLat)) * Math.cos(toRad(destinationLat)) * Math.sin(dLng / 2) ** 2;
+  return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function classifyPublicEvent(category: string, title: string, labels: string[] = []): EventCategory {
   const normalized = (String(category) + " " + String(title) + " " + labels.join(" ")).toLowerCase();
   if (/sale|discount|ลดราคา|clearance|shopping/.test(normalized)) return "sale";
@@ -1087,17 +1102,41 @@ app.post("/api/internal/public-data/sync-tat", rateLimit(2), async (req, res) =>
 app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async (req, res) => {
   const eventDate = String(req.query.date || "").trim();
   const country = "TH";
+  const latitude = Number(req.query.latitude);
+  const longitude = Number(req.query.longitude);
+  const hasOrigin = Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
     return res.status(400).json({ message: "วันที่กิจกรรมไม่ถูกต้อง", events: [] });
   }
 
   const cacheKey = country + ":" + eventDate;
+  const dayStart = new Date(eventDate + "T00:00:00+07:00");
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+  const decorate = (baseEvents: NearbyEventResult[]) => baseEvents
+    .map((event: any) => ({
+      ...event,
+      ...(hasOrigin ? { distanceKm: Math.round(publicHaversineKm(latitude, longitude, event.latitude, event.longitude) * 100) / 100 } : {}),
+      externalUrl: event.sourceUrl || undefined,
+    }))
+    .sort((a: any, b: any) => {
+      if (hasOrigin) {
+        const distanceDiff = Number(a.distanceKm ?? Number.POSITIVE_INFINITY) - Number(b.distanceKm ?? Number.POSITIVE_INFINITY);
+        if (Math.abs(distanceDiff) > 0.001) return distanceDiff;
+      }
+      return Date.parse(a.startAt) - Date.parse(b.startAt);
+    });
+
   const cached = dailyEventsCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return res.json({
-      events: cached.value,
-      source: "WINRIDER.AI • Direct TAT Public Data",
+      events: decorate(cached.value),
+      source: "WINRIDER.AI • Public Event Data",
+      sources: [...new Set(cached.value.map((event: any) => event.sourceName).filter(Boolean))],
       sourceDriven: true,
+      freePublicData: true,
       fetchedAt: new Date().toISOString(),
       eventDate,
       country,
@@ -1105,17 +1144,20 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
     });
   }
 
-  const dayStart = new Date(eventDate + "T00:00:00+07:00");
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
-
   try {
-    const snapshot = await ordersDb.collection("winAlertEvents")
-      .where("source", "==", "TAT Data Catalog")
-      .where("sourceDriven", "==", true)
-      .get();
+    const [eventsSnapshot, publicDataSnapshot] = await Promise.all([
+      ordersDb.collection("winAlertEvents").where("sourceDriven", "==", true).get(),
+      ordersDb.collection("publicDataRecords").where("sourceDriven", "==", true).get(),
+    ]);
 
-    const events = snapshot.docs.flatMap((docSnap): NearbyEventResult[] => {
-      const item = docSnap.data() || {};
+    const candidates = [
+      ...eventsSnapshot.docs.map((docSnap) => ({ docSnap, item: docSnap.data() || {}, collection: "winAlertEvents" })),
+      ...publicDataSnapshot.docs
+        .map((docSnap) => ({ docSnap, item: docSnap.data() || {}, collection: "publicDataRecords" }))
+        .filter(({ item }) => String(item.kind || item.sourceKind || "").toLowerCase() === "events"),
+    ];
+
+    const normalized = candidates.flatMap(({ docSnap, item }): NearbyEventResult[] => {
       if (item.publicVisible !== true) return [];
 
       const startAt = parseThaiOrIsoDate(item.startAt || item.start);
@@ -1124,9 +1166,9 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
       const endMs = endAt ? Date.parse(endAt) : startMs;
       if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < dayStart.getTime() || startMs > dayEnd.getTime()) return [];
 
-      const latitude = Number(item.latitude ?? item.lat);
-      const longitude = Number(item.longitude ?? item.lng ?? item.lon);
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
+      const eventLat = Number(item.latitude ?? item.lat);
+      const eventLng = Number(item.longitude ?? item.lng ?? item.lon);
+      if (!Number.isFinite(eventLat) || !Number.isFinite(eventLng) || eventLat < -90 || eventLat > 90 || eventLng < -180 || eventLng > 180) return [];
 
       const id = String(item.id || docSnap.id).trim();
       const title = String(item.title || item.name || "").trim();
@@ -1138,37 +1180,57 @@ app.get("/api/events/daily", rateLimit(RATE_LIMITS["/api/events/daily"]), async 
         ? categoryValue as EventCategory
         : classifyPublicEvent(categoryValue, title, Array.isArray(item.labels) ? item.labels : []);
 
+      const sourceName = String(item.sourceName || item.source || "Public Data").trim();
+      const sourceUrl = String(item.sourceUrl || item.sourceDatasetUrl || item.website || "").trim();
+
       return [{
-        id: "tat-event-" + id,
+        id: "public-event-" + id,
         title,
         category,
-        venueName: String(item.venueName || item.venue || "").trim(),
-        venueArea: String(item.venueArea || item.area || item.province || "").trim(),
-        latitude,
-        longitude,
+        venueName: String(item.venueName || item.venue || item.address || "").trim(),
+        venueArea: String(item.venueArea || item.area || item.province || item.district || "").trim(),
+        latitude: eventLat,
+        longitude: eventLng,
         startAt,
         endAt: endAt || undefined,
         description: typeof item.description === "string" ? item.description : undefined,
-        sourceName: "WINRIDER.AI • Direct TAT Public Data",
+        sourceName,
+        sourceUrl: sourceUrl || undefined,
         providerEventId: String(item.providerRecordId || id),
         attendance: Number.isFinite(Number(item.attendance)) && Number(item.attendance) > 0 ? Number(item.attendance) : undefined,
         rank: Number.isFinite(Number(item.rank)) ? Number(item.rank) : undefined,
-      }];
-    }).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+      } as any];
+    });
 
-    dailyEventsCache.set(cacheKey, { value: events, expiresAt: Date.now() + EVENT_CACHE_MS });
+    const deduped = new Map<string, NearbyEventResult>();
+    for (const event of normalized) {
+      const key = [
+        event.title.trim().toLowerCase(),
+        event.startAt.slice(0, 10),
+        event.latitude.toFixed(4),
+        event.longitude.toFixed(4),
+      ].join("|");
+      const existing = deduped.get(key);
+      if (!existing || (!existing.sourceUrl && (event as any).sourceUrl)) deduped.set(key, event);
+    }
+
+    const baseEvents = [...deduped.values()].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+    dailyEventsCache.set(cacheKey, { value: baseEvents, expiresAt: Date.now() + EVENT_CACHE_MS });
+
     return res.json({
-      events,
-      source: "WINRIDER.AI • Direct TAT Public Data",
+      events: decorate(baseEvents),
+      source: "WINRIDER.AI • Public Event Data",
+      sources: [...new Set(baseEvents.map((event: any) => event.sourceName).filter(Boolean))],
       sourceDriven: true,
+      freePublicData: true,
       fetchedAt: new Date().toISOString(),
       eventDate,
       country,
       cached: false,
     });
   } catch (error) {
-    console.error("[Events API] Firestore read failed:", error instanceof Error ? error.message : error);
-    return res.status(503).json({ message: "โหลดกิจกรรมจริงจากฐานข้อมูลไม่สำเร็จ", events: [] });
+    console.error("[Events API] public-data read failed:", error instanceof Error ? error.message : error);
+    return res.status(503).json({ message: "โหลดกิจกรรมจากข้อมูลสาธารณะไม่สำเร็จ", events: [] });
   }
 });
 
@@ -1264,7 +1326,6 @@ app.get("/api/public-data/discovery", rateLimit(30), async (req, res) => {
     for (const kind of kinds) {
       const collection = kind === "events" ? "winAlertEvents" : "publicDataRecords";
       const snapshot = await ordersDb.collection(collection)
-        .where("source", "==", "TAT Data Catalog")
         .where("sourceDriven", "==", true)
         .get();
 
@@ -1276,7 +1337,7 @@ app.get("/api/public-data/discovery", rateLimit(30), async (req, res) => {
     }
 
     return res.json({
-      source: "WINRIDER.AI • Direct TAT Public Data",
+      source: "WINRIDER.AI • Public Data Aggregator",
       sourceDriven: true,
       adminVerifyRequired: false,
       data,
