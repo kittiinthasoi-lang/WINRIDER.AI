@@ -15,6 +15,7 @@ export interface WalletStateResponse {
     accountName: string;
     bankName?: string;
     bankAccountNumber?: string;
+    lineUrl?: string;
   };
   submissions: Array<{
     id: string;
@@ -70,24 +71,6 @@ export async function getWalletMe(role?: string): Promise<WalletStateResponse> {
 
   if (!res.ok) return emptyWallet(role);
   return await res.json();
-}
-
-export async function submitTopupProof(amount: number, imageDataUrl: string) {
-  const token = await getToken();
-  if (!token) throw new Error('กรุณาเข้าสู่ระบบก่อนทำรายการเติมเงิน');
-
-  const res = await fetch('/api/wallet/topup-proof', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ amount, imageDataUrl }),
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'ส่งสลิปไม่สำเร็จ');
-  return data;
 }
 
 export async function submitWithdrawal(params: {
