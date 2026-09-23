@@ -3996,7 +3996,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 <RealGpsMapModal
   isOpen={showRealGpsModal}
   onClose={() => setShowRealGpsModal(false)}
-  destinationTitle={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
+  rideId={activeLiveOrder?.id}
+  driverUserId={activeLiveOrder?.driverUserId}
+  driverName={activeLiveOrder?.driverName || currentMatchedDriver?.name || 'พี่วิน'}
+  passengerName={passengerProfileData.displayName || currentUserSession?.name || 'คุณ'}
+  pickupAddress={activeLiveOrder?.pickupLocation || ''}
+  pickupCoords={activeLiveOrder?.pickupCoord ? { latitude: activeLiveOrder.pickupCoord.lat, longitude: activeLiveOrder.pickupCoord.lng } : undefined}
+  destinationTitle={activeLiveOrder?.dropoffLocation || selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
   destinationCoords={
     activeLiveOrder?.dropoffCoord
       ? { latitude: activeLiveOrder.dropoffCoord.lat, longitude: activeLiveOrder.dropoffCoord.lng }
