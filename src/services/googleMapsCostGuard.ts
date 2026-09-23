@@ -1,6 +1,7 @@
 /**
- * Client-side Google Maps request guard.
- * Real Google Routes/Places remain enabled, but duplicate/burst requests are cached and throttled.
+ * Compatibility request guard for location/public-data endpoints.
+ * The guarded endpoints no longer require Google Maps/Places/Routes API keys;
+ * caching and burst throttling are retained to protect our server and public sources.
  */
 type CacheEntry = { expiresAt: number; response: Response };
 const CACHE_TTL_MS = 120_000;
@@ -9,7 +10,7 @@ const MAX_REQUESTS_PER_WINDOW = 6;
 const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<Response>>();
 const windowCounts = new Map<string, { startedAt: number; count: number }>();
-const GOOGLE_BACKED_PATHS = new Set([
+const LOCATION_DATA_PATHS = new Set([
   '/api/routes/compute', '/api/places/resolve-routes', '/api/radar/nearby-places',
   '/api/pet-care/nearby', '/api/emergency/nearby',
 ]);
@@ -28,7 +29,7 @@ export function installGoogleMapsCostGuard(): void {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     let pathname = '';
     try { pathname = new URL(url, window.location.href).pathname; } catch { return originalFetch(input, init); }
-    if (!GOOGLE_BACKED_PATHS.has(pathname)) return originalFetch(input, init);
+    if (!LOCATION_DATA_PATHS.has(pathname)) return originalFetch(input, init);
     const key = requestKey(input, init);
     const now = Date.now();
     const cached = cache.get(key);
@@ -39,7 +40,7 @@ export function installGoogleMapsCostGuard(): void {
     const bucket = windowCounts.get(pathname);
     if (!bucket || now - bucket.startedAt >= WINDOW_MS) windowCounts.set(pathname, { startedAt: now, count: 1 });
     else if (bucket.count >= MAX_REQUESTS_PER_WINDOW) {
-      return new Response(JSON.stringify({ error: 'REQUEST_GUARDED', message: 'ระบบหยุดการเรียก Maps ซ้ำชั่วคราว' }), { status: 429, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'REQUEST_GUARDED', message: 'ระบบหยุดการเรียกข้อมูลตำแหน่งซ้ำชั่วคราว' }), { status: 429, headers: { 'Content-Type': 'application/json' } });
     } else bucket.count += 1;
     const promise = originalFetch(input, init).then((response) => {
       if (response.ok) cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, response: cloneResponse(response) });

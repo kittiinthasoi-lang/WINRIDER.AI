@@ -76,7 +76,12 @@ export const WinBuddyModal: React.FC<Props> = ({ isOpen, onClose, audioEnabled }
         body: JSON.stringify({ message: textToSend })
       });
       const data = await res.json();
-      const reply = data.reply || 'รับทราบสัญญาณครับท่านอัศวิน WIN Buddy กำลังดำเนินการ';
+      let reply = data.reply || 'รับทราบสัญญาณครับท่านอัศวิน';
+      if (data.externalOnly) {
+        try { await navigator.clipboard?.writeText(String(data.prompt || textToSend)); } catch {}
+        const links = Array.isArray(data.providers) ? data.providers.map((p: any) => `${p.name}: ${p.url}`).join('\n') : '';
+        reply = `WIN Buddy ไม่ส่งคำถามไป AI provider ภายในระบบและไม่ใช้ API key\nคัดลอก Prompt ให้แล้ว:\n${links}`;
+      }
 
       setMessages(prev => [...prev, { sender: 'buddy', text: reply, time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) }]);
       if (audioEnabled) speakThaiText(reply, 'knight_bold');

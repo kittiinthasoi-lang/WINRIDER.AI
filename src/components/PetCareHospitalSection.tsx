@@ -49,7 +49,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
     if (!geo.isRealGps) return;
     if (!force && geo.latitude !== null && geo.longitude !== null && canReusePetCareScan(geo.latitude, geo.longitude)) {
       setPlaces(petCareScanCache?.data.places || []);
-      setSource(petCareScanCache?.data.source || 'Google Maps Platform');
+      setSource(petCareScanCache?.data.source || 'WIN Public Data + OpenStreetMap');
       setFetchedAt(petCareScanCache?.data.fetchedAt || new Date().toISOString());
       return;
     }
@@ -69,7 +69,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
       const data = await response.json() as NearbyPetCareResponse;
       if (!response.ok) throw new Error(data.error || 'โหลดข้อมูลสถานพยาบาลสัตว์จริงไม่สำเร็จ');
       setPlaces(Array.isArray(data.places) ? data.places : []);
-      setSource(data.source || 'Google Maps Platform');
+      setSource(data.source || 'WIN Public Data + OpenStreetMap');
       setFetchedAt(data.fetchedAt || new Date().toISOString());
       petCareScanCache = { latitude: geo.latitude as number, longitude: geo.longitude as number, fetchedAt: Date.now(), data };
     } catch (error) {
@@ -106,7 +106,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
             <div>
               <p className="text-[10px] font-bold uppercase text-amber-300">WIN-Pet Care • Live Nearby Search</p>
               <h3 className="text-base font-black text-white">โรงพยาบาลและคลินิกรักษาสัตว์ใกล้ตำแหน่งปัจจุบัน</h3>
-              <p className="mt-1 text-xs text-slate-300">รายชื่อจาก Google Places • ระยะเส้นตรงโดยประมาณ (Google Routes ปิดชั่วคราว)</p>
+              <p className="mt-1 text-xs text-slate-300">รายชื่อจาก Public Data + OpenStreetMap • ระยะเส้นตรงโดยประมาณ (Google Routes ปิดชั่วคราว)</p>
             </div>
           </div>
           <button type="button" onClick={() => setShowEmergencyTips((value) => !value)} className="rounded-xl border border-rose-500/40 bg-rose-500/15 px-3 py-2 text-xs font-bold text-rose-200">
@@ -156,7 +156,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
         ))}
       </div>
 
-      {loading && <div className="rounded-2xl border border-amber-400/20 bg-black/30 p-8 text-center text-sm text-amber-200"><Loader2 className="mx-auto mb-2 h-7 w-7 animate-spin" />กำลังค้นหาสถานพยาบาลจาก Google Places…</div>}
+      {loading && <div className="rounded-2xl border border-amber-400/20 bg-black/30 p-8 text-center text-sm text-amber-200"><Loader2 className="mx-auto mb-2 h-7 w-7 animate-spin" />กำลังค้นหาสถานพยาบาลจาก Public Data + OpenStreetMap…</div>}
       {!loading && errorMessage && <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-100"><AlertCircle className="mr-2 inline h-5 w-5" />{errorMessage}<p className="mt-1 text-xs text-slate-400">ระบบจะไม่แสดงรายชื่อหรือระยะทางจำลองแทนข้อมูลจริง</p></div>}
       {!loading && geo.isRealGps && !errorMessage && places.length === 0 && <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-slate-300">ไม่พบสถานพยาบาลสัตว์ในรัศมี 15 กิโลเมตรจากตำแหน่งปัจจุบัน</div>}
 
@@ -175,7 +175,7 @@ export const PetCareHospitalSection: React.FC<PetCareHospitalSectionProps> = ({
                       {hospital.openNow !== null && <span className={`rounded-full px-2 py-0.5 ${hospital.openNow ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-500/20 text-slate-300'}`}>{hospital.openNow ? 'เปิดอยู่' : 'ปิดอยู่'}</span>}
                     </div>
                     <h4 className="mt-1 text-sm font-bold text-white">{hospital.name}</h4>
-                    <p className="mt-1 text-[11px] text-slate-400"><MapPin className="mr-1 inline h-3 w-3 text-amber-300" />{hospital.address || 'ดูที่อยู่บน Google Maps'}</p>
+                    <p className="mt-1 text-[11px] text-slate-400"><MapPin className="mr-1 inline h-3 w-3 text-amber-300" />{hospital.address || 'ดูที่อยู่บน แผนที่ภายนอก'}</p>
                   </div>
                 </div>
                 <div className="shrink-0 text-right text-xs">

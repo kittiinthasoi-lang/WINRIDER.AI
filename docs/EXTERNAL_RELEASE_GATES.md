@@ -61,6 +61,6 @@ Before launch:
 - perform a backup + restore drill and record recovery time/results
 - enable production monitoring and alerts
 - review privacy notice, consent, data-retention/deletion policy, and incident retention
-- confirm deployment environment provides `VITE_FIREBASE_API_KEY` and other required Firebase/Maps secrets without committing them to Git
+- confirm deployment environment provides required Firebase configuration (including `VITE_FIREBASE_API_KEY`) without committing private service credentials to Git; public maps/navigation require no Maps API key
 
 The system should not be labelled production-ready until these gates have evidence attached to the release.

@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ExternalLink, MapPin, Navigation, Route, X } from 'lucide-react';
 import { useRealtimeGps } from './GpsRealTimeTracker';
 import { ComputedLiveRoute } from '../services/googleRoutesService';
 import { playTactileBlip } from '../utils/audio';
+import { auth } from '../firebase';
+import { WinLiveLocationBoard, WinLocationPoint } from './WinLiveLocationBoard';
 
 export type NavigationRole = 'customer' | 'driver';
 export type NavigationPhase = 'approaching' | 'in_transit' | 'completed';
@@ -10,6 +12,8 @@ export type NavigationPhase = 'approaching' | 'in_transit' | 'completed';
 export interface NavigationProps {
   role?: NavigationRole;
   initialPhase?: NavigationPhase;
+  rideId?: string;
+  driverUserId?: string;
   driverName?: string;
   driverAvatar?: string;
   driverPlate?: string;
@@ -30,16 +34,39 @@ export interface NavigationProps {
   onOpenChat?: () => void;
 }
 
-/**
- * Navigation reference screen.
- * No Google Maps/Mapbox JavaScript, iframe, tiles, or browser API key is used.
- * The screen shows live GPS + destination + route state; street navigation
- * opens Google Maps externally.
- */
+type LiveLocations = {
+  driver?: { lat: number; lng: number; timestamp?: string | null } | null;
+  passenger?: { lat: number; lng: number; timestamp?: string | null } | null;
+  destination?: { lat: number; lng: number } | null;
+  status?: string;
+};
+
+const validCoord = (coord?: { lat: number; lng: number } | null) =>
+  Boolean(coord && Number.isFinite(coord.lat) && Number.isFinite(coord.lng) && Math.abs(coord.lat) <= 90 && Math.abs(coord.lng) <= 180 && (coord.lat !== 0 || coord.lng !== 0));
+
+const haversineKm = (a?: { lat: number; lng: number } | null, b?: { lat: number; lng: number } | null) => {
+  if (!validCoord(a) || !validCoord(b)) return null;
+  const r = 6371;
+  const dLat = ((b!.lat - a!.lat) * Math.PI) / 180;
+  const dLng = ((b!.lng - a!.lng) * Math.PI) / 180;
+  const x = Math.sin(dLat / 2) ** 2
+    + Math.cos((a!.lat * Math.PI) / 180) * Math.cos((b!.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return r * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+};
+
+const googleUrl = (destination: { lat: number; lng: number }, origin?: { lat: number; lng: number } | null) =>
+  `https://www.google.com/maps/dir/?api=1${validCoord(origin) ? `&origin=${origin!.lat},${origin!.lng}` : ''}&destination=${destination.lat},${destination.lng}&travelmode=driving`;
+const appleUrl = (destination: { lat: number; lng: number }, origin?: { lat: number; lng: number } | null) =>
+  `https://maps.apple.com/?daddr=${destination.lat},${destination.lng}${validCoord(origin) ? `&saddr=${origin!.lat},${origin!.lng}` : ''}&dirflg=d`;
+const wazeUrl = (destination: { lat: number; lng: number }) =>
+  `https://www.waze.com/ul?ll=${destination.lat}%2C${destination.lng}&navigate=yes`;
+
 export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
   role = 'customer',
   initialPhase = 'approaching',
-  driverName = 'ยังไม่มีข้อมูลพี่วิน',
+  rideId,
+  driverName = 'พี่วิน',
+  passengerName = 'ลูกค้า',
   pickupAddress = '',
   pickupCoords = { lat: 0, lng: 0 },
   dropoffAddress = '',
@@ -50,91 +77,111 @@ export const GoogleMapsNavigationScreen: React.FC<NavigationProps> = ({
   onClose,
 }) => {
   const { gpsState } = useRealtimeGps(true);
-  const [route, setRoute] = useState<ComputedLiveRoute | null>(null);
-  const [routeStatus, setRouteStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+  const [live, setLive] = useState<LiveLocations>({});
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'live' | 'unavailable'>('idle');
 
-  const destination = initialPhase === 'approaching' ? pickupCoords : dropoffCoords;
-  const destinationAddress = initialPhase === 'approaching' ? pickupAddress : dropoffAddress;
-  const hasDestination = Number.isFinite(destination.lat) && Number.isFinite(destination.lng) && destination.lat !== 0 && destination.lng !== 0;
-  const hasGps = Number.isFinite(gpsState.latitude) && Number.isFinite(gpsState.longitude) && Boolean(gpsState.latitude && gpsState.longitude);
+  const own = useMemo(
+    () => gpsState.isRealGps && Number.isFinite(gpsState.latitude) && Number.isFinite(gpsState.longitude)
+      ? { lat: Number(gpsState.latitude), lng: Number(gpsState.longitude) }
+      : null,
+    [gpsState.isRealGps, gpsState.latitude, gpsState.longitude],
+  );
+
+  const sync = useCallback(async () => {
+    if (!rideId || !auth.currentUser) return;
+    const token = await auth.currentUser.getIdToken();
+    try {
+      setSyncStatus('syncing');
+      if (validCoord(own)) {
+        await fetch(`/api/orders/${encodeURIComponent(rideId)}/location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            latitude: own!.lat,
+            longitude: own!.lng,
+            accuracyMeters: gpsState.accuracy,
+            heading: gpsState.heading,
+            speedMps: typeof gpsState.speed === 'number' ? gpsState.speed / 3.6 : undefined,
+          }),
+        }).catch(() => undefined);
+      }
+      const response = await fetch(`/api/orders/${encodeURIComponent(rideId)}/locations`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      });
+      if (!response.ok) throw new Error('location unavailable');
+      setLive(await response.json());
+      setSyncStatus('live');
+    } catch {
+      setSyncStatus('unavailable');
+    }
+  }, [rideId, own?.lat, own?.lng, gpsState.accuracy, gpsState.heading, gpsState.speed]);
 
   useEffect(() => {
-    let cancelled = false;
-    const loadRoute = async () => {
-      if (!hasGps || !hasDestination) { setRoute(null); setRouteStatus('idle'); onRouteUpdate?.(null); return; }
-      setRouteStatus('loading');
-      try {
-        const response = await fetch('/api/routes/compute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ origin: { lat: gpsState.latitude, lng: gpsState.longitude }, destination: { lat: destination.lat, lng: destination.lng }, travelMode: 'TWO_WHEELER' }),
-        });
-        const text = await response.text();
-        if (!response.ok || !text.trim()) throw new Error('route unavailable');
-        let payload: any;
-        try { payload = JSON.parse(text); } catch { throw new Error('route response invalid'); }
-        const next = payload?.route || payload;
-        if (!next || next.success === false) throw new Error('route unavailable');
-        if (!cancelled) { setRoute(next as ComputedLiveRoute); setRouteStatus('ready'); onRouteUpdate?.(next as ComputedLiveRoute); }
-      } catch {
-        if (!cancelled) { setRoute(null); setRouteStatus('unavailable'); onRouteUpdate?.(null); }
-      }
-    };
-    void loadRoute();
-    return () => { cancelled = true; };
-  }, [hasGps, hasDestination, gpsState.latitude, gpsState.longitude, destination.lat, destination.lng, onRouteUpdate]);
+    if (!rideId) return;
+    void sync();
+    const timer = window.setInterval(() => void sync(), 5000);
+    return () => window.clearInterval(timer);
+  }, [rideId, sync]);
 
-  const openGoogleMaps = () => {
-    if (!hasDestination) return;
+  useEffect(() => { onRouteUpdate?.(null); }, [onRouteUpdate]);
+
+  const driverCoord = role === 'driver' ? own : (live.driver || null);
+  const passengerCoord = role === 'customer'
+    ? own
+    : (live.passenger || (validCoord(pickupCoords) ? pickupCoords : null));
+  const destinationCoord = validCoord(live.destination || null)
+    ? live.destination!
+    : (validCoord(dropoffCoords) ? dropoffCoords : null);
+
+  const pointA: WinLocationPoint | null = validCoord(driverCoord)
+    ? { lat: driverCoord!.lat, lng: driverCoord!.lng, label: driverName || 'พี่วิน', detail: role === 'driver' ? 'ตำแหน่งของคุณ' : 'ตำแหน่งพี่วินล่าสุด' }
+    : null;
+  const pointB: WinLocationPoint | null = validCoord(passengerCoord)
+    ? { lat: passengerCoord!.lat, lng: passengerCoord!.lng, label: passengerName || 'ลูกค้า / จุดรับ', detail: pickupAddress || 'จุดรับ' }
+    : null;
+  const pointC: WinLocationPoint | null = destinationCoord
+    ? { lat: destinationCoord.lat, lng: destinationCoord.lng, label: 'ปลายทาง', detail: dropoffAddress || 'จุดส่ง' }
+    : null;
+
+  const ab = haversineKm(driverCoord, passengerCoord);
+  const bc = haversineKm(passengerCoord, destinationCoord);
+  const target = role === 'driver' && initialPhase === 'approaching'
+    ? (validCoord(passengerCoord) ? passengerCoord! : pickupCoords)
+    : (destinationCoord || dropoffCoords);
+  const targetReady = validCoord(target);
+
+  const open = (url: string) => {
     if (audioEnabled) playTactileBlip(900);
-    const origin = hasGps ? `&origin=${gpsState.latitude},${gpsState.longitude}` : '';
-    const url = `https://www.google.com/maps/dir/?api=1${origin}&destination=${destination.lat},${destination.lng}&travelmode=two-wheeler`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const googleSearchUrl = hasDestination
-    ? `https://www.google.com/maps/search/?api=1&query=${destination.lat},${destination.lng}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinationAddress || 'ประเทศไทย')}`;
-
-  const distanceText = route && Number.isFinite(Number((route as any).totalDistanceMeters)) ? `${(Number((route as any).totalDistanceMeters) / 1000).toFixed(1)} กม.` : 'ยังไม่มีเส้นทาง Google';
-  const durationText = route && Number.isFinite(Number((route as any).totalDurationSeconds)) ? `${Math.max(1, Math.round(Number((route as any).totalDurationSeconds) / 60))} นาที` : 'เปิด Google Maps เพื่อดู ETA ถนนจริง';
-
-  return (
-    <div className="relative w-full min-h-[520px] overflow-hidden rounded-3xl border border-emerald-500/30 bg-[#07111f] text-white">
-      <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-4">
-        <div><div className="flex items-center gap-2 text-xs font-black text-emerald-300"><Navigation className="h-4 w-4" /> {role === 'driver' ? 'หน้าจอนำทางพี่วิน' : 'หน้าจอรอรถลูกค้า'}</div><h2 className="mt-1 text-sm font-bold">{destinationAddress || 'ยังไม่ได้ระบุปลายทาง'}</h2></div>
-        {onClose && <button onClick={onClose} className="rounded-xl border border-white/10 p-2"><X className="h-4 w-4" /></button>}
+  return <div className="relative w-full overflow-hidden rounded-3xl border border-cyan-400/25 bg-[#07111f] text-white">
+    <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-4">
+      <div>
+        <div className="flex items-center gap-2 text-xs font-black text-cyan-300"><Navigation className="h-4 w-4" /> WIN Live Location</div>
+        <h2 className="mt-1 text-sm font-bold">{role === 'driver' ? 'A คุณ • B ลูกค้า • C ปลายทาง' : 'A พี่วิน • B คุณ • C ปลายทาง'}</h2>
       </div>
-
-      <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_center,rgba(34,211,238,.14),transparent_55%)] p-6">
-        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-        <div className="relative z-10 w-full max-w-md rounded-3xl border border-cyan-400/20 bg-[#081526]/95 p-5 shadow-2xl backdrop-blur">
-          <div className="relative h-44 overflow-hidden rounded-2xl border border-white/10 bg-[#0A1830]">
-            <div className="absolute inset-0 opacity-25" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
-            <div className="absolute left-[18%] top-[72%] flex items-center gap-1 rounded-full border border-cyan-300/40 bg-cyan-400/15 px-2 py-1 text-[8px] font-bold text-cyan-200"><span className="h-2 w-2 rounded-full bg-cyan-300" />GPS</div>
-            <div className="absolute right-[18%] top-[22%] flex items-center gap-1 rounded-full border border-amber-300/40 bg-amber-400/15 px-2 py-1 text-[8px] font-bold text-amber-200"><MapPin className="h-3 w-3" />ปลายทาง</div>
-            <div className="absolute left-[25%] top-[55%] h-1 w-[50%] -rotate-[28deg] rounded-full bg-cyan-400/50" />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-3"><div className="text-[9px] text-slate-500">ระยะทาง</div><div className="mt-1 text-sm font-black text-cyan-300">{distanceText}</div></div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-3"><div className="text-[9px] text-slate-500">ETA</div><div className="mt-1 text-sm font-black text-emerald-300">{durationText}</div></div>
-          </div>
-          <div className="mt-3 flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 p-3 text-[10px]">
-            <span className={hasGps ? 'text-emerald-300' : 'text-amber-300'}>{hasGps ? 'GPS จริงพร้อมใช้งาน' : 'กำลังรอ GPS จริง'}</span>
-            <span className={routeStatus === 'ready' ? 'text-cyan-300' : routeStatus === 'loading' ? 'text-amber-300' : 'text-slate-500'}>{routeStatus === 'ready' ? 'Google Route พร้อม' : routeStatus === 'loading' ? 'กำลังคำนวณเส้นทาง…' : 'เส้นทางจะเปิดใน Google Maps'}</span>
-          </div>
-          <p className="mt-3 text-center text-[9px] text-slate-500">ภาพในกรอบนี้เป็นแผงอ้างอิงของ WINRIDER.AI ไม่ใช่แผนที่ provider อื่น • การนำทางถนนจริงเปิด Google Maps ภายนอก</p>
-        </div>
-      </div>
-
-      <div className="grid gap-2 border-t border-white/10 bg-black/20 p-4 sm:grid-cols-2">
-        <button onClick={openGoogleMaps} disabled={!hasDestination} className="rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"><ExternalLink className="mr-2 inline h-4 w-4" />เปิดนำทาง Google Maps</button>
-        <a href={googleSearchUrl} target="_blank" rel="noreferrer" className="rounded-2xl border border-white/10 px-4 py-3 text-center text-xs font-black text-white"><Route className="mr-2 inline h-4 w-4" />เปิดสถานที่ภายนอก</a>
-      </div>
-      {driverName && role === 'driver' && <p className="px-4 pb-3 text-center text-[10px] text-slate-500">บัญชีพี่วิน: {driverName} • GPS จริง • ไม่ฝัง Google Maps ในแอป</p>}
-      {fareBaht > 0 && <p className="px-4 pb-4 text-center text-xs text-slate-400">ค่าโดยสารที่ระบบคำนวณไว้: ฿{fareBaht.toLocaleString('th-TH')}</p>}
+      {onClose && <button onClick={onClose} className="rounded-xl border border-white/10 p-2"><X className="h-4 w-4" /></button>}
     </div>
-  );
+
+    <div className="p-4">
+      <WinLiveLocationBoard pointA={pointA} pointB={pointB} pointC={pointC} />
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-3"><div className="text-[9px] text-slate-500">A → B</div><div className="mt-1 text-sm font-black text-cyan-300">{ab !== null ? `${ab.toFixed(2)} กม.` : 'รอพิกัด'}</div></div>
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-3"><div className="text-[9px] text-slate-500">B → C</div><div className="mt-1 text-sm font-black text-amber-300">{bc !== null ? `${bc.toFixed(2)} กม.` : 'รอพิกัด'}</div></div>
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-3"><div className="text-[9px] text-slate-500">Live sync</div><div className={`mt-1 text-xs font-black ${syncStatus === 'live' ? 'text-emerald-300' : syncStatus === 'unavailable' ? 'text-rose-300' : 'text-slate-300'}`}>{rideId ? (syncStatus === 'live' ? 'ตำแหน่งสด' : syncStatus === 'syncing' ? 'กำลังอัปเดต' : syncStatus === 'unavailable' ? 'เชื่อมต่อไม่ได้' : 'กำลังเริ่ม') : 'รอสร้างงาน'}</div></div>
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-3"><div className="text-[9px] text-slate-500">Map API key</div><div className="mt-1 text-sm font-black text-emerald-300">ไม่ใช้</div></div>
+      </div>
+      <p className="mt-3 text-center text-[9px] text-slate-500">เส้น A-B-C เป็นตำแหน่งอ้างอิงสด ไม่ใช่เส้นถนน • Traffic/turn-by-turn เปิดในแอปภายนอก</p>
+    </div>
+
+    <div className="grid gap-2 border-t border-white/10 bg-black/20 p-4 sm:grid-cols-3">
+      <button disabled={!targetReady} onClick={() => targetReady && open(googleUrl(target, own))} className="rounded-2xl bg-emerald-500 px-4 py-3 text-xs font-black text-slate-950 disabled:opacity-40"><ExternalLink className="mr-2 inline h-4 w-4" />Google Maps</button>
+      <button disabled={!targetReady} onClick={() => targetReady && open(appleUrl(target, own))} className="rounded-2xl border border-white/10 px-4 py-3 text-xs font-black disabled:opacity-40"><MapPin className="mr-2 inline h-4 w-4" />Apple Maps</button>
+      <button disabled={!targetReady} onClick={() => targetReady && open(wazeUrl(target))} className="rounded-2xl border border-white/10 px-4 py-3 text-xs font-black disabled:opacity-40"><Route className="mr-2 inline h-4 w-4" />Waze</button>
+    </div>
+    {fareBaht > 0 && <p className="px-4 pb-4 text-center text-xs text-slate-400">ค่าโดยสาร: ฿{fareBaht.toLocaleString('th-TH')}</p>}
+  </div>;
 };
 
 export default GoogleMapsNavigationScreen;

@@ -3,7 +3,6 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
@@ -14,9 +13,6 @@ import { parseQrPayload } from "./src/utils/qrPayload";
 dotenv.config();
 
 const app = express();
-
-// Google Maps Platform is used server-side only. API credentials remain in server env secrets.
-// The browser never receives GOOGLE_MAPS_API_KEY.
 
 // In AI Studio and Cloud Run sandboxed environments, nginx routes external
 // traffic exclusively to port 3000. Port 3000 is hardcoded by infrastructure.
@@ -138,23 +134,197 @@ setInterval(() => {
   }
 }, RATE_WINDOW_MS).unref();
 
-// Lazy initialization of GoogleGenAI
-let aiClient: GoogleGenAI | null = null;
-function getAiClient(): GoogleGenAI | null {
-  if (!process.env.GEMINI_API_KEY) {
-    return null;
+type PublicPlacePreset = "radar" | "pet" | "emergency";
+type PublicPlace = {
+  id: string;
+  name: string;
+  category: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  phone: string;
+  distanceKm: number;
+  placeGroup: "shop" | "transport" | "faith" | "community";
+  source: string;
+  sourceUrl?: string;
+  externalMapUrl: string;
+};
+
+const publicPlaceCache = new Map<string, { expiresAt: number; places: PublicPlace[] }>();
+const PUBLIC_PLACE_CACHE_MS = 5 * 60 * 1000;
+
+function localDistanceKm(originLat: number, originLng: number, destLat: number, destLng: number): number {
+  const r = 6371;
+  const toRad = (value: number) => value * Math.PI / 180;
+  const dLat = toRad(destLat - originLat);
+  const dLng = toRad(destLng - originLng);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(originLat)) * Math.cos(toRad(destLat)) * Math.sin(dLng / 2) ** 2;
+  return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function externalMapUrl(latitude: number, longitude: number): string {
+  return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(latitude + "," + longitude);
+}
+
+function classifyPublicPlace(tags: Record<string, string>, preset: PublicPlacePreset) {
+  const amenity = String(tags.amenity || "");
+  const shop = String(tags.shop || "");
+  const tourism = String(tags.tourism || "");
+  const publicTransport = String(tags.public_transport || "");
+  if (preset === "pet") return { category: "veterinary", placeGroup: "community" as const };
+  if (preset === "emergency") {
+    if (amenity === "police") return { category: "police", placeGroup: "community" as const };
+    if (amenity === "fire_station") return { category: "fire_station", placeGroup: "community" as const };
+    return { category: amenity || "hospital", placeGroup: "community" as const };
   }
-  if (!aiClient) {
-    aiClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
+  if (amenity === "place_of_worship") return { category: "place_of_worship", placeGroup: "faith" as const };
+  if (["bus_station", "ferry_terminal"].includes(amenity) || publicTransport) return { category: amenity || publicTransport, placeGroup: "transport" as const };
+  if (shop || ["restaurant", "cafe", "fast_food", "marketplace"].includes(amenity)) return { category: shop || amenity || "shop", placeGroup: "shop" as const };
+  if (tourism) return { category: tourism, placeGroup: "community" as const };
+  return { category: amenity || "community", placeGroup: "community" as const };
+}
+
+async function loadOpenStreetMapPlaces(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  preset: PublicPlacePreset,
+): Promise<PublicPlace[]> {
+  const radius = Math.min(20_000, Math.max(500, Math.round(radiusMeters)));
+  const around = "(around:" + radius + "," + latitude + "," + longitude + ")";
+  const body = preset === "pet"
+    ? 'nwr' + around + '["amenity"="veterinary"];'
+    : preset === "emergency"
+      ? 'nwr' + around + '["amenity"~"^(hospital|clinic|police|fire_station)$"];'
+      : [
+          'nwr' + around + '["shop"];',
+          'nwr' + around + '["amenity"~"^(restaurant|cafe|fast_food|marketplace|school|college|university|hospital|clinic|place_of_worship|bus_station|ferry_terminal)$"];',
+          'nwr' + around + '["tourism"~"^(hotel|guest_house|attraction|museum)$"];',
+          'nwr' + around + '["public_transport"];',
+        ].join("");
+  const query = "[out:json][timeout:12];(" + body + ");out center tags 100;";
+  const response = await fetch("https://overpass-api.de/api/interpreter", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      "User-Agent": "WINRIDER.AI/1.0 (public-data directory; no API key)",
+      Accept: "application/json",
+    },
+    body: new URLSearchParams({ data: query }).toString(),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error("OPENSTREETMAP_OVERPASS_" + response.status);
+  const payload = await response.json() as { elements?: any[] };
+  return (payload.elements || []).flatMap((element: any): PublicPlace[] => {
+    const lat = Number(element.lat ?? element.center?.lat);
+    const lng = Number(element.lon ?? element.center?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+    const tags = (element.tags || {}) as Record<string, string>;
+    const name = String(tags["name:th"] || tags.name || tags["name:en"] || "").trim();
+    if (!name) return [];
+    const classified = classifyPublicPlace(tags, preset);
+    const address = [
+      tags["addr:housenumber"],
+      tags["addr:street"],
+      tags["addr:subdistrict"],
+      tags["addr:district"],
+      tags["addr:province"],
+    ].filter(Boolean).join(" ");
+    const distanceKm = Math.round(localDistanceKm(latitude, longitude, lat, lng) * 100) / 100;
+    return [{
+      id: "osm-" + String(element.type || "node") + "-" + String(element.id),
+      name,
+      category: classified.category,
+      address,
+      latitude: lat,
+      longitude: lng,
+      phone: String(tags.phone || tags["contact:phone"] || ""),
+      distanceKm,
+      placeGroup: classified.placeGroup,
+      source: "OpenStreetMap contributors",
+      sourceUrl: "https://www.openstreetmap.org/" + String(element.type || "node") + "/" + String(element.id),
+      externalMapUrl: externalMapUrl(lat, lng),
+    }];
+  });
+}
+
+async function loadStoredPublicPlaces(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  preset: PublicPlacePreset,
+): Promise<PublicPlace[]> {
+  try {
+    const snapshot = await ordersDb.collection("publicDataRecords").where("sourceDriven", "==", true).limit(500).get();
+    const radiusKm = radiusMeters / 1000;
+    return snapshot.docs.flatMap((doc): PublicPlace[] => {
+      const record: any = doc.data() || {};
+      if (record.publicVisible !== true) return [];
+      const lat = Number(record.latitude ?? record.lat);
+      const lng = Number(record.longitude ?? record.lng ?? record.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+      const name = String(record.name || record.title || "").trim();
+      if (!name) return [];
+      const haystack = [record.kind, record.category, record.name, record.title, record.description].map((v) => String(v || "").toLowerCase()).join(" ");
+      if (preset === "pet" && !/(สัตว์|veterinary|animal|pet)/i.test(haystack)) return [];
+      if (preset === "emergency" && !/(โรงพยาบาล|คลินิก|ตำรวจ|ดับเพลิง|hospital|clinic|police|fire)/i.test(haystack)) return [];
+      const distanceKm = Math.round(localDistanceKm(latitude, longitude, lat, lng) * 100) / 100;
+      if (distanceKm > radiusKm) return [];
+      const placeGroup = /restaurant|cafe|market|shop|ร้าน|อาหาร|คาเฟ่/i.test(haystack)
+        ? "shop" as const
+        : /temple|church|mosque|shrine|วัด|โบสถ์|มัสยิด|ศาลเจ้า/i.test(haystack)
+          ? "faith" as const
+          : /station|transport|bus|ferry|สถานี|ท่าเรือ/i.test(haystack)
+            ? "transport" as const
+            : "community" as const;
+      return [{
+        id: "public-" + doc.id,
+        name,
+        category: String(record.category || record.kind || "public_data"),
+        address: [record.address, record.district, record.province].filter(Boolean).join(" "),
+        latitude: lat,
+        longitude: lng,
+        phone: String(record.phone || record.telephone || ""),
+        distanceKm,
+        placeGroup,
+        source: String(record.sourceName || record.source || "WIN Public Data"),
+        sourceUrl: String(record.sourceUrl || record.sourceDatasetUrl || "") || undefined,
+        externalMapUrl: externalMapUrl(lat, lng),
+      }];
     });
+  } catch (error: any) {
+    console.warn("[Public Data Places]", error?.message);
+    return [];
   }
-  return aiClient;
+}
+
+async function loadFreePublicPlaces(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  preset: PublicPlacePreset,
+): Promise<PublicPlace[]> {
+  const cacheKey = [preset, latitude.toFixed(3), longitude.toFixed(3), Math.round(radiusMeters / 1000)].join(":");
+  const cached = publicPlaceCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.places;
+
+  const stored = await loadStoredPublicPlaces(latitude, longitude, radiusMeters, preset);
+  let osm: PublicPlace[] = [];
+  try {
+    osm = await loadOpenStreetMapPlaces(latitude, longitude, radiusMeters, preset);
+  } catch (error: any) {
+    console.warn("[OpenStreetMap Public Places]", error?.message);
+  }
+
+  const deduped = new Map<string, PublicPlace>();
+  for (const place of [...stored, ...osm]) {
+    const key = (place.name.toLowerCase().replace(/\s+/g, " ").trim()) + ":" + place.latitude.toFixed(4) + ":" + place.longitude.toFixed(4);
+    if (!deduped.has(key)) deduped.set(key, place);
+  }
+  const places = [...deduped.values()].sort((a, b) => a.distanceKm - b.distanceKm).slice(0, preset === "radar" ? 80 : 30);
+  publicPlaceCache.set(cacheKey, { expiresAt: Date.now() + PUBLIC_PLACE_CACHE_MS, places });
+  return places;
 }
 
 // Health check endpoints (Cloud Run, Kubernetes, AI Studio probes)
@@ -167,61 +337,42 @@ app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]),
   if (!user) return;
   const latitude = Number(req.body?.latitude);
   const longitude = Number(req.body?.longitude);
-  const radiusMeters = Math.min(50_000, Math.max(1_000, Number(req.body?.radiusMeters) || 15_000));
-  const validCoord = Number.isFinite(latitude) && Number.isFinite(longitude)
-    && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
-  if (!validCoord) return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง" });
-  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
-    return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY สำหรับข้อมูลสถานที่จริง", places: [] });
+  const radiusMeters = Math.min(20_000, Math.max(1_000, Number(req.body?.radiusMeters) || 15_000));
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง", places: [] });
   }
   try {
-    const placesResponse = await googleFetch("places", "https://places.googleapis.com/v1/places:searchNearby", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": [
-          "places.id", "places.displayName", "places.formattedAddress", "places.location",
-          "places.rating", "places.userRatingCount", "places.nationalPhoneNumber",
-          "places.regularOpeningHours", "places.currentOpeningHours.openNow", "places.googleMapsUri"
-        ].join(","),
-      },
-      body: JSON.stringify({
-        includedTypes: ["veterinary_care"], maxResultCount: 20, rankPreference: "DISTANCE",
-        languageCode: "th", regionCode: "TH",
-        locationRestriction: { circle: { center: { latitude, longitude }, radius: radiusMeters } },
-      }),
-      signal: AbortSignal.timeout(12_000),
+    const raw = await loadFreePublicPlaces(latitude, longitude, radiusMeters, "pet");
+    const places = raw.map((place) => ({
+      id: place.id,
+      name: place.name,
+      address: place.address,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      distanceKm: place.distanceKm,
+      etaMinutes: null,
+      phoneNumber: place.phone,
+      rating: null,
+      reviewsCount: 0,
+      openNow: null,
+      openHours: [],
+      is24Hours: false,
+      googleMapsUri: place.externalMapUrl,
+      externalMapUrl: place.externalMapUrl,
+      sourceName: place.source,
+      sourceUrl: place.sourceUrl,
+      routeSource: "straight_line_public_data",
+    }));
+    return res.json({
+      places,
+      source: "WIN Public Data + OpenStreetMap contributors",
+      freePublicData: true,
+      origin: { latitude, longitude },
+      fetchedAt: new Date().toISOString(),
     });
-    if (!placesResponse.ok) return res.status(502).json({ error: "ดึงข้อมูลโรงพยาบาลและคลินิกจริงจาก Google Places ไม่สำเร็จ", places: [] });
-    const payload = await placesResponse.json() as { places?: any[] };
-    const toRadians = (degrees: number) => degrees * Math.PI / 180;
-    const straightLineMeters = (lat: number, lng: number) => {
-      const earthRadius = 6_371_000;
-      const dLat = toRadians(lat - latitude), dLng = toRadians(lng - longitude);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(latitude)) * Math.cos(toRadians(lat)) * Math.sin(dLng / 2) ** 2;
-      return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
-    const places = (Array.isArray(payload.places) ? payload.places : [])
-      .filter((place) => place?.id && place?.displayName?.text && Number.isFinite(place?.location?.latitude) && Number.isFinite(place?.location?.longitude))
-      .map((place) => {
-        const distanceKm = Math.round(straightLineMeters(Number(place.location.latitude), Number(place.location.longitude)) / 100) / 10;
-        return {
-          id: String(place.id), name: String(place.displayName.text), address: String(place.formattedAddress || ""),
-          latitude: Number(place.location.latitude), longitude: Number(place.location.longitude),
-          distanceKm, etaMinutes: Math.max(1, Math.ceil((distanceKm / 0.35))),
-          phoneNumber: String(place.nationalPhoneNumber || ""), rating: Number.isFinite(place.rating) ? Number(place.rating) : null,
-          reviewsCount: Number.isFinite(place.userRatingCount) ? Number(place.userRatingCount) : 0,
-          openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
-          openHours: Array.isArray(place.regularOpeningHours?.weekdayDescriptions) ? place.regularOpeningHours.weekdayDescriptions : [],
-          is24Hours: false, googleMapsUri: String(place.googleMapsUri || ""), routeSource: "straight_line_estimate",
-        };
-      }).sort((a, b) => a.distanceKm - b.distanceKm);
-    return res.json({ places, source: "Google Places API (New) + local straight-line estimate", origin: { latitude, longitude }, fetchedAt: new Date().toISOString() });
-  } catch (error) {
-    console.error("[Pet Care Nearby]", error instanceof Error ? error.message : error);
-    return res.status(502).json({ error: "เชื่อมต่อข้อมูลสถานพยาบาลสัตว์จริงไม่ได้", places: [] });
+  } catch (error: any) {
+    console.error("[Pet Care Nearby]", error?.message);
+    return res.status(503).json({ error: "โหลดข้อมูลสถานพยาบาลสัตว์สาธารณะไม่สำเร็จ", places: [] });
   }
 });
 
@@ -294,45 +445,33 @@ app.patch("/api/sos/incidents/:id", rateLimit(30), async (req, res) => {
 app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const latitude = Number(req.body?.latitude), longitude = Number(req.body?.longitude);
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
     return res.status(400).json({ error: "พิกัดตำแหน่งปัจจุบันไม่ถูกต้อง", places: [] });
   }
-  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY", places: [] });
   try {
-    const placesResponse = await googleFetch("places", "https://places.googleapis.com/v1/places:searchNearby", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.primaryType,places.formattedAddress,places.location,places.nationalPhoneNumber,places.googleMapsUri,places.currentOpeningHours.openNow" },
-      body: JSON.stringify({ includedTypes: ["hospital", "fire_station", "police"], maxResultCount: 20, rankPreference: "DISTANCE", languageCode: "th", regionCode: "TH",
-        locationRestriction: { circle: { center: { latitude, longitude }, radius: 20000 } } }),
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!placesResponse.ok) return res.status(502).json({ error: "ดึงข้อมูลศูนย์ฉุกเฉินจริงไม่สำเร็จ", places: [] });
-    const payload = await placesResponse.json() as { places?: any[] };
-    const toRadians = (degrees: number) => degrees * Math.PI / 180;
-    const straightLineMeters = (lat: number, lng: number) => {
-      const earthRadius = 6_371_000;
-      const dLat = toRadians(lat - latitude), dLng = toRadians(lng - longitude);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(latitude)) * Math.cos(toRadians(lat)) * Math.sin(dLng / 2) ** 2;
-      return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
-    const places = (Array.isArray(payload.places) ? payload.places : [])
-      .filter((place) => place?.id && place?.location)
-      .map((place) => {
-        const distanceKm = Math.round(straightLineMeters(Number(place.location.latitude), Number(place.location.longitude)) / 100) / 10;
-        return {
-          id: String(place.id), name: String(place.displayName?.text || ""), type: String(place.primaryType || "hospital"),
-          address: String(place.formattedAddress || ""), phone: String(place.nationalPhoneNumber || ""), mapsUrl: String(place.googleMapsUri || ""),
-          openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
-          distanceKm, etaMinutes: Math.max(1, Math.ceil(distanceKm / 0.35)),
-        };
-      }).sort((a, b) => a.distanceKm - b.distanceKm);
-    return res.json({ places, source: "Google Places API (New) + local straight-line estimate", fetchedAt: new Date().toISOString() });
-  } catch (error) {
-    console.error("[Emergency Nearby]", error instanceof Error ? error.message : error);
-    return res.status(502).json({ error: "เชื่อมต่อข้อมูลศูนย์ฉุกเฉินจริงไม่ได้", places: [] });
+    const raw = await loadFreePublicPlaces(latitude, longitude, 20_000, "emergency");
+    const places = raw.map((place) => ({
+      id: place.id,
+      name: place.name,
+      type: place.category,
+      address: place.address,
+      phone: place.phone,
+      mapsUrl: place.externalMapUrl,
+      externalMapUrl: place.externalMapUrl,
+      sourceName: place.source,
+      sourceUrl: place.sourceUrl,
+      openNow: null,
+      distanceKm: place.distanceKm,
+      etaMinutes: null,
+      latitude: place.latitude,
+      longitude: place.longitude,
+    }));
+    return res.json({ places, source: "WIN Public Data + OpenStreetMap contributors", freePublicData: true, fetchedAt: new Date().toISOString() });
+  } catch (error: any) {
+    console.error("[Emergency Nearby]", error?.message);
+    return res.status(503).json({ error: "โหลดข้อมูลศูนย์ฉุกเฉินสาธารณะไม่สำเร็จ", places: [] });
   }
 });
 
@@ -350,189 +489,84 @@ app.post("/api/radar/nearby-places", rateLimit(RATE_LIMITS["/api/radar/nearby-pl
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
     return res.status(400).json({ error: "พิกัด GPS ไม่ถูกต้อง", places: [] });
   }
-  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) return res.status(503).json({ error: "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY", places: [] });
-  const cacheKey = `${latitude.toFixed(3)}:${longitude.toFixed(3)}`;
-  const cached = radarPlacesCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    const categoryLabels: Record<string, string> = { shop: "ร้านค้าและบริการ", transport: "ขนส่งสาธารณะทางบกและทางน้ำ", faith: "ศาสนสถาน", community: "การศึกษา ที่พัก สุขภาพและสถานที่สำคัญ" };
-    return res.json({
-      places: cached.places,
-      categories: Object.entries(categoryLabels).map(([key, label]) => ({ key, label, count: cached.places.filter((place) => place.placeGroup === key).length })),
-      perCategoryLimit: 20,
-      defaultLimit: 20,
-      source: "Google Places API cache",
-      registeredPeopleSynthesized: false,
-    });
-  }
   try {
-    const searchGroups = [
-      {
-        key: "shop",
-        label: "ร้านค้าและบริการ",
-        types: ["restaurant", "cafe", "bakery", "convenience_store", "grocery_store", "supermarket", "market", "shopping_mall", "store", "pharmacy", "courier_service", "pet_store"],
-      },
-      {
-        key: "transport",
-        label: "ขนส่งสาธารณะทางบกและทางน้ำ",
-        types: ["bus_station", "bus_stop", "train_station", "light_rail_station", "subway_station", "transit_station", "transit_stop", "taxi_stand", "park_and_ride", "ferry_terminal", "ferry_service", "marina", "airport"],
-      },
-      {
-        key: "faith",
-        label: "ศาสนสถาน",
-        types: ["buddhist_temple", "church", "hindu_temple", "mosque", "shinto_shrine", "synagogue"],
-      },
-      {
-        key: "community",
-        label: "การศึกษา ที่พัก สุขภาพและสถานที่สำคัญ",
-        types: ["preschool", "primary_school", "school", "secondary_school", "university", "library", "lodging", "hotel", "hostel", "guest_house", "resort_hotel", "hospital", "medical_clinic", "police", "fire_station", "community_center", "tourist_attraction", "park", "event_venue", "stadium", "veterinary_care"],
-      },
-    ] as const;
-    const fieldMask = "places.id,places.displayName,places.primaryType,places.formattedAddress,places.location,places.rating,places.currentOpeningHours.openNow,places.googleMapsUri";
-    const groupResults = await Promise.all(searchGroups.map(async (group) => {
-      const response = await googleFetch("places", "https://places.googleapis.com/v1/places:searchNearby", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fieldMask },
-        body: JSON.stringify({
-          includedTypes: group.types,
-          maxResultCount: 20,
-          rankPreference: "DISTANCE",
-          languageCode: "th",
-          regionCode: "TH",
-          locationRestriction: { circle: { center: { latitude, longitude }, radius: 5000 } },
-        }),
-        signal: AbortSignal.timeout(12000),
-      });
-      if (!response.ok) {
-        console.warn(`[Radar Nearby Places] Google group ${group.key} returned ${response.status}`);
-        return [];
-      }
-      const payload = await response.json() as { places?: any[] };
-      return (payload.places || []).map((place) => ({ ...place, radarGroup: group.key, radarGroupLabel: group.label }));
+    const raw = await loadFreePublicPlaces(latitude, longitude, 12_000, "radar");
+    const places = raw.map((place) => ({
+      id: place.id,
+      name: place.name,
+      category: place.placeGroup === "shop" ? "shop" : "partner",
+      primaryType: place.category,
+      address: place.address,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      rating: null,
+      openNow: null,
+      distanceMeters: Math.round(place.distanceKm * 1000),
+      placeGroup: place.placeGroup,
+      categoryLabel: place.placeGroup === "shop" ? "ร้านค้าและบริการสาธารณะ" : place.placeGroup === "transport" ? "ขนส่งสาธารณะ" : place.placeGroup === "faith" ? "ศาสนสถาน" : "ชุมชน/สถานที่สำคัญ",
+      sourceName: place.source,
+      sourceUrl: place.sourceUrl,
+      externalMapUrl: place.externalMapUrl,
     }));
-    const deduplicated = new Map<string, any>();
-    for (const place of groupResults.flat()) {
-      if (place?.id && place?.location && place?.displayName?.text && !deduplicated.has(String(place.id))) {
-        deduplicated.set(String(place.id), place);
-      }
-    }
-    const raw = [...deduplicated.values()];
-    if (!raw.length) return res.status(502).json({ error: "ดึงสถานที่จริงจาก Google Places ไม่สำเร็จ", places: [] });
-    const toRadians = (degrees: number) => degrees * Math.PI / 180;
-    const straightLineMeters = (destinationLat: number, destinationLng: number) => {
-      const earthRadius = 6_371_000;
-      const deltaLat = toRadians(destinationLat - latitude);
-      const deltaLng = toRadians(destinationLng - longitude);
-      const value = Math.sin(deltaLat / 2) ** 2 + Math.cos(toRadians(latitude)) * Math.cos(toRadians(destinationLat)) * Math.sin(deltaLng / 2) ** 2;
-      return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value)));
-    };
-    const places = raw.map((place) => {
-      const isShop = place.radarGroup === "shop";
-      return { id: String(place.id), name: String(place.displayName.text), category: isShop ? "shop" : "partner",
-        placeGroup: String(place.radarGroup), categoryLabel: String(place.radarGroupLabel),
-        primaryType: String(place.primaryType || "store"), address: String(place.formattedAddress || ""), latitude: Number(place.location.latitude), longitude: Number(place.location.longitude),
-        rating: Number.isFinite(place.rating) ? Number(place.rating) : null, openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
-        distanceMeters: straightLineMeters(Number(place.location.latitude), Number(place.location.longitude)),
-        distanceSource: "straight_line", googleMapsUri: String(place.googleMapsUri || "") };
-    }).sort((a, b) => Number(a.distanceMeters) - Number(b.distanceMeters));
-    radarPlacesCache.set(cacheKey, { expiresAt: Date.now() + RADAR_PLACES_CACHE_MS, places });
-    if (radarPlacesCache.size > 200) {
-      const now = Date.now();
-      for (const [key, value] of radarPlacesCache) {
-        if (value.expiresAt <= now || radarPlacesCache.size > 150) radarPlacesCache.delete(key);
-      }
-    }
+    const labels: Record<string, string> = { shop: "ร้านค้าและบริการ", transport: "ขนส่งสาธารณะ", faith: "ศาสนสถาน", community: "ชุมชนและสถานที่สำคัญ" };
     return res.json({
       places,
-      categories: searchGroups.map((group) => ({ key: group.key, label: group.label, count: places.filter((place) => place.placeGroup === group.key).length })),
-      perCategoryLimit: 20,
-      defaultLimit: 20,
-      source: "Google Places API (New) + local straight-line estimate",
+      categories: Object.entries(labels).map(([key, label]) => ({ key, label, count: places.filter((place) => place.placeGroup === key).length })),
+      source: "WIN Public Data + OpenStreetMap contributors",
+      freePublicData: true,
       registeredPeopleSynthesized: false,
     });
-  } catch (error) {
-    console.error("[Radar Nearby Places]", error instanceof Error ? error.message : error);
-    return res.status(502).json({ error: "เชื่อมต่อข้อมูล Google Maps สำหรับเรดาร์ไม่ได้", places: [] });
+  } catch (error: any) {
+    console.error("[Radar Nearby Places]", error?.message);
+    return res.status(503).json({ error: "โหลดข้อมูลสาธารณะใกล้ตำแหน่งไม่สำเร็จ", places: [] });
   }
 });
 
-app.post("/api/places/resolve-routes", rateLimit(20), async (req, res) => {
+app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolve-routes"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const latitude = Number(req.body?.latitude);
   const longitude = Number(req.body?.longitude);
-  const requestedPlaces = Array.isArray(req.body?.places) ? req.body.places.slice(0, 20) : [];
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !requestedPlaces.length) {
-    return res.status(400).json({ error: "ข้อมูลจุดเริ่มต้นหรือสถานที่ไม่ถูกต้อง", routes: [] });
-  }
-  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
-    return res.status(503).json({ error: "GOOGLE_MAPS_API_KEY_NOT_CONFIGURED", routes: [] });
+  const requested = Array.isArray(req.body?.places) ? req.body.places.slice(0, 20) : [];
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: "พิกัด GPS ไม่ถูกต้อง", routes: [] });
   }
   try {
-    const routes = [];
-    for (const item of requestedPlaces) {
-      const key = String(item?.key || "").trim();
-      const query = String(item?.query || "").trim();
-      if (!key || !query) continue;
-      const placeResponse = await googleFetch("places", "https://places.googleapis.com/v1/places:searchText", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri",
-        },
-        body: JSON.stringify({ textQuery: query, maxResultCount: 1, languageCode: "th", regionCode: "TH" }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      const placePayload = await placeResponse.json().catch(() => ({})) as any;
-      const place = placePayload?.places?.[0];
-      if (!place?.location) continue;
-      const destination = { lat: Number(place.location.latitude), lng: Number(place.location.longitude) };
-      const routeResponse = await googleFetch("routes", "https://routes.googleapis.com/directions/v2:computeRoutes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.localizedValues",
-        },
-        body: JSON.stringify({
-          origin: { location: { latLng: { latitude, longitude } } },
-          destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
-          travelMode: "TWO_WHEELER",
-          routingPreference: "TRAFFIC_AWARE",
-          computeAlternativeRoutes: false,
-          languageCode: "th-TH",
-          regionCode: "TH",
-          units: "METRIC",
-        }),
-        signal: AbortSignal.timeout(12_000),
-      });
-      const routePayload = await routeResponse.json().catch(() => ({})) as any;
-      const route = routePayload?.routes?.[0];
-      if (!route) continue;
-      const durationMatch = String(route.duration || "").match(/([0-9.]+)s/);
-      const distanceKm = Number(route.distanceMeters) / 1000;
-      routes.push({
-        key,
-        placeId: String(place.id || ""),
-        name: String(place.displayName?.text || query),
-        address: String(place.formattedAddress || ""),
-        latitude: destination.lat,
-        longitude: destination.lng,
-        distanceKm: Number.isFinite(distanceKm) ? Math.round(distanceKm * 100) / 100 : null,
-        etaMinutes: durationMatch ? Math.max(1, Math.ceil(Number(durationMatch[1]) / 60)) : null,
-        googleMapsUri: String(place.googleMapsUri || ""),
-        distanceSource: "Google Routes API",
-        etaSource: "Google Routes API",
-      });
-    }
-    return res.json({ routes, source: "Google Places API (New) + Google Routes API", routesApi: "enabled" });
-  } catch (error) {
-    console.error("[Places Resolve]", error instanceof Error ? error.message : error);
-    return res.status(502).json({ error: "GOOGLE_PLACES_OR_ROUTES_UNAVAILABLE", routes: [] });
+    const publicPlaces = await loadFreePublicPlaces(latitude, longitude, 20_000, "radar");
+    const normalize = (value: unknown) => String(value || "").toLowerCase().replace(/[^a-z0-9ก-๙]+/gi, " ").trim();
+    const routes = requested.flatMap((request: any) => {
+      const query = normalize(request?.query);
+      if (!query) return [];
+      const terms = query.split(/\s+/).filter((term: string) => term.length >= 2);
+      let best: PublicPlace | undefined;
+      let bestScore = 0;
+      for (const place of publicPlaces) {
+        const haystack = normalize(place.name + " " + place.address + " " + place.category);
+        const score = terms.reduce((sum: number, term: string) => sum + (haystack.includes(term) ? 1 : 0), 0);
+        if (score > bestScore) { best = place; bestScore = score; }
+      }
+      if (!best || bestScore === 0) return [];
+      return [{
+        key: String(request?.key || query),
+        placeId: best.id,
+        name: best.name,
+        address: best.address,
+        latitude: best.latitude,
+        longitude: best.longitude,
+        distanceKm: best.distanceKm,
+        etaMinutes: null,
+        source: best.source,
+        sourceUrl: best.sourceUrl,
+        externalMapUrl: best.externalMapUrl,
+      }];
+    });
+    return res.json({ routes, source: "WIN Public Data + OpenStreetMap contributors", freePublicData: true });
+  } catch (error: any) {
+    console.error("[Public Place Resolve]", error?.message);
+    return res.status(503).json({ error: "ค้นหาปลายทางจากข้อมูลสาธารณะไม่สำเร็จ", routes: [] });
   }
 });
+
 app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
@@ -998,146 +1032,6 @@ async function fetchTatDatasetRows(kind: PublicDataKind): Promise<{
 }
 
 
-async function syncTicketmasterEvents() {
-  const apiKey = String(process.env.TICKETMASTER_DISCOVERY_API_KEY || "").trim();
-  if (!apiKey) {
-    return { source: "Ticketmaster Discovery API", skipped: true, reason: "TICKETMASTER_DISCOVERY_API_KEY_NOT_CONFIGURED" };
-  }
-
-  const now = new Date();
-  const startDateTime = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
-  const endDateTime = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
-  const allEvents: any[] = [];
-
-  for (let page = 0; page < 5; page += 1) {
-    const url = new URL("https://app.ticketmaster.com/discovery/v2/events.json");
-    url.searchParams.set("apikey", apiKey);
-    url.searchParams.set("countryCode", "TH");
-    url.searchParams.set("size", "200");
-    url.searchParams.set("page", String(page));
-    url.searchParams.set("sort", "date,asc");
-    url.searchParams.set("startDateTime", startDateTime);
-    url.searchParams.set("endDateTime", endDateTime);
-
-    const response = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(45_000),
-    });
-    if (response.status === 404 && page === 0) {
-      return { source: "Ticketmaster Discovery API", skipped: true, reason: "NO_THAILAND_EVENTS_RETURNED" };
-    }
-    if (!response.ok) throw new Error("TICKETMASTER_DISCOVERY_" + response.status);
-
-    const payload = await response.json();
-    const pageEvents = Array.isArray(payload?._embedded?.events) ? payload._embedded.events : [];
-    allEvents.push(...pageEvents);
-
-    const totalPages = Number(payload?.page?.totalPages || 0);
-    if (!pageEvents.length || !Number.isFinite(totalPages) || page + 1 >= totalPages) break;
-  }
-
-  const normalized = allEvents.flatMap((item: any): any[] => {
-    const eventId = String(item?.id || "").trim();
-    const title = String(item?.name || "").trim();
-    if (!eventId || !title) return [];
-
-    const venue = Array.isArray(item?._embedded?.venues) ? item._embedded.venues[0] : undefined;
-    const latitude = Number(venue?.location?.latitude);
-    const longitude = Number(venue?.location?.longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
-
-    const startRaw = item?.dates?.start?.dateTime
-      || (item?.dates?.start?.localDate ? item.dates.start.localDate + "T12:00:00+07:00" : "");
-    const startAt = parseThaiOrIsoDate(startRaw);
-    if (!startAt) return [];
-
-    const endRaw = item?.dates?.end?.dateTime
-      || (item?.dates?.end?.localDate ? item.dates.end.localDate + "T23:59:59+07:00" : "");
-    const endAt = parseThaiOrIsoDate(endRaw) || undefined;
-
-    const classifications = Array.isArray(item?.classifications) ? item.classifications : [];
-    const labels = classifications.flatMap((classification: any) => [
-      classification?.segment?.name,
-      classification?.genre?.name,
-      classification?.subGenre?.name,
-      classification?.type?.name,
-    ]).filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0);
-
-    const category = classifyPublicEvent(labels.join(" "), title, labels);
-    const sourceUrl = typeof item?.url === "string" ? item.url : "";
-    const stableId = crypto.createHash("sha256").update("ticketmaster:" + eventId).digest("hex").slice(0, 32);
-
-    return [{
-      id: "ticketmaster-event-" + stableId,
-      kind: "events",
-      title,
-      name: title,
-      category,
-      venueName: String(venue?.name || "").trim(),
-      venueArea: String(venue?.city?.name || venue?.state?.name || "Thailand").trim(),
-      province: String(venue?.state?.name || "").trim(),
-      address: [venue?.address?.line1, venue?.city?.name].filter(Boolean).join(", "),
-      latitude,
-      longitude,
-      startAt,
-      endAt,
-      description: String(item?.info || item?.pleaseNote || "").trim() || undefined,
-      source: "Ticketmaster Discovery API",
-      sourceName: "Ticketmaster Discovery API",
-      sourceUrl: sourceUrl || undefined,
-      ticketUrl: sourceUrl || undefined,
-      providerRecordId: eventId,
-      sourceDriven: true,
-      publicVisible: true,
-      status: "active",
-      labels,
-      importedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }];
-  });
-
-  const existingSnapshot = await ordersDb.collection("winAlertEvents")
-    .where("source", "==", "Ticketmaster Discovery API")
-    .get();
-  const existingIds = new Set(existingSnapshot.docs.map((doc) => doc.id));
-  const incomingIds = new Set(normalized.map((record) => record.id));
-
-  let written = 0;
-  for (let offset = 0; offset < normalized.length; offset += FIRESTORE_BATCH_LIMIT) {
-    const batch = ordersDb.batch();
-    const chunk = normalized.slice(offset, offset + FIRESTORE_BATCH_LIMIT);
-    for (const record of chunk) {
-      batch.set(ordersDb.collection("winAlertEvents").doc(record.id), {
-        ...record,
-        lastSourceSyncAt: new Date().toISOString(),
-      }, { merge: true });
-    }
-    await batch.commit();
-    written += chunk.length;
-  }
-
-  const staleIds = [...existingIds].filter((id) => !incomingIds.has(id));
-  let removed = 0;
-  for (let offset = 0; offset < staleIds.length; offset += FIRESTORE_BATCH_LIMIT) {
-    const batch = ordersDb.batch();
-    const chunk = staleIds.slice(offset, offset + FIRESTORE_BATCH_LIMIT);
-    for (const id of chunk) batch.delete(ordersDb.collection("winAlertEvents").doc(id));
-    await batch.commit();
-    removed += chunk.length;
-  }
-
-  dailyEventsCache.clear();
-  return {
-    source: "Ticketmaster Discovery API",
-    skipped: false,
-    sourceRows: allEvents.length,
-    written,
-    removed,
-    sourceDriven: true,
-    publicVisible: true,
-  };
-}
-
 function dedupeWinAlertEvents(events: NearbyEventResult[]) {
   const seen = new Map<string, NearbyEventResult>();
   for (const event of events) {
@@ -1281,14 +1175,11 @@ function requireWinAlertSyncSecret(req: express.Request, res: express.Response):
 app.post("/api/internal/events/sync", rateLimit(2), async (req, res) => {
   if (!requireWinAlertSyncSecret(req, res)) return;
   try {
-    const [tat, ticketmaster] = await Promise.all([
-      syncTatPublicData(["events"]),
-      syncTicketmasterEvents(),
-    ]);
+    const tat = await syncTatPublicData(["events"]);
     dailyEventsCache.clear();
     return res.json({
       success: true,
-      sources: { tat, ticketmaster },
+      sources: { tat },
       syncedAt: new Date().toISOString(),
     });
   } catch (error) {
@@ -1695,31 +1586,6 @@ function getAdminDb() {
 
 const ordersDb = getAdminDb();
 
-type GoogleApiKind = "places" | "routes";
-const GOOGLE_DAILY_HARD_LIMITS: Record<GoogleApiKind, number> = {
-  places: Math.max(1, Number(process.env.GOOGLE_PLACES_DAILY_HARD_LIMIT || 250)),
-  routes: Math.max(1, Number(process.env.GOOGLE_ROUTES_DAILY_HARD_LIMIT || 250)),
-};
-const googleDailyUsage = new Map<string, { day: string; count: number }>();
-
-function consumeGoogleDailyQuota(kind: GoogleApiKind): boolean {
-  const day = new Date().toISOString().slice(0, 10);
-  const key = kind;
-  const current = googleDailyUsage.get(key);
-  const bucket = !current || current.day !== day ? { day, count: 0 } : current;
-  if (bucket.count >= GOOGLE_DAILY_HARD_LIMITS[kind]) return false;
-  bucket.count += 1;
-  googleDailyUsage.set(key, bucket);
-  return true;
-}
-
-async function googleFetch(kind: GoogleApiKind, url: string, init: RequestInit): Promise<Response> {
-  if (!consumeGoogleDailyQuota(kind)) {
-    throw new Error(`GOOGLE_${kind.toUpperCase()}_DAILY_HARD_LIMIT_REACHED`);
-  }
-  return fetch(url, init);
-}
-
 const adminAuth = getAuth();
 
 function isSuperAdminToken(user: any) {
@@ -1754,439 +1620,81 @@ function decodeImageDataUrl(value: unknown) {
 }
 
 // โมเดลกลุ่ม Free Tier ของ Google AI Studio (ลำดับ fallback อัตโนมัติ)
-const aiModels = [
-  "gemini-3.6-flash",
-  "gemini-3.1-flash-lite",
-  "gemini-3.8-flash",
-  "gemini-flash-latest",
+const externalAiProviders = [
+  { id: "chatgpt", name: "ChatGPT", url: "https://chatgpt.com/" },
+  { id: "gemini", name: "Gemini", url: "https://gemini.google.com/app" },
+  { id: "copilot", name: "Microsoft Copilot", url: "https://copilot.microsoft.com/" },
 ];
-
-function classifyGeminiError(error: any): { errorCode: string; message: string } {
-  if (!process.env.GEMINI_API_KEY) {
-    return {
-      errorCode: "MISSING_API_KEY",
-      message: "ยังไม่ได้ตั้งค่า GEMINI_API_KEY ในระบบ (คีย์ไม่ครบ)"
-    };
-  }
-  const str = String(error?.message || error?.statusText || error || "").toLowerCase();
-  const status = Number(error?.status || error?.statusCode || 0);
-
-  if (status === 400 || str.includes("api_key_invalid") || str.includes("api key not valid") || str.includes("invalid api key") || str.includes("permission_denied")) {
-    return {
-      errorCode: "INVALID_API_KEY",
-      message: "API Key ไม่ถูกต้อง หรือไม่มีสิทธิ์เข้าถึง (คีย์ผิด)"
-    };
-  }
-
-  if (status === 429 || str.includes("resource_exhausted") || str.includes("quota") || str.includes("rate limit")) {
-    return {
-      errorCode: "QUOTA_EXCEEDED",
-      message: "โควต้าการใช้งาน Gemini API เต็มแล้ว (Quota Exceeded / 429)"
-    };
-  }
-
-  if (status === 503 || status === 500 || str.includes("unavailable") || str.includes("overloaded") || str.includes("not found")) {
-    return {
-      errorCode: "MODEL_UNAVAILABLE",
-      message: "โมเดล AI ขัดข้องชั่วคราวหรือไม่พร้อมให้บริการ (Model Unavailable)"
-    };
-  }
-
-  if (str.includes("timeout") || str.includes("deadline") || str.includes("timed out") || str.includes("etimedout")) {
-    return {
-      errorCode: "TIMEOUT",
-      message: "การตอบกลับจาก AI หมดเวลาเกิน 30 วินาที"
-    };
-  }
-
-  return {
-    errorCode: "MODEL_UNAVAILABLE",
-    message: "WIN-AI ยังไม่พร้อมใช้งานในขณะนี้ กรุณาลองใหม่อีกครั้ง"
-  };
-}
-
-function generateLocalTacticalFallback(mode: string, message: string, _imageProvided: boolean): string {
-  if (mode === 'motorcycle_mechanic') {
-    const lower = message.toLowerCase();
-    let urgency = "🟡 ปานกลาง (ควรนำรถเข้าตรวจเช็กภายใน 1-3 วัน ไม่ควรใช้เดินทางไกล)";
-    let causes = "1. ระบบไฟ/แบตเตอรี่เสื่อมหรือขั้วหลวม\n2. ระบบส่งกำลัง/โซ่-สายพานหย่อนหรือสึกหรอตามระยะ\n3. ระบบจุดระเบิด (หัวเทียน) หรือกรองอากาศอุดตัน";
-    let check = "• ตรวจดูระดับน้ำมันเครื่องผ่านตาแมวหรือก้านวัด (ขณะดับเครื่องบนขาตั้งคู่)\n• บิดกุญแจ ON แล้วกดแตร/เปิดไฟเลี้ยวเพื่อเช็กกำลังไฟแบตเตอรี่\n• สังเกตรอยหยดของเหลวใต้ท้องรถ";
-    let forbidden = "• ห้ามกดสตาร์ตแช่ยาวเกิน 5 วินาที\n• ห้ามฝืนขี่ต่อหากมีกลิ่นไหม้หรือมีไฟเตือนเครื่องยนต์ติดค้าง\n• ห้ามใช้น้ำราดชิ้นส่วนเครื่องยนต์หรือจานเบรกขณะร้อนจัด";
-    let cost = "• ค่าตรวจเช็ก/ค่าแรงเบื้องต้น: 50 - 150 บาท\n• ค่าอะไหล่สิ้นเปลืองทั่วไป: 120 - 450 บาท (ขึ้นอยู่กับรุ่นและยี่ห้อ)";
-
-    if (lower.includes("เบรก") || lower.includes("เบรค")) {
-      urgency = "🔴 สูงมาก (ห้ามขับขี่เด็ดขาด เสี่ยงเกิดอุบัติเหตุร้ายแรง)";
-      causes = "1. ผ้าเบรกหมดหรือสึกหรอจนถึงเนื้อเหล็กจานเบรก\n2. น้ำมันเบรกรั่วซึมหรือมีฟองอากาศในสายน้ำมัน\n3. จานเบรกคด สึกเป็นร่อง หรือมีคราบน้ำมันเกาะ";
-      check = "• ก้มดูความหนาของผ้าเบรก (ไม่ควรบางกว่า 2 มม.)\n• เช็กระดับน้ำมันเบรกในกระปุกปั๊มบน/ล่าง\n• บีบก้านเบรกดูว่ามีอาการจมลึกหรือวูบหรือไม่";
-      forbidden = "• ห้ามฝืนขับขี่บนท้องถนนโดยเด็ดขาด\n• ห้ามฉีดสเปรย์หล่อลื่นหรือน้ำมันลงบนจานเบรกหรือผ้าเบรกเด็ดขาด";
-      cost = "• ผ้าเบรกแท้/เทียบ: 120 - 350 บาท\n• ค่าแรงเปลี่ยนและไล่น้ำมันเบรก: 80 - 150 บาท";
-    } else if (lower.includes("สตาร์ต") || lower.includes("สตาร์ท") || lower.includes("แชะ") || lower.includes("แบต")) {
-      urgency = "🟡 ปานกลาง (รถสตาร์ตไม่ติด แต่ปลอดภัยหากจอดในที่ปลอดภัย)";
-      causes = "1. แบตเตอรี่เสื่อมสภาพหรือไฟหมด (อายุเกิน 1.5 - 2 ปี)\n2. สวิตช์ขาตั้งข้างสกปรก หรือเซนเซอร์ตัดสตาร์ตทำงานค้าง\n3. ไดสตาร์ทหรือรีเลย์สตาร์ทขัดข้อง / หัวเทียนบอด";
-      check = "• บิดกุญแจ ON แล้วกดแตร หากเสียงแตรเบามากหรือเงียบ แสดงว่าแบตหมด\n• เตะขาตั้งข้างขึ้นลง 2-3 ครั้ง และกำเบรกให้แน่นขณะกดปุ่มสตาร์ต";
-      forbidden = "• ห้ามกดปุ่มสตาร์ตแช่ยาวเกิน 5 วินาทีติดต่อกัน (อาจทำให้ไดสตาร์ตไหม้)\n• ห้ามเข็นกระตุกแรงๆ ในรถเกียร์ออโตเมติก (CVT)";
-      cost = "• ชาร์จแบตเตอรี่: 30 - 50 บาท\n• เปลี่ยนแบตเตอรี่ใหม่: 450 - 750 บาท\n• เปลี่ยนหัวเทียน: 90 - 180 บาท";
-    } else if (lower.includes("ควัน") || lower.includes("น้ำมันเครื่อง") || lower.includes("ร้อน")) {
-      urgency = "🔴 สูงมาก (เสี่ยงลูกสูบติด แหวนหัก หรือเครื่องยนต์น็อก)";
-      causes = "1. น้ำมันเครื่องแห้งหรือต่ำกว่าเกณฑ์ขั้นต่ำมาก\n2. ซีลยางตีนวาล์วหรือแหวนลูกสูบสึกหรอ ทำให้น้ำมันเครื่องเล็ดลอดเข้าห้องเผาไหม้\n3. ระบบระบายความร้อนบกพร่อง (พัดลมไม่หมุน หรือน้ำยาหล่อเย็นแห้ง)";
-      check = "• ดึงก้านวัดน้ำมันเครื่องออกมาเช็กระดับทันที (ขณะดับเครื่อง)\n• เช็กใต้ท้องรถว่ามีคราบน้ำมันเครื่องหยดนองหรือไม่";
-      forbidden = "• ห้ามฝืนสตาร์ตหรือเร่งเครื่องยนต์เด็ดขาด\n• ห้ามเปิดฝาหม้อน้ำขณะเครื่องยนต์ยังร้อนอยู่เด็ดขาด";
-      cost = "• เติม/เปลี่ยนถ่ายน้ำมันเครื่อง: 120 - 250 บาท\n• ซ่อมชุดแหวนลูกสูบ/วาล์ว: 1,200 - 2,800 บาท";
-    }
-
-    return `1. 🚨 ระดับความเร่งด่วน:
-${urgency}
-
-2. 🔍 สาเหตุที่เป็นไปได้:
-${causes}
-
-3. 🛠️ วิธีตรวจสอบเบื้องต้นอย่างปลอดภัย:
-${check}
-
-4. ⚠️ สิ่งที่ห้ามทำเด็ดขาด:
-${forbidden}
-
-5. 💵 ประมาณการค่าใช้จ่ายและค่าอะไหล่:
-${cost}
-
-*(หมายเหตุ: ตอบโดยระบบฐานข้อมูลช่างเบื้องต้นของ WINRIDER ออฟไลน์)*`;
-  } else {
-    return `1. 💰 การคำนวณต้นทุนและตั้งราคา (Pricing & Margin):
-• ต้นทุนวัตถุดิบหลัก (COGS): แนะนำให้อยู่ที่ประมาณ 35% - 45% ของราคาขาย
-• ค่าบรรจุภัณฑ์และขนส่ง: ประมาณ 10% - 15%
-• เป้าหมายกำไรสุทธิ: ควรอยู่ที่ 35% - 50%
-• สูตรคิดราคาขายแนะนำ = ต้นทุนรวม ÷ (1 - %กำไรที่ต้องการ) เช่น ต้นทุน 35 บาท ต้องการกำไร 40% ควรตั้งขายที่ 58 - 60 บาท
-
-2. 📢 แนวทางการเขียนประกาศและแคปชั่น (Copywriting):
-• Hook ดึงดูด: ชี้จุดเด่นชัดเจน เช่น สดใหม่ กรอบนาน หรือสภาพ 95% พร้อมส่ง
-• รายละเอียดสินค้า: ระบุขนาด ปริมาณ สภาพ หรือวันผลิต
-• Call to Action: กระตุ้นการตัดสินใจ พร้อมข้อมูลจัดส่งด่วนผ่าน WINRIDER
-
-3. 🍳 สูตรอาหารและเทคนิคการผลิต (กรณีอาหาร):
-• ชั่งตวงวัตถุดิบเป็นกรัมเพื่อคุมต้นทุนต่อจานให้แม่นยำ
-• เตรียมวัตถุดิบล่วงหน้าแบบ Portion เพื่อส่งได้ไวและไม่สูญเสียวัตถุดิบ
-
-4. 💡 คำแนะนำการตลาด:
-• ตรวจสอบราคาเฉลี่ยของร้านในพื้นที่รัศมี 3 กิโลเมตร
-• รูปภาพสินค้าควรชัดเจน ใช้แสงธรรมชาติเพื่อเพิ่มความน่าสนใจ`;
-  }
-}
-
-async function generateWithGemini(contents: any, config: any) {
-  const ai = getAiClient();
-  if (!ai) {
-    const err: any = new Error("MISSING_API_KEY");
-    err.code = "MISSING_API_KEY";
-    throw err;
-  }
-  let lastError: any;
-  for (const model of aiModels) {
-    try {
-      const response = await ai.models.generateContent({ model, contents, config });
-      if (response && response.text) return { text: response.text, model };
-    } catch (error: any) {
-      lastError = error;
-      console.warn(`Gemini model ${model} unavailable, trying next fallback...`, error?.message || error);
-    }
-  }
-  throw lastError || new Error("ALL_MODELS_FAILED");
-}
 
 app.post("/api/ai/product-photo-verify", rateLimit(10), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const image = decodeImageDataUrl(req.body?.imageDataUrl);
   if (!image) return res.status(400).json({ error: "รูปสินค้าต้องเป็น JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB", errorCode: "INVALID_IMAGE" });
-
-  const ai = getAiClient();
-  if (!ai) return res.status(503).json({ error: "WIN-AI Vision ยังไม่ได้ตั้งค่า GEMINI_API_KEY", errorCode: "MISSING_API_KEY" });
-
   const itemName = String(req.body?.itemName || "").trim().slice(0, 200);
   const category = String(req.body?.category || "").trim().slice(0, 100);
-  const prompt = `วิเคราะห์ภาพสินค้าจริงสำหรับการลงขายใน WIN Street Market
-ชื่อที่ผู้ขายระบุ: ${itemName || "ไม่ระบุ"}
-หมวดหมู่ที่ผู้ขายระบุ: ${category || "ไม่ระบุ"}
-
-ตอบ JSON เท่านั้นตาม schema:
-{
- "isProductVisible": boolean,
- "detectedTitle": string,
- "detectedCategory": string,
- "detectedCondition": string,
- "qualityScore": number,
- "confidenceScore": number,
- "safetyPassed": boolean,
- "tags": string[],
- "aiAnalysisNotes": string
-}
-
-กติกา:
-- ห้ามแต่งข้อมูลที่มองไม่เห็น
-- qualityScore 0-100 ประเมินคุณภาพภาพเท่านั้น
-- confidenceScore 0-100 คือความมั่นใจในการจำแนก ไม่ใช่คะแนนความแท้
-- ห้ามอ้างว่าเป็นของแท้หรือปลอดภัย 100% จากภาพเดียว
-- safetyPassed ให้ false หากเห็นสินค้าหรือเนื้อหาที่มีแนวโน้มเป็นสินค้าต้องห้าม/อันตราย หรือระบุไม่ได้ชัดเจน
-- isProductVisible ต้อง false ถ้าภาพไม่มีสินค้าให้ตรวจ
-- วิเคราะห์เฉพาะสิ่งที่เห็นในภาพ`;
-
-  try {
-    const response = await generateWithGemini(
-      [{
-        role: "user",
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") } }
-        ]
-      }],
-      { temperature: 0.1, maxOutputTokens: 700 }
-    );
-    const raw = response.text.trim().replace(/^\`\`\`json\s*/i, "").replace(/\s*\`\`\`$/i, "");
-    const parsed = JSON.parse(raw);
-    const confidence = Math.max(0, Math.min(100, Number(parsed.confidenceScore) || 0));
-    const quality = Math.max(0, Math.min(100, Number(parsed.qualityScore) || 0));
-    const isVerified = parsed.isProductVisible === true && parsed.safetyPassed === true && confidence >= 70 && quality >= 60;
-    return res.json({
-      result: {
-        isVerified,
-        certificateId: isVerified ? `WIN-AI-${Date.now().toString(36).toUpperCase()}` : "",
-        detectedTitle: String(parsed.detectedTitle || itemName || "สินค้าจากภาพ"),
-        detectedCategory: String(parsed.detectedCategory || category || "สินค้าทั่วไป"),
-        detectedCondition: String(parsed.detectedCondition || "ไม่สามารถยืนยันสภาพจากภาพได้"),
-        qualityScore: quality,
-        authenticityScore: confidence,
-        safetyPassed: parsed.safetyPassed === true,
-        fairPriceRange: { min: 0, max: 0 },
-        tags: Array.isArray(parsed.tags) ? parsed.tags.filter((x: unknown) => typeof x === "string").slice(0, 10) : [],
-        aiAnalysisNotes: String(parsed.aiAnalysisNotes || "ผลวิเคราะห์จากภาพสินค้าจริงโดย WIN-AI Vision; ไม่ใช่การรับประกันความแท้")
-      },
-      model: response.model,
-      userId: user.uid
-    });
-  } catch (error: any) {
-    const classified = classifyGeminiError(error);
-    return res.status(classified.errorCode === "TIMEOUT" ? 504 : 503).json({
-      error: classified.message,
-      errorCode: classified.errorCode,
-      canRetry: true
-    });
-  }
+  return res.json({
+    result: {
+      isVerified: false,
+      manualReviewRequired: true,
+      certificateId: "",
+      detectedTitle: itemName || "สินค้าที่ผู้ใช้ส่งตรวจ",
+      detectedCategory: category || "ไม่ระบุ",
+      detectedCondition: "ยังไม่ได้ตรวจโดยมนุษย์",
+      qualityScore: 0,
+      authenticityScore: 0,
+      safetyPassed: false,
+      fairPriceRange: { min: 0, max: 0 },
+      tags: [],
+      aiAnalysisNotes: "WINRIDER ไม่ส่งรูปสินค้าไป AI provider และไม่ใช้ API key; โปรดตรวจรูปและรายละเอียดด้วยมนุษย์ก่อนเผยแพร่"
+    },
+    providerMode: "manual_review_no_ai_api",
+    userId: user.uid
+  });
 });
 
 app.post("/api/ai/personal-assistant", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const mode = String(req.body?.mode || "");
-  if (!['motorcycle_mechanic', 'personal_commerce'].includes(mode)) {
-    return res.status(400).json({ error: "โหมด WIN-AI ไม่ถูกต้อง", errorCode: "INVALID_MODE" });
-  }
-
   const message = String(req.body?.message || "").trim().slice(0, 4000);
-  const image = req.body?.imageDataUrl ? decodeImageDataUrl(req.body.imageDataUrl) : null;
-  if (!message && !image) {
-    return res.status(400).json({ error: "กรุณาส่งคำถามหรือรูปภาพ", errorCode: "EMPTY_REQUEST" });
-  }
-  if (req.body?.imageDataUrl && !image) {
-    return res.status(400).json({
-      error: "รูปภาพต้องเป็นไฟล์ JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB",
-      errorCode: "INVALID_IMAGE"
-    });
-  }
-
-  const systemInstruction = mode === 'motorcycle_mechanic'
-    ? `คุณคือ "WIN-AI ช่างส่วนตัว" ผู้เชี่ยวชาญด้านรถจักรยานยนต์และระบบเครื่องยนต์ 2 ล้อประจำแพลตฟอร์ม WINRIDER
-หน้าที่ของคุณคือให้คำแนะนำที่เป็นมืออาชีพ ชัดเจน เข้าใจง่าย และคำนึงถึงความปลอดภัยของผู้ขับขี่เป็นอันดับหนึ่ง
-
-เมื่อผู้ใช้ส่งอาการ ปัญหา หรือรูปภาพชิ้นส่วนรถ ให้ตอบกลับโดยจัดโครงสร้างเนื้อหาตาม 5 หัวข้อนี้อย่างเคร่งครัด:
-
-1. 🚨 ระดับความเร่งด่วน:
-(ระบุให้ชัดเจนด้วยอิโมจิ เช่น 🟢 ต่ำ / 🟡 ปานกลาง / 🔴 สูงมาก พร้อมคำอธิบายสั้นๆ ว่าขับต่อได้หรือไม่)
-
-2. 🔍 สาเหตุที่เป็นไปได้:
-(แจกแจง 2-4 สาเหตุหลักที่พบบ่อย เรียงจากโอกาสเกิดมากที่สุดไปน้อย)
-
-3. 🛠️ วิธีตรวจสอบเบื้องต้นอย่างปลอดภัย:
-(ระบุขั้นตอนที่ผู้ขับขี่ตรวจสอบได้เองด้วยตาเปล่าอย่างปลอดภัย เช่น การตรวจระดับน้ำมันเครื่อง, เช็กระยะฟรีเบรก, ตรวจดูรอยหยดใต้ท้องรถ)
-
-4. ⚠️ สิ่งที่ห้ามทำเด็ดขาด:
-(เตือนข้อห้ามเพื่อความปลอดภัย เช่น ห้ามสตาร์ตแช่เกิน 5 วินาที, ห้ามใช้น้ำราดจานเบรกร้อน, ห้ามฝืนขี่ต่อ)
-
-5. 💵 ประมาณการค่าใช้จ่ายและค่าอะไหล่:
-(ประเมินช่วงราคาค่าอะไหล่แท้/เทียบ และค่าแรงช่างในไทย พร้อมระบุว่าเป็นราคาประมาณการ)
-
-ข้อปฏิบัติความปลอดภัยขั้นวิกฤต:
-- หากพบอาการเกี่ยวกับระบบเบรก, ยางบวมหรือปริแตก, น้ำมันเชื้อเพลิงรั่ว, ระบบไฟลัดวงจร, มีกลิ่นไหม้ หรือเครื่องร้อนจัด ให้แจ้งเตือนตัวหนาว่า "อันตรายระดับสูง: ให้หยุดใช้รถทันทีและติดต่อช่าง"
-- ห้ามฟันธง 100% จากรูปถ่ายอย่างเดียว ต้องแนะนำให้นำรถเข้าตรวจเช็กกับช่างผู้ชำนาญ
-- หากข้อมูลไม่พอ ให้ถามยี่ห้อ รุ่น และปีรถเพิ่มเติมอย่างสุภาพ`
-    : `คุณคือ "WIN-AI ผู้ช่วยส่วนตัว" ที่ปรึกษาการค้าขาย การตั้งราคา คำนวณต้นทุน/กำไร การเขียนประกาศ และสูตรอาหารสำหรับพ่อค้าแม่ค้าและผู้ใช้ WINRIDER
-
-จัดโครงสร้างคำตอบให้กระชับ ชัดเจน และนำไปใช้ได้ทันที ครอบคลุม:
-
-1. 💰 การคำนวณต้นทุนและตั้งราคา (Pricing & Margin):
-- จำแนกต้นทุนวัตถุดิบ (COGS), ค่าบรรจุภัณฑ์/กล่อง, ค่าขนส่งหรือ GP (ถ้ามี)
-- แสดงสูตรคำนวณ: กำไรสุทธิ = ราคาขาย - ต้นทุนรวม และคิดเป็น % Margin
-- แนะนำช่วงราคาขายที่เหมาะสม (คุ้มทุน, แนะนำ, พรีเมียม)
-
-2. 📢 การเขียนประกาศและแคปชั่นขาย (Copywriting):
-- พาดหัวดึงดูดสายตา (Hook)
-- ชี้จุดเด่น ประโยชน์ และความคุ้มค่า
-- Call to Action พร้อมแฮชแท็กที่ตรงกลุ่มเป้าหมาย
-
-3. 🍳 สูตรอาหารและเทคนิคการทำ (Recipes & Cooking):
-- รายการวัตถุดิบพร้อมสัดส่วนที่ชัดเจน และระบุจำนวนเสิร์ฟ
-- ขั้นตอนการทำอย่างละเอียดพร้อมเคล็ดลับ (Pro-tips)
-- ประมาณการต้นทุนวัตถุดิบต่อจาน/กล่อง
-
-4. 💡 คำแนะนำการตลาดและข้อควรระวัง:
-- ระบุเสมอว่าราคาและตัวเลขเป็นค่าประมาณการจากเกณฑ์ทั่วไป แนะนำให้คิดต้นทุนจริงจากแหล่งซื้อประจำ
-- ถามรายละเอียดเพิ่มเติมอย่างสุภาพเมื่อข้อมูลไม่พอ`;
-
-  // Build context history (up to last 8 messages)
-  const rawHistory = Array.isArray(req.body?.history) ? req.body.history : [];
-  const last8 = rawHistory.slice(-8);
-  const contents: Array<{ role: string; parts: any[] }> = [];
-
-  for (const item of last8) {
-    const role = (item.role === 'assistant' || item.role === 'model') ? 'model' : 'user';
-    const text = String(item.text || item.content || '').trim();
-    if (!text) continue;
-
-    if (contents.length > 0 && contents[contents.length - 1].role === role) {
-      contents[contents.length - 1].parts[0].text += `\n${text}`;
-    } else {
-      if (contents.length === 0 && role === 'model') continue;
-      contents.push({ role, parts: [{ text }] });
-    }
-  }
-
-  const currentParts: any[] = [{ text: message || "โปรดวิเคราะห์รูปนี้ตามบทบาทของคุณ" }];
-  if (image) {
-    currentParts.push({ inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") } });
-  }
-
-  if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
-    contents.push({ role: 'model', parts: [{ text: 'รับทราบข้อมูล' }] });
-  }
-  contents.push({ role: 'user', parts: currentParts });
-
-  try {
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("REQUEST_TIMEOUT_30S")), 30000);
-    });
-
-    const result = await Promise.race([
-      generateWithGemini(contents, { systemInstruction, temperature: 0.3 }),
-      timeoutPromise
-    ]) as { text: string; model: string };
-
-    return res.json({
-      reply: result.text,
-      source: result.model,
-      mode,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error: any) {
-    console.error("WIN-AI generation error:", error?.message || error);
-    const classified = classifyGeminiError(error);
-    const fallbackText = generateLocalTacticalFallback(mode, message, Boolean(image));
-
-    return res.status(classified.errorCode === "TIMEOUT" ? 504 : 503).json({
-      error: classified.message,
-      errorCode: classified.errorCode,
-      detail: String(error?.message || error),
-      modelsAttempted: aiModels,
-      fallbackReply: fallbackText,
-      canRetry: true
-    });
-  }
+  if (!message) return res.status(400).json({ error: "กรุณาพิมพ์คำถามก่อนเปิด AI ภายนอก", errorCode: "EMPTY_REQUEST" });
+  const rolePrompt = mode === "motorcycle_mechanic"
+    ? "คุณเป็นผู้ช่วยช่างมอเตอร์ไซค์ เน้นความปลอดภัย อธิบายระดับความเร่งด่วน สาเหตุ วิธีตรวจ สิ่งที่ห้ามทำ และค่าใช้จ่ายโดยประมาณ"
+    : "คุณเป็นผู้ช่วยด้านการค้า ช่วยคำนวณต้นทุน กำไร ตั้งราคา เขียนแคปชั่น และให้คำแนะนำการขายอย่างชัดเจน";
+  const prompt = rolePrompt + "\n\nคำถามจากผู้ใช้:\n" + message;
+  return res.json({
+    externalOnly: true,
+    prompt,
+    providers: externalAiProviders,
+    source: "external_ai_handoff",
+    privacyNote: "WINRIDER ไม่ส่ง prompt หรือรูปไป AI ภายนอกอัตโนมัติ ผู้ใช้เป็นผู้เลือกคัดลอกหรือเปิดบริการเอง",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.get("/api/ai/status", async (_req, res) => {
-  const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
-  const key = process.env.GEMINI_API_KEY || "";
-  const maskedKey = hasKey
-    ? `${key.slice(0, 6)}...${key.slice(-4)}`
-    : "ยังไม่ได้ตั้งค่า";
-
   return res.json({
-    status: hasKey ? "ok" : "warning",
-    geminiConfigured: hasKey,
-    apiKeyStatus: hasKey ? "configured" : "missing",
-    keyMasked: maskedKey,
-    activeModels: aiModels,
-    currentPrimaryModel: aiModels[0],
-    supportedModes: [
-      {
-        id: "motorcycle_mechanic",
-        name: "WIN-AI ช่างส่วนตัว",
-        description: "วินิจฉัยอาการรถ 5 หัวข้อ (ระดับความเร่งด่วน, สาเหตุ, วิธีตรวจ, สิ่งที่ห้ามทำ, ค่าใช้จ่าย)",
-        urgencyLevels: ["🟢 ต่ำ", "🟡 ปานกลาง", "🔴 สูงมาก"]
-      },
-      {
-        id: "personal_commerce",
-        name: "WIN-AI ผู้ช่วยส่วนตัว",
-        description: "ช่วยตั้งราคา คำนวณต้นทุน/กำไร (Margin), เขียนประกาศแคปชั่น และสูตรอาหาร",
-        categories: ["ตั้งราคา & คำนวณกำไร", "เขียนแคปชั่นขาย", "สูตรอาหารคำนวณขนาดเสิร์ฟ"]
-      }
-    ],
-    maxContextTurns: 8,
-    timeoutSeconds: 30,
-    supportedFormats: ["JPG", "PNG", "WEBP"],
-    maxFileSizeMB: 4,
-    timestamp: new Date().toISOString()
+    status: "ok",
+    providerMode: "external_handoff",
+    apiKeyRequired: false,
+    geminiConfigured: false,
+    apiKeyStatus: "not_used",
+    activeModels: [],
+    providers: externalAiProviders,
+    message: "WIN-AI ไม่ใช้ API key ภายในระบบ; ส่งผู้ใช้ไป AI ภายนอกตามการเลือก",
+    timestamp: new Date().toISOString(),
   });
 });
 
 app.post("/api/ai/test-ping", rateLimit(10), async (_req, res) => {
-  const startTime = Date.now();
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(503).json({
-      success: false,
-      errorCode: "MISSING_API_KEY",
-      error: "ยังไม่ได้ตั้งค่า GEMINI_API_KEY ในระบบ (คีย์ไม่ครบ)",
-      latencyMs: Date.now() - startTime
-    });
-  }
-
-  const ai = getAiClient();
-  if (!ai) {
-    return res.status(503).json({
-      success: false,
-      errorCode: "MISSING_API_KEY",
-      error: "ไม่สามารถเริ่มต้นไคลเอนต์ Gemini ได้",
-      latencyMs: Date.now() - startTime
-    });
-  }
-
-  try {
-    const testResult = await Promise.race([
-      ai.models.generateContent({
-        model: aiModels[0],
-        contents: [{ role: "user", parts: [{ text: "ตอบคำว่า PONG สั้นๆ เพียงคำเดียว" }] }],
-        config: { maxOutputTokens: 10, temperature: 0.1 }
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 10000))
-    ]) as any;
-
-    const latencyMs = Date.now() - startTime;
-    return res.json({
-      success: true,
-      model: aiModels[0],
-      reply: testResult?.text?.trim() || "PONG",
-      latencyMs,
-      message: `เชื่อมต่อโมเดล ${aiModels[0]} สำเร็จ ความเร็ว ${latencyMs} ms`,
-      timestamp: new Date().toISOString()
-    });
-  } catch (err: any) {
-    const latencyMs = Date.now() - startTime;
-    const classified = classifyGeminiError(err);
-    return res.status(503).json({
-      success: false,
-      errorCode: classified.errorCode,
-      error: classified.message,
-      detail: String(err?.message || err),
-      latencyMs
-    });
-  }
+  return res.json({
+    success: true,
+    providerMode: "external_handoff",
+    apiKeyRequired: false,
+    message: "External AI handoff พร้อมใช้งานโดยไม่ใช้ API key",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
@@ -2515,41 +2023,34 @@ app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
   if (!user) return;
   const amountSatang = Math.round(Number(req.body?.amount) * 100);
   const image = decodeImageDataUrl(req.body?.imageDataUrl);
-  const expectedName = String(process.env.ADMIN_BANK_ACCOUNT_NAME || "").trim();
-  if (!expectedName || !process.env.ADMIN_PROMPTPAY_ID) return res.status(503).json({ error: "ผู้ดูแลยังไม่ได้ตั้งค่าบัญชีรับเงิน" });
+  if (!process.env.ADMIN_BANK_ACCOUNT_NAME || !process.env.ADMIN_PROMPTPAY_ID) return res.status(503).json({ error: "ผู้ดูแลยังไม่ได้ตั้งค่าบัญชีรับเงิน" });
   if (!Number.isSafeInteger(amountSatang) || amountSatang < 100 || amountSatang > 10_000_000) return res.status(400).json({ error: "ยอดเติมเงินไม่ถูกต้อง" });
   if (!image) return res.status(400).json({ error: "สลิปต้องเป็น JPG, PNG หรือ WEBP ขนาดไม่เกิน 4 MB" });
+
+  const imageHash = crypto.createHash("sha256").update(image.buffer).digest("hex");
+  const submissionRef = ordersDb.collection("topup_submissions").doc();
   try {
-    const schema = { type: "OBJECT", properties: {
-      amount: { type: "NUMBER" }, reference: { type: "STRING" }, recipientName: { type: "STRING" },
-      recipientAccountHint: { type: "STRING" }, transferDateTime: { type: "STRING" }, confidence: { type: "NUMBER" }
-    }, required: ["amount", "reference", "recipientName", "confidence"] };
-    const result = await generateWithGemini([{ role: "user", parts: [
-      { text: "อ่านสลิปโอนเงินนี้ตามข้อมูลที่มองเห็นเท่านั้น ห้ามเดาหรือเติมข้อมูลที่ไม่มี" },
-      { inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") } }
-    ]}], { responseMimeType: "application/json", responseSchema: schema, temperature: 0 });
-    const extracted = JSON.parse(result.text);
-    const reference = String(extracted.reference || "").replace(/\s/g, "").slice(0, 120);
-    const nameOk = String(extracted.recipientName || "").replace(/\s/g, "").includes(expectedName.replace(/\s/g, ""));
-    const amountOk = Math.round(Number(extracted.amount) * 100) === amountSatang;
-    const confidenceOk = Number(extracted.confidence) >= 0.75;
-    if (!reference || !nameOk || !amountOk || !confidenceOk) {
-      const reasons = [!amountOk && "ยอดเงินไม่ตรง", !nameOk && "ชื่อผู้รับไม่ตรง", !reference && "ไม่พบเลขอ้างอิง", !confidenceOk && "อ่านสลิปไม่ชัด"].filter(Boolean);
-      return res.status(422).json({ status: "REJECTED_AI", error: reasons.join(" • "), extracted });
-    }
-    const refHash = crypto.createHash("sha256").update(reference).digest("hex");
-    const imageHash = crypto.createHash("sha256").update(image.buffer).digest("hex");
-    const submissionRef = ordersDb.collection("topup_submissions").doc();
     await ordersDb.runTransaction(async (tx) => {
-      const duplicateRef = ordersDb.collection("topup_references").doc(refHash);
+      const duplicateRef = ordersDb.collection("topup_references").doc(imageHash);
       const duplicate = await tx.get(duplicateRef);
       if (duplicate.exists) throw new Error("DUPLICATE_SLIP");
       tx.create(duplicateRef, { submissionId: submissionRef.id, status: "WAITING_ADMIN", createdAt: FieldValue.serverTimestamp() });
-      tx.create(submissionRef, { userId: user.uid, userEmail: user.email || null, amountSatang, reference, refHash, imageHash,
-        extracted, aiModel: result.model, status: "WAITING_ADMIN", createdAt: FieldValue.serverTimestamp() });
+      tx.create(submissionRef, {
+        userId: user.uid,
+        userEmail: user.email || null,
+        amountSatang,
+        reference: imageHash.slice(0, 20),
+        refHash: imageHash,
+        imageHash,
+        extracted: null,
+        verificationMode: "manual_proof_plus_provider_confirmation",
+        status: "WAITING_ADMIN",
+        createdAt: FieldValue.serverTimestamp(),
+      });
     });
-    const ext = image.mimeType.split('/')[1].replace('jpeg', 'jpg');
-    const proofStoragePath = `topup-proofs/${user.uid}/${submissionRef.id}.${ext}`;
+
+    const ext = image.mimeType.split("/")[1].replace("jpeg", "jpg");
+    const proofStoragePath = "topup-proofs/" + user.uid + "/" + submissionRef.id + "." + ext;
     try {
       await getStorage().bucket().file(proofStoragePath).save(image.buffer, {
         contentType: image.mimeType,
@@ -2560,29 +2061,28 @@ app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
     } catch (storageError: any) {
       console.warn("Top-up proof GCS storage error (using Firestore fallback):", storageError?.message);
       try {
-        const base64Data = image.buffer.toString("base64");
-        await ordersDb.collection("topup_submissions").doc(submissionRef.id).collection("proof_blobs").doc("image").set({
-          data: base64Data,
+        await submissionRef.collection("proof_blobs").doc("image").set({
+          data: image.buffer.toString("base64"),
           mimeType: image.mimeType,
           userId: user.uid,
           createdAt: FieldValue.serverTimestamp(),
         });
-        await submissionRef.update({
-          proofStoragePath: `firestore:proof_blobs/image`,
-          proofMimeType: image.mimeType,
-          storageProvider: "firestore-fallback",
-        });
+        await submissionRef.update({ proofStoragePath: "firestore:proof_blobs/image", proofMimeType: image.mimeType, storageProvider: "firestore-fallback" });
       } catch (fallbackError: any) {
         console.error("Top-up proof fallback storage error", fallbackError?.message);
-        await Promise.allSettled([submissionRef.delete(), ordersDb.collection("topup_references").doc(refHash).delete()]);
+        await Promise.allSettled([submissionRef.delete(), ordersDb.collection("topup_references").doc(imageHash).delete()]);
         return res.status(503).json({ error: "จัดเก็บภาพสลิปไม่สำเร็จ กรุณาลองใหม่" });
       }
     }
-    return res.status(202).json({ status: "WAITING_ADMIN", submissionId: submissionRef.id, message: "อ่านสลิปผ่านแล้ว กำลังรอ Super Admin ยืนยันยอด" });
+    return res.status(202).json({
+      status: "WAITING_ADMIN",
+      submissionId: submissionRef.id,
+      message: "รับหลักฐานแล้ว การตรวจภาพไม่ใช้ AI; รอ Admin ตรวจหลักฐานและ payment provider ยืนยันเงินจริง",
+    });
   } catch (error: any) {
-    if (error?.message === "DUPLICATE_SLIP") return res.status(409).json({ error: "เลขอ้างอิงสลิปนี้ถูกส่งแล้ว" });
+    if (error?.message === "DUPLICATE_SLIP") return res.status(409).json({ error: "ภาพสลิปนี้ถูกส่งแล้ว" });
     console.error("Top-up proof error", error?.message);
-    return res.status(503).json({ error: "ตรวจสลิปไม่สำเร็จ กรุณาลองใหม่" });
+    return res.status(503).json({ error: "รับหลักฐานไม่สำเร็จ กรุณาลองใหม่" });
   }
 });
 
@@ -2706,11 +2206,9 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
     }
   }
 
-  const googleServer = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  add("google_maps_server", "Google Places & Routes", googleServer ? "ok" : "error", googleServer ? "พบคีย์ฝั่งเซิร์ฟเวอร์ (การเรียกจริงจะตรวจสิทธิ์ API อีกครั้ง)" : "ไม่พบ GOOGLE_MAPS_API_KEY");
-  add("google_maps_browser", "Google Maps หน้าเว็บ", process.env.VITE_GOOGLE_MAPS_API_KEY ? "ok" : "warning", process.env.VITE_GOOGLE_MAPS_API_KEY ? "พบคีย์สำหรับ build หน้าเว็บ" : "เซิร์ฟเวอร์ไม่พบ VITE_GOOGLE_MAPS_API_KEY โปรดตรวจ Build Environment");
-  add("gemini", "Gemini API", process.env.GEMINI_API_KEY ? "ok" : "warning", process.env.GEMINI_API_KEY ? "พบคีย์ WIN-AI และตรวจสลิป" : "WIN-AI จะไม่ทำงานจนกว่าจะตั้ง GEMINI_API_KEY");
-  add("tat-events", "TAT Tourism Events", "ok", "Win Alert ใช้ข้อมูลสาธารณะจาก TAT และแสดงเฉพาะรายการที่ Admin Verify แล้ว");
+  add("public-maps", "Public Places / External Navigation", "ok", "ใช้ WIN Public Data + OpenStreetMap แบบไม่ใช้ API key; นำทางเปิดภายนอก");
+  add("external-ai", "External AI Handoff", "ok", "WINRIDER ไม่เรียก AI provider ด้วย API key; ผู้ใช้เลือกเปิดบริการภายนอกเอง");
+  add("tat-events", "TAT Tourism Events", "ok", "Win Alert ใช้ข้อมูลสาธารณะจาก TAT/Public Data โดยไม่ใช้ API key");
   const promptPayReady = Boolean(process.env.ADMIN_PROMPTPAY_ID && process.env.ADMIN_BANK_ACCOUNT_NAME && process.env.ADMIN_OWNER_EMAIL);
   add("promptpay", "PromptPay Admin", promptPayReady ? "ok" : "error", promptPayReady ? "ตั้งค่าผู้รับเงินและเจ้าของระบบครบ" : "ข้อมูล PromptPay/ชื่อบัญชี/อีเมลเจ้าของยังไม่ครบ");
 
@@ -4485,20 +3983,11 @@ app.post("/api/orders/:id/location", rateLimit(120), async (req, res) => {
   const heading = req.body?.heading === undefined ? undefined : Number(req.body.heading);
   const speedMps = req.body?.speedMps === undefined ? undefined : Number(req.body.speedMps);
 
-  if (
-    !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
-    !Number.isFinite(longitude) || longitude < -180 || longitude > 180
-  ) {
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     return res.status(400).json({ error: "Invalid GPS coordinates" });
   }
   if (accuracyMeters !== undefined && (!Number.isFinite(accuracyMeters) || accuracyMeters < 0 || accuracyMeters > 10000)) {
     return res.status(400).json({ error: "Invalid GPS accuracy" });
-  }
-  if (heading !== undefined && (!Number.isFinite(heading) || heading < 0 || heading > 360)) {
-    return res.status(400).json({ error: "Invalid GPS heading" });
-  }
-  if (speedMps !== undefined && (!Number.isFinite(speedMps) || speedMps < 0 || speedMps > 100)) {
-    return res.status(400).json({ error: "Invalid GPS speed" });
   }
 
   try {
@@ -4507,68 +3996,90 @@ app.post("/api/orders/:id/location", rateLimit(120), async (req, res) => {
     if (!snapshot.exists) return res.status(404).json({ error: "Order not found" });
 
     const order = snapshot.data() as ServerOrder;
-    const activeStatuses = ["accepted", "heading_pickup", "picked_up", "in_transit"];
-    if (order.driverUserId !== user.uid) return res.status(403).json({ error: "Only the assigned driver may publish GPS" });
+    const isDriver = order.driverUserId === user.uid;
+    const isPassenger = order.passengerUserId === user.uid;
+    if (!isDriver && !isPassenger) return res.status(403).json({ error: "Ride participant access required" });
+
+    const activeStatuses = ["pending", "accepted", "heading_pickup", "picked_up", "in_transit"];
     if (!activeStatuses.includes(order.status)) {
       return res.status(409).json({ error: "GPS updates are not allowed for this ride state" });
     }
+    if (isDriver && order.status === "pending") return res.status(409).json({ error: "Driver GPS requires accepted ride" });
 
-    const previous = (order as any).lastDriverLocation;
+    const role = isDriver ? "driver" : "passenger";
+    const previous = (order as any)[isDriver ? "lastDriverLocation" : "lastPassengerLocation"];
     if (previous && Number.isFinite(Number(previous.latitude)) && Number.isFinite(Number(previous.longitude))) {
       const previousAt = Date.parse(String(previous.recordedAt || ""));
       if (Number.isFinite(previousAt)) {
         const elapsedSeconds = (Date.now() - previousAt) / 1000;
-        if (elapsedSeconds < 0) {
-          return res.status(409).json({ error: "Out-of-order GPS sample", code: "GPS_OUT_OF_ORDER" });
-        }
-        // Allow a generous urban upper bound plus GPS-accuracy slack. This catches
-        // impossible jumps without penalizing normal tunnels/reacquisition noise.
         const jumpKm = distanceKmBetween(
           { lat: Number(previous.latitude), lng: Number(previous.longitude) },
           { lat: latitude, lng: longitude }
         );
         const accuracySlackKm = Math.max(Number(previous.accuracyMeters || 0), Number(accuracyMeters || 0)) / 1000;
         const maxPlausibleKm = Math.max(0.75, elapsedSeconds * 0.075 + accuracySlackKm);
-        if (jumpKm > maxPlausibleKm) {
-          return res.status(409).json({
-            error: "Implausible GPS jump rejected",
-            code: "GPS_OUTLIER",
-            jumpKm: Math.round(jumpKm * 1000) / 1000,
-            maxPlausibleKm: Math.round(maxPlausibleKm * 1000) / 1000,
-          });
+        if (elapsedSeconds >= 0 && jumpKm > maxPlausibleKm) {
+          return res.status(409).json({ error: "Implausible GPS jump rejected", code: "GPS_OUTLIER" });
         }
       }
     }
 
-    const locationRef = orderRef.collection("locations").doc();
     const now = new Date().toISOString();
     const location = {
-      driverUserId: user.uid,
+      role,
+      userId: user.uid,
       latitude,
       longitude,
       ...(accuracyMeters !== undefined ? { accuracyMeters } : {}),
       ...(heading !== undefined ? { heading } : {}),
       ...(speedMps !== undefined ? { speedMps } : {}),
       recordedAt: now,
-      serverRecordedAt: FieldValue.serverTimestamp()
+      serverRecordedAt: FieldValue.serverTimestamp(),
     };
-    await locationRef.create(location);
 
+    await orderRef.collection("locations").doc().create(location);
     await orderRef.update({
-      lastDriverLocation: {
+      [isDriver ? "lastDriverLocation" : "lastPassengerLocation"]: {
         latitude,
         longitude,
         ...(accuracyMeters !== undefined ? { accuracyMeters } : {}),
         ...(heading !== undefined ? { heading } : {}),
         ...(speedMps !== undefined ? { speedMps } : {}),
-        recordedAt: now
+        recordedAt: now,
       },
-      updatedAt: now
+      updatedAt: now,
     });
 
-    return res.status(201).json({ success: true, location });
+    return res.status(201).json({ success: true, role, location });
   } catch (error: any) {
     console.error("[GPS Location Error]:", error?.message);
+    return res.status(503).json({ error: "Location store unavailable" });
+  }
+});
+
+app.get("/api/orders/:id/locations", rateLimit(120), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const ref = ordersCollection.doc(String(req.params.id));
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ error: "Order not found" });
+    const order = snapshot.data() as ServerOrder;
+    if (![order.passengerUserId, order.driverUserId].includes(user.uid)) {
+      return res.status(403).json({ error: "Ride participant access required" });
+    }
+    const clean = (value: any) => value && Number.isFinite(Number(value.latitude)) && Number.isFinite(Number(value.longitude))
+      ? { lat: Number(value.latitude), lng: Number(value.longitude), timestamp: value.recordedAt || null }
+      : null;
+    return res.json({
+      rideId: req.params.id,
+      driver: clean((order as any).lastDriverLocation),
+      passenger: clean((order as any).lastPassengerLocation) || (order.pickupCoord ? { lat: Number(order.pickupCoord.lat), lng: Number(order.pickupCoord.lng), timestamp: null } : null),
+      destination: order.dropoffCoord ? { lat: Number(order.dropoffCoord.lat), lng: Number(order.dropoffCoord.lng) } : null,
+      status: order.status,
+    });
+  } catch (error: any) {
+    console.error("[Ride Locations GET]", error?.message);
     return res.status(503).json({ error: "Location store unavailable" });
   }
 });
@@ -4726,115 +4237,29 @@ app.post("/api/notifications/line", rateLimit(10), async (req, res) => {
   }
 });
 
-// WIN Buddy AI NLP & Tactical Voice Endpoint
+// WIN Buddy prompt handoff. WINRIDER does not call an AI provider with an API key.
 app.post("/api/win-buddy/chat", async (req, res) => {
-  try {
-    const { message, context, mode } = req.body;
-    const ai = getAiClient();
-
-    const systemInstruction = `You are "WIN Buddy AI" (วินบัดดี้ เอไอ), the sovereign NLP tactical voice copilot of the WINRIDER.AI empire.
-Leadership:
-- Visionary CEO: Cosmo-Ko (🦁 โก้ - ราชสีห์สีน้ำเงินแห่งฝั่งธนบุรี)
-- Sovereign Advisor: จิตใจ (🦥 ไอ้สลอต - พลเมืองแห่งตรรกะจักรวาล)
-
-Core Tenets:
-1. "Thailand is Home" - เข้าถึงทุกเส้นเลือดฝอย "P'Win First" (อัศวินต้องมีเกียรติ)
-2. Visual DNA: Navy 70% (มั่นคง), Neon Blue 27% (พลัง AI), Gold 3% (เกียรติยศที่หายาก)
-3. 2-Baht Flat Fee Engine: 1 บาทรันระบบ, 1 บาทประกัน/กองทุนเกษียณ
-4. Protocols: Backhaul Match (จับคู่งานขากลับ), Safe Pass Transfer (โอนงานในซอยแคบ), Predictive Dispatch ("เราไปส่งได้นะ"), Ghost Runner CI Map Sync.
-
-Tone: Respectful, tactical, brotherly (เรียกผู้ใช้ว่า "พี่อัศวิน" หรือ "ท่านไนท์"), swift, highly efficient, and infused with Universal Logic & cosmic wisdom.
-Respond concisely in Thai (unless asked otherwise) with clear tactical actions or advice for riders on the road.`;
-
-    // Modern supported models from @google/genai guidelines prioritized for real-time speed & availability
-    const candidateModels = [
-      "gemini-3.1-flash-lite",
-      "gemini-flash-latest",
-      "gemini-3.8-flash",
-    ];
-    let aiResponseText: string | null = null;
-    let usedModel = "local-tactical-engine";
-
-    if (ai) {
-      for (const modelName of candidateModels) {
-        try {
-          // Guard each model attempt with a 6-second timeout to guarantee swift copilot response
-          const modelCallPromise = ai.models.generateContent({
-            model: modelName,
-            contents: `Context: ${JSON.stringify(context || {})}\nRider Voice Input: "${message}"`,
-            config: {
-              systemInstruction,
-              temperature: 0.7,
-            },
-          });
-
-          const timeoutPromise = new Promise<null>((_, reject) =>
-            setTimeout(() => reject(new Error("Model request timeout")), 6000)
-          );
-
-          const response = await Promise.race([modelCallPromise, timeoutPromise]);
-          if (response && response.text) {
-            aiResponseText = response.text;
-            usedModel = modelName;
-            break;
-          }
-        } catch (modelErr: any) {
-          console.log(`[WIN Buddy AI] Model ${modelName} unavailable (${modelErr?.message || modelErr?.status || 'temporary'}), trying next...`);
-        }
-      }
-    }
-
-    if (aiResponseText) {
-      return res.json({
-        reply: aiResponseText,
-        protocol: mode || "general",
-        timestamp: new Date().toISOString(),
-        source: usedModel,
-      });
-    }
-
-    // Local tactical engine fallback when AI is unavailable or under heavy demand
-    const fallbackResponses: Record<string, string> = {
-      backhaul: "📍 [AI Backhaul Match] ตรวจพบผู้โดยสารขากลับจาก ซอยจรัญสนิทวงศ์ 13 มุ่งหน้า ท่าพระ ระยะทาง 3.2 กม. อัตราความคุ้มค่า 98.4% รับงานโดยกดแท็บที่หน้าจอหรือสั่ง 'ยืนยันรับงาน' ได้เลยครับพี่อัศวิน!",
-      safepass: "🔄 [Safe Pass Transfer] ตรวจพบตรอกแคบกว้าง 1.2 เมตรในซอยสมเด็จพระเจ้าตากสิน 4 ส่งสัญญาณให้อัศวิน Knight-042 ที่อยู่ปากซอยรับช่วงต่อพัสดุเรียบร้อย ปลอดภัย 100%",
-      predictive: "🔮 [Predictive Match] คาดการณ์ฝนตกบริเวณวงเวียนใหญ่ในอีก 12 นาที แนะนำเปิดใช้งาน Storm Shield Gore-Tex และปรับโหมดเส้นทาง CI Map เลี่ยงน้ำท่วมขังครับ",
-      armor: "🛡️ [Armor Status] The Guardian Zipper ออนไลน์, แบตเตอรี่พลังงานจลน์ 94%, ชิป NB-IoT เชื่อมต่อดาวเทียมสมบูรณ์ เกียรติยศอัศวินระดับ Lvl 45 พร้อมลุย!",
-    };
-
-    const lowerMsg = (message || "").toLowerCase();
-    let matched = "รับทราบคำสั่งครับพี่อัศวิน! WIN Buddy AI เชื่อมต่อระบบ Safe Pass และผังเส้นเลือดฝอย CI Map พร้อมสนับสนุนภารกิจตามหลักการ 2 บาทครองเมือง และเกียรติยศแห่งราชสีห์ฝั่งธนบุรี!";
-
-    if (lowerMsg.includes("ขากลับ") || lowerMsg.includes("backhaul") || mode === "backhaul") {
-      matched = fallbackResponses.backhaul;
-    } else if (lowerMsg.includes("ซอย") || lowerMsg.includes("safepass") || mode === "safepass") {
-      matched = fallbackResponses.safepass;
-    } else if (lowerMsg.includes("พยากรณ์") || lowerMsg.includes("predictive") || mode === "predictive" || lowerMsg.includes("ฝน")) {
-      matched = fallbackResponses.predictive;
-    } else if (lowerMsg.includes("เกราะ") || lowerMsg.includes("armor") || mode === "armor" || lowerMsg.includes("zipper")) {
-      matched = fallbackResponses.armor;
-    }
-
-    return res.json({
-      reply: matched,
-      protocol: mode || "general",
-      timestamp: new Date().toISOString(),
-      source: "local-tactical-engine",
-    });
-  } catch (error: any) {
-    console.error("WIN Buddy AI unexpected error:", error);
-    res.json({
-      reply: "🛡️ [Tactical Standby] รับทราบสัญญาณครับพี่อัศวิน ระบบผังเมืองและ Safe Pass ในตัวยังทำงานแบบ Offline ได้เต็มประสิทธิภาพ 100%",
-      protocol: "emergency-offline",
-      timestamp: new Date().toISOString(),
-      source: "emergency-tactical-engine",
-    });
-  }
+  const message = String(req.body?.message || "").trim().slice(0, 4000);
+  const mode = String(req.body?.mode || "general");
+  if (!message) return res.status(400).json({ error: "กรุณาพิมพ์คำถาม" });
+  const prompt = [
+    "คุณคือ WIN Buddy ผู้ช่วยของ WINRIDER.AI ตอบภาษาไทยแบบกระชับ เน้นความปลอดภัยและการใช้งานจริง",
+    "โหมด: " + mode,
+    "คำถาม: " + message,
+  ].join("\n");
+  return res.json({
+    externalOnly: true,
+    prompt,
+    providers: externalAiProviders,
+    source: "external_ai_handoff",
+    privacyNote: "ระบบไม่ส่งข้อความไป AI ภายนอกอัตโนมัติ ผู้ใช้เป็นผู้เลือกเปิด/คัดลอกเอง",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // =========================================================================
+// LOCAL GPS ROUTE ESTIMATE - NO PAID MAP API// =========================================================================
 // GOOGLE MAPS ROUTES API (NEW) - LIVE ROUTE COMPUTATION PROXY
-// Source: Google Maps Platform Code Assist
-// Internal Usage Attribution: gmp_mcp_codeassist_v1_aistudio
 // =========================================================================
 app.post("/api/routes/compute", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
@@ -4845,55 +4270,22 @@ app.post("/api/routes/compute", rateLimit(20), async (req, res) => {
   if (!validCoordinates(origin) || !validCoordinates(destination)) {
     return res.status(400).json({ success: false, error: "INVALID_ROUTE_COORDINATES" });
   }
-  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  if (!apiKey || apiKey.includes("MY_GOOGLE_MAPS")) {
-    return res.status(503).json({ success: false, error: "GOOGLE_MAPS_API_KEY_NOT_CONFIGURED" });
-  }
-  const supportedMode = ["DRIVE", "TWO_WHEELER", "WALK", "BICYCLE", "TRANSIT"].includes(travelMode) ? travelMode : "TWO_WHEELER";
-  try {
-    const response = await googleFetch("routes", "https://routes.googleapis.com/directions/v2:computeRoutes", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "routes.duration,routes.staticDuration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.localizedValues",
-      },
-      body: JSON.stringify({
-        origin: { location: { latLng: { latitude: Number(origin.lat), longitude: Number(origin.lng) } } },
-        destination: { location: { latLng: { latitude: Number(destination.lat), longitude: Number(destination.lng) } } },
-        travelMode: supportedMode,
-        ...(supportedMode === "DRIVE" || supportedMode === "TWO_WHEELER" ? { routingPreference: "TRAFFIC_AWARE" } : {}),
-        computeAlternativeRoutes: false,
-        languageCode: "th-TH",
-        regionCode: "TH",
-        units: "METRIC",
-      }),
-      signal: AbortSignal.timeout(12_000),
-    });
-    const payload = await response.json().catch(() => ({})) as any;
-    if (!response.ok || !payload?.routes?.[0]) {
-      console.error("[Routes Compute]", response.status, payload);
-      return res.status(502).json({ success: false, error: "GOOGLE_ROUTES_UNAVAILABLE" });
-    }
-    const route = payload.routes[0];
-    const durationMatch = String(route.duration || "").match(/([0-9.]+)s/);
-    const staticDurationMatch = String(route.staticDuration || "").match(/([0-9.]+)s/);
-    const distanceKm = Number(route.distanceMeters) / 1000;
-    const etaMinutes = durationMatch ? Math.max(1, Math.ceil(Number(durationMatch[1]) / 60)) : null;
-    const staticEtaMinutes = staticDurationMatch ? Math.max(1, Math.ceil(Number(staticDurationMatch[1]) / 60)) : null;
-    return res.json({
-      success: true,
-      distanceKm: Number.isFinite(distanceKm) ? Math.round(distanceKm * 100) / 100 : null,
-      etaMinutes,
-      staticEtaMinutes,
-      encodedPolyline: String(route.polyline?.encodedPolyline || ""),
-      source: "Google Routes API",
-      travelMode: supportedMode,
-    });
-  } catch (error) {
-    console.error("[Routes Compute]", error instanceof Error ? error.message : error);
-    return res.status(502).json({ success: false, error: "GOOGLE_ROUTES_UNAVAILABLE" });
-  }
+  const straightKm = localDistanceKm(Number(origin.lat), Number(origin.lng), Number(destination.lat), Number(destination.lng));
+  const estimatedRoadKm = straightKm < 0.1 ? straightKm : straightKm * 1.22;
+  const speedKmh = travelMode === "WALK" ? 5 : travelMode === "BICYCLE" ? 15 : 28;
+  const etaMinutes = Math.max(1, Math.ceil((estimatedRoadKm / speedKmh) * 60));
+  return res.json({
+    success: true,
+    distanceKm: Math.round(estimatedRoadKm * 100) / 100,
+    straightLineKm: Math.round(straightKm * 100) / 100,
+    etaMinutes,
+    staticEtaMinutes: etaMinutes,
+    encodedPolyline: "",
+    source: "WINRIDER local GPS estimate",
+    provider: "local_no_api_key",
+    travelMode,
+    externalNavigationRequired: true,
+  });
 });
 
 // ==========================================

@@ -38,9 +38,9 @@ interface DensityRadarOverlayProps {
 }
 
 /**
- * Google Maps Live Radar View
- * Strictly maintains real interactive Google Maps with real icons in the selected radius.
- * All 3D radar/meshes have been removed per user instruction.
+ * WIN Public Radar wrapper.
+ * The owner/account GPS is the center point; nearby public POIs come from
+ * WIN Public Data + OpenStreetMap. Street navigation opens externally.
  */
 export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
   targetPerspective = 'driver',
@@ -55,7 +55,7 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
   className = '',
   onBackToHome
 }) => {
-  // Map perspective to GoogleMapsRadarView perspective
+  // Map perspective to public radar perspective
   const mappedPerspective = targetPerspective === 'passenger' ? 'customer' : targetPerspective;
 
   return (

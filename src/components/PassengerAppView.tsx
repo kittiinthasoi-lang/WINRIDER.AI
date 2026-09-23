@@ -1258,7 +1258,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       const message = reason.startsWith('GPS_')
         ? 'ไม่สามารถอ่านตำแหน่ง GPS ได้ กรุณาอนุญาต Location แล้วลองใหม่'
         : reason === 'DESTINATION_NOT_RESOLVED'
-          ? 'ค้นหาปลายทางไม่ได้ โปรดตรวจ GOOGLE_MAPS_API_KEY และการตั้งค่า Places API (New)'
+          ? 'ค้นหาปลายทางไม่ได้จากข้อมูลสาธารณะ กรุณาระบุชื่อสถานที่หรือเลือกจุดที่มีพิกัด'
           : reason === 'PICKUP_LOCATION_NOT_RESOLVED'
             ? 'ค้นหาจุดรับจริงไม่ได้ กรุณาระบุชื่อสถานที่และพื้นที่ให้ชัดเจน'
             : reason.includes('ACTIVE_ORDER_EXISTS')
@@ -3996,7 +3996,13 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 <RealGpsMapModal
   isOpen={showRealGpsModal}
   onClose={() => setShowRealGpsModal(false)}
-  destinationTitle={selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
+  rideId={activeLiveOrder?.id}
+  driverUserId={activeLiveOrder?.driverUserId}
+  driverName={activeLiveOrder?.driverName || currentMatchedDriver?.name || 'พี่วิน'}
+  passengerName={passengerProfileData.displayName || currentUserSession?.name || 'คุณ'}
+  pickupAddress={activeLiveOrder?.pickupLocation || ''}
+  pickupCoords={activeLiveOrder?.pickupCoord ? { latitude: activeLiveOrder.pickupCoord.lat, longitude: activeLiveOrder.pickupCoord.lng } : undefined}
+  destinationTitle={activeLiveOrder?.dropoffLocation || selectedDestination || 'ยังไม่ได้เลือกปลายทาง'}
   destinationCoords={
     activeLiveOrder?.dropoffCoord
       ? { latitude: activeLiveOrder.dropoffCoord.lat, longitude: activeLiveOrder.dropoffCoord.lng }
