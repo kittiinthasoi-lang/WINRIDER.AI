@@ -1730,6 +1730,12 @@ function getManualSettlementConfig() {
   return { configured, promptPayId, bankName, bankAccountNumber, accountName, lineUrl };
 }
 
+function getWithdrawalDailyLimit() {
+  const configured = Number(process.env.WINRIDER_WITHDRAWALS_PER_DAY || 3);
+  if (!Number.isInteger(configured) || configured < 1 || configured > 20) return 3;
+  return configured;
+}
+
 app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
@@ -1954,13 +1960,18 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
     
     let submissions: any[] = [];
     let withdrawals: any[] = [];
+    let withdrawalsToday = 0;
+    const withdrawalLimitPerDay = getWithdrawalDailyLimit();
+    const withdrawalDateKey = bangkokDateKey();
     try {
-      const [topupSnap, withdrawSnap] = await Promise.all([
-        ordersDb.collection("topup_submissions").where("userId", "==", user.uid).limit(10).get(),
-        ordersDb.collection("withdrawal_requests").where("userId", "==", user.uid).limit(10).get()
+      const [topupSnap, withdrawSnap, dailyCounterSnap] = await Promise.all([
+        ordersDb.collection("manual_topups").where("userId", "==", user.uid).limit(10).get(),
+        ordersDb.collection("withdrawal_requests").where("userId", "==", user.uid).limit(10).get(),
+        ordersDb.collection("withdrawal_daily_counters").doc(`${user.uid}_${withdrawalDateKey}`).get()
       ]);
       submissions = topupSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       withdrawals = withdrawSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      withdrawalsToday = Math.max(0, Number(dailyCounterSnap.data()?.count || 0));
     } catch {
       // index or fetch fallback
     }
@@ -1976,6 +1987,9 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
       availableSatang,
       balance: balanceSatang / 100,
       availableBalance: availableSatang / 100,
+      withdrawalLimitPerDay,
+      withdrawalsToday,
+      withdrawalsRemainingToday: Math.max(0, withdrawalLimitPerDay - withdrawalsToday),
       systemPromptPay: settlement,
       submissions,
       withdrawals
@@ -1991,6 +2005,9 @@ app.get("/api/wallet/me", rateLimit(30), async (req, res) => {
       availableSatang: 0,
       balance: 0.0,
       availableBalance: 0.0,
+      withdrawalLimitPerDay: getWithdrawalDailyLimit(),
+      withdrawalsToday: 0,
+      withdrawalsRemainingToday: getWithdrawalDailyLimit(),
       systemPromptPay: getManualSettlementConfig(),
       submissions: [],
       withdrawals: []
@@ -2007,8 +2024,8 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
   const accountName = String(req.body?.accountName || "").trim();
   const bankName = String(req.body?.bankName || "PromptPay").trim();
 
-  if (!Number.isSafeInteger(amountSatang) || amountSatang < 2000) {
-    return res.status(400).json({ error: "ยอดถอนขั้นต่ำคือ 20.00 บาท" });
+  if (!Number.isSafeInteger(amountSatang) || amountSatang < 1) {
+    return res.status(400).json({ error: "ยอดถอนต้องมากกว่า 0 บาท" });
   }
   if (!promptPayOrAccount || !accountName) {
     return res.status(400).json({ error: "กรุณาระบุบัญชีปลายทางและชื่อเจ้าของบัญชี" });
@@ -2018,13 +2035,24 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
     const walletRef = ordersDb.collection("wallets").doc(user.uid);
     let availableAfterSatang = 0;
     const withdrawRef = ordersDb.collection("withdrawal_requests").doc();
+    const withdrawalLimitPerDay = getWithdrawalDailyLimit();
+    const withdrawalDateKey = bangkokDateKey();
+    const dailyCounterRef = ordersDb.collection("withdrawal_daily_counters").doc(`${user.uid}_${withdrawalDateKey}`);
+    let withdrawalsTodayAfter = 0;
 
     await ordersDb.runTransaction(async (tx) => {
-      const snap = await tx.get(walletRef);
+      const [snap, dailyCounterSnap] = await Promise.all([
+        tx.get(walletRef),
+        tx.get(dailyCounterRef)
+      ]);
       const currentBalance = snap.exists ? Number(snap.data()?.balanceSatang || 0) : 0;
       const currentLocked = Math.max(0, Number(snap.data()?.lockedSatang || 0));
       const currentAvailable = Math.max(0, currentBalance - currentLocked);
       if (currentAvailable < amountSatang) throw new Error("INSUFFICIENT_AVAILABLE_BALANCE");
+
+      const withdrawalsToday = Math.max(0, Number(dailyCounterSnap.data()?.count || 0));
+      if (withdrawalsToday >= withdrawalLimitPerDay) throw new Error("DAILY_WITHDRAWAL_LIMIT_REACHED");
+      withdrawalsTodayAfter = withdrawalsToday + 1;
 
       const nextLocked = currentLocked + amountSatang;
       availableAfterSatang = currentBalance - nextLocked;
@@ -2033,6 +2061,14 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
         balanceSatang: currentBalance,
         lockedSatang: nextLocked,
         availableSatang: availableAfterSatang,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      tx.set(dailyCounterRef, {
+        userId: user.uid,
+        dateKey: withdrawalDateKey,
+        count: withdrawalsTodayAfter,
+        limit: withdrawalLimitPerDay,
         updatedAt: FieldValue.serverTimestamp()
       }, { merge: true });
 
@@ -2046,6 +2082,9 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
         bankName,
         status: "WAITING_ADMIN",
         settlementMode: "MANUAL_BANK_TRANSFER",
+        withdrawalDateKey,
+        dailySequence: withdrawalsTodayAfter,
+        dailyLimit: withdrawalLimitPerDay,
         createdAt: FieldValue.serverTimestamp()
       });
     });
@@ -2054,11 +2093,20 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
       status: "WAITING_ADMIN",
       withdrawalId: withdrawRef.id,
       availableBalance: availableAfterSatang / 100,
+      withdrawalsToday: withdrawalsTodayAfter,
+      withdrawalLimitPerDay,
+      withdrawalsRemainingToday: Math.max(0, withdrawalLimitPerDay - withdrawalsTodayAfter),
       message: `ส่งคำขอถอนเงิน ฿${(amountSatang / 100).toFixed(2)} แล้ว ระบบล็อกยอดไว้จนกว่า Admin จะโอนเงินจริงและยืนยันรายการ`
     });
   } catch (err: any) {
     if (err?.message === "INSUFFICIENT_AVAILABLE_BALANCE") {
       return res.status(400).json({ error: "ยอดที่ถอนได้ไม่เพียงพอ เนื่องจากมีเงินบางส่วนถูกล็อกไว้ในคำขอถอนที่กำลังรอตรวจ" });
+    }
+    if (err?.message === "DAILY_WITHDRAWAL_LIMIT_REACHED") {
+      return res.status(429).json({
+        error: `วันนี้ถอนครบ ${getWithdrawalDailyLimit()} ครั้งแล้ว กรุณาถอนใหม่หลังเที่ยงคืนเวลาไทย`,
+        withdrawalLimitPerDay: getWithdrawalDailyLimit()
+      });
     }
     console.error("withdrawal error:", err);
     return res.status(500).json({ error: "เกิดข้อผิดพลาดในการทำรายการถอนเงิน กรุณาลองใหม่อีกครั้ง" });
@@ -2484,8 +2532,8 @@ app.post("/api/admin/system-payout-request", rateLimit(10), async (req, res) => 
   const bankName = String(req.body?.bankName || "").trim().slice(0, 120);
   const bankAccountNumber = String(req.body?.bankAccountNumber || "").trim().slice(0, 80);
   const accountName = String(req.body?.accountName || "").trim().slice(0, 160);
-  if (!Number.isSafeInteger(amountSatang) || amountSatang < 2000) {
-    return res.status(400).json({ error: "ยอดถอนรายได้ขั้นต่ำคือ 20.00 บาท" });
+  if (!Number.isSafeInteger(amountSatang) || amountSatang < 1) {
+    return res.status(400).json({ error: "ยอดถอนรายได้ต้องมากกว่า 0 บาท" });
   }
   if (!bankName || !bankAccountNumber || !accountName) {
     return res.status(400).json({ error: "กรุณากรอกธนาคาร เลขบัญชี และชื่อบัญชีให้ครบ" });
