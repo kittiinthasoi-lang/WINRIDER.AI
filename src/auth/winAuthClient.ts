@@ -1,4 +1,4 @@
-import type { UserDoc, UserRole } from '../types/auth';
+import type { RegistrationProfile, UserDoc, UserRole } from '../types/auth';
 
 const TOKEN_KEY = 'winrider.auth.session';
 
@@ -102,10 +102,10 @@ export async function signInWinAuth(email: string, password: string) {
   return storeSession(payload);
 }
 
-export async function registerWinAuth(email: string, password: string, role: UserRole) {
+export async function registerWinAuth(email: string, password: string, role: UserRole, registration: RegistrationProfile) {
   const payload = await request('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email: email.trim(), password, role }),
+    body: JSON.stringify({ email: email.trim(), password, role, registration }),
   });
   return storeSession(payload);
 }
