@@ -4101,6 +4101,33 @@ app.post("/api/orders/:id/location", rateLimit(120), async (req, res) => {
       return res.status(409).json({ error: "GPS updates are not allowed for this ride state" });
     }
 
+    const previous = (order as any).lastDriverLocation;
+    if (previous && Number.isFinite(Number(previous.latitude)) && Number.isFinite(Number(previous.longitude))) {
+      const previousAt = Date.parse(String(previous.recordedAt || ""));
+      if (Number.isFinite(previousAt)) {
+        const elapsedSeconds = (Date.now() - previousAt) / 1000;
+        if (elapsedSeconds < 0) {
+          return res.status(409).json({ error: "Out-of-order GPS sample", code: "GPS_OUT_OF_ORDER" });
+        }
+        // Allow a generous urban upper bound plus GPS-accuracy slack. This catches
+        // impossible jumps without penalizing normal tunnels/reacquisition noise.
+        const jumpKm = distanceKmBetween(
+          { lat: Number(previous.latitude), lng: Number(previous.longitude) },
+          { lat: latitude, lng: longitude }
+        );
+        const accuracySlackKm = Math.max(Number(previous.accuracyMeters || 0), Number(accuracyMeters || 0)) / 1000;
+        const maxPlausibleKm = Math.max(0.75, elapsedSeconds * 0.075 + accuracySlackKm);
+        if (jumpKm > maxPlausibleKm) {
+          return res.status(409).json({
+            error: "Implausible GPS jump rejected",
+            code: "GPS_OUTLIER",
+            jumpKm: Math.round(jumpKm * 1000) / 1000,
+            maxPlausibleKm: Math.round(maxPlausibleKm * 1000) / 1000,
+          });
+        }
+      }
+    }
+
     const locationRef = orderRef.collection("locations").doc();
     const now = new Date().toISOString();
     const location = {
