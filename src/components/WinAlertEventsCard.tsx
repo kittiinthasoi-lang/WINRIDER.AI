@@ -6,6 +6,7 @@ import {
   BookmarkCheck,
   CalendarDays,
   CheckCircle2,
+  Crosshair,
   ExternalLink,
   Clock,
   Loader2,
@@ -21,6 +22,8 @@ import { playTactileBlip, speakThaiText } from '../utils/audio';
 import { sendBrowserNotification } from '../utils/notifications';
 import { auth } from '../firebase';
 import { loadAccountPreference, saveAccountPreference } from '../services/accountPersistenceService';
+import { useRealGeolocation } from '../hooks/useRealGeolocation';
+import { buildGoogleMapsCoordinateUrl } from '../services/googleMapsExternal';
 import { LAUNCH_TIMELINE } from '../data/bibleData';
 
 interface WinAlertEventsCardProps {
@@ -75,6 +78,7 @@ const NOTIFIED_DATE_KEY = 'winrider_daily_events_last_notified';
 export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
   audioEnabled, onBookEventRide, onSelectEvent, className = '',
 }) => {
+  const geo = useRealGeolocation(false);
   const [selectedCategory, setSelectedCategory] = useState<'all' | WinAlertCategory>('all');
   const [events, setEvents] = useState<WinAlertEvent[]>([]);
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
@@ -180,7 +184,7 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
           <div>
             <div className="flex flex-wrap items-center gap-2"><h3 id="daily-events-title" className="text-base font-black text-white">Win Alert เราไปส่งได้นะ</h3><span className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-300">ทั่วประเทศไทย</span></div>
             <p className="mt-1 text-sm text-slate-300">{formatDay(eventDate)}</p>
-            <p className="mt-1 text-sm text-slate-400">กดสถานที่เพื่อให้ระบบขอ GPS ปัจจุบันและค้นหาปลายทาง พร้อมแสดงระยะทาง/เวลาแบบประมาณการก่อนเข้าสู่การจอง (เส้นทางถนนจริงปิดชั่วคราว)</p>
+            <p className="mt-1 text-sm text-slate-400">รวมคอนเสิร์ต กีฬา เทศกาล ตลาด และอีเวนต์จากข้อมูลสาธารณะฟรี • ถ้ามี GPS จะเรียงใกล้คุณก่อน • การนำทางจริงเปิดแอปภายนอก</p>
           </div>
         </div>
         <button type="button" onClick={() => void loadEvents()} disabled={loading} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 text-sm font-bold text-cyan-200 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />อัปเดตวันนี้</button>
@@ -201,7 +205,7 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
         ))}
       </div>
 
-      {loading && <div className="flex min-h-36 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 text-sm text-slate-300"><Loader2 className="h-5 w-5 animate-spin text-cyan-300" />กำลังตรวจสอบ Win Alert และเตรียมข้อมูลสถานที่จริงของวันนี้...</div>}
+      {loading && <div className="flex min-h-36 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 text-sm text-slate-300"><Loader2 className="h-5 w-5 animate-spin text-cyan-300" />กำลังรวม Win Alert จาก Public Data ฟรีของวันนี้...</div>}
       {!loading && errorMessage && <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-100"><div className="flex gap-2"><AlertCircle className="h-5 w-5 shrink-0" /><div><p className="font-bold">ยังโหลด Win Alert ไม่ได้</p><p className="mt-1 text-rose-200/80">{errorMessage}</p><p className="mt-2 text-xs text-slate-400">ระบบไม่แสดงกิจกรรมจำลองแทนข้อมูลจริง</p></div></div></div>}
       {!loading && !errorMessage && filteredEvents.length === 0 && <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center"><CalendarDays className="mx-auto h-8 w-8 text-slate-500" /><p className="mt-3 font-bold text-white">ไม่พบสถานที่/กิจกรรมจริงในหมวดนี้สำหรับวันนี้</p><p className="mt-1 text-sm text-slate-400">สถานที่/งานที่จัดหลายวันจะแสดงทุกวันจนถึงวันสิ้นสุดโดยอัตโนมัติ</p></div>}
 
@@ -214,7 +218,7 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
           <h4 className="mt-3 text-base font-black leading-snug text-white">{event.title}</h4>
           <div className="mt-3 space-y-2 text-sm text-slate-300">
             <div className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" /><span>{event.venueName}{event.venueArea ? ` • ${event.venueArea}` : ''}</span></div>
-            <div className="flex items-start gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><span>{formatDateTime(event.startAt)}{event.endAt ? ` – ${formatDateTime(event.endAt)}` : ''}</span></div>
+            <div className="flex items-start gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><span>{formatDateTime(event.startAt)}{event.endAt ? ` – ${formatDateTime(event.endAt)}` : ''}</span></div>{typeof event.distanceKm === 'number' && <div className="flex items-center gap-2 text-xs font-bold text-cyan-300"><Crosshair className="h-3.5 w-3.5" />ประมาณ {event.distanceKm.toFixed(1)} กม. จากตำแหน่งคุณ (เส้นตรง)</div>}
             {typeof event.attendance === 'number' && event.attendance > 0 && (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
                 <Users className="h-3.5 w-3.5 shrink-0" />
@@ -231,7 +235,7 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
             )}
             <p className="text-[10px] font-semibold text-slate-500">แหล่งข้อมูล: {event.sourceName}</p>
           </div>
-          <button type="button" onClick={(clickEvent) => { clickEvent.stopPropagation(); bookRide(event); }} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 px-4 text-sm font-black text-slate-950"><Navigation className="h-4 w-4" />คำนวณระยะทางจริง & เรียกพี่วิน</button>
+          <div className="mt-4 grid grid-cols-2 gap-2"><a href={buildGoogleMapsCoordinateUrl({ latitude: event.latitude, longitude: event.longitude })} target="_blank" rel="noreferrer" onClick={(clickEvent) => clickEvent.stopPropagation()} className="flex min-h-11 items-center justify-center gap-1 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 text-xs font-black text-emerald-300"><ExternalLink className="h-4 w-4" />แผนที่ภายนอก</a><button type="button" onClick={(clickEvent) => { clickEvent.stopPropagation(); bookRide(event); }} className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 px-3 text-xs font-black text-slate-950"><Navigation className="h-4 w-4" />เรียกพี่วินไปงาน</button></div>{event.sourceUrl && <a href={event.sourceUrl} target="_blank" rel="noreferrer" onClick={(clickEvent) => clickEvent.stopPropagation()} className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-cyan-300"><ExternalLink className="h-3 w-3" />ดูข้อมูลต้นทาง: {event.sourceName}</a>}
         </article>;
       })}</div>}
 
@@ -259,7 +263,7 @@ export const WinAlertEventsCard: React.FC<WinAlertEventsCardProps> = ({
         </div>
       </section>
 
-      {selectedEventModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="event-detail-title"><div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-cyan-400/30 bg-[#071126] p-5 text-slate-100 shadow-2xl"><div className="flex items-start justify-between gap-3"><div><span className={`inline-block rounded-full border px-2.5 py-1 text-xs font-bold ${categoryMeta[selectedEventModal.category].className}`}>{categoryMeta[selectedEventModal.category].icon} {categoryMeta[selectedEventModal.category].label}</span><h3 id="event-detail-title" className="mt-3 text-xl font-black">{selectedEventModal.title}</h3></div><button type="button" onClick={() => setSelectedEventModal(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5" aria-label="ปิดรายละเอียด"><X className="h-5 w-5" /></button></div><div className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm"><p className="flex gap-2"><MapPin className="h-4 w-4 shrink-0 text-cyan-300" /><span>{selectedEventModal.venueName}{selectedEventModal.venueArea ? ` • ${selectedEventModal.venueArea}` : ''}</span></p><p className="flex gap-2"><CalendarDays className="h-4 w-4 shrink-0 text-amber-300" /><span>{formatDateTime(selectedEventModal.startAt)}{selectedEventModal.endAt ? ` – ${formatDateTime(selectedEventModal.endAt)}` : ''}</span></p>{typeof selectedEventModal.attendance === 'number' && selectedEventModal.attendance > 0 && (<p className="flex items-center gap-2 font-semibold text-amber-300"><Users className="h-4 w-4 shrink-0" /><span>คาดการณ์ผู้เข้าร่วม: ~{selectedEventModal.attendance.toLocaleString('th-TH')} คน {selectedEventModal.attendance >= 2500 ? '(จุดหนาแน่นสูง แนะนำเลี่ยงรถติดด้วยวิน)' : ''}</span></p>)}</div>{selectedEventModal.description && (<div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-950/30 p-4 text-sm leading-relaxed text-slate-200"><p className="mb-1 font-bold text-cyan-300">รายละเอียดกิจกรรม & ข้อแนะนำการเดินทาง:</p><p>{selectedEventModal.description}</p></div>)}<p className="mt-4 text-xs text-slate-500">รหัสผู้ให้บริการ: {selectedEventModal.providerEventId} • {selectedEventModal.sourceName}</p>
+      {selectedEventModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="event-detail-title"><div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-cyan-400/30 bg-[#071126] p-5 text-slate-100 shadow-2xl"><div className="flex items-start justify-between gap-3"><div><span className={`inline-block rounded-full border px-2.5 py-1 text-xs font-bold ${categoryMeta[selectedEventModal.category].className}`}>{categoryMeta[selectedEventModal.category].icon} {categoryMeta[selectedEventModal.category].label}</span><h3 id="event-detail-title" className="mt-3 text-xl font-black">{selectedEventModal.title}</h3></div><button type="button" onClick={() => setSelectedEventModal(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5" aria-label="ปิดรายละเอียด"><X className="h-5 w-5" /></button></div><div className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm"><p className="flex gap-2"><MapPin className="h-4 w-4 shrink-0 text-cyan-300" /><span>{selectedEventModal.venueName}{selectedEventModal.venueArea ? ` • ${selectedEventModal.venueArea}` : ''}</span></p><p className="flex gap-2"><CalendarDays className="h-4 w-4 shrink-0 text-amber-300" /><span>{formatDateTime(selectedEventModal.startAt)}{selectedEventModal.endAt ? ` – ${formatDateTime(selectedEventModal.endAt)}` : ''}</span></p>{typeof selectedEventModal.attendance === 'number' && selectedEventModal.attendance > 0 && (<p className="flex items-center gap-2 font-semibold text-amber-300"><Users className="h-4 w-4 shrink-0" /><span>คาดการณ์ผู้เข้าร่วม: ~{selectedEventModal.attendance.toLocaleString('th-TH')} คน {selectedEventModal.attendance >= 2500 ? '(จุดหนาแน่นสูง แนะนำเลี่ยงรถติดด้วยวิน)' : ''}</span></p>)}</div>{selectedEventModal.description && (<div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-950/30 p-4 text-sm leading-relaxed text-slate-200"><p className="mb-1 font-bold text-cyan-300">รายละเอียดกิจกรรม & ข้อแนะนำการเดินทาง:</p><p>{selectedEventModal.description}</p></div>)}<p className="mt-4 text-xs text-slate-500">รหัสข้อมูล: {selectedEventModal.providerEventId} • {selectedEventModal.sourceName}</p>{selectedEventModal.sourceUrl && <a href={selectedEventModal.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-cyan-300"><ExternalLink className="h-3.5 w-3.5" />เปิดข้อมูลต้นทาง</a>}
 <div className="mt-3 flex flex-wrap gap-2">
   {selectedEventModal.sourceUrl && <a href={selectedEventModal.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-bold text-slate-200"><ExternalLink className="h-3.5 w-3.5" />ดูแหล่งข้อมูล</a>}
   {selectedEventModal.ticketUrl && selectedEventModal.ticketUrl !== selectedEventModal.sourceUrl && <a href={selectedEventModal.ticketUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 text-xs font-bold text-amber-200"><ExternalLink className="h-3.5 w-3.5" />ดูหน้าบัตร/กิจกรรม</a>}

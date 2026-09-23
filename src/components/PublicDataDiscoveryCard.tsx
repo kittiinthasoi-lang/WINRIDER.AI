@@ -50,8 +50,8 @@ export const PublicDataDiscoveryCard: React.FC<Props> = ({ enabled = false }) =>
     <section className="rounded-3xl border border-cyan-400/15 bg-[#08152E] p-4 shadow-lg">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-cyan-300" /><h2 className="text-sm font-black text-white">ข้อมูลสาธารณะประเทศไทย</h2><span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[8px] font-black text-emerald-300">FREE • SOURCE DIRECT</span></div>
-          <p className="mt-1 text-[9px] text-slate-500">ข้อมูลสาธารณะเพื่อการอ้างอิงเท่านั้น • ไม่ใช่แผนที่ในแอป • เปิด Google Maps ภายนอกเมื่อผู้ใช้เลือก</p>
+          <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-cyan-300" /><h2 className="text-sm font-black text-white">ข้อมูลสาธารณะประเทศไทย</h2><span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[8px] font-black text-emerald-300">FREE • PUBLIC DATA</span></div>
+          <p className="mt-1 text-[9px] text-slate-500">ข้อมูลสาธารณะเพื่อการอ้างอิง • หมวดกิจกรรมใช้ชุดเดียวกับ WIN Alert • ไม่มีแผนที่เสียเงินในแอป • เปิดแผนที่ภายนอกเมื่อผู้ใช้เลือก</p>
         </div>
         <div className="flex items-center gap-2"><div className="flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-950/60 px-2"><Search className="h-3.5 w-3.5 text-slate-500" /><input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void load(); }} placeholder="ค้นหาทั่วไทย..." className="w-36 bg-transparent py-2 text-[10px] text-white outline-none placeholder:text-slate-600" /></div><button onClick={() => void load()} disabled={loading} className="rounded-xl border border-slate-700 bg-slate-900 p-2 text-slate-300"><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /></button></div>
       </div>
