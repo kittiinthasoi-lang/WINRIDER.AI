@@ -184,8 +184,8 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
       setWithdrawError(`ยอดถอนต้องไม่เกินยอดที่ถอนได้ (฿${availableBalance.toFixed(2)})`);
       return;
     }
-    if (withdrawAmount < 20) {
-      setWithdrawError('ยอดถอนขั้นต่ำคือ 20.00 บาท');
+    if (withdrawAmount <= 0) {
+      setWithdrawError('ยอดถอนต้องมากกว่า 0 บาท');
       return;
     }
     if (!withdrawDestination.trim()) {
@@ -404,10 +404,15 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
             <span className="font-mono text-lg font-black text-[#FFD700]">฿{availableBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
           </div>
 
+          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-3 text-xs text-slate-300">
+            ถอนเงินได้ทุกบทบาท ไม่มีขั้นต่ำ • วันนี้ใช้ไป <strong>{walletData?.withdrawalsToday ?? 0}/{walletData?.withdrawalLimitPerDay ?? 3}</strong> ครั้ง
+            <span className="ml-1 text-cyan-300">เหลือ {walletData?.withdrawalsRemainingToday ?? 3} ครั้ง</span>
+          </div>
+
           <div className="grid gap-3">
             <input
               type="number"
-              min="20"
+              min="0.01"
               step="0.01"
               value={withdrawAmount || ''}
               onChange={(e) => setWithdrawAmount(Number(e.target.value))}
@@ -437,7 +442,7 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
           <button
             type="button"
             onClick={() => void handleWithdrawSubmit()}
-            disabled={withdrawBusy || availableBalance <= 0}
+            disabled={withdrawBusy || availableBalance <= 0 || (walletData?.withdrawalsRemainingToday ?? 3) <= 0}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-300 py-3.5 text-sm font-black text-slate-950 disabled:opacity-40"
           >
             {withdrawBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
