@@ -698,6 +698,45 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
   }
 });
 
+
+app.patch("/api/shop/listings/:id", rateLimit(RATE_LIMITS["/api/shop/listings"]), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const id = String(req.params.id || "").trim();
+  const action = String(req.body?.action || "").trim().toUpperCase();
+  if (!id || action !== "UNPUBLISH") return res.status(400).json({ error: "Invalid listing action" });
+  try {
+    const ref = ordersDb.collection("marketListings").doc(id);
+    let result: any = null;
+    await ordersDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error("LISTING_NOT_FOUND");
+      const listing: any = snap.data() || {};
+      if (String(listing.sellerUserId || "") !== user.uid && !isSuperAdminToken(user)) throw new Error("FORBIDDEN");
+      if (String(listing.status || "") === "unpublished") {
+        result = listing;
+        return;
+      }
+      const updatedAt = new Date().toISOString();
+      tx.update(ref, { status: "unpublished", unpublishedAt: updatedAt, updatedAt });
+      tx.set(ordersDb.collection("audit_logs").doc(), {
+        action: "MARKET_LISTING_UNPUBLISHED",
+        listingId: id,
+        actorUid: user.uid,
+        sellerUserId: String(listing.sellerUserId || ""),
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      result = { ...listing, status: "unpublished", unpublishedAt: updatedAt, updatedAt };
+    });
+    return res.json({ ok: true, listing: result });
+  } catch (error: any) {
+    if (error?.message === "LISTING_NOT_FOUND") return res.status(404).json({ error: "Listing not found" });
+    if (error?.message === "FORBIDDEN") return res.status(403).json({ error: "Only the listing owner may unpublish it" });
+    console.error("[Shop Listing PATCH]", error?.message);
+    return res.status(503).json({ error: "อัปเดตรายการสินค้าไม่สำเร็จ" });
+  }
+});
+
 // WINRIDER.AI Public Data Layer
 // Source of truth: TAT Data Catalog CKAN metadata + its current JSON resource.
 // Public-source records are source-driven and do NOT require Admin Verify.
