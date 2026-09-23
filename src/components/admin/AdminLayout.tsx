@@ -36,6 +36,7 @@ import { AdminTopupReviewView } from './AdminTopupReviewView';
 import { AdminSystemHealthView } from './AdminSystemHealthView';
 import { AdminPaymentProfilesView } from './AdminPaymentProfilesView';
 import { AdminPublicDataView } from './AdminPublicDataView';
+import { AdminOperationsView } from './AdminOperationsView';
 
 interface AdminLayoutProps {
   adminLevel: AdminLevel;
@@ -52,13 +53,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onSwitchAdminLevel,
   onSelectOwnerPersona
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'operations' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
 
-  const tabs: { id: 'dashboard' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
+  const tabs: { id: 'dashboard' | 'operations' | 'health' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
     { 
       id: 'dashboard', 
       label: 'ภาพรวมระบบ', 
       icon: <img src={WIN_IMAGES.admin.overview} alt="ภาพรวม" className="w-5 h-5 rounded-md object-cover ring-1 ring-cyan-400/50 shadow-sm" /> 
+    },
+    {
+      id: 'operations',
+      label: 'Operations',
+      icon: <HeartPulse className="w-5 h-5" />
     },
     { 
       id: 'health', 
@@ -257,6 +263,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {activeTab === 'dashboard' && (
           <AdminDashboardView onNavigateTab={(t) => setActiveTab(t)} />
         )}
+        {activeTab === 'operations' && <AdminOperationsView onOpenTopups={() => setActiveTab('topups')} />}
         {activeTab === 'health' && <AdminSystemHealthView />}
         {activeTab === 'kyc' && (
           <AdminKycView adminLevel={adminLevel} />

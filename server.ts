@@ -3081,10 +3081,11 @@ app.get("/api/admin/ops/overview", rateLimit(30), async (req, res) => {
   if (!user) return;
   if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Admin access required" });
   try {
-    const [ridesSnap, sosSnap, knightsSnap] = await Promise.all([
+    const [ridesSnap, sosSnap, knightsSnap, topupsSnap] = await Promise.all([
       ordersDb.collection("rides").orderBy("createdAt", "desc").limit(200).get(),
       ordersDb.collection("sosIncidents").where("status", "in", ["open", "acknowledged"]).limit(100).get(),
       ordersDb.collection("knights").where("isOnline", "==", true).limit(300).get(),
+      ordersDb.collection("topup_submissions").where("status", "==", "WAITING_ADMIN").limit(100).get(),
     ]);
     const rides = ridesSnap.docs.map((doc) => doc.data() as any);
     const activeStatuses = new Set(["pending", "accepted", "arriving", "picked_up", "in_progress"]);
@@ -3098,12 +3099,128 @@ app.get("/api/admin/ops/overview", rateLimit(30), async (req, res) => {
         return Number.isFinite(heartbeat) && Date.now() - heartbeat <= 120000;
       }).length,
       openSosIncidents: sosSnap.size,
+      pendingTopups: topupsSnap.size,
       sosIncidents: sosSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).slice(0, 100),
       recentRides: rides.slice(0, 50),
     });
   } catch (error: any) {
     console.error("[Admin Ops Overview]", error?.message);
     return res.status(503).json({ error: "Operations overview unavailable" });
+  }
+});
+
+
+app.post("/api/admin/ops/ride-action", rateLimit(20), async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  const rideId = String(req.body?.rideId || "").trim();
+  const action = String(req.body?.action || "").trim().toUpperCase();
+  if (!rideId || !["REDISPATCH", "CANCEL"].includes(action)) {
+    return res.status(400).json({ error: "Invalid ride action" });
+  }
+  try {
+    const ref = ordersDb.collection("rides").doc(rideId);
+    let result: any = null;
+    await ordersDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error("RIDE_NOT_FOUND");
+      const ride: any = snap.data() || {};
+      const activeStatuses = new Set(["pending", "accepted", "heading_pickup", "picked_up", "in_transit"]);
+      if (!activeStatuses.has(String(ride.status))) throw new Error("RIDE_NOT_ACTIVE");
+      const now = new Date().toISOString();
+
+      if (action === "REDISPATCH") {
+        if (String(ride.status) !== "pending") throw new Error("REDISPATCH_PENDING_ONLY");
+        tx.update(ref, {
+          offeredDriverId: null,
+          offerExpiresAt: null,
+          dispatchCandidateIndex: -1,
+          dispatchAttempt: FieldValue.increment(1),
+          updatedAt: now,
+        });
+        result = { ...ride, offeredDriverId: null, offerExpiresAt: null, dispatchCandidateIndex: -1, updatedAt: now };
+      } else {
+        tx.update(ref, {
+          status: "cancelled",
+          cancellationReason: "admin_operations_cancelled",
+          cancelledBy: adminUser.uid,
+          updatedAt: now,
+        });
+        if (ride.driverUserId) {
+          tx.set(ordersDb.collection("knights").doc(String(ride.driverUserId)), {
+            activeRideId: FieldValue.delete(),
+            lastRideFinishedAt: now,
+          }, { merge: true });
+        }
+        result = { ...ride, status: "cancelled", cancellationReason: "admin_operations_cancelled", updatedAt: now };
+      }
+
+      tx.set(ordersDb.collection("audit_logs").doc(), {
+        action: action === "REDISPATCH" ? "ADMIN_RIDE_REDISPATCH" : "ADMIN_RIDE_CANCEL",
+        rideId,
+        actorUid: adminUser.uid,
+        actorType: "super_admin",
+        previousStatus: String(ride.status || ""),
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+    if (result) resilientOrdersStore.set(rideId, result);
+    return res.json({ success: true, ride: result });
+  } catch (error: any) {
+    if (error?.message === "RIDE_NOT_FOUND") return res.status(404).json({ error: "Ride not found" });
+    if (error?.message === "RIDE_NOT_ACTIVE") return res.status(409).json({ error: "Ride is no longer active" });
+    if (error?.message === "REDISPATCH_PENDING_ONLY") return res.status(409).json({ error: "Only pending rides can be re-dispatched" });
+    console.error("[Admin Ride Action]", error?.message);
+    return res.status(503).json({ error: "Ride operation failed" });
+  }
+});
+
+app.post("/api/admin/ops/sos-action", rateLimit(20), async (req, res) => {
+  const adminUser = await requireSuperAdmin(req, res);
+  if (!adminUser) return;
+  const incidentId = String(req.body?.incidentId || "").trim();
+  const action = String(req.body?.action || "").trim().toUpperCase();
+  if (!incidentId || !["ACKNOWLEDGE", "RESOLVE"].includes(action)) {
+    return res.status(400).json({ error: "Invalid SOS action" });
+  }
+  try {
+    const ref = ordersDb.collection("sosIncidents").doc(incidentId);
+    await ordersDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error("SOS_NOT_FOUND");
+      const incident: any = snap.data() || {};
+      const current = String(incident.status || "open");
+      const next = action === "ACKNOWLEDGE" ? "acknowledged" : "resolved";
+      if (action === "ACKNOWLEDGE" && current !== "open") throw new Error("INVALID_SOS_TRANSITION");
+      if (action === "RESOLVE" && !["open", "acknowledged"].includes(current)) throw new Error("INVALID_SOS_TRANSITION");
+      tx.update(ref, {
+        status: next,
+        updatedAt: new Date().toISOString(),
+        ...(action === "ACKNOWLEDGE" ? { acknowledgedBy: adminUser.uid, acknowledgedAt: FieldValue.serverTimestamp() } : { resolvedBy: adminUser.uid, resolvedAt: FieldValue.serverTimestamp() }),
+      });
+      tx.set(ref.collection("audit").doc(), {
+        action: "ADMIN_SOS_" + action,
+        fromStatus: current,
+        toStatus: next,
+        actorUid: adminUser.uid,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      tx.set(ordersDb.collection("audit_logs").doc(), {
+        action: "ADMIN_SOS_" + action,
+        incidentId,
+        actorUid: adminUser.uid,
+        actorType: "super_admin",
+        fromStatus: current,
+        toStatus: next,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+    return res.json({ success: true, status: action === "ACKNOWLEDGE" ? "acknowledged" : "resolved" });
+  } catch (error: any) {
+    if (error?.message === "SOS_NOT_FOUND") return res.status(404).json({ error: "SOS incident not found" });
+    if (error?.message === "INVALID_SOS_TRANSITION") return res.status(409).json({ error: "Invalid SOS state transition" });
+    console.error("[Admin SOS Action]", error?.message);
+    return res.status(503).json({ error: "SOS operation failed" });
   }
 });
 
