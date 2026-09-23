@@ -8,7 +8,7 @@ import { WinScanAndPayModal } from './WinScanAndPayModal';
 import { MerchantParcelPickupMapModal } from './MerchantParcelPickupMapModal';
 import { ProfileCustomizerModal, ProfileCustomizationData } from './ProfileCustomizerModal';
 import { DensityRadarOverlay } from './DensityRadarOverlay';
-import { AIProductPhotoVerifier, AIVerificationResult } from './AIProductPhotoVerifier';
+import { AdminPhotoEvidencePicker, PhotoEvidenceResult } from './AdminPhotoEvidencePicker';
 import { CyberGraphic } from './CyberGraphic';
 import { getMerchantTier, calculateLevelMaxXp, getLevelDifficultyMetrics } from '../data/tierHierarchyData';
 import { playTactileBlip, playRadarScan, playLevelUpFanfare } from '../utils/audio';
@@ -209,7 +209,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   const [newProdStock, setNewProdStock] = useState<string>('');
   const [newProdDesc, setNewProdDesc] = useState<string>('');
   const [newProdIsFlash, setNewProdIsFlash] = useState<boolean>(false);
-  const [newProdAiVerified, setNewProdAiVerified] = useState<AIVerificationResult | null>(null);
+  const [newProdPhoto, setNewProdPhoto] = useState<PhotoEvidenceResult | null>(null);
 
   const [flashSales, setFlashSales] = useState<FlashSaleItem[]>([]);
   const [deliveries, setDeliveries] = useState<Array<{ id: string; item: string; destination: string; eta: string; status: string; knight: string }>>([]);
@@ -377,53 +377,48 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
   };
 
   // Owner: Add new product listing
-  const handleAddNewProductListing = (e: React.FormEvent) => {
+  const handleAddNewProductListing = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProdTitle || !newProdPrice) return;
-
-    const newProd: StoreCatalogProduct = {
-      id: 'prod-' + Date.now(),
-      title: newProdTitle,
-      category: newProdCategory,
-      price: parseFloat(newProdPrice) || 199,
-      originalPrice: parseFloat(newProdOrigPrice) || (parseFloat(newProdPrice) * 1.3),
-      discountBadge: newProdOrigPrice ? `ลด ${Math.round((1 - (parseFloat(newProdPrice) / parseFloat(newProdOrigPrice))) * 100)}%` : undefined,
-      imageIcon: newProdAiVerified?.imageIcon || '📸',
-      imageUrl: newProdAiVerified?.imageUrl,
-      description: newProdDesc || 'สินค้าคุณภาพดี การันตีมาตรฐานโดยร้านค้าพันธมิตร',
-      stock: parseInt(newProdStock) || 20,
-      soldCount: 0,
-      isFlashSale: newProdIsFlash,
-      aiVerified: !!newProdAiVerified
-    };
-
-    const nextProducts = [newProd, ...storeProducts];
-    setStoreProducts(nextProducts);
-    void persistMerchantProducts(nextProducts);
-
-    if (newProdIsFlash) {
-      setFlashSales(prev => [{
-        id: Date.now().toString(),
-        title: newProdTitle,
-        price: parseFloat(newProdPrice),
-        originalPrice: parseFloat(newProdOrigPrice) || (parseFloat(newProdPrice) * 1.3),
-        timeLeft: '06:00:00',
-        salesCount: 0,
-        category: newProdCategory,
-        imageIcon: newProdAiVerified?.imageIcon || '⚡'
-      }, ...prev]);
+    if (!newProdTitle.trim() || !newProdPrice || !newProdPhoto) {
+      alert('กรุณากรอกชื่อ ราคา และถ่ายรูปสินค้าจริงก่อนส่งให้แอดมินตรวจ');
+      return;
     }
 
-    setNewProdTitle('');
-    setNewProdPrice('');
-    setNewProdOrigPrice('');
-    setNewProdDesc('');
-    setNewProdAiVerified(null);
-    setShowAddProductModal(false);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+      const response = await fetch('/api/shop/profile-content/product-submissions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${await user.getIdToken()}`,
+        },
+        body: JSON.stringify({
+          title: newProdTitle.trim(),
+          category: newProdCategory,
+          price: parseFloat(newProdPrice),
+          originalPrice: parseFloat(newProdOrigPrice) || parseFloat(newProdPrice),
+          description: newProdDesc.trim(),
+          stock: parseInt(newProdStock) || 1,
+          isFlashSale: newProdIsFlash,
+          imageUrl: newProdPhoto.imageUrl,
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'ส่งสินค้าให้แอดมินตรวจไม่สำเร็จ');
 
-    handleGainMerchantXp(180, "ลงของขายสินค้าใหม่สำเร็จ ✨");
-    if (audioEnabled) playTactileBlip(1200);
-    confetti({ particleCount: 60, spread: 75, colors: ['#00D2FF', '#FFD700', '#10B981'] });
+      setNewProdTitle('');
+      setNewProdPrice('');
+      setNewProdOrigPrice('');
+      setNewProdDesc('');
+      setNewProdPhoto(null);
+      setNewProdIsFlash(false);
+      setShowAddProductModal(false);
+      alert('ส่งรูปและข้อมูลสินค้าให้แอดมินตรวจแล้ว เมื่ออนุมัติสินค้าจะขึ้นหน้าร้าน');
+      if (audioEnabled) playTactileBlip(1100);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'ส่งสินค้าให้แอดมินตรวจไม่สำเร็จ');
+    }
   };
 
   // Filtered products for customer view
@@ -1481,23 +1476,13 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
             </div>
 
             <div className="space-y-3 text-xs">
-              {/* Mandatory AI Photo Verification Section */}
-              <div>
-                <label className="block text-slate-300 mb-1 font-bold">
-                  📸 สแกนรูปถ่ายสินค้าด้วย AI Vision Guard (แนะนำ):
-                </label>
-                <AIProductPhotoVerifier
-                  audioEnabled={audioEnabled}
-                  initialItemName={newProdTitle}
-                  initialCategory={newProdCategory}
-                  onVerificationComplete={(result) => {
-                    setNewProdAiVerified(result);
-                    if (!newProdTitle) setNewProdTitle(result.detectedTitle);
-                    if (!newProdPrice) setNewProdPrice(result.fairPriceRange.min.toString());
-                    if (!newProdOrigPrice) setNewProdOrigPrice(result.fairPriceRange.max.toString());
-                  }}
-                />
-              </div>
+              <AdminPhotoEvidencePicker
+                category="merchant-product"
+                title="รูปสินค้าจริง"
+                description="ไม่ใช้ AI ตรวจ รูปและข้อมูลสินค้าจะเข้าคิวให้แอดมินอนุมัติก่อนขึ้นหน้าร้าน"
+                onPhotoReady={setNewProdPhoto}
+                onReset={() => setNewProdPhoto(null)}
+              />
 
               <div>
                 <label className="block text-slate-300 mb-1">ชื่อสินค้า:</label>
