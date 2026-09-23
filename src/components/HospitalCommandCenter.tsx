@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getAuth } from 'firebase/auth';
 import { Building2, Flame, Hospital, Loader2, MapPin, Navigation, PhoneCall, ShieldAlert } from 'lucide-react';
 import { useRealGeolocation } from '../hooks/useRealGeolocation';
+import { auth } from '../firebase';
 
 interface Props { audioEnabled: boolean; onOpenWinBuddy?: () => void; }
 interface EmergencyPlace { id: string; name: string; type: string; address: string; phone: string; mapsUrl: string; openNow: boolean | null; distanceKm: number | null; etaMinutes: number | null; }
@@ -41,7 +41,7 @@ export const HospitalCommandCenter: React.FC<Props> = () => {
     void (async () => {
       setLoading(true); setError('');
       try {
-        const user = getAuth().currentUser;
+        const user = auth.currentUser;
         if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนเปิดศูนย์ฉุกเฉิน');
         const response = await fetch('/api/emergency/nearby', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` }, body: JSON.stringify({ latitude: geo.latitude, longitude: geo.longitude }) });
         const payload = await response.json() as { places?: EmergencyPlace[]; error?: string };
