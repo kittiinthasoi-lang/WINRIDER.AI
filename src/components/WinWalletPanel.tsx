@@ -6,17 +6,21 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Copy,
   RefreshCw,
   Building2,
   ShieldCheck,
-  ExternalLink,
   MessageCircle,
 } from 'lucide-react';
-import { generatePromptPayQRDataUrl } from '../utils/promptpay';
 import { getWalletMe, submitWithdrawal, WalletStateResponse } from '../services/walletService';
 import { getPaymentProfile } from '../services/paymentProfileService';
 import { playTactileBlip, playPaymentSuccessChime } from '../utils/audio';
+
+const WIN_WALLET_TOPUP_ACCOUNT = {
+  bankName: 'กสิกรไทย',
+  accountNumber: '0931530151',
+  accountName: 'กิตติ อินทะสร้อย',
+  lineContact: '0837583169',
+} as const;
 
 interface WinWalletPanelProps {
   role?: 'citizen' | 'knight' | 'merchant' | 'partner';
@@ -40,10 +44,8 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
   const [refreshing, setRefreshing] = useState(false);
 
   const [depositAmount, setDepositAmount] = useState<number>(200);
-  const [depositQr, setDepositQr] = useState('');
   const [depositMessage, setDepositMessage] = useState('');
   const [depositError, setDepositError] = useState('');
-  const [copiedPromptPay, setCopiedPromptPay] = useState(false);
 
   const [withdrawAmount, setWithdrawAmount] = useState<number>(100);
   const [withdrawDestination, setWithdrawDestination] = useState('');
@@ -92,25 +94,9 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
     }
   }, [userId]);
 
-  useEffect(() => {
-    const promptPayId = walletData?.systemPromptPay?.promptPayId || '';
-    if (!promptPayId || depositAmount <= 0) {
-      setDepositQr('');
-      return;
-    }
-    generatePromptPayQRDataUrl(promptPayId, depositAmount)
-      .then(setDepositQr)
-      .catch(() => setDepositError('สร้าง QR PromptPay ไม่สำเร็จ'));
-  }, [walletData?.systemPromptPay?.promptPayId, depositAmount]);
-
   const balance = walletData?.balance ?? 0;
   const availableBalance = walletData?.availableBalance ?? balance;
   const lockedBalance = (walletData?.lockedSatang ?? 0) / 100;
-  const promptPaySystemId = walletData?.systemPromptPay?.promptPayId || '';
-  const systemBankName = walletData?.systemPromptPay?.bankName || '';
-  const systemBankAccountNumber = walletData?.systemPromptPay?.bankAccountNumber || '';
-  const systemAccountName = walletData?.systemPromptPay?.accountName || '';
-  const lineUrl = walletData?.systemPromptPay?.lineUrl || '';
 
   const topupMessage = useMemo(() => {
     const amount = Number.isFinite(depositAmount) && depositAmount > 0 ? depositAmount.toFixed(2) : '0.00';
@@ -119,7 +105,11 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
       `WIN Wallet ID: ${walletData?.walletId || '-'}`,
       `บทบาท: ${roleLabelMap[role] || role}`,
       `ยอดโอน: ฿${amount}`,
-      'ส่งสลิปนี้เพื่อให้ Admin ตรวจเงินจริงในบัญชีบริษัทและเติมยอดตามจำนวนเงินจริง',
+      `ธนาคาร: ${WIN_WALLET_TOPUP_ACCOUNT.bankName}`,
+      `เลขบัญชี: ${WIN_WALLET_TOPUP_ACCOUNT.accountNumber}`,
+      `ชื่อเจ้าของบัญชี: ${WIN_WALLET_TOPUP_ACCOUNT.accountName}`,
+      `LINE ส่งสลิป: ${WIN_WALLET_TOPUP_ACCOUNT.lineContact}`,
+      'ส่งสลิปพร้อม WIN Wallet ID เพื่อให้ Admin ตรวจเงินจริงก่อนเติมยอด',
     ].join('\n');
   }, [depositAmount, role, walletData?.walletId]);
 
@@ -133,26 +123,10 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
     }
   };
 
-  const handleCopyPromptPay = async () => {
-    if (!promptPaySystemId) return;
-    const copied = await copyText(promptPaySystemId);
-    setCopiedPromptPay(copied);
-    if (copied && audioEnabled) playTactileBlip(1000);
-    if (copied) setTimeout(() => setCopiedPromptPay(false), 2000);
-  };
-
-  const handleOpenLineForTopup = async () => {
+  const handleCopyTopupInstructions = async () => {
     setDepositError('');
     setDepositMessage('');
 
-    if (!walletData?.systemPromptPay?.configured) {
-      setDepositError('ยังไม่ได้ตั้งค่าบัญชีบริษัทสำหรับรับเงิน');
-      return;
-    }
-    if (!lineUrl) {
-      setDepositError('ยังไม่ได้ตั้ง LINE หลักของ WINRIDER ในระบบ');
-      return;
-    }
     if (!walletData?.walletId) {
       setDepositError('ยังไม่พบ WIN Wallet ID กรุณากดซิงค์ยอดแล้วลองใหม่');
       return;
@@ -165,11 +139,10 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
     const copied = await copyText(topupMessage);
     setDepositMessage(
       copied
-        ? 'คัดลอกข้อมูลรายการแล้ว เปิด LINE จากนั้นแนบสลิปและวางข้อความนี้ส่งให้ Admin'
-        : 'เปิด LINE แล้ว กรุณาแนบสลิปพร้อมแจ้ง WIN Wallet ID และยอดที่โอน'
+        ? `คัดลอกข้อมูลแล้ว หลังโอนเงินให้ส่งสลิปทาง LINE: ${WIN_WALLET_TOPUP_ACCOUNT.lineContact}`
+        : `หลังโอนเงินให้ส่งสลิปพร้อม WIN Wallet ID ทาง LINE: ${WIN_WALLET_TOPUP_ACCOUNT.lineContact}`
     );
     if (audioEnabled) playTactileBlip(950);
-    window.open(lineUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleWithdrawSubmit = async () => {
@@ -327,31 +300,16 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
             className="w-full rounded-xl border border-white/15 bg-black/40 p-3 text-sm font-mono font-bold text-white outline-none focus:border-emerald-400"
           />
 
-          <div className="rounded-2xl border border-amber-400/30 bg-amber-500/5 p-4 space-y-1.5">
-            <p className="text-sm font-black text-amber-200">บัญชีบริษัทสำหรับเติม WIN Wallet</p>
-            {systemBankName && <p className="text-sm text-white">ธนาคาร: <strong>{systemBankName}</strong></p>}
-            {systemBankAccountNumber && <p className="text-base font-mono font-black text-emerald-300">เลขบัญชี: {systemBankAccountNumber}</p>}
-            {systemAccountName && <p className="text-sm text-white">ชื่อบัญชี: <strong>{systemAccountName}</strong></p>}
-            {promptPaySystemId && (
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-white">PromptPay: <strong className="font-mono">{promptPaySystemId}</strong></p>
-                <button type="button" onClick={() => void handleCopyPromptPay()} className="rounded-lg border border-white/10 p-1.5 text-cyan-300">
-                  {copiedPromptPay ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                </button>
-              </div>
-            )}
-            {!walletData?.systemPromptPay?.configured && (
-              <p className="text-xs text-rose-300">ยังไม่ได้ตั้งค่าบัญชีบริษัท กรุณาติดต่อ Admin</p>
-            )}
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-500/5 p-4 space-y-2">
+            <p className="text-sm font-black text-amber-200">ข้อมูลโอนเงินสำหรับเติม WIN Wallet</p>
+            <p className="text-sm text-white">ชื่อธนาคาร: <strong>{WIN_WALLET_TOPUP_ACCOUNT.bankName}</strong></p>
+            <p className="text-base font-mono font-black text-emerald-300">เลขบัญชี: {WIN_WALLET_TOPUP_ACCOUNT.accountNumber}</p>
+            <p className="text-sm text-white">ชื่อเจ้าของบัญชี: <strong>{WIN_WALLET_TOPUP_ACCOUNT.accountName}</strong></p>
+            <p className="text-sm text-white">
+              LINE ส่งสลิป: <strong className="font-mono text-[#06C755]">{WIN_WALLET_TOPUP_ACCOUNT.lineContact}</strong>
+            </p>
+            <p className="pt-1 text-[11px] text-slate-400">หน้าเติมเงินไม่แสดงหรือสร้าง QR ชำระเงิน</p>
           </div>
-
-          {depositQr && (
-            <div className="flex justify-center">
-              <div className="rounded-2xl bg-white p-2.5">
-                <img src={depositQr} alt="PromptPay QR Code" className="h-44 w-44 object-contain" />
-              </div>
-            </div>
-          )}
 
           <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-xs text-slate-300">
             <p className="font-black text-cyan-200">ข้อมูลที่จะส่งให้ Admin</p>
@@ -360,20 +318,13 @@ export const WinWalletPanel: React.FC<WinWalletPanelProps> = ({
 
           <button
             type="button"
-            onClick={() => void handleOpenLineForTopup()}
-            disabled={!walletData?.systemPromptPay?.configured || !lineUrl || depositAmount <= 0}
+            onClick={() => void handleCopyTopupInstructions()}
+            disabled={!walletData?.walletId || depositAmount <= 0}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#06C755] py-3.5 text-sm font-black text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
           >
             <MessageCircle className="h-5 w-5" />
-            ส่งสลิปทาง LINE ของ WINRIDER
-            <ExternalLink className="h-4 w-4" />
+            คัดลอกข้อมูลสำหรับส่งสลิป LINE
           </button>
-
-          {!lineUrl && (
-            <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs text-amber-200">
-              LINE หลักยังไม่ได้ตั้งค่าใน <span className="font-mono">WINRIDER_LINE_URL</span> จึงปิดปุ่มไว้เพื่อไม่ให้เปิด LINE ปลอม
-            </p>
-          )}
           {depositError && (
             <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/15 p-3 text-xs text-rose-200">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
