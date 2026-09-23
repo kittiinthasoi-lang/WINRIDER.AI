@@ -142,7 +142,7 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
         const directoryResponse = await fetch('/api/shop/directory', { headers: { Authorization: `Bearer ${token}` } });
         const directoryPayload = await directoryResponse.json() as { profiles?: Array<{ id: string; role: 'merchant' | 'partner'; name: string; address: string; category: string }> };
         const registered = directoryResponse.ok ? (directoryPayload.profiles || []).filter((profile) => profile.address) : [];
-        let sourcePlaces: Array<{ id: string; name: string; category: 'shop' | 'partner'; primaryType: string; address: string; latitude: number; longitude: number; rating: number | null; openNow: boolean | null; distanceMeters: number; placeGroup?: Exclude<RadarPlaceGroup, 'all'>; categoryLabel?: string; source: 'win' | 'google' }> = [];
+        let sourcePlaces: Array<{ id: string; name: string; category: 'shop' | 'partner'; primaryType: string; address: string; latitude: number; longitude: number; rating: number | null; openNow: boolean | null; distanceMeters: number; placeGroup?: Exclude<RadarPlaceGroup, 'all'>; categoryLabel?: string; source: 'win' | 'public' }> = [];
 
         if (registered.length > 0) {
           const routeResponse = await fetch('/api/places/resolve-routes', {
@@ -167,18 +167,18 @@ export const ThreeDimensionalDriverRadar: React.FC<ThreeDimensionalDriverRadarPr
         });
         const payload = await response.json() as { places?: Array<Omit<(typeof sourcePlaces)[number], 'source'>>; error?: string };
         if (!response.ok) throw new Error(payload.error || 'โหลดสถานที่จริงไม่สำเร็จ');
-        sourcePlaces = [...sourcePlaces, ...(payload.places || []).map((place) => ({ ...place, source: 'google' as const }))];
+        sourcePlaces = [...sourcePlaces, ...(payload.places || []).map((place) => ({ ...place, source: 'public' as const }))];
 
         const next = sourcePlaces.map((place): Radar3DPing => {
           const northKm = (place.latitude - gpsState.latitude) * 111;
           const eastKm = (place.longitude - gpsState.longitude) * 111 * Math.cos(gpsState.latitude * Math.PI / 180);
           return { id: `${place.source}:${place.id}`, name: place.name, avatar: '', category: place.category,
-            categoryLabel: place.source === 'win' ? (place.category === 'shop' ? 'ร้านค้าในระบบ WIN' : 'พาร์ทเนอร์ในระบบ WIN') : (place.categoryLabel || (place.category === 'shop' ? 'ร้านค้าจาก Google Maps' : 'สถานที่จาก Google Maps')),
+            categoryLabel: place.source === 'win' ? (place.category === 'shop' ? 'ร้านค้าในระบบ WIN' : 'พาร์ทเนอร์ในระบบ WIN') : (place.categoryLabel || (place.category === 'shop' ? 'ร้านค้าจาก Public Data' : 'สถานที่จาก Public Data')),
             placeGroup: place.placeGroup || (place.category === 'shop' ? 'shop' : 'community'),
             service: place.primaryType, serviceEmoji: place.category === 'shop' ? '🛍️' : '🤝', serviceType: 'knight', fare: 0,
             distanceMeters: place.distanceMeters, location: place.address, x: Math.max(-100, Math.min(100, eastKm * 20)),
             y: Math.max(-100, Math.min(100, -northKm * 20)), elevation: 10, urgency: 'normal',
-            specialNote: place.openNow === null ? undefined : place.openNow ? 'เปิดอยู่' : 'ปิดอยู่', badge: place.source === 'win' ? 'WIN VERIFIED' : 'GOOGLE MAPS',
+            specialNote: place.openNow === null ? undefined : place.openNow ? 'เปิดอยู่' : 'ปิดอยู่', badge: place.source === 'win' ? 'WIN VERIFIED' : 'PUBLIC DATA',
             details: place.rating ? `คะแนน Google ${place.rating}` : 'ข้อมูลสถานที่จริงจาก Google Places' };
         });
         if (!cancelled) { setRadarPings(next); setSelectedPing(next[0] || null); }
