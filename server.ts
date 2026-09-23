@@ -79,11 +79,6 @@ function stableCanonicalJson(value: unknown): string {
   return "{" + Object.keys(obj).sort().map((key) => JSON.stringify(key) + ":" + stableCanonicalJson(obj[key])).join(",") + "}";
 }
 
-function timingSafeHexEqual(a: string, b: string): boolean {
-  if (!/^[a-f0-9]{64}$/i.test(a) || !/^[a-f0-9]{64}$/i.test(b)) return false;
-  return crypto.timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
-}
-
 function rateLimitKey(req: express.Request): string {
   const bearer = String(req.headers.authorization || "");
   if (bearer.startsWith("Bearer ")) {
@@ -126,6 +121,7 @@ function distributedRateLimit(scope: string, maxRequests: number) {
     }
   };
 }
+
 
 function rateLimit(maxRequests: number) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -1142,14 +1138,14 @@ async function syncTatPublicData(kinds: PublicDataKind[]) {
 }
 
 function requireTatSyncSecret(req: express.Request, res: express.Response): boolean {
-  const configured = String(process.env.TAT_INTERNAL_SYNC_SECRET || "").trim();
-  const supplied = String(req.headers["x-winrider-tat-sync-secret"] || "").trim();
+  const configured = String(process.env.WIN_ALERT_INTERNAL_SYNC_SECRET || "").trim();
+  const supplied = String(req.headers["x-winrider-event-sync-secret"] || req.headers["x-winrider-tat-sync-secret"] || "").trim();
   if (!configured) {
-    res.status(503).json({ error: "TAT_INTERNAL_SYNC_SECRET is not configured" });
+    res.status(503).json({ error: "WIN_ALERT_INTERNAL_SYNC_SECRET is not configured" });
     return false;
   }
   if (!supplied || supplied !== configured) {
-    res.status(401).json({ error: "Unauthorized TAT sync request" });
+    res.status(401).json({ error: "Unauthorized public-data sync request" });
     return false;
   }
   return true;
@@ -1177,7 +1173,7 @@ app.post("/api/internal/public-data/sync-tat", rateLimit(2), async (req, res) =>
 
 
 function requireWinAlertSyncSecret(req: express.Request, res: express.Response): boolean {
-  const configured = String(process.env.WIN_ALERT_INTERNAL_SYNC_SECRET || process.env.TAT_INTERNAL_SYNC_SECRET || "").trim();
+  const configured = String(process.env.WIN_ALERT_INTERNAL_SYNC_SECRET || "").trim();
   const supplied = String(req.headers["x-winrider-event-sync-secret"] || req.headers["x-winrider-tat-sync-secret"] || "").trim();
   if (!configured) {
     res.status(503).json({ error: "WIN_ALERT_INTERNAL_SYNC_SECRET is not configured" });
@@ -2052,9 +2048,7 @@ function getManualSettlementConfig() {
 }
 
 function getWithdrawalDailyLimit() {
-  const configured = Number(process.env.WINRIDER_WITHDRAWALS_PER_DAY || 3);
-  if (!Number.isInteger(configured) || configured < 1 || configured > 20) return 3;
-  return configured;
+  return 3;
 }
 
 app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
@@ -2653,8 +2647,8 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
   add("public-maps", "Public Places / External Navigation", "ok", "ใช้ WIN Public Data + OpenStreetMap แบบไม่ใช้ API key; นำทางเปิดภายนอก");
   add("external-ai", "External AI Handoff", "ok", "WINRIDER ไม่เรียก AI provider ด้วย API key; ผู้ใช้เลือกเปิดบริการภายนอกเอง");
   add("tat-events", "TAT Tourism Events", "ok", "Win Alert ใช้ข้อมูลสาธารณะจาก TAT/Public Data โดยไม่ใช้ API key");
-  const promptPayReady = Boolean(process.env.ADMIN_PROMPTPAY_ID && process.env.ADMIN_BANK_ACCOUNT_NAME && process.env.ADMIN_OWNER_EMAIL);
-  add("promptpay", "PromptPay Admin", promptPayReady ? "ok" : "error", promptPayReady ? "ตั้งค่าผู้รับเงินและเจ้าของระบบครบ" : "ข้อมูล PromptPay/ชื่อบัญชี/อีเมลเจ้าของยังไม่ครบ");
+  const manualSettlement = getManualSettlementConfig();
+  add("manual-topup", "Manual WIN Wallet Top-up", manualSettlement.configured ? "ok" : "error", manualSettlement.configured ? "บัญชีรับโอนและช่องทางส่งสลิปพร้อมใช้งาน" : "ข้อมูลบัญชีรับโอนหรือช่องทางส่งสลิปยังไม่ครบ");
 
   let onlineKnights = 0;
   let pendingOrders = 0;
@@ -3016,235 +3010,6 @@ app.post("/api/admin/system-payout-review", rateLimit(10), async (req, res) => {
     if (["SYSTEM_PAYOUT_HOLD_MISMATCH", "SYSTEM_REVENUE_MISMATCH"].includes(code)) return res.status(422).json({ error: code });
     console.error("system payout review error:", error);
     return res.status(500).json({ error: "ยืนยันการถอนรายได้ระบบไม่สำเร็จ" });
-  }
-});
-
-app.post("/api/webhooks/payment-provider", rateLimit(120), distributedRateLimit("payment_webhook", 120), async (req, res) => {
-  const secret = String(process.env.PAYMENT_PROVIDER_WEBHOOK_SECRET || "").trim();
-  if (!secret) return res.status(503).json({ error: "Payment provider webhook is not configured" });
-
-  const signatureHeader = String(req.headers["x-winrider-payment-signature"] || "");
-  const supplied = signatureHeader.replace(/^sha256=/i, "").trim();
-  const expected = crypto.createHmac("sha256", secret).update(stableCanonicalJson(req.body ?? {})).digest("hex");
-  if (!timingSafeHexEqual(supplied, expected)) return res.status(401).json({ error: "Invalid payment webhook signature" });
-
-  const eventId = String(req.body?.eventId || "").trim();
-  const eventType = String(req.body?.type || "").trim().toUpperCase();
-  if (!eventId || !["PAYMENT_CONFIRMED", "REFUND_CONFIRMED", "REFUND_FAILED"].includes(eventType)) {
-    return res.status(400).json({ error: "Invalid payment event" });
-  }
-
-  try {
-    const eventRef = ordersDb.collection("payment_provider_events").doc(crypto.createHash("sha256").update(eventId).digest("hex"));
-    const result = await ordersDb.runTransaction(async (tx) => {
-      const existing = await tx.get(eventRef);
-      if (existing.exists) return { duplicate: true, ...(existing.data() || {}) };
-
-      if (eventType === "PAYMENT_CONFIRMED") {
-        const submissionId = String(req.body?.submissionId || "").trim();
-        const providerTransactionId = String(req.body?.transactionId || "").trim();
-        const userId = String(req.body?.userId || "").trim();
-        const amountSatang = Number(req.body?.amountSatang);
-        if (!submissionId || !providerTransactionId || !userId || !Number.isInteger(amountSatang) || amountSatang <= 0) {
-          throw new Error("INVALID_PAYMENT_EVENT");
-        }
-        const submissionRef = ordersDb.collection("topup_submissions").doc(submissionId);
-        const submissionSnap = await tx.get(submissionRef);
-        if (!submissionSnap.exists) throw new Error("TOPUP_NOT_FOUND");
-        const topup: any = submissionSnap.data() || {};
-        if (!["WAITING_ADMIN", "PROOF_REVIEWED"].includes(String(topup.status))) throw new Error("TOPUP_ALREADY_SETTLED");
-        if (String(topup.userId) !== userId || Number(topup.amountSatang) !== amountSatang) throw new Error("PAYMENT_MISMATCH");
-
-        const providerTxRef = ordersDb.collection("payment_provider_transactions").doc(
-          crypto.createHash("sha256").update(providerTransactionId).digest("hex")
-        );
-        const providerTxSnap = await tx.get(providerTxRef);
-        if (providerTxSnap.exists) throw new Error("PROVIDER_TRANSACTION_REUSED");
-
-        const walletRef = ordersDb.collection("wallets").doc(userId);
-        const walletSnap = await tx.get(walletRef);
-        const wallet = walletSnap.data() || {};
-        const currentBalance = Number(wallet.balanceSatang || 0);
-        const currentLocked = Number(wallet.lockedSatang || 0);
-        const nextBalance = currentBalance + amountSatang;
-        const ledgerRef = ordersDb.collection("ledger_entries").doc();
-
-        tx.set(walletRef, {
-          userId,
-          balanceSatang: nextBalance,
-          lockedSatang: currentLocked,
-          availableSatang: nextBalance - currentLocked,
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-        tx.create(ledgerRef, {
-          userId,
-          amountSatang,
-          type: "TOP_UP_PROVIDER_VERIFIED",
-          providerTransactionId,
-          submissionId,
-          totalDebitSatang: amountSatang,
-          totalCreditSatang: amountSatang,
-          balanced: true,
-          legs: [
-            { accountId: "PAYMENT_PROVIDER_CLEARING", direction: "DEBIT", amountSatang },
-            { accountId: userId, direction: "CREDIT", amountSatang },
-          ],
-          createdAt: FieldValue.serverTimestamp(),
-        });
-        tx.create(providerTxRef, {
-          providerTransactionId,
-          eventId,
-          submissionId,
-          userId,
-          amountSatang,
-          status: "CONFIRMED",
-          createdAt: FieldValue.serverTimestamp(),
-        });
-        tx.update(submissionRef, {
-          status: "PROVIDER_CONFIRMED",
-          providerTransactionId,
-          providerConfirmedAt: FieldValue.serverTimestamp(),
-        });
-        if (topup.refHash) tx.update(ordersDb.collection("topup_references").doc(String(topup.refHash)), { status: "PROVIDER_CONFIRMED" });
-        tx.create(eventRef, { eventId, type: eventType, providerTransactionId, userId, amountSatang, processedAt: FieldValue.serverTimestamp() });
-        return { duplicate: false, status: "PROVIDER_CONFIRMED", ledgerId: ledgerRef.id };
-      }
-
-      const refundRequestId = String(req.body?.refundRequestId || "").trim();
-      const providerRefundId = String(req.body?.refundId || "").trim();
-      if (!refundRequestId) throw new Error("INVALID_REFUND_EVENT");
-      const refundRef = ordersDb.collection("refund_requests").doc(refundRequestId);
-      const refundSnap = await tx.get(refundRef);
-      if (!refundSnap.exists) throw new Error("REFUND_NOT_FOUND");
-      const refund: any = refundSnap.data() || {};
-      if (String(refund.status) !== "PENDING_PROVIDER") throw new Error("REFUND_ALREADY_FINAL");
-      const userId = String(refund.userId || "");
-      const amountSatang = Number(refund.amountSatang || 0);
-      const walletRef = ordersDb.collection("wallets").doc(userId);
-      const walletSnap = await tx.get(walletRef);
-      if (!walletSnap.exists) throw new Error("WALLET_NOT_FOUND");
-      const wallet = walletSnap.data() || {};
-      const balance = Number(wallet.balanceSatang || 0);
-      const locked = Number(wallet.lockedSatang || 0);
-
-      if (eventType === "REFUND_FAILED") {
-        tx.update(walletRef, { lockedSatang: Math.max(0, locked - amountSatang), availableSatang: balance - Math.max(0, locked - amountSatang), updatedAt: FieldValue.serverTimestamp() });
-        tx.update(refundRef, { status: "FAILED", providerRefundId: providerRefundId || null, failedAt: FieldValue.serverTimestamp() });
-        tx.create(eventRef, { eventId, type: eventType, refundRequestId, processedAt: FieldValue.serverTimestamp() });
-        return { duplicate: false, status: "FAILED" };
-      }
-
-      if (balance < amountSatang || locked < amountSatang) throw new Error("REFUND_LOCK_INCONSISTENT");
-      const nextBalance = balance - amountSatang;
-      const nextLocked = locked - amountSatang;
-      const ledgerRef = ordersDb.collection("ledger_entries").doc();
-      tx.update(walletRef, { balanceSatang: nextBalance, lockedSatang: nextLocked, availableSatang: nextBalance - nextLocked, updatedAt: FieldValue.serverTimestamp() });
-      tx.create(ledgerRef, {
-        userId, amountSatang, type: "TOP_UP_REFUND", refundRequestId, providerRefundId,
-        totalDebitSatang: amountSatang, totalCreditSatang: amountSatang, balanced: true,
-        legs: [
-          { accountId: userId, direction: "DEBIT", amountSatang },
-          { accountId: "PAYMENT_PROVIDER_CLEARING", direction: "CREDIT", amountSatang },
-        ],
-        createdAt: FieldValue.serverTimestamp(),
-      });
-      tx.update(refundRef, { status: "REFUNDED", providerRefundId: providerRefundId || null, ledgerId: ledgerRef.id, refundedAt: FieldValue.serverTimestamp() });
-      tx.create(eventRef, { eventId, type: eventType, refundRequestId, processedAt: FieldValue.serverTimestamp() });
-      return { duplicate: false, status: "REFUNDED", ledgerId: ledgerRef.id };
-    });
-    return res.json({ ok: true, ...result });
-  } catch (error: any) {
-    const known = new Set(["INVALID_PAYMENT_EVENT","TOPUP_NOT_FOUND","TOPUP_ALREADY_SETTLED","PAYMENT_MISMATCH","PROVIDER_TRANSACTION_REUSED","INVALID_REFUND_EVENT","REFUND_NOT_FOUND","REFUND_ALREADY_FINAL","WALLET_NOT_FOUND","REFUND_LOCK_INCONSISTENT"]);
-    if (known.has(error?.message)) return res.status(409).json({ error: error.message });
-    console.error("[Payment Provider Webhook]", error?.message);
-    return res.status(503).json({ error: "Payment event processing failed" });
-  }
-});
-
-app.post("/api/admin/payments/refund", rateLimit(10), distributedRateLimit("admin_refund", 10), async (req, res) => {
-  const adminUser = await requireSuperAdmin(req, res);
-  if (!adminUser) return;
-  const submissionId = String(req.body?.submissionId || "").trim();
-  const amountSatang = Number(req.body?.amountSatang);
-  const reason = String(req.body?.reason || "").trim().slice(0, 500);
-  if (!submissionId || !Number.isInteger(amountSatang) || amountSatang <= 0 || reason.length < 3) {
-    return res.status(400).json({ error: "Invalid refund request" });
-  }
-
-  const refundRef = ordersDb.collection("refund_requests").doc();
-  try {
-    let providerTransactionId = "";
-    let userId = "";
-    await ordersDb.runTransaction(async (tx) => {
-      const submissionRef = ordersDb.collection("topup_submissions").doc(submissionId);
-      const submissionSnap = await tx.get(submissionRef);
-      if (!submissionSnap.exists) throw new Error("TOPUP_NOT_FOUND");
-      const topup: any = submissionSnap.data() || {};
-      if (String(topup.status) !== "PROVIDER_CONFIRMED") throw new Error("TOPUP_NOT_PROVIDER_CONFIRMED");
-      userId = String(topup.userId || "");
-      providerTransactionId = String(topup.providerTransactionId || "");
-      const maxRefund = Number(topup.amountSatang || 0);
-      if (amountSatang > maxRefund) throw new Error("REFUND_TOO_LARGE");
-
-      const previousRefunds = await tx.get(ordersDb.collection("refund_requests").where("submissionId", "==", submissionId));
-      const alreadyReserved = previousRefunds.docs
-        .filter((doc) => ["PENDING_PROVIDER", "REFUNDED"].includes(String(doc.data().status)))
-        .reduce((sum, doc) => sum + Number(doc.data().amountSatang || 0), 0);
-      if (alreadyReserved + amountSatang > maxRefund) throw new Error("REFUND_TOO_LARGE");
-
-      const walletRef = ordersDb.collection("wallets").doc(userId);
-      const walletSnap = await tx.get(walletRef);
-      if (!walletSnap.exists) throw new Error("WALLET_NOT_FOUND");
-      const wallet = walletSnap.data() || {};
-      const balance = Number(wallet.balanceSatang || 0);
-      const locked = Number(wallet.lockedSatang || 0);
-      const available = balance - locked;
-      if (available < amountSatang) throw new Error("INSUFFICIENT_AVAILABLE_BALANCE");
-
-      tx.update(walletRef, { lockedSatang: locked + amountSatang, availableSatang: available - amountSatang, updatedAt: FieldValue.serverTimestamp() });
-      tx.create(refundRef, {
-        submissionId, providerTransactionId, userId, amountSatang, reason,
-        status: "PENDING_PROVIDER", requestedBy: adminUser.uid, createdAt: FieldValue.serverTimestamp(),
-      });
-      tx.create(ordersDb.collection("audit_logs").doc(), {
-        action: "PAYMENT_REFUND_REQUESTED", refundRequestId: refundRef.id, submissionId, userId,
-        amountSatang, actorUid: adminUser.uid, reason, createdAt: FieldValue.serverTimestamp(),
-      });
-    });
-
-    const refundUrlRaw = String(process.env.PAYMENT_PROVIDER_REFUND_URL || "").trim();
-    const refundToken = String(process.env.PAYMENT_PROVIDER_API_TOKEN || "").trim();
-    const allowedHost = String(process.env.PAYMENT_PROVIDER_ALLOWED_HOST || "").trim().toLowerCase();
-    if (!refundUrlRaw || !refundToken || !allowedHost) {
-      await refundRef.update({ providerDispatchStatus: "NOT_CONFIGURED" });
-      return res.status(202).json({ ok: true, refundRequestId: refundRef.id, status: "PENDING_PROVIDER", providerDispatchStatus: "NOT_CONFIGURED" });
-    }
-    const refundUrl = new URL(refundUrlRaw);
-    if (refundUrl.protocol !== "https:" || refundUrl.hostname.toLowerCase() !== allowedHost) {
-      await refundRef.update({ providerDispatchStatus: "BLOCKED_INVALID_HOST" });
-      return res.status(503).json({ error: "Payment refund provider host is not allowed" });
-    }
-
-    const response = await fetch(refundUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + refundToken },
-      body: JSON.stringify({ refundRequestId: refundRef.id, providerTransactionId, userId, amountSatang, reason }),
-      signal: AbortSignal.timeout(12_000),
-    });
-    const providerBody = await response.json().catch(() => ({}));
-    await refundRef.update({
-      providerDispatchStatus: response.ok ? "ACCEPTED" : "REJECTED",
-      providerResponseCode: response.status,
-      providerReference: String(providerBody?.refundId || providerBody?.id || "").slice(0, 200) || null,
-      providerDispatchedAt: FieldValue.serverTimestamp(),
-    });
-    if (!response.ok) return res.status(502).json({ error: "Payment provider rejected refund request", refundRequestId: refundRef.id });
-    return res.status(202).json({ ok: true, refundRequestId: refundRef.id, status: "PENDING_PROVIDER" });
-  } catch (error: any) {
-    const known = new Set(["TOPUP_NOT_FOUND","TOPUP_NOT_PROVIDER_CONFIRMED","REFUND_TOO_LARGE","WALLET_NOT_FOUND","INSUFFICIENT_AVAILABLE_BALANCE"]);
-    if (known.has(error?.message)) return res.status(409).json({ error: error.message });
-    console.error("[Refund Request]", error?.message);
-    return res.status(503).json({ error: "Refund request failed" });
   }
 });
 

@@ -18,12 +18,10 @@ jobs:
         env:
           WINRIDER_APP_URL: ${{ vars.WINRIDER_APP_URL }}
           WIN_ALERT_INTERNAL_SYNC_SECRET: ${{ secrets.WIN_ALERT_INTERNAL_SYNC_SECRET }}
-          TAT_INTERNAL_SYNC_SECRET: ${{ secrets.TAT_INTERNAL_SYNC_SECRET }}
         run: |
           set -euo pipefail
-          secret="${WIN_ALERT_INTERNAL_SYNC_SECRET:-${TAT_INTERNAL_SYNC_SECRET:-}}"
-          if [ -z "${WINRIDER_APP_URL:-}" ] || [ -z "${secret}" ]; then
+          if [ -z "${WINRIDER_APP_URL:-}" ] || [ -z "${WIN_ALERT_INTERNAL_SYNC_SECRET:-}" ]; then
             echo "WINRIDER_APP_URL or WIN Alert sync secret is not configured; skipping scheduled sync."
             exit 0
           fi
-          curl --fail-with-body --silent --show-error             --request POST             --header "x-winrider-event-sync-secret: ${secret}"             --header "Accept: application/json"             --max-time 300             "${WINRIDER_APP_URL%/}/api/internal/events/sync"
+          curl --fail-with-body --silent --show-error             --request POST             --header "x-winrider-event-sync-secret: ${WIN_ALERT_INTERNAL_SYNC_SECRET}"             --header "Accept: application/json"             --max-time 300             "${WINRIDER_APP_URL%/}/api/internal/events/sync"
