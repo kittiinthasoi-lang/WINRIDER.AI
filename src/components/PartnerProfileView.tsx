@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { emitQuestMetric } from '../services/questService';
-import { getAuth } from 'firebase/auth';
 import { 
+import { auth } from '../firebase';
   PartnerProfile, 
   PartnerCategory, 
   PartnerEvent, 
@@ -158,7 +158,7 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
     if (!canEdit) return;
     void (async () => {
       try {
-        const user = getAuth().currentUser;
+        const user = auth.currentUser;
         if (!user) return;
         const response = await fetch('/api/shop/profile-content', { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
         const payload = await response.json() as { promotions?: PartnerPromotion[] };
@@ -173,7 +173,7 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
 
   const persistPartnerPromotions = async (promotions: PartnerPromotion[]) => {
     try {
-      const user = getAuth().currentUser;
+      const user = auth.currentUser;
       if (!user) return;
       await fetch('/api/shop/profile-content', {
         method: 'PUT',
