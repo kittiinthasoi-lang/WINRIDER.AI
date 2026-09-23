@@ -2,7 +2,7 @@ export {
   default,
   db,
   auth,
+  authPersistenceReady,
   storage,
   functions,
-  googleProvider,
 } from "../firebase";
