@@ -475,7 +475,7 @@ app.post("/api/emergency/nearby", rateLimit(RATE_LIMITS["/api/emergency/nearby"]
   }
 });
 
-const radarPlacesCacheconst radarPlacesCache = new Map<string, { expiresAt: number; places: any[] }>();
+const radarPlacesCache = new Map<string, { expiresAt: number; places: any[] }>();
 const RADAR_PLACES_CACHE_MS = 2 * 60 * 1000;
 
 // Real-world radar places shared by customer, knight, merchant and partner views.
@@ -567,7 +567,7 @@ app.post("/api/places/resolve-routes", rateLimit(RATE_LIMITS["/api/places/resolv
   }
 });
 
-app.get("/api/shop/directory"app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
+app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   try {
@@ -1032,7 +1032,7 @@ async function fetchTatDatasetRows(kind: PublicDataKind): Promise<{
 }
 
 
-function dedupeWinAlertEventsfunction dedupeWinAlertEvents(events: NearbyEventResult[]) {
+function dedupeWinAlertEvents(events: NearbyEventResult[]) {
   const seen = new Map<string, NearbyEventResult>();
   for (const event of events) {
     const day = String(event.startAt || "").slice(0, 10);
@@ -1697,7 +1697,7 @@ app.post("/api/ai/test-ping", rateLimit(10), async (_req, res) => {
   });
 });
 
-app.get("/api/wallet/topup-config"app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
+app.get("/api/wallet/topup-config", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const promptPayId = String(process.env.ADMIN_PROMPTPAY_ID || "0899999999").trim();
@@ -2086,7 +2086,7 @@ app.post("/api/wallet/topup-proof", rateLimit(5), async (req, res) => {
   }
 });
 
-app.get("/api/admin/topup-submissions"app.get("/api/admin/topup-submissions", rateLimit(20), async (req, res) => {
+app.get("/api/admin/topup-submissions", rateLimit(20), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
@@ -4084,7 +4084,7 @@ app.get("/api/orders/:id/locations", rateLimit(120), async (req, res) => {
   }
 });
 
-function validateWebhookTargetfunction validateWebhookTarget(rawUrl: string): URL {
+function validateWebhookTarget(rawUrl: string): URL {
   let target: URL;
   try {
     target = new URL(rawUrl);
