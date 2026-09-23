@@ -76,7 +76,7 @@ export default function App() {
 
   // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดได้ครบทั้ง 5 บทบาท
   // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Super Admin)
-  // โดยยังคงใช้ Firebase UID เดิมเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
+  // โดยใช้ WIN Auth UID เดิมเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
   const isOwnerAdmin = Boolean(
     firebaseUser && (
       firebaseUser.email === 'kittiinthasoi@gmail.com' ||
@@ -86,7 +86,7 @@ export default function App() {
     )
   );
 
-  // Convert real Firebase or Dev userData to live UserSession
+  // Convert WIN Auth userData to live UserSession
   const currentUserSession: UserSession | null = useMemo(() => {
     if (isOwnerAdmin && firebaseUser) {
       const mappedRole = ownerPersona;
@@ -385,7 +385,7 @@ export default function App() {
   }
 
   // 4. Pending review state (for knight, merchant, partner)
-  if (userData?.status === 'pending_review' && userData?.role !== 'citizen' && activeMode !== 'admin') {
+  if (userData?.status === 'pending_review' && !isOwnerAdmin && activeMode !== 'admin') {
     return (
       <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans flex flex-col">
         <Navbar
