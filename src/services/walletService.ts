@@ -18,7 +18,7 @@ export interface WalletStateResponse {
     accountName: string;
     bankName?: string;
     bankAccountNumber?: string;
-    lineUrl?: string;
+    lineContact?: string;
   };
   submissions: Array<{
     id: string;
@@ -52,11 +52,12 @@ const emptyWallet = (role?: string): WalletStateResponse => ({
   withdrawalsToday: 0,
   withdrawalsRemainingToday: 3,
   systemPromptPay: {
-    configured: false,
+    configured: true,
     promptPayId: '',
-    accountName: '',
-    bankName: '',
-    bankAccountNumber: '',
+    accountName: 'กิตติอินทะสร้อย',
+    bankName: 'กสิกรไทย',
+    bankAccountNumber: '0931530151',
+    lineContact: '0837583169',
   },
   submissions: [],
   withdrawals: [],
