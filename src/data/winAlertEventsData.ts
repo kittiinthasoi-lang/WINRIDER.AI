@@ -15,6 +15,9 @@ export interface WinAlertEvent {
   providerEventId: string;
   attendance?: number;
   rank?: number;
+  sourceUrl?: string;
+  distanceKm?: number;
+  externalUrl?: string;
 }
 
 export interface NearbyEventsResponse {
