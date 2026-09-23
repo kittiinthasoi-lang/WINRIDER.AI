@@ -16,6 +16,7 @@
 
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
@@ -1003,3 +1004,97 @@ export {
   updateFeeRule,
   setAdminRole
 } from "./admin";
+
+
+/**
+ * Daily internal payment reconciliation.
+ *
+ * This verifies that every provider-confirmed top-up/refund has exactly one
+ * matching balanced ledger record with the same amount. It does not replace
+ * reconciliation against the external provider settlement report.
+ */
+export const reconcilePaymentsDaily = onSchedule(
+  { schedule: "15 3 * * *", timeZone: "Asia/Bangkok", retryCount: 1 },
+  async () => {
+    const [topupsSnap, refundsSnap] = await Promise.all([
+      db.collection("topup_submissions").where("status", "==", "PROVIDER_CONFIRMED").limit(2000).get(),
+      db.collection("refund_requests").where("status", "==", "REFUNDED").limit(2000).get(),
+    ]);
+
+    const mismatches: Array<Record<string, unknown>> = [];
+    let matchedTopups = 0;
+    let matchedRefunds = 0;
+
+    for (const doc of topupsSnap.docs) {
+      const topup = doc.data() || {};
+      const amountSatang = Number(topup.amountSatang || 0);
+      const ledgerSnap = await db.collection("ledger_entries")
+        .where("submissionId", "==", doc.id)
+        .where("type", "==", "TOP_UP_PROVIDER_VERIFIED")
+        .limit(3)
+        .get();
+      const ledgers = ledgerSnap.docs.map((ledgerDoc) => ledgerDoc.data() || {});
+      const valid = ledgers.length === 1
+        && Number(ledgers[0].amountSatang || 0) === amountSatang
+        && ledgers[0].balanced === true
+        && Number(ledgers[0].totalDebitSatang || 0) === amountSatang
+        && Number(ledgers[0].totalCreditSatang || 0) === amountSatang;
+      if (valid) matchedTopups++;
+      else mismatches.push({
+        kind: "TOPUP",
+        submissionId: doc.id,
+        providerTransactionId: String(topup.providerTransactionId || ""),
+        expectedAmountSatang: amountSatang,
+        ledgerCount: ledgers.length,
+        ledgerAmounts: ledgers.map((l) => Number(l.amountSatang || 0)),
+      });
+    }
+
+    for (const doc of refundsSnap.docs) {
+      const refund = doc.data() || {};
+      const amountSatang = Number(refund.amountSatang || 0);
+      const ledgerSnap = await db.collection("ledger_entries")
+        .where("refundRequestId", "==", doc.id)
+        .where("type", "==", "TOP_UP_REFUND")
+        .limit(3)
+        .get();
+      const ledgers = ledgerSnap.docs.map((ledgerDoc) => ledgerDoc.data() || {});
+      const valid = ledgers.length === 1
+        && Number(ledgers[0].amountSatang || 0) === amountSatang
+        && ledgers[0].balanced === true
+        && Number(ledgers[0].totalDebitSatang || 0) === amountSatang
+        && Number(ledgers[0].totalCreditSatang || 0) === amountSatang;
+      if (valid) matchedRefunds++;
+      else mismatches.push({
+        kind: "REFUND",
+        refundRequestId: doc.id,
+        providerRefundId: String(refund.providerRefundId || ""),
+        expectedAmountSatang: amountSatang,
+        ledgerCount: ledgers.length,
+        ledgerAmounts: ledgers.map((l) => Number(l.amountSatang || 0)),
+      });
+    }
+
+    const dateKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit"
+    }).format(new Date());
+
+    await db.collection("reconciliation_reports").doc(dateKey).set({
+      dateKey,
+      checkedAt: FieldValue.serverTimestamp(),
+      providerConfirmedTopups: topupsSnap.size,
+      refundedRequests: refundsSnap.size,
+      matchedTopups,
+      matchedRefunds,
+      mismatchCount: mismatches.length,
+      status: mismatches.length ? "ACTION_REQUIRED" : "BALANCED",
+      mismatches: mismatches.slice(0, 500),
+    }, { merge: true });
+
+    if (mismatches.length) {
+      console.error("[Payment Reconciliation] mismatches", JSON.stringify(mismatches.slice(0, 20)));
+    } else {
+      console.log("[Payment Reconciliation] all internal provider-confirmed records match balanced ledgers");
+    }
+  }
+);
