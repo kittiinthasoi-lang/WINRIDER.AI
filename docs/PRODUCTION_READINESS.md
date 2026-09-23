@@ -8,11 +8,12 @@ This checklist is the release gate for real-world operation.
 - `[ ]` means production-like or external verification is still required.
 - A test harness is not counted as passed until it has a successful run against the intended environment.
 
-Latest fully verified repository gate before this documentation-only update:
-- Commit: `90d3a7dfd9ad5316eddac62235464e6ab6d833bd`
-- CI: success
-- Production Gate run: `35811632578` — success
-- Verified steps: TypeScript, unit tests, integration tests, production build, dependency audit, secret scan, Cloud Functions build.
+Latest verified repository gate:
+- Commit: `edd75047265b3f951499589cc7710b3ea4bfee25`
+- CI run `35812184517`: success
+- Production Gate run `35812184509`: success
+- Firestore Rules Emulator run `35812138510`: success
+- Verified: TypeScript, unit tests, integration tests, production build, dependency audit, secret scan, Cloud Functions build, and Firestore authorization rules.
 
 ## Phase 1 — Core Ride
 - [x] Authenticated order creation
@@ -25,7 +26,7 @@ Latest fully verified repository gate before this documentation-only update:
 - [x] Driver GPS authorization and validation
 - [ ] Automated end-to-end tests for every state transition — authenticated harness exists at `scripts/e2e-ride.mjs` and `.github/workflows/production-like-e2e.yml`; successful production-like run still required
 - [x] Idempotent order creation (order ID replay returns the existing passenger order)
-- [ ] Idempotency key on every remaining ride mutation
+- [x] Durable idempotency for state-changing ride mutations: accept, decline, step/cancel/complete, and completion proof; GPS remains an intentional event stream
 - [ ] Production load test with concurrent accept/decline/cancel — authenticated concurrency harness exists at `scripts/load-test.mjs`; successful production-like run still required
 
 ## Phase 2 — Money
@@ -83,7 +84,7 @@ Latest fully verified repository gate before this documentation-only update:
 - [ ] Customer-facing Partner profile completion audit
 - [ ] Owner/back-office Partner profile completion audit
 - [ ] WIN Shop directory consistency audit
-- [ ] WIN Street Market publish/unpublish persistence audit
+- [x] WIN Street Market publish/unpublish persistence implemented with owner authorization and audit trail
 - [ ] Order/stock/promotion lifecycle tests
 
 ## Phase 8 — Security
@@ -94,11 +95,12 @@ Latest fully verified repository gate before this documentation-only update:
 - [x] Self-service profile writes cannot elevate role/status/admin/level/XP/financial privilege fields
 - [x] Webhook HTTPS + host allowlist
 - [x] API rate limiting
-- [ ] Distributed rate limiting at the edge — requires deployment-platform configuration
+- [x] Distributed application-layer rate limiting for payment/admin/ride mutations using Firestore transaction buckets
+- [ ] Distributed rate limiting at the edge — distributed Firestore application-layer limiting is implemented on sensitive mutations; deployment-platform edge/WAF limit still required — requires deployment-platform configuration
 - [ ] Independent security review for IDOR/privilege escalation — internal engineering baseline and hardening are in `docs/SECURITY_REVIEW.md`; independent review still required
 - [x] Secret scanning in CI
 - [x] Dependency vulnerability scan
-- [ ] Production Firebase Rules emulator tests
+- [x] Firestore Rules emulator tests pass — run `35812138510` covers privilege fields, ride/wallet/ledger denial, account preferences ownership, Knight KYC/dispatch fields and Admin moderation
 
 ## Phase 9 — Admin / Operations
 - [x] Authenticated operations overview API for Admin Command Center
@@ -113,10 +115,10 @@ Latest fully verified repository gate before this documentation-only update:
 - [ ] Role-based admin action integration tests
 
 ## Phase 10 — Release / QA
-- [x] TypeScript lint passes — Production Gate `35811632578`
-- [x] Production build passes — Production Gate `35811632578`
-- [x] Unit tests pass — Production Gate `35811632578`
-- [x] Integration tests pass — Production Gate `35811632578`
+- [x] TypeScript lint passes — Production Gate `35812184509`
+- [x] Production build passes — Production Gate `35812184509`
+- [x] Unit tests pass — Production Gate `35812184509`
+- [x] Integration tests pass — Production Gate `35812184509`
 - [ ] Mobile browser smoke test
 - [ ] Desktop smoke test
 - [ ] Authentication recovery test
