@@ -9,23 +9,6 @@ import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
 import { calculateAppFare } from "./src/core/serverFare";
 import { parseQrPayload } from "./src/utils/qrPayload";
-import {
-  configureWinAuthStore,
-  createWinAuthSession,
-  createWinAuthUser,
-  deleteWinAuthSession,
-  getWinAuthSessionUser,
-  getWinAuthUserByEmail,
-  getWinAuthUserById,
-  hashWinAuthPassword,
-  listWinAuthUsers,
-  normalizeWinAuthEmail,
-  saveWinAuthUser,
-  verifyWinAuthPassword,
-  type WinAuthRegistrationProfile,
-  type WinAuthRole,
-  type WinAuthStoredUser,
-} from "./src/server/winAuthStore";
 
 dotenv.config();
 
@@ -1738,7 +1721,6 @@ function getAdminDb() {
 }
 
 const ordersDb = getAdminDb();
-configureWinAuthStore(ordersDb);
 
 async function checkFirebaseReadiness() {
   const firestore = { ok: false, error: "" };
