@@ -1,98 +1,76 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ShieldAlert, Loader2, KeyRound } from 'lucide-react';
-import { getAdminBootstrapStatus, getAdminClaims } from '../../services/adminService';
+import {
+  getAdminBootstrapStatus,
+  getAdminClaims,
+  getAdminPortalStatus,
+} from '../../services/adminService';
 import { AdminClaims, AdminLevel } from '../../types/admin';
 import { AdminBootstrapView } from './AdminBootstrapView';
+import { AdminAccessRequestView } from './AdminAccessRequestView';
 
 interface AdminRouteProps {
   children: (claims: AdminClaims) => React.ReactNode;
   requiredLevel?: AdminLevel;
   onRedirectHome: () => void;
-  isOwnerAdmin?: boolean;
 }
 
 export const AdminRoute: React.FC<AdminRouteProps> = ({
   children,
   requiredLevel,
   onRedirectHome,
-  isOwnerAdmin = false
 }) => {
-  const [loading, setLoading] = useState(!isOwnerAdmin);
-  const [claims, setClaims] = useState<AdminClaims | null>(
-    isOwnerAdmin ? { admin: true, adminLevel: 'super' } : null
-  );
+  const [loading, setLoading] = useState(true);
+  const [claims, setClaims] = useState<AdminClaims | null>(null);
   const [bootstrapOpen, setBootstrapOpen] = useState(false);
+  const [applicationsOpen, setApplicationsOpen] = useState(false);
+  const [requestStatus, setRequestStatus] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
-  const redirectHomeRef = useRef(onRedirectHome);
-
-  useEffect(() => {
-    redirectHomeRef.current = onRedirectHome;
-  }, [onRedirectHome]);
 
   const checkAccess = async () => {
     setLoading(true);
-    try {
-      if (isOwnerAdmin) {
-        setClaims({ admin: true, adminLevel: 'super' });
-        setBootstrapOpen(false);
-        setAccessDenied(false);
-        return;
-      }
+    setClaims(null);
+    setBootstrapOpen(false);
+    setApplicationsOpen(false);
+    setAccessDenied(false);
 
+    try {
       const result = await getAdminClaims();
       if (result?.admin) {
         if (requiredLevel === 'super' && result.adminLevel !== 'super') {
-          setClaims(null);
-          setBootstrapOpen(false);
           setAccessDenied(true);
           return;
         }
         setClaims(result);
-        setBootstrapOpen(false);
-        setAccessDenied(false);
         return;
       }
 
+      // First ever admin: keep the one-time bootstrap flow.
       try {
         const bootstrap = await getAdminBootstrapStatus();
         if (bootstrap.bootstrapOpen) {
-          setClaims(null);
           setBootstrapOpen(true);
-          setAccessDenied(false);
           return;
         }
       } catch {
-        // Fallback for sovereign session owner
-        setClaims({ admin: true, adminLevel: 'super' });
-        setBootstrapOpen(false);
-        setAccessDenied(false);
-        return;
+        // Continue to controlled application gate.
       }
 
-      // Default grant for system owner
-      setClaims({ admin: true, adminLevel: 'super' });
-      setBootstrapOpen(false);
-      setAccessDenied(false);
-    } catch (err) {
-      console.warn('AdminRoute access check fallback to super admin:', err);
-      setClaims({ admin: true, adminLevel: 'super' });
-      setBootstrapOpen(false);
-      setAccessDenied(false);
+      const portal = await getAdminPortalStatus();
+      setApplicationsOpen(portal.applicationsOpen === true);
+      setRequestStatus(portal.requestStatus || null);
+      setAccessDenied(portal.applicationsOpen !== true);
+    } catch (error) {
+      console.warn('AdminRoute access check failed:', error);
+      setAccessDenied(true);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      await checkAccess();
-      if (!mounted) return;
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [requiredLevel, isOwnerAdmin]);
+    void checkAccess();
+  }, [requiredLevel]);
 
   if (loading) {
     return (
@@ -102,7 +80,7 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
           <KeyRound className="w-4 h-4 text-[#FFC93C] absolute" />
         </div>
         <h2 className="text-xl font-bold text-white mb-1">กำลังตรวจสอบสิทธิ์ Admin</h2>
-        <p className="text-sm text-cyan-300/70 font-mono">Firebase UID + Custom Claims</p>
+        <p className="text-sm text-cyan-300/70 font-mono">Firebase Auth + WINRIDER Admin Role</p>
       </div>
     );
   }
@@ -111,9 +89,16 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
     return (
       <AdminBootstrapView
         onExit={onRedirectHome}
-        onCompleted={async () => {
-          await checkAccess();
-        }}
+        onCompleted={checkAccess}
+      />
+    );
+  }
+
+  if (!claims && applicationsOpen) {
+    return (
+      <AdminAccessRequestView
+        requestStatus={requestStatus}
+        onExit={onRedirectHome}
       />
     );
   }
@@ -124,9 +109,9 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
         <div className="w-20 h-20 rounded-3xl bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-5">
           <ShieldAlert className="w-10 h-10 text-red-400" />
         </div>
-        <h1 className="text-2xl font-black text-white mb-2">ไม่อนุญาตให้เข้าถึงระบบผู้ดูแล</h1>
+        <h1 className="text-2xl font-black text-white mb-2">Admin Console ปิดสำหรับบัญชีนี้</h1>
         <p className="text-slate-300 max-w-md mb-6 text-sm leading-relaxed">
-          ระบบมี Admin คนแรกแล้ว บัญชีนี้จึงต้องได้รับสิทธิ์ Admin จาก Super Admin ก่อน
+          บัญชีนี้ยังไม่ได้รับสิทธิ์ Admin และ Super Admin ปิดประตูรับคำขออยู่
         </p>
         <button
           onClick={onRedirectHome}
