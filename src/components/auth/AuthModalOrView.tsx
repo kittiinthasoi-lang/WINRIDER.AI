@@ -466,14 +466,41 @@ export const AuthModalOrView: React.FC = () => {
 
           <div className="max-w-md mx-auto">
             {googleOnboarding ? (
-              <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100">
-                <div className="font-black text-emerald-300">✓ เชื่อมบัญชี Google แล้ว</div>
-                <div className="mt-1 text-slate-300">
-                  {googleOnboarding.displayName || 'Google Account'}
-                  {googleOnboarding.email ? ` • ${googleOnboarding.email}` : ''}
+              <div className="rounded-xl border border-[#dadce0] bg-white px-4 py-3 text-slate-900 shadow-sm">
+                <div className="flex items-center gap-3">
+                  {googleOnboarding.photoURL ? (
+                    <img
+                      src={googleOnboarding.photoURL}
+                      alt=""
+                      className="h-10 w-10 rounded-full border border-slate-200 object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                      <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+                        <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"/>
+                        <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"/>
+                        <path fill="#FBBC05" d="M6.39 13.93A6 6 0 0 1 6.08 12c0-.67.12-1.32.31-1.93V7.45H3.04A10 10 0 0 0 2 12c0 1.61.39 3.13 1.04 4.55l3.35-2.62Z"/>
+                        <path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.62 9.62 0 0 0 12 2 10 10 0 0 0 3.04 7.45l3.35 2.62C7.18 7.7 9.39 5.94 12 5.94Z"/>
+                      </svg>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-medium text-slate-500">Google Account</div>
+                    <div className="truncate text-sm font-semibold text-slate-900">{googleOnboarding.displayName || 'Google Account'}</div>
+                    {googleOnboarding.email && (
+                      <div className="truncate text-xs text-slate-600">{googleOnboarding.email}</div>
+                    )}
+                  </div>
+                  <svg viewBox="0 0 24 24" className="h-6 w-6 shrink-0" aria-hidden="true">
+                    <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"/>
+                    <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"/>
+                    <path fill="#FBBC05" d="M6.39 13.93A6 6 0 0 1 6.08 12c0-.67.12-1.32.31-1.93V7.45H3.04A10 10 0 0 0 2 12c0 1.61.39 3.13 1.04 4.55l3.35-2.62Z"/>
+                    <path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.62 9.62 0 0 0 12 2 10 10 0 0 0 3.04 7.45l3.35 2.62C7.18 7.7 9.39 5.94 12 5.94Z"/>
+                  </svg>
                 </div>
-                <div className="mt-1 text-[11px] text-slate-400">
-                  ขั้นต่อไปยังต้องตั้ง WIN UID และรหัสผ่านของ WINRIDER ตามปกติ
+                <div className="mt-2 border-t border-slate-200 pt-2 text-[11px] text-slate-600">
+                  เชื่อม Google สำเร็จแล้ว • ตั้ง WIN UID และรหัสผ่านต่อด้านล่าง
                 </div>
               </div>
             ) : (
@@ -481,10 +508,15 @@ export const AuthModalOrView: React.FC = () => {
                 type="button"
                 onClick={() => void handleGoogleSignIn()}
                 disabled={working}
-                className="w-full rounded-xl border border-white/15 bg-white px-4 py-3 text-sm font-black text-slate-900 shadow-md hover:bg-slate-100 disabled:opacity-50 flex items-center justify-center gap-3"
+                className="w-full rounded-md border border-[#747775] bg-white px-4 py-2.5 text-sm font-medium text-[#1f1f1f] shadow-sm transition hover:bg-[#f8fafd] disabled:opacity-50 flex items-center justify-center gap-3"
               >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-black text-blue-600">G</span>
-                <span>{working ? 'กำลังเชื่อม Google...' : 'เข้าสู่ระบบด้วย Google'}</span>
+                <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" aria-hidden="true">
+                  <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"/>
+                  <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"/>
+                  <path fill="#FBBC05" d="M6.39 13.93A6 6 0 0 1 6.08 12c0-.67.12-1.32.31-1.93V7.45H3.04A10 10 0 0 0 2 12c0 1.61.39 3.13 1.04 4.55l3.35-2.62Z"/>
+                  <path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.62 9.62 0 0 0 12 2 10 10 0 0 0 3.04 7.45l3.35 2.62C7.18 7.7 9.39 5.94 12 5.94Z"/>
+                </svg>
+                <span>{working ? 'กำลังเชื่อม Google...' : 'Sign in with Google'}</span>
               </button>
             )}
             <div className="my-4 flex items-center gap-3 text-[10px] font-bold text-slate-500">
