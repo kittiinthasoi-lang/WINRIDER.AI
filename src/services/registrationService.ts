@@ -1,5 +1,6 @@
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import type { UserDoc } from '../types/auth';
 
 export interface BaseRegistrationPayload {
   uid: string;
@@ -37,6 +38,13 @@ export interface PartnerRegistrationPayload extends BaseRegistrationPayload {
   estimatedUsers: number;
 }
 
+export interface RegistrationResult {
+  user: UserDoc;
+  approvalRequired: boolean;
+  isFoundingKnight?: boolean;
+  recovered?: boolean;
+}
+
 export function subscribeFoundingKnightCounter(callback: (data: { count: number; limit: number; remaining: number }) => void) {
   const counterRef = doc(db, 'counters', 'foundingKnights');
   return onSnapshot(counterRef, (snap) => {
@@ -54,26 +62,59 @@ export function subscribeFoundingKnightCounter(callback: (data: { count: number;
   });
 }
 
-async function submitRegistration(role: 'knight' | 'citizen' | 'merchant' | 'partner', registration: Record<string, unknown>) {
+async function fetchCurrentProfile(token: string): Promise<UserDoc | null> {
+  const response = await fetch('/api/auth/me', {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    cache: 'no-store',
+  });
+  if (!response.ok) return null;
+  const payload = await response.json().catch(() => ({}));
+  return payload?.user ? payload.user as UserDoc : null;
+}
+
+async function submitRegistration(
+  role: 'knight' | 'citizen' | 'merchant' | 'partner',
+  registration: Record<string, unknown>
+): Promise<RegistrationResult> {
   const user = auth.currentUser;
   if (!user) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+
   const token = await user.getIdToken();
   const response = await fetch('/api/auth/register-profile', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      Accept: 'application/json',
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ role, registration }),
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(payload?.error || 'ลงทะเบียนไม่สำเร็จ');
-    (error as any).code = payload?.code || `HTTP_${response.status}`;
-    throw error;
+
+  if (response.ok && payload?.user) {
+    return payload as RegistrationResult;
   }
-  return payload;
+
+  // If the server created the profile but the preview/network interrupted the
+  // original response, a retry receives PROFILE_ALREADY_REGISTERED. Recover the
+  // real profile instead of forcing the user to start registration again.
+  if (response.status === 409 && payload?.code === 'PROFILE_ALREADY_REGISTERED') {
+    const existing = await fetchCurrentProfile(token);
+    if (existing?.role) {
+      return {
+        user: existing,
+        approvalRequired: false,
+        recovered: true,
+      };
+    }
+  }
+
+  const error = new Error(payload?.error || 'ลงทะเบียนไม่สำเร็จ');
+  (error as any).code = payload?.code || `HTTP_${response.status}`;
+  throw error;
 }
 
 function common(payload: BaseRegistrationPayload) {
@@ -88,8 +129,8 @@ function common(payload: BaseRegistrationPayload) {
   };
 }
 
-export async function registerKnight(payload: KnightRegistrationPayload): Promise<boolean> {
-  const result = await submitRegistration('knight', {
+export async function registerKnight(payload: KnightRegistrationPayload): Promise<RegistrationResult> {
+  return submitRegistration('knight', {
     ...common(payload),
     vehicleType: payload.vehicleType,
     plateNumber: payload.plateNumber,
@@ -97,19 +138,18 @@ export async function registerKnight(payload: KnightRegistrationPayload): Promis
     driverLicenseUrl: payload.driverLicenseUrl || '',
     vehiclePhotoUrl: payload.vehiclePhotoUrl || '',
   });
-  return result?.isFoundingKnight === true;
 }
 
-export async function registerCitizen(payload: CitizenRegistrationPayload): Promise<void> {
-  await submitRegistration('citizen', {
+export async function registerCitizen(payload: CitizenRegistrationPayload): Promise<RegistrationResult> {
+  return submitRegistration('citizen', {
     ...common(payload),
     emergencyContactName: payload.emergencyContactName,
     emergencyContactPhone: payload.emergencyContactPhone,
   });
 }
 
-export async function registerMerchant(payload: MerchantRegistrationPayload): Promise<void> {
-  await submitRegistration('merchant', {
+export async function registerMerchant(payload: MerchantRegistrationPayload): Promise<RegistrationResult> {
+  return submitRegistration('merchant', {
     ...common(payload),
     shopName: payload.shopName,
     shopType: payload.shopType,
@@ -118,8 +158,8 @@ export async function registerMerchant(payload: MerchantRegistrationPayload): Pr
   });
 }
 
-export async function registerPartner(payload: PartnerRegistrationPayload): Promise<void> {
-  await submitRegistration('partner', {
+export async function registerPartner(payload: PartnerRegistrationPayload): Promise<RegistrationResult> {
+  return submitRegistration('partner', {
     ...common(payload),
     orgName: payload.orgName,
     orgType: payload.orgType,
