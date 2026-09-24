@@ -18,6 +18,7 @@ import {
   Upload,
   Sparkles,
   Database,
+  Mail,
   Phone,
   MapPin,
   Check,
@@ -90,6 +91,7 @@ export const AuthModalOrView: React.FC = () => {
   // Common User Info
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [winUid, setWinUid] = useState('');
   const [phone, setPhone] = useState('');
   const [province, setProvince] = useState('กรุงเทพมหานคร');
@@ -158,6 +160,7 @@ export const AuthModalOrView: React.FC = () => {
     setError('');
     if (!firstName.trim() && googleOnboarding.firstName) setFirstName(googleOnboarding.firstName);
     if (!lastName.trim() && googleOnboarding.lastName) setLastName(googleOnboarding.lastName);
+    if (!email.trim() && googleOnboarding.email) setEmail(googleOnboarding.email.toLowerCase());
   }, [googleOnboarding]);
 
   const changeMode = (next: Mode) => {
@@ -179,6 +182,10 @@ export const AuthModalOrView: React.FC = () => {
     const normalizedUid = normalizeWinUid(winUid);
     if (!firstName.trim() || !lastName.trim()) {
       setError('กรุณากรอกชื่อและนามสกุลจริง');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) {
+      setError('กรุณากรอกอีเมลจริงให้ถูกต้อง');
       return;
     }
     if (!isValidWinUid(normalizedUid)) {
@@ -280,6 +287,7 @@ export const AuthModalOrView: React.FC = () => {
         {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
+          email: email.trim().toLowerCase(),
           winUid: normalizedUid,
           phone: phone.trim(),
           password,
@@ -337,6 +345,7 @@ export const AuthModalOrView: React.FC = () => {
         setRegStep(1);
         if (result.google.firstName) setFirstName(result.google.firstName);
         if (result.google.lastName) setLastName(result.google.lastName);
+        if (result.google.email) setEmail(result.google.email.toLowerCase());
       }
     } catch (cause: any) {
       const code = String(cause?.code || cause?.message || '');
@@ -680,6 +689,25 @@ export const AuthModalOrView: React.FC = () => {
                       />
                     </label>
                   </div>
+
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-bold text-slate-300">อีเมลจริง *</span>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cyan-400" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value.trimStart().toLowerCase())}
+                        required
+                        autoComplete="email"
+                        placeholder="name@example.com"
+                        className="w-full rounded-xl border border-white/10 bg-black/40 py-2.5 pl-9 pr-3 text-sm text-white outline-none focus:border-cyan-400/70"
+                      />
+                    </div>
+                    <span className="mt-1 block text-[10px] text-slate-400">
+                      บันทึกเป็นอีเมลจริงใน Firestore{googleOnboarding ? ' • เติมจาก Google ให้แล้ว แก้ไขได้' : ''}
+                    </span>
+                  </label>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className="block">
