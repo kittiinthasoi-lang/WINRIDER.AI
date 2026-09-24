@@ -53,6 +53,49 @@ export async function getAdminClaims(): Promise<AdminClaims | null> {
   return null;
 }
 
+
+export interface AdminBootstrapStatus {
+  bootstrapOpen: boolean;
+  status: string;
+  reservedUid?: string;
+  currentUid: string;
+  currentEmail?: string;
+}
+
+export async function getAdminBootstrapStatus(): Promise<AdminBootstrapStatus> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อน');
+  const token = await user.getIdToken();
+  const res = await fetch('/api/admin/bootstrap-status', {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'ตรวจสอบสถานะ Admin bootstrap ไม่สำเร็จ');
+  return data as AdminBootstrapStatus;
+}
+
+export async function bootstrapFirstAdmin(targetUid: string): Promise<{ ok: boolean; adminLevel: AdminLevel }> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อน');
+  const token = await user.getIdToken();
+  const res = await fetch('/api/admin/bootstrap', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ targetUid }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'ตั้งค่า Super Admin คนแรกไม่สำเร็จ');
+  await user.getIdToken(true);
+  return { ok: true, adminLevel: 'super' };
+}
+
 /**
  * เรียก Cloud Function ผ่าน httpsCallable พร้อม Fallback ไปยัง Express /api/admin/*
  */
@@ -252,23 +295,8 @@ export async function updateFeeRule(ruleId: string, patch: any, reason?: string)
  */
 export async function setAdminRole(targetUid: string, level: AdminLevel, reason?: string) {
   const result = await callAdminEndpoint('setAdminRole', '/api/admin/set-role', { targetUid, level, reason });
-  try {
-    await updateDoc(doc(db, 'users', targetUid), {
-      isAdmin: true,
-      adminLevel: level,
-      updatedAt: serverTimestamp()
-    });
-    await addDoc(collection(db, 'audit_logs'), {
-      adminUid: auth.currentUser?.uid || 'ADMIN',
-      adminEmail: auth.currentUser?.email || '',
-      action: 'SET_ADMIN_ROLE',
-      targetUid,
-      targetCollection: 'users',
-      reason: reason || `แต่งตั้งสิทธิ์ระดับ ${level}`,
-      createdAt: serverTimestamp()
-    });
-  } catch (e) {
-    console.warn('Direct Firestore setAdminRole write note:', e);
+  if (auth.currentUser?.uid === targetUid) {
+    await auth.currentUser.getIdToken(true);
   }
   return result;
 }
