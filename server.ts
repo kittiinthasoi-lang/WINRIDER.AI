@@ -2499,6 +2499,74 @@ async function requireSuperAdmin(req: express.Request, res: express.Response) {
   return user;
 }
 
+
+app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
+  const admin = await requireSuperAdmin(req, res);
+  if (!admin) return;
+
+  const targetUid = String(req.body?.targetUid || "").trim();
+  const level = String(req.body?.level || "").trim();
+  const validLevels = new Set(["super", "reviewer", "support"]);
+
+  if (!targetUid) return res.status(400).json({ error: "ต้องระบุ UID ผู้ใช้", code: "TARGET_UID_REQUIRED" });
+  if (!validLevels.has(level)) {
+    return res.status(400).json({ error: "ระดับ Admin ไม่ถูกต้อง", code: "INVALID_ADMIN_LEVEL" });
+  }
+
+  try {
+    const [record, userSnap] = await Promise.all([
+      adminAuth.getUser(targetUid),
+      ordersDb.collection("users").doc(targetUid).get(),
+    ]);
+    if (!userSnap.exists) {
+      return res.status(404).json({ error: "ไม่พบโปรไฟล์ UID นี้ใน WINRIDER", code: "USER_PROFILE_NOT_FOUND" });
+    }
+
+    await adminAuth.setCustomUserClaims(targetUid, {
+      ...(record.customClaims || {}),
+      admin: true,
+      adminLevel: level,
+    });
+
+    const now = new Date().toISOString();
+    await Promise.all([
+      ordersDb.collection("users").doc(targetUid).set({
+        isAdmin: true,
+        adminLevel: level,
+        status: "active",
+        adminAssignedAt: now,
+        adminAssignedBy: admin.uid,
+        updatedAt: now,
+      }, { merge: true }),
+      ordersDb.collection("adminAccess").doc(targetUid).set({
+        uid: targetUid,
+        adminLevel: level,
+        active: true,
+        bootstrap: false,
+        assignedBy: admin.uid,
+        updatedAt: now,
+        createdAt: now,
+      }, { merge: true }),
+      ordersDb.collection("audit_logs").add({
+        action: "SET_ADMIN_ROLE",
+        actorUid: admin.uid,
+        targetUid,
+        adminLevel: level,
+        reason: String(req.body?.reason || "").slice(0, 500),
+        createdAt: FieldValue.serverTimestamp(),
+      }),
+    ]);
+
+    return res.json({ ok: true, targetUid, adminLevel: level, forceTokenRefresh: true });
+  } catch (error: any) {
+    if (error?.code === "auth/user-not-found") {
+      return res.status(404).json({ error: "ไม่พบ UID นี้ใน Firebase Authentication", code: "FIREBASE_USER_NOT_FOUND" });
+    }
+    console.error("[Admin Set Role]", error?.message);
+    return res.status(503).json({ error: "ตั้งสิทธิ์ Admin ไม่สำเร็จ", code: "SET_ADMIN_ROLE_FAILED" });
+  }
+});
+
 function decodeImageDataUrl(value: unknown) {
   const match = String(value || "").match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
   if (!match) return null;
