@@ -3,7 +3,6 @@ import { auth, db } from '../firebase';
 
 export interface BaseRegistrationPayload {
   uid: string;
-  email: string;
   displayName: string;
   phone: string;
   province: string;
