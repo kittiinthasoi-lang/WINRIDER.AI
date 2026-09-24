@@ -343,9 +343,20 @@ async function loadFreePublicPlaces(
   return places;
 }
 
-// Health check endpoints (Cloud Run, Kubernetes, AI Studio probes)
+// Lightweight liveness probe. Firebase readiness is intentionally separate so
+// platform health checks do not create Firestore/Storage reads on every probe.
 app.get(["/api/health", "/healthz", "/health"], (_req, res) => {
-  res.json({ status: "ok", empire: "WINRIDER.AI", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    empire: "WINRIDER.AI",
+    firebaseConfigured: firebaseAdminRuntimeStatus.credentialConfigured,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/api/health/firebase", rateLimit(20), async (_req, res) => {
+  const result = await checkFirebaseReadiness();
+  return res.status(result.ready ? 200 : 503).json(result);
 });
 
 app.post("/api/pet-care/nearby", rateLimit(RATE_LIMITS["/api/pet-care/nearby"]), async (req, res) => {
@@ -1580,6 +1591,54 @@ interface ServerOrder {
   expressPackageVerificationId?: string;
 }
 
+type FirebaseAdminRuntimeStatus = {
+  credentialSource: "service_account_json" | "split_env" | "application_default";
+  credentialConfigured: boolean;
+  credentialError: string | null;
+  projectId: string;
+  databaseId: string;
+  storageBucket: string;
+};
+
+let firebaseAdminRuntimeStatus: FirebaseAdminRuntimeStatus = {
+  credentialSource: "application_default",
+  credentialConfigured: false,
+  credentialError: null,
+  projectId: "",
+  databaseId: "",
+  storageBucket: "",
+};
+
+function parseFirebaseServiceAccountSecret(raw: string) {
+  let normalized = String(raw || "").trim();
+  if (normalized.startsWith("'") && normalized.endsWith("'")) {
+    normalized = normalized.slice(1, -1).trim();
+  }
+
+  let parsed: any = JSON.parse(normalized);
+  if (typeof parsed === "string") {
+    parsed = JSON.parse(parsed);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("SERVICE_ACCOUNT_MUST_BE_JSON_OBJECT");
+  }
+
+  const projectId = String(parsed.project_id || parsed.projectId || "").trim();
+  const clientEmail = String(parsed.client_email || parsed.clientEmail || "").trim();
+  const privateKey = String(parsed.private_key || parsed.privateKey || "").replace(/\\n/g, "\n").trim();
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error("SERVICE_ACCOUNT_REQUIRED_FIELDS_MISSING");
+  }
+
+  return {
+    ...parsed,
+    project_id: projectId,
+    client_email: clientEmail,
+    private_key: privateKey,
+  };
+}
+
 function getAdminDb() {
   let defaultDbId = "ai-studio-winriderai-96f1b3b6-26ee-4fca-ba51-662b278eea8d";
   let defaultProjectId = "decoded-robot-6lkcn";
@@ -1592,7 +1651,9 @@ function getAdminDb() {
       if (cfg.projectId) defaultProjectId = cfg.projectId;
       if (cfg.storageBucket) defaultStorageBucket = cfg.storageBucket;
     }
-  } catch (e) {}
+  } catch (error) {
+    console.warn("[Firebase Admin] Unable to read firebase-applet-config.json; using built-in project defaults");
+  }
 
   const rawDbId = process.env.FIRESTORE_DATABASE_ID || process.env.VITE_FIRESTORE_DATABASE_ID || defaultDbId;
   const databaseId = (!rawDbId || rawDbId === "(default)") ? undefined : rawDbId;
@@ -1602,47 +1663,127 @@ function getAdminDb() {
   const saJson = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
 
-  const app = getApps().length
-    ? getApps()[0]
-    : (() => {
-        if (saJson) {
-          try {
-            const parsed = JSON.parse(saJson);
-            return initializeApp({
-              credential: cert(parsed),
-              projectId: parsed.project_id || projectId,
-              ...(storageBucket ? { storageBucket } : {}),
-            });
-          } catch (e) {
-            console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:", e);
-          }
+  let credentialSource: FirebaseAdminRuntimeStatus["credentialSource"] = "application_default";
+  let credentialConfigured = false;
+  let credentialError: string | null = null;
+  let adminApp = getApps().length ? getApps()[0] : null;
+
+  if (!adminApp) {
+    if (saJson) {
+      try {
+        const parsed = parseFirebaseServiceAccountSecret(saJson);
+        if (parsed.project_id !== projectId) {
+          throw new Error("SERVICE_ACCOUNT_PROJECT_MISMATCH");
         }
-        if (projectId && clientEmail && privateKey) {
-          try {
-            return initializeApp({
-              credential: cert({
-                projectId,
-                clientEmail,
-                privateKey: privateKey.replace(/\\n/g, "\n"),
-              }),
-              projectId,
-              ...(storageBucket ? { storageBucket } : {}),
-            });
-          } catch (e) {
-            console.warn("Failed to initialize Firebase Admin with clientEmail/privateKey:", e);
-          }
-        }
-        return initializeApp({
+        adminApp = initializeApp({
+          credential: cert(parsed),
           projectId,
           ...(storageBucket ? { storageBucket } : {}),
         });
-      })();
+        credentialSource = "service_account_json";
+        credentialConfigured = true;
+      } catch (error) {
+        credentialSource = "service_account_json";
+        credentialError = error instanceof Error ? error.message : "SERVICE_ACCOUNT_INVALID";
+        console.error("[Firebase Admin] FIREBASE_SERVICE_ACCOUNT is invalid; Firebase readiness checks will remain unavailable until the Replit Secret is replaced.");
+      }
+    }
 
-  return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+    if (!adminApp && projectId && clientEmail && privateKey) {
+      try {
+        adminApp = initializeApp({
+          credential: cert({
+            projectId,
+            clientEmail,
+            privateKey: privateKey.replace(/\\n/g, "\n"),
+          }),
+          projectId,
+          ...(storageBucket ? { storageBucket } : {}),
+        });
+        credentialSource = "split_env";
+        credentialConfigured = true;
+        credentialError = null;
+      } catch (error) {
+        credentialSource = "split_env";
+        credentialError = error instanceof Error ? error.message : "SPLIT_ENV_CREDENTIAL_INVALID";
+        console.error("[Firebase Admin] FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY credentials are invalid.");
+      }
+    }
+
+    if (!adminApp) {
+      adminApp = initializeApp({
+        projectId,
+        ...(storageBucket ? { storageBucket } : {}),
+      });
+      credentialSource = "application_default";
+    }
+  } else {
+    credentialConfigured = true;
+    credentialSource = "application_default";
+  }
+
+  firebaseAdminRuntimeStatus = {
+    credentialSource,
+    credentialConfigured,
+    credentialError,
+    projectId,
+    databaseId: databaseId || "(default)",
+    storageBucket,
+  };
+
+  console.info("[Firebase Admin] project=%s database=%s bucket=%s credential=%s", projectId, databaseId || "(default)", storageBucket, credentialSource);
+  return databaseId ? getFirestore(adminApp, databaseId) : getFirestore(adminApp);
 }
 
 const ordersDb = getAdminDb();
 configureWinAuthStore(ordersDb);
+
+async function checkFirebaseReadiness() {
+  const firestore = { ok: false, error: "" };
+  const storage = { ok: false, error: "" };
+
+  try {
+    await ordersDb.collection("_connection_test").doc("ping").get();
+    firestore.ok = true;
+  } catch (error) {
+    firestore.error = error instanceof Error ? error.message : "FIRESTORE_READ_FAILED";
+  }
+
+  try {
+    const bucket = getStorage().bucket(firebaseAdminRuntimeStatus.storageBucket || undefined);
+    await bucket.getMetadata();
+    storage.ok = true;
+  } catch (error) {
+    storage.error = error instanceof Error ? error.message : "STORAGE_READ_FAILED";
+  }
+
+  const ready = firestore.ok && storage.ok;
+  return {
+    status: ready ? "ready" : "not_ready",
+    ready,
+    projectId: firebaseAdminRuntimeStatus.projectId,
+    databaseId: firebaseAdminRuntimeStatus.databaseId,
+    storageBucket: firebaseAdminRuntimeStatus.storageBucket,
+    credentialSource: firebaseAdminRuntimeStatus.credentialSource,
+    credentialConfigured: firebaseAdminRuntimeStatus.credentialConfigured,
+    credentialError: firebaseAdminRuntimeStatus.credentialError,
+    checks: { firestore, storage },
+    temporaryAdminBypassEnabled: TEMPORARY_ADMIN_BYPASS_ENABLED,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+void checkFirebaseReadiness()
+  .then((result) => {
+    if (result.ready) {
+      console.info("[Firebase Readiness] Firestore and Storage read checks passed for project %s.", result.projectId);
+    } else {
+      console.warn("[Firebase Readiness] Firebase is not ready. Configure the service account in the deployment secret store.");
+    }
+  })
+  .catch(() => {
+    console.warn("[Firebase Readiness] Unable to complete startup Firebase checks.");
+  });
 
 const WIN_AUTH_ROLES = new Set<WinAuthRole>(["citizen", "knight", "merchant", "partner"]);
 
@@ -1803,7 +1944,7 @@ function isOwnerAdminEmail(value: unknown): boolean {
   return normalizeWinAuthEmail(value) === ownerAdminEmail();
 }
 
-const TEMPORARY_ADMIN_BYPASS_ENABLED = true;
+const TEMPORARY_ADMIN_BYPASS_ENABLED = false;
 const TEMPORARY_ADMIN_BYPASS_TOKEN = "WINRIDER-TEMP-ADMIN-BYPASS-V1";
 
 function isTemporaryAdminBypassToken(token: string): boolean {
