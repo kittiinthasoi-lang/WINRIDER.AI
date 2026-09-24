@@ -56,7 +56,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   // Set Role Dialog
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [targetAdminLevel, setTargetAdminLevel] = useState<'super' | 'reviewer' | 'support'>('reviewer');
-  const [manualAdminUid, setManualAdminUid] = useState('');
+  const [manualAdminWinUid, setManualAdminWinUid] = useState('');
   const [manualAdminLevel, setManualAdminLevel] = useState<AdminLevel>('support');
 
   const [actionLoading, setActionLoading] = useState(false);
@@ -104,7 +104,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
         u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.phone?.includes(searchTerm) ||
         u.uid?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+        u.winUid?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchRole = roleFilter === 'all' || u.role === roleFilter;
       const matchStatus = statusFilter === 'all' || u.status === statusFilter;
@@ -114,7 +114,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   }, [users, searchTerm, roleFilter, statusFilter]);
 
   const handleApproveRegistration = async (u: AdminUserSummary) => {
-    if (!window.confirm(`อนุมัติบัญชี "${u.displayName}" (${u.email}) ให้เข้าใช้งาน WINRIDER ใช่หรือไม่?`)) return;
+    if (!window.confirm(`อนุมัติบัญชี "${u.displayName}" (WIN UID: ${u.winUid || "-"}) ให้เข้าใช้งาน WINRIDER ใช่หรือไม่?`)) return;
     setActionLoading(true);
     try {
       await approveRegistration(u.uid);
@@ -162,10 +162,10 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   };
 
   const handleConfirmSetAdminRole = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser?.winUid) return;
     setActionLoading(true);
     try {
-      await setAdminRole(selectedUser.uid, targetAdminLevel, `แต่งตั้งสิทธิ์ระดับ ${targetAdminLevel}`);
+      await setAdminRole(selectedUser.winUid, targetAdminLevel, `แต่งตั้งสิทธิ์ระดับ ${targetAdminLevel}`);
       alert(`แต่งตั้งสิทธิ์ ${targetAdminLevel} ให้แก่ ${selectedUser.displayName} เรียบร้อยแล้ว`);
       setShowRoleModal(false);
       fetchUsers();
@@ -178,13 +178,13 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   };
 
   const handleManualSetAdmin = async () => {
-    const uid = manualAdminUid.trim();
-    if (!uid) return;
+    const winUid = manualAdminWinUid.trim().toLowerCase();
+    if (!winUid) return;
     setActionLoading(true);
     try {
-      await setAdminRole(uid, manualAdminLevel, `แต่งตั้ง Admin ด้วย UID ระดับ ${manualAdminLevel}`);
-      alert(`ตั้ง UID ${uid} เป็น Admin ระดับ ${manualAdminLevel} เรียบร้อยแล้ว`);
-      setManualAdminUid('');
+      await setAdminRole(winUid, manualAdminLevel, `แต่งตั้ง Admin ด้วย WIN UID ระดับ ${manualAdminLevel}`);
+      alert(`ตั้ง WIN UID ${winUid} เป็น Admin ระดับ ${manualAdminLevel} เรียบร้อยแล้ว`);
+      setManualAdminWinUid('');
       await fetchUsers();
     } catch (err: any) {
       alert(`ตั้ง Admin ไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
@@ -210,7 +210,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
             จัดการบัญชีผู้ใช้งานและบทบาท
           </h1>
           <p className="text-xs text-slate-300 mt-1">
-            บัญชีใหม่เข้าใช้งานได้ทันที ส่วน Super Admin สามารถกำหนดผู้ช่วย Admin ด้วย Firebase UID และระดับสิทธิ์
+            บัญชีใหม่เข้าใช้งานได้ทันที ส่วน Super Admin สามารถกำหนดผู้ช่วย Admin ด้วย WIN UID และระดับสิทธิ์
           </p>
         </div>
 
@@ -228,16 +228,16 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
         <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-500/10 to-yellow-500/5 p-5">
           <div className="flex items-center gap-2 mb-1">
             <Crown className="w-5 h-5 text-amber-300" />
-            <h2 className="text-base font-black text-white">ตั้ง Admin ด้วย Firebase UID</h2>
+            <h2 className="text-base font-black text-white">ตั้ง Admin ด้วย WIN UID</h2>
           </div>
           <p className="text-xs text-slate-400 mb-4">
-            กรอก UID ของบัญชีที่สมัครแล้ว เลือกระดับสิทธิ์ แล้วกดตั้ง Admin บัญชีนั้นจะได้รับ Firebase Custom Claim ในครั้งถัดไปที่ token รีเฟรช
+            กรอก WIN UID ของบัญชีที่สมัครแล้ว เลือกระดับสิทธิ์ แล้วกดตั้ง Admin บัญชีนั้นจะได้รับ Firebase Custom Claim ในครั้งถัดไปที่ token รีเฟรช
           </p>
           <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
             <input
-              value={manualAdminUid}
-              onChange={(e) => setManualAdminUid(e.target.value)}
-              placeholder="Firebase UID เช่น AbCdEf123..."
+              value={manualAdminWinUid}
+              onChange={(e) => setManualAdminWinUid(e.target.value.toLowerCase())}
+              placeholder="WIN UID เช่น AbCdEf123..."
               className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-xs font-mono text-white outline-none focus:border-amber-400"
             />
             <select
@@ -252,7 +252,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
             <button
               type="button"
               onClick={handleManualSetAdmin}
-              disabled={actionLoading || !manualAdminUid.trim()}
+              disabled={actionLoading || !manualAdminWinUid.trim()}
               className="rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-slate-950 disabled:opacity-50"
             >
               ตั้ง Admin
@@ -268,7 +268,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="ค้นหาด้วยชื่อ, เบอร์โทร, หรือ UID..."
+            placeholder="ค้นหาด้วยชื่อ, เบอร์โทร, หรือ WIN UID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:border-[#00D4FF] focus:outline-none"
@@ -367,7 +367,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10px] text-slate-400 font-mono">{u.uid}</div>
+                            <div className="text-[10px] text-cyan-300 font-mono">WIN UID: {u.winUid || '-'}</div>
                           </div>
                         </div>
                       </td>
@@ -467,7 +467,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                     {selectedUser.role}
                   </span>
                 </h2>
-                <div className="text-xs text-slate-400 font-mono">UID: {selectedUser.uid}</div>
+                <div className="text-xs text-cyan-300 font-mono">WIN UID: {selectedUser.winUid || '-'}</div>
               </div>
             </div>
 
@@ -516,9 +516,9 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
           {/* User Details & Wallet Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
-              <span className="text-[11px] font-mono text-slate-400 block mb-1">เบอร์โทร & อีเมล</span>
+              <span className="text-[11px] font-mono text-slate-400 block mb-1">เบอร์โทร & WIN UID</span>
               <div className="text-xs text-white font-mono font-bold">{selectedUser.phone || '-'}</div>
-              <div className="text-[11px] text-slate-400 font-mono truncate">{selectedUser.email || '-'}</div>
+              <div className="text-[11px] text-cyan-300 font-mono truncate">{selectedUser.winUid || '-'}</div>
             </div>
 
             <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
