@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, Flame, Hospital, Loader2, MapPin, Navigation, PhoneCall, ShieldAlert } from 'lucide-react';
 import { useRealGeolocation } from '../hooks/useRealGeolocation';
 import { auth } from '../firebase';
+import { getAuthHeaders } from '../utils/dispatchSync';
 
 interface Props {
   audioEnabled: boolean;
@@ -45,11 +46,23 @@ export const HospitalCommandCenter: React.FC<Props> = ({ onRideToDestination }) 
     void (async () => {
       setLoading(true); setError('');
       try {
-        const user = auth.currentUser;
-        if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนเปิดศูนย์ฉุกเฉิน');
-        const response = await fetch('/api/emergency/nearby', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` }, body: JSON.stringify({ latitude: geo.latitude, longitude: geo.longitude }) });
-        const payload = await response.json() as { places?: EmergencyPlace[]; error?: string };
-        if (!response.ok) throw new Error(payload.error || 'โหลดศูนย์ฉุกเฉินไม่สำเร็จ');
+        const headers = await getAuthHeaders();
+        const response = await fetch('/api/emergency/nearby', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ latitude: geo.latitude, longitude: geo.longitude }),
+        });
+        const payload = await response.json() as { places?: EmergencyPlace[]; error?: string; message?: string };
+        if (!response.ok) {
+          if (payload.error === 'REQUEST_GUARDED') {
+            if (emergencyScanCache?.places?.length) {
+              setPlaces(emergencyScanCache.places);
+              return;
+            }
+            throw new Error(payload.message || 'ระบบกำลังโหลดข้อมูลล่าสุด กรุณารอสักครู่');
+          }
+          throw new Error(payload.message || payload.error || 'โหลดศูนย์ฉุกเฉินไม่สำเร็จ');
+        }
         if (!cancelled) {
           const nextPlaces = payload.places || [];
           setPlaces(nextPlaces);

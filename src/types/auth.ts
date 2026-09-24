@@ -6,9 +6,10 @@ export interface RegistrationProfile {
   phone: string;
   province: string;
   district: string;
-  pdpaAccepted: boolean;
-  gpsConsent: boolean;
-  termsAccepted: boolean;
+  pdpaAccepted?: boolean;
+  gpsConsent?: boolean;
+  termsAccepted?: boolean;
+  vehicleType?: 'motorcycle' | 'car' | string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   winStation?: string;
@@ -39,6 +40,7 @@ export interface UserDoc {
   winUid: string;
   firstName?: string;
   lastName?: string;
+  fullName?: string;
   role: UserRole;
   displayName: string;
   phone: string;
@@ -48,6 +50,7 @@ export interface UserDoc {
   status: UserStatus;
   isAdmin?: boolean;
   adminLevel?: string;
+  isFoundingKnight?: boolean;
   pdpaConsent?: PdpaConsent;
   level?: number;
   xp?: number;

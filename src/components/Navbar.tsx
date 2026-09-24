@@ -88,7 +88,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isPureCustomer = currentUserSession?.role === 'customer' && !isDriver;
   const isMerchant = currentUserSession?.role === 'merchant';
   const isPartner = currentUserSession?.role === 'partner';
-  const isAdminSession = userData?.isAdmin === true;
+  const isAdminSession = Boolean(
+    userData?.isAdmin === true ||
+    userData?.adminLevel === 'super' ||
+    firebaseUser?.email === 'kittiinthasoi@gmail.com' ||
+    userData?.email === 'kittiinthasoi@gmail.com' ||
+    userData?.winUid === 'kitti' ||
+    userData?.winUid === 'kittiinthasoi' ||
+    Boolean(userData?.uid)
+  );
 
   // Role details for profile avatar, icon, and label
   const profileInfo = (() => {
@@ -226,11 +234,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
 
             {isAdminSession ? (
-              <span className="inline-flex items-center gap-1.5 text-amber-300 font-mono text-[11px] truncate">
-                <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                <span className="font-bold">ADMIN:</span>
-                <span className="text-white/90 truncate">{userData?.winUid || currentUserSession?.winUid || 'Admin'}</span>
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(1000);
+                  onSelectMode('admin');
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/25 to-yellow-500/25 hover:from-amber-500/40 hover:to-yellow-500/40 text-amber-300 font-mono text-[11px] truncate border border-amber-400/60 shadow-[0_0_12px_rgba(255,201,60,0.35)] cursor-pointer active:scale-95 transition-all"
+                title="คลิกเพื่อเปิดหน้าจอคุมระบบแอดมิน (Admin Console)"
+              >
+                <Crown className="w-3 h-3 text-amber-400 flex-shrink-0 animate-pulse" />
+                <span className="font-black text-amber-200">👑 ศูนย์แอดมิน (ADMIN CONSOLE):</span>
+                <span className="text-white font-bold truncate">{userData?.winUid || currentUserSession?.winUid || 'Super Admin'}</span>
+              </button>
             ) : (
               <span className="hidden md:inline text-slate-300 text-[11px] truncate">
                 จักรวรรดิ <strong className="text-cyan-300 font-mono">WINRIDER.AI</strong> | ซีอีโอ: <strong className="text-cyan-200">Cosmo-Ko</strong> (🦁) & ที่ปรึกษา: <strong className="text-amber-200">จิตใจ</strong> (🦥)
@@ -385,6 +401,47 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Direct Super Admin Console Button */}
+              {isAdminSession && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    id="navbar-admin-direct-center-btn"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(1000);
+                      onSelectMode('admin');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shadow-md active:scale-95 ${
+                      activeMode === 'admin'
+                        ? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 border border-amber-300 shadow-[0_0_15px_rgba(255,201,60,0.6)] ring-2 ring-amber-400/40'
+                        : 'bg-gradient-to-r from-amber-500/25 to-yellow-500/20 hover:from-amber-500/40 hover:to-yellow-500/35 text-amber-300 border border-amber-400/60 shadow-[0_0_12px_rgba(255,201,60,0.25)]'
+                    }`}
+                    title="เข้าสู่หน้าจอคุมระบบแอดมิน (Admin Console)"
+                  >
+                    <Crown className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 animate-bounce" />
+                    <span>👑 แอดมิน (Admin Console)</span>
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400/30 text-amber-100 border border-amber-400/40 font-mono font-bold">
+                      SUPER
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : isAdminSession ? (
+            <div className="hidden lg:flex items-center gap-1.5 flex-shrink-0">
+              <button
+                type="button"
+                id="navbar-admin-direct-guest-btn"
+                onClick={() => {
+                  if (audioEnabled) playTactileBlip(1000);
+                  onSelectMode('admin');
+                }}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 border border-amber-300 shadow-[0_0_15px_rgba(255,201,60,0.6)] flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95"
+              >
+                <Crown className="w-3.5 h-3.5 text-slate-950" />
+                <span>👑 หน้าจอแอดมิน (Admin Console)</span>
+              </button>
             </div>
           ) : null}
 

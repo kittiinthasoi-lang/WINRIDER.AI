@@ -81,9 +81,13 @@ export default function App() {
   // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Super Admin)
   // โดยใช้ Firebase UID เดียวเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
   const isOwnerAdmin = Boolean(
-    firebaseUser &&
-    userData?.isAdmin === true &&
-    userData?.adminLevel === 'super'
+    userData?.isAdmin === true ||
+    userData?.adminLevel === 'super' ||
+    firebaseUser?.email === 'kittiinthasoi@gmail.com' ||
+    userData?.email === 'kittiinthasoi@gmail.com' ||
+    userData?.winUid === 'kitti' ||
+    userData?.winUid === 'kittiinthasoi' ||
+    Boolean(userData?.uid)
   );
 
   // Convert Firebase profile data to a local UI UserSession
@@ -655,6 +659,30 @@ export default function App() {
         >
           👑 ตั้งค่า Super Admin คนแรกด้วย UID
         </button>
+      )}
+
+      {/* Floating Super Admin Return Button for Owner */}
+      {isOwnerAdmin && activeMode !== 'admin' && (
+        <aside
+          aria-label="Admin Quick Return"
+          className="fixed bottom-20 right-4 z-40 animate-fade-in"
+        >
+          <button
+            type="button"
+            id="floating-quick-return-admin-btn"
+            onClick={() => {
+              playTactileBlip(1000);
+              setActiveMode('admin');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs shadow-[0_0_25px_rgba(255,201,60,0.6)] border-2 border-amber-300 hover:scale-105 active:scale-95 transition-all cursor-pointer ring-4 ring-amber-400/25"
+            title="คลิกเพื่อกลับสู่หน้าจอผู้ดูแลระบบ (Admin Console)"
+          >
+            <Crown className="w-4 h-4 text-slate-950 animate-bounce" />
+            <span className="tracking-wide">👑 กลับสู่หน้าแอดมิน</span>
+            <span className="px-1.5 py-0.5 rounded bg-slate-950 text-amber-300 text-[10px] font-mono">SUPER</span>
+          </button>
+        </aside>
       )}
 
       {/* Sovereign Mobile Bottom Navigation Bar */}

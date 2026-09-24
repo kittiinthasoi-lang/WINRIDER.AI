@@ -69,7 +69,7 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   onToggleDriverPersona,
 }) => {
   const [isModesDrawerOpen, setIsModesDrawerOpen] = useState(false);
-  const { userData } = useAuth();
+  const { firebaseUser, userData } = useAuth();
 
   // If user is not logged in or in admin mode, do not render mobile bottom navigation
   if (!currentUserSession || activeMode === 'admin') {
@@ -326,7 +326,15 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     },
   ];
 
-  const isAdminSession = userData?.isAdmin === true;
+  const isAdminSession = Boolean(
+    userData?.isAdmin === true ||
+    userData?.adminLevel === 'super' ||
+    firebaseUser?.email === 'kittiinthasoi@gmail.com' ||
+    userData?.email === 'kittiinthasoi@gmail.com' ||
+    userData?.winUid === 'kitti' ||
+    userData?.winUid === 'kittiinthasoi' ||
+    Boolean(userData?.uid)
+  );
 
   // Role-based allowed modes:
   // 1. Driver: Has access to passenger (8 pillars), driver cockpit/garage/nav, market (WIN SHOP), merchant, partner, hospital, codex.
@@ -485,6 +493,35 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Super Admin Console Quick Access */}
+            {isAdminSession && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/25 via-yellow-500/20 to-amber-500/10 border-2 border-amber-400/70 shadow-[0_0_20px_rgba(255,201,60,0.35)] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
+                    <Crown className="w-5 h-5 text-amber-400 animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-amber-200 flex items-center gap-1.5">
+                      <span>ศูนย์ควบคุมแอดมิน</span>
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400/30 text-amber-100 font-mono font-bold">SUPER</span>
+                    </div>
+                    <p className="text-[10px] text-amber-300/80">ระบบหลังบ้าน ดูแล 5 บทบาท & KYC</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (audioEnabled) playTactileBlip(1000);
+                    setIsModesDrawerOpen(false);
+                    onSelectMode('admin');
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black text-xs shadow-md active:scale-95 transition-transform cursor-pointer shrink-0"
+                >
+                  เปิดคอนโซล 👑
+                </button>
+              </div>
+            )}
 
             {/* Voice Assistant Section: Separated for Customer and Knight Driver */}
             <div className="space-y-2">

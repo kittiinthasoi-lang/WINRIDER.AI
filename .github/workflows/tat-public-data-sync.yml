@@ -1,0 +1,29 @@
+name: TAT Public Data Sync
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+      timezone: "Asia/Bangkok"
+  workflow_dispatch:
+
+jobs:
+  sync-tat-public-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync TAT public data
+        env:
+          WINRIDER_APP_URL: ${{ vars.WINRIDER_APP_URL }}
+          TAT_INTERNAL_SYNC_SECRET: ${{ secrets.TAT_INTERNAL_SYNC_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WINRIDER_APP_URL:-}" ] || [ -z "${TAT_INTERNAL_SYNC_SECRET:-}" ]; then
+            echo "WINRIDER_APP_URL or TAT_INTERNAL_SYNC_SECRET is not configured; skipping scheduled sync."
+            exit 0
+          fi
+          response="$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "x-winrider-tat-sync-secret: ${TAT_INTERNAL_SYNC_SECRET}" \
+            --header "Accept: application/json" \
+            --max-time 300 \
+            "${WINRIDER_APP_URL%/}/api/internal/public-data/sync-tat")"
+          echo "${response}"

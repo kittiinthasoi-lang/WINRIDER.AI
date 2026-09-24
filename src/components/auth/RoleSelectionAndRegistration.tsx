@@ -1006,17 +1006,17 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-4 px-6 rounded-2xl bg-[#00D4FF] hover:bg-[#00c0e8] text-slate-950 font-extrabold text-base flex items-center justify-center gap-3 transition-all shadow-[0_0_25px_rgba(0,212,255,0.4)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 text-slate-950 font-black text-base flex items-center justify-center gap-3 transition-all shadow-[0_0_25px_rgba(52,211,153,0.35)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>{uploadProgressText || 'กำลังประมวลผลข้อมูล...'}</span>
+                  <span>{uploadProgressText || 'กำลังบันทึกลง Cloud Firestore...'}</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="w-5 h-5" />
-                  <span>ยืนยันการลงทะเบียนเข้าสู่ระบบ WINRIDER.AI</span>
+                  <span>⚡ กดยืนยัน บันทึกลง Cloud Firestore และเข้าใช้งานแอป</span>
                 </>
               )}
             </button>

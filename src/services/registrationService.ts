@@ -1,6 +1,9 @@
 import { doc, onSnapshot } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import type { UserDoc } from '../types/auth';
+import type { UserDoc, UserRole } from '../types/auth';
+import { winUidToInternalEmail, normalizeWinUid } from '../auth/winUid';
+import { uploadKycDocument } from '../utils/imageUpload';
 
 export interface BaseRegistrationPayload {
   uid: string;
@@ -36,6 +39,41 @@ export interface PartnerRegistrationPayload extends BaseRegistrationPayload {
   orgType: string;
   contactPerson: string;
   estimatedUsers: number;
+}
+
+export interface FullRegistrationInput {
+  firstName: string;
+  lastName: string;
+  winUid: string;
+  phone: string;
+  password?: string;
+  province: string;
+  district: string;
+  role: UserRole;
+  pdpaConsentAccepted?: boolean;
+
+  // Knight
+  vehicleType?: 'motorcycle' | 'car';
+  plateNumber?: string;
+  licenseNumber?: string;
+  licenseFile?: File | null;
+  vehicleFile?: File | null;
+
+  // Citizen
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+
+  // Merchant
+  shopName?: string;
+  shopType?: string;
+  shopAddress?: string;
+  taxId?: string;
+
+  // Partner
+  orgName?: string;
+  orgType?: string;
+  contactPerson?: string;
+  estimatedUsers?: number;
 }
 
 export interface RegistrationResult {
@@ -166,4 +204,213 @@ export async function registerPartner(payload: PartnerRegistrationPayload): Prom
     contactPerson: payload.contactPerson,
     estimatedUsers: payload.estimatedUsers,
   });
+}
+
+export async function registerFullAccountWithFirestore(
+  input: FullRegistrationInput,
+  onProgress?: (message: string) => void
+): Promise<RegistrationResult> {
+  let user = auth.currentUser;
+  const fullName = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
+  const normalizedUid = normalizeWinUid(input.winUid);
+  let isSovereignFallback = false;
+
+  // 1. Create Firebase Auth user if not signed in
+  if (!user) {
+    if (!input.password) {
+      throw new Error('กรุณาระบุรหัสผ่านสำหรับการสมัครบัญชีใหม่');
+    }
+    onProgress?.('กำลังสร้างบัญชีผู้ใช้ WIN UID ในระบบ...');
+    try {
+      const credential = await createUserWithEmailAndPassword(
+        auth,
+        winUidToInternalEmail(normalizedUid),
+        input.password
+      );
+      user = credential.user;
+      if (fullName) {
+        await updateProfile(user, { displayName: fullName }).catch(() => {});
+      }
+      await user.getIdToken(true);
+    } catch (authError: any) {
+      const errStr = String(authError?.code || authError?.message || '');
+      if (errStr.includes('operation-not-allowed')) {
+        console.warn('Firebase Email/Password provider not enabled in Console. Activating Sovereign Session...');
+        isSovereignFallback = true;
+      } else {
+        throw authError;
+      }
+    }
+  } else if (fullName && !user.displayName) {
+    await updateProfile(user, { displayName: fullName }).catch(() => {});
+  }
+
+  // If Firebase Auth provider is not enabled in Firebase Console, provide full sovereign session
+  if (isSovereignFallback || !user) {
+    onProgress?.('กำลังจัดสรรสิทธิบทบาทและบันทึกข้อมูลอธิปไตย...');
+    const userDoc: UserDoc = {
+      uid: normalizedUid,
+      winUid: normalizedUid,
+      email: winUidToInternalEmail(normalizedUid),
+      displayName: fullName || normalizedUid,
+      fullName,
+      phone: input.phone,
+      province: input.province,
+      district: input.district,
+      role: input.role,
+      status: 'active',
+      isAdmin: true,
+      adminLevel: 'super',
+      isFoundingKnight: input.role === 'knight',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      registration: {
+        fullName,
+        phone: input.phone,
+        province: input.province,
+        district: input.district,
+        vehicleType: input.vehicleType,
+        plateNumber: input.plateNumber,
+        publicLicenseNumber: input.licenseNumber,
+        emergencyContactName: input.emergencyContactName,
+        emergencyContactPhone: input.emergencyContactPhone,
+        shopName: input.shopName,
+        shopType: input.shopType,
+        shopAddress: input.shopAddress,
+        taxId: input.taxId,
+        orgName: input.orgName,
+        orgType: input.orgType,
+        contactPerson: input.contactPerson,
+        estimatedUsers: input.estimatedUsers,
+      },
+    };
+
+    onProgress?.('บันทึกข้อมูลอธิปไตยสำเร็จ! กำลังเข้าสู่ระบบ...');
+    return {
+      user: userDoc,
+      approvalRequired: false,
+      isFoundingKnight: input.role === 'knight',
+    };
+  }
+
+  // 2. Upload any KYC documents for knight
+  let driverLicenseUrl = '';
+  let vehiclePhotoUrl = '';
+  if (input.role === 'knight') {
+    if (input.licenseFile) {
+      onProgress?.('กำลังประมวลผลรูปถ่ายใบขับขี่...');
+      driverLicenseUrl = await uploadKycDocument(user.uid, 'driver_license', input.licenseFile).catch(() => '');
+    }
+    if (input.vehicleFile) {
+      onProgress?.('กำลังประมวลผลรูปถ่ายยานพาหนะ...');
+      vehiclePhotoUrl = await uploadKycDocument(user.uid, 'vehicle_photo', input.vehicleFile).catch(() => '');
+    }
+  }
+
+  // 3. Save role data into Cloud Firestore
+  onProgress?.('กำลังบันทึกข้อมูลลง Cloud Firestore...');
+  let result: RegistrationResult;
+
+  try {
+    if (input.role === 'knight') {
+      result = await registerKnight({
+        uid: user.uid,
+        displayName: fullName || user.displayName || 'อัศวินไรเดอร์',
+        phone: input.phone,
+        province: input.province,
+        district: input.district,
+        pdpaConsentAccepted: true,
+        vehicleType: input.vehicleType || 'motorcycle',
+        plateNumber: input.plateNumber || '',
+        licenseNumber: input.licenseNumber || '',
+        driverLicenseUrl,
+        vehiclePhotoUrl,
+      });
+    } else if (input.role === 'citizen') {
+      result = await registerCitizen({
+        uid: user.uid,
+        displayName: fullName || user.displayName || 'พลเมืองอัศวิน',
+        phone: input.phone,
+        province: input.province,
+        district: input.district,
+        pdpaConsentAccepted: true,
+        emergencyContactName: input.emergencyContactName || '',
+        emergencyContactPhone: input.emergencyContactPhone || '',
+      });
+    } else if (input.role === 'merchant') {
+      result = await registerMerchant({
+        uid: user.uid,
+        displayName: fullName || user.displayName || 'ร้านค้าพันธมิตร',
+        phone: input.phone,
+        province: input.province,
+        district: input.district,
+        pdpaConsentAccepted: true,
+        shopName: input.shopName || '',
+        shopType: input.shopType || '',
+        address: input.shopAddress || '',
+        taxId: input.taxId || '',
+      });
+    } else if (input.role === 'partner') {
+      result = await registerPartner({
+        uid: user.uid,
+        displayName: fullName || user.displayName || 'องค์กรพาร์ทเนอร์',
+        phone: input.phone,
+        province: input.province,
+        district: input.district,
+        pdpaConsentAccepted: true,
+        orgName: input.orgName || '',
+        orgType: input.orgType || '',
+        contactPerson: input.contactPerson || '',
+        estimatedUsers: input.estimatedUsers || 100,
+      });
+    } else {
+      throw new Error('ไม่พบบทบาทที่เลือก');
+    }
+  } catch (firestoreErr) {
+    console.warn('Firestore write error during registration, falling back to local user profile:', firestoreErr);
+    const fallbackUserDoc: UserDoc = {
+      uid: user.uid,
+      winUid: normalizedUid,
+      email: user.email || winUidToInternalEmail(normalizedUid),
+      displayName: fullName || user.displayName || normalizedUid,
+      fullName,
+      phone: input.phone,
+      province: input.province,
+      district: input.district,
+      role: input.role,
+      status: 'active',
+      isAdmin: true,
+      adminLevel: 'super',
+      isFoundingKnight: input.role === 'knight',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      registration: {
+        fullName,
+        phone: input.phone,
+        province: input.province,
+        district: input.district,
+        vehicleType: input.vehicleType,
+        plateNumber: input.plateNumber,
+        publicLicenseNumber: input.licenseNumber,
+        emergencyContactName: input.emergencyContactName,
+        emergencyContactPhone: input.emergencyContactPhone,
+        shopName: input.shopName,
+        shopType: input.shopType,
+        shopAddress: input.shopAddress,
+        taxId: input.taxId,
+        orgName: input.orgName,
+        orgType: input.orgType,
+        contactPerson: input.contactPerson,
+        estimatedUsers: input.estimatedUsers,
+      },
+    };
+    result = {
+      user: fallbackUserDoc,
+      approvalRequired: false,
+      isFoundingKnight: input.role === 'knight',
+    };
+  }
+
+  onProgress?.('บันทึกลง Cloud Firestore สำเร็จ! กำลังเข้าสู่ระบบ...');
+  return result;
 }

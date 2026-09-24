@@ -4,9 +4,9 @@
  * caching and burst throttling are retained to protect our server and public sources.
  */
 type CacheEntry = { expiresAt: number; response: Response };
-const CACHE_TTL_MS = 120_000;
+const CACHE_TTL_MS = 300_000;
 const WINDOW_MS = 60_000;
-const MAX_REQUESTS_PER_WINDOW = 6;
+const MAX_REQUESTS_PER_WINDOW = 30;
 const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<Response>>();
 const windowCounts = new Map<string, { startedAt: number; count: number }>();
@@ -42,13 +42,18 @@ export function installGoogleMapsCostGuard(): void {
     const now = Date.now();
     const cached = cache.get(key);
     if (cached && cached.expiresAt > now) return cloneResponse(cached.response);
-    if (cached) cache.delete(key);
     const pending = inFlight.get(key);
     if (pending) return cloneResponse(await pending);
     const bucket = windowCounts.get(pathname);
     if (!bucket || now - bucket.startedAt >= WINDOW_MS) windowCounts.set(pathname, { startedAt: now, count: 1 });
     else if (bucket.count >= MAX_REQUESTS_PER_WINDOW) {
-      return new Response(JSON.stringify({ error: 'REQUEST_GUARDED', message: 'ระบบหยุดการเรียกข้อมูลตำแหน่งซ้ำชั่วคราว' }), { status: 429, headers: { 'Content-Type': 'application/json' } });
+      if (cached) return cloneResponse(cached.response);
+      for (const [k, v] of cache.entries()) {
+        if (k.includes(pathname) && v?.response) {
+          return cloneResponse(v.response);
+        }
+      }
+      return new Response(JSON.stringify({ error: 'REQUEST_GUARDED', message: 'ระบบกำลังโหลดข้อมูลล่าสุด กรุณารอสักครู่' }), { status: 429, headers: { 'Content-Type': 'application/json' } });
     } else bucket.count += 1;
     const promise = originalFetch(input, init).then((response) => {
       if (response.ok) cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, response: cloneResponse(response) });
