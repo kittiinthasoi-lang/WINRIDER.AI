@@ -34,14 +34,11 @@ function verifyAdminAuth(request: any, requiredLevel?: AdminLevel): { adminUid: 
 
   const token = request.auth.token;
   const adminEmail = String(token?.email || '').toLowerCase();
-  const isOwnerSuperAdmin =
-    adminEmail === "kittiinthasoi@gmail.com" &&
-    token?.email_verified === true;
-  if (!token || (token.admin !== true && !isOwnerSuperAdmin)) {
+  if (!token || token.admin !== true) {
     throw new HttpsError("permission-denied", "ไม่อนุญาต: บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบ (Admin Claim missing)");
   }
 
-  const adminLevel: AdminLevel = isOwnerSuperAdmin ? "super" : ((token.adminLevel as AdminLevel) || "support");
+  const adminLevel: AdminLevel = (token.adminLevel as AdminLevel) || "support";
 
   if (requiredLevel === "super" && adminLevel !== "super") {
     throw new HttpsError("permission-denied", "ไม่อนุญาต: คำสั่งนี้สงวนสิทธิ์เฉพาะผู้ดูแลระบบระดับสูงสุด (Super Admin)");
