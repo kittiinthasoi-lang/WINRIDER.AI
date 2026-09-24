@@ -2108,8 +2108,14 @@ async function adminBootstrapState(requesterUid?: string) {
 }
 
 app.get("/api/admin/bootstrap-status", rateLimit(30), async (req, res) => {
-  const decoded = await authenticateTokenOrSovereign(req);
-  if (!decoded) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  let decoded: any;
+  try {
+    decoded = await adminAuth.verifyIdToken(token);
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+  }
   try {
     const state = await adminBootstrapState(decoded.uid);
     let winUid = decoded.winUid || winUidFromAuthEmail(decoded.email);
@@ -2119,28 +2125,33 @@ app.get("/api/admin/bootstrap-status", rateLimit(30), async (req, res) => {
     } catch {}
     return res.json({
       ...state,
-      currentWinUid: String(winUid || "kitti"),
+      currentWinUid: String(winUid || ""),
     });
   } catch {
-    return res.json({
-      bootstrapOpen: false,
-      status: "ready",
-      currentWinUid: "kitti",
+    return res.status(503).json({
+      error: "ตรวจสอบสถานะ Admin bootstrap ไม่สำเร็จ",
+      code: "ADMIN_BOOTSTRAP_STATUS_FAILED",
     });
   }
 });
 
 app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
-  const decoded = await authenticateTokenOrSovereign(req);
-  if (!decoded) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  let decoded: any;
+  try {
+    decoded = await adminAuth.verifyIdToken(token);
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+  }
 
   try {
     const targetWinUid = normalizeWinUidServer(req.body?.targetWinUid);
     const userRef = ordersDb.collection("users").doc(decoded.uid);
     const userSnap = await userRef.get().catch(() => null);
-    const currentWinUid = normalizeWinUidServer(userSnap?.data?.()?.winUid || winUidFromAuthEmail(decoded.email) || decoded.winUid || "kitti");
+    const currentWinUid = normalizeWinUidServer(userSnap?.data?.()?.winUid || winUidFromAuthEmail(decoded.email));
 
-    if (!targetWinUid || (targetWinUid !== currentWinUid && !isSuperAdminToken(decoded))) {
+    if (!targetWinUid || targetWinUid !== currentWinUid) {
       return res.status(400).json({
         error: "การตั้ง Admin ครั้งแรกต้องใช้ WIN UID ของบัญชีที่กำลังล็อกอิน",
         code: "BOOTSTRAP_SELF_WIN_UID_REQUIRED",
