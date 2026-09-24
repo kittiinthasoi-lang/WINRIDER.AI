@@ -389,9 +389,10 @@ export async function setAdminRole(targetWinUid: string, level: AdminLevel, reas
  * ดึงข้อมูลสรุปตัวเลขสถิติ Dashboard โดยอ้างอิงจากข้อมูลจริงใน Firestore
  */
 export async function getAdminDashboardMetrics() {
-  // 1. ลองเรียกจาก Server API ก่อน (Server มี Admin SDK root access)
+  // 1. เรียก Server API ด้วย Firebase Admin identity จริง
   try {
-    const res = await fetch('/api/admin/dashboard-metrics');
+    const headers = await getAdminAuthHeaders();
+    const res = await fetch('/api/admin/dashboard-metrics', { headers, cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data && typeof data.totalUsersCount === 'number') {
@@ -406,8 +407,8 @@ export async function getAdminDashboardMetrics() {
         };
       }
     }
-  } catch {
-    // ดำเนินการต่อด้วย Client SDK
+  } catch (error) {
+    console.warn('Admin dashboard API unavailable; using permitted Firestore fallback:', error);
   }
 
   // 2. ดึงผ่าน Client Firestore SDK พร้อมระบบป้องกันสิทธิ์ขาด (Permission Fallback)
