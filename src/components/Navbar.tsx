@@ -88,15 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isPureCustomer = currentUserSession?.role === 'customer' && !isDriver;
   const isMerchant = currentUserSession?.role === 'merchant';
   const isPartner = currentUserSession?.role === 'partner';
-  const isAdminSession = Boolean(
-    userData?.isAdmin === true ||
-    userData?.adminLevel === 'super' ||
-    firebaseUser?.email === 'kittiinthasoi@gmail.com' ||
-    userData?.email === 'kittiinthasoi@gmail.com' ||
-    userData?.winUid === 'kitti' ||
-    userData?.winUid === 'kittiinthasoi' ||
-    Boolean(userData?.uid)
-  );
+  const isAdminSession = userData?.isAdmin === true;
 
   // Role details for profile avatar, icon, and label
   const profileInfo = (() => {
