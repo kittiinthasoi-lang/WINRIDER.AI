@@ -7,8 +7,7 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, authPersistenceReady, db } from '../firebase';
+import { auth, authPersistenceReady } from '../firebase';
 import { UserDoc } from '../types/auth';
 import { clearUserSession } from '../utils/userSession';
 import { internalEmailToWinUid, normalizeWinUid, winUidToInternalEmail } from '../auth/winUid';
@@ -28,14 +27,54 @@ interface AuthContextType {
   signInWithWinUid: (winUid: string, password: string) => Promise<void>;
   signUpWithWinUid: (payload: SignUpPayload) => Promise<void>;
   signOut: () => Promise<void>;
-  refreshUserData: () => Promise<void>;
+  refreshUserData: () => Promise<UserDoc | null>;
+  adoptUserData: (profile: UserDoc) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const ONBOARDING_KEY = 'WINRIDER_PENDING_ONBOARDING';
 
-async function readUserProfile(uid: string): Promise<UserDoc | null> {
-  const snap = await getDoc(doc(db, 'users', uid));
-  return snap.exists() ? snap.data() as UserDoc : null;
+async function readUserProfile(user: User): Promise<UserDoc | null> {
+  const token = await user.getIdToken();
+  const response = await fetch('/api/auth/me', {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    cache: 'no-store',
+  });
+
+  if (response.status === 401) {
+    throw new Error('AUTH_SESSION_INVALID');
+  }
+  if (!response.ok) {
+    throw new Error(`PROFILE_FETCH_FAILED_${response.status}`);
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  return payload?.user ? payload.user as UserDoc : null;
+}
+
+function rememberPendingOnboarding(winUid: string, displayName: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(ONBOARDING_KEY, JSON.stringify({
+      winUid,
+      displayName,
+      createdAt: Date.now(),
+    }));
+  } catch {
+    // Embedded previews may block localStorage. Firebase persistence remains authoritative.
+  }
+}
+
+function clearPendingOnboarding() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(ONBOARDING_KEY);
+  } catch {
+    // Ignore storage restrictions.
+  }
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -52,22 +91,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (!active) return;
         setLoading(true);
-        try {
-          if (!user) {
-            setFirebaseUser(null);
-            setUserData(null);
-            return;
-          }
 
-          const profile = await readUserProfile(user.uid);
+        if (!user) {
+          setFirebaseUser(null);
+          setUserData(null);
+          setLoading(false);
+          return;
+        }
+
+        // Keep the authenticated identity in state immediately. Profile hydration
+        // must never make the UI look signed out while onboarding is in progress.
+        setFirebaseUser(user);
+
+        try {
+          const profile = await readUserProfile(user);
           if (!active) return;
-          setFirebaseUser(user);
           setUserData(profile);
+          if (profile?.role) clearPendingOnboarding();
         } catch (error) {
           console.warn('Firebase auth hydration failed:', error);
           if (!active) return;
-          setFirebaseUser(user);
-          setUserData(null);
+          // Preserve the authenticated user and let onboarding continue. A transient
+          // profile read failure must not bounce the user to the sign-up screen.
+          setUserData((current) => current);
         } finally {
           if (active) setLoading(false);
         }
@@ -85,9 +131,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authPersistenceReady;
       const credential = await signInWithEmailAndPassword(auth, winUidToInternalEmail(winUid), password);
-      const profile = await readUserProfile(credential.user.uid);
       setFirebaseUser(credential.user);
+      const profile = await readUserProfile(credential.user);
       setUserData(profile);
+      if (profile?.role) clearPendingOnboarding();
     } finally {
       setLoading(false);
     }
@@ -103,10 +150,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         winUidToInternalEmail(normalizedWinUid),
         password
       );
+
       const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
       if (displayName) {
         await updateProfile(credential.user, { displayName });
       }
+
+      // Force Firebase to finish issuing a usable token before moving to the role
+      // screen. This avoids a race in embedded previews after account creation.
+      await credential.user.getIdToken(true);
+      rememberPendingOnboarding(normalizedWinUid, displayName);
       setFirebaseUser(credential.user);
       setUserData(null);
     } finally {
@@ -114,10 +167,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const adoptUserData = (profile: UserDoc) => {
+    setFirebaseUser(auth.currentUser);
+    setUserData(profile);
+    if (profile?.role) clearPendingOnboarding();
+  };
+
   const signOut = async () => {
     setLoading(true);
     try {
       clearUserSession();
+      clearPendingOnboarding();
       await firebaseSignOut(auth);
       setUserData(null);
       setFirebaseUser(null);
@@ -126,16 +186,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const refreshUserData = async () => {
+  const refreshUserData = async (): Promise<UserDoc | null> => {
     const user = auth.currentUser;
     if (!user) {
       setUserData(null);
-      return;
+      return null;
     }
+
     await user.reload();
-    const profile = await readUserProfile(user.uid);
     setFirebaseUser(user);
-    setUserData(profile);
+    const profile = await readUserProfile(user);
+    if (profile) {
+      setUserData(profile);
+      if (profile.role) clearPendingOnboarding();
+    }
+    return profile;
   };
 
   return (
@@ -149,6 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUpWithWinUid,
         signOut,
         refreshUserData,
+        adoptUserData,
       }}
     >
       {children}
