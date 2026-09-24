@@ -8,7 +8,8 @@ import { HospitalCommandCenter } from './components/HospitalCommandCenter';
 import { PartnerProfileView } from './components/PartnerProfileView';
 import { WinShopHubView } from './components/WinShopHubView';
 import { 
-  UserSession, 
+  UserSession,
+  saveUserSession,
   isDriverAccount,
   isDriverInCitizenMode,
   switchDriverPersona
@@ -77,14 +78,14 @@ export default function App() {
 
   // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดได้ครบทั้ง 5 บทบาท
   // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Super Admin)
-  // โดยใช้ WIN Auth UID เดิมเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
+  // โดยใช้ Firebase UID เดียวเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
   const isOwnerAdmin = Boolean(
     firebaseUser &&
     userData?.isAdmin === true &&
     userData?.adminLevel === 'super'
   );
 
-  // Convert WIN Auth userData to live UserSession
+  // Convert Firebase profile data to a local UI UserSession
   const currentUserSession: UserSession | null = useMemo(() => {
     if (isOwnerAdmin && firebaseUser) {
       const mappedRole = ownerPersona;
@@ -153,6 +154,10 @@ export default function App() {
       registeredAt: userData.createdAt || new Date().toISOString(),
     };
   }, [firebaseUser, userData, driverCitizenPersona, isOwnerAdmin, ownerPersona]);
+
+  useEffect(() => {
+    if (currentUserSession) void saveUserSession(currentUserSession);
+  }, [currentUserSession]);
 
   const isSuperAdminUser = isOwnerAdmin;
 
