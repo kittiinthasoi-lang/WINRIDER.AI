@@ -11,7 +11,7 @@ import {
   ArrowRight,
   ShieldAlert
 } from 'lucide-react';
-import { UserRole } from '../services/firebaseService';
+import type { UserRole } from '../types/auth';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface SplashOnboardingViewProps {
