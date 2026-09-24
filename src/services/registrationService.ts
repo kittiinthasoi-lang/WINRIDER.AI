@@ -8,6 +8,7 @@ import { uploadKycDocument } from '../utils/imageUpload';
 export interface BaseRegistrationPayload {
   uid: string;
   displayName: string;
+  email: string;
   phone: string;
   province: string;
   district: string;
@@ -44,6 +45,7 @@ export interface PartnerRegistrationPayload extends BaseRegistrationPayload {
 export interface FullRegistrationInput {
   firstName: string;
   lastName: string;
+  email: string;
   winUid: string;
   phone: string;
   password?: string;
@@ -158,6 +160,7 @@ async function submitRegistration(
 function common(payload: BaseRegistrationPayload) {
   return {
     fullName: payload.displayName,
+    email: payload.email.trim().toLowerCase(),
     phone: payload.phone,
     province: payload.province,
     district: payload.district,
@@ -222,7 +225,8 @@ async function persistRegistrationDirectly(
   const userDoc: UserDoc = {
     uid: user.uid,
     winUid: normalizedUid,
-    email: user.email || winUidToInternalEmail(normalizedUid),
+    email: input.email.trim().toLowerCase(),
+    authEmail: user.email || winUidToInternalEmail(normalizedUid),
     displayName: fullName || user.displayName || normalizedUid,
     fullName,
     phone: input.phone,
@@ -237,6 +241,7 @@ async function persistRegistrationDirectly(
     updatedAt: now,
     registration: {
       fullName,
+      email: input.email.trim().toLowerCase(),
       phone: input.phone,
       province: input.province,
       district: input.district,
@@ -408,6 +413,7 @@ export async function registerFullAccountWithFirestore(
         winUid: normalizedUid,
         password: input.password,
         displayName: fullName,
+        contactEmail: input.email.trim().toLowerCase(),
       }),
     });
     const payload = await response.json().catch(() => ({}));
@@ -446,6 +452,7 @@ export async function registerFullAccountWithFirestore(
       result = await registerKnight({
         uid: user.uid,
         displayName: fullName || user.displayName || 'อัศวินไรเดอร์',
+        email: input.email.trim().toLowerCase(),
         phone: input.phone,
         province: input.province,
         district: input.district,
@@ -460,6 +467,7 @@ export async function registerFullAccountWithFirestore(
       result = await registerCitizen({
         uid: user.uid,
         displayName: fullName || user.displayName || 'พลเมืองอัศวิน',
+        email: input.email.trim().toLowerCase(),
         phone: input.phone,
         province: input.province,
         district: input.district,
@@ -471,6 +479,7 @@ export async function registerFullAccountWithFirestore(
       result = await registerMerchant({
         uid: user.uid,
         displayName: fullName || user.displayName || 'ร้านค้าพันธมิตร',
+        email: input.email.trim().toLowerCase(),
         phone: input.phone,
         province: input.province,
         district: input.district,
@@ -484,6 +493,7 @@ export async function registerFullAccountWithFirestore(
       result = await registerPartner({
         uid: user.uid,
         displayName: fullName || user.displayName || 'องค์กรพาร์ทเนอร์',
+        email: input.email.trim().toLowerCase(),
         phone: input.phone,
         province: input.province,
         district: input.district,
