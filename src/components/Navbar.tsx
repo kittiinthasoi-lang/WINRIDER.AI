@@ -88,20 +88,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isPureCustomer = currentUserSession?.role === 'customer' && !isDriver;
   const isMerchant = currentUserSession?.role === 'merchant';
   const isPartner = currentUserSession?.role === 'partner';
-  const isAdminSession = 
-    firebaseUser?.email === 'kittiinthasoi@gmail.com' ||
-    firebaseUser?.email?.toLowerCase().includes('kittiinthasoi') ||
-    userData?.isAdmin === true ||
-    userData?.adminLevel === 'super' ||
-    currentUserSession?.email === 'kittiinthasoi@gmail.com' ||
-    currentUserSession?.email?.toLowerCase().includes('kittiinthasoi');
+  const isAdminSession =
+    userData?.isAdmin === true &&
+    userData?.adminLevel === 'super';
 
   // Role details for profile avatar, icon, and label
   const profileInfo = (() => {
     if (isAdminSession) {
       return {
         name: currentUserSession?.name || userData?.displayName || 'Super Admin',
-        title: `ผู้ดูแลระบบสูงสุด (Super Admin): ${firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}`,
+        title: `ผู้ดูแลระบบสูงสุด (Super Admin): ${firebaseUser?.email || currentUserSession?.email || 'Super Admin'}`,
         roleLabel: 'Super Admin',
         avatar: '/avatars/partner.jpg',
         badgeBorder: 'border-amber-400 shadow-[0_0_12px_rgba(255,201,60,0.6)]',
