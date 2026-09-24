@@ -2675,31 +2675,250 @@ async function releaseRideWalletHoldInTransaction(
 
 const adminAuth = getAuth();
 
+const ADMIN_LEVELS = new Set(["super", "reviewer", "support"]);
+
+function isAdminToken(user: any) {
+  return user?.admin === true && ADMIN_LEVELS.has(String(user?.adminLevel || ""));
+}
+
 function isSuperAdminToken(user: any) {
-  return (
-    (user?.admin === true && user?.adminLevel === "super") ||
-    (typeof user?.email === "string" && /kittiinthasoi/i.test(user.email)) ||
-    user?.winUid === "kitti" ||
-    user?.winUid === "kittiinthasoi" ||
-    user?.uid === "kitti-super-admin" ||
-    user?.uid === "kitti"
-  );
+  return isAdminToken(user) && user?.adminLevel === "super";
 }
 
 async function isAdminUser(user: any): Promise<boolean> {
-  return isSuperAdminToken(user);
+  return isAdminToken(user);
+}
+
+async function requireFirebaseAdmin(
+  req: express.Request,
+  res: express.Response,
+  requiredLevel?: "super"
+) {
+  const token = rawBearerToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+    return null;
+  }
+
+  let decoded: any;
+  try {
+    decoded = await adminAuth.verifyIdToken(token);
+  } catch {
+    res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+    return null;
+  }
+
+  try {
+    const profileSnap = await ordersDb.collection("users").doc(decoded.uid).get();
+    const profile = profileSnap.exists ? profileSnap.data() || {} : {};
+    const adminLevel = String(decoded.adminLevel || profile.adminLevel || "");
+    const isAdmin = decoded.admin === true || profile.isAdmin === true;
+
+    if (!isAdmin || !ADMIN_LEVELS.has(adminLevel)) {
+      res.status(403).json({ error: "Admin access required", code: "ADMIN_ACCESS_REQUIRED" });
+      return null;
+    }
+    if (requiredLevel === "super" && adminLevel !== "super") {
+      res.status(403).json({ error: "Super Admin access required", code: "SUPER_ADMIN_REQUIRED" });
+      return null;
+    }
+
+    return {
+      ...decoded,
+      ...profile,
+      uid: decoded.uid,
+      admin: true,
+      adminLevel,
+    };
+  } catch (error: any) {
+    console.error("[Admin Auth]", error?.message);
+    res.status(503).json({ error: "Admin authorization unavailable", code: "ADMIN_AUTH_UNAVAILABLE" });
+    return null;
+  }
+}
+
+async function requireAdmin(req: express.Request, res: express.Response) {
+  return requireFirebaseAdmin(req, res);
 }
 
 async function requireSuperAdmin(req: express.Request, res: express.Response) {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return null;
-  if (!isSuperAdminToken(user)) {
-    res.status(403).json({ error: "Super Admin access required" });
-    return null;
-  }
-  return user;
+  return requireFirebaseAdmin(req, res, "super");
 }
 
+
+const ADMIN_PORTAL_CONFIG_REF = () => ordersDb.collection("system_config").doc("admin_portal");
+
+async function getAdminPortalConfig() {
+  const snap = await ADMIN_PORTAL_CONFIG_REF().get();
+  const data = snap.exists ? snap.data() || {} : {};
+  return {
+    applicationsOpen: data.applicationsOpen === true,
+    updatedAt: data.updatedAt || null,
+    updatedBy: String(data.updatedBy || ""),
+  };
+}
+
+app.get("/api/admin/portal-status", rateLimit(60), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+
+  try {
+    const decoded: any = await adminAuth.verifyIdToken(token);
+    const [profileSnap, config] = await Promise.all([
+      ordersDb.collection("users").doc(decoded.uid).get(),
+      getAdminPortalConfig(),
+    ]);
+    const profile = profileSnap.exists ? profileSnap.data() || {} : {};
+    const adminLevel = String(decoded.adminLevel || profile.adminLevel || "");
+    const admin = (decoded.admin === true || profile.isAdmin === true) && ADMIN_LEVELS.has(adminLevel);
+    const requestSnap = await ordersDb.collection("adminAccessRequests").doc(decoded.uid).get();
+
+    return res.json({
+      applicationsOpen: config.applicationsOpen,
+      isAdmin: admin,
+      adminLevel: admin ? adminLevel : null,
+      requestStatus: requestSnap.exists ? String(requestSnap.data()?.status || "pending") : null,
+    });
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+  }
+});
+
+app.post("/api/admin/portal-status", rateLimit(20), async (req, res) => {
+  const admin = await requireSuperAdmin(req, res);
+  if (!admin) return;
+
+  const applicationsOpen = req.body?.applicationsOpen === true;
+  await ADMIN_PORTAL_CONFIG_REF().set({
+    applicationsOpen,
+    updatedBy: admin.uid,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  await ordersDb.collection("audit_logs").add({
+    action: applicationsOpen ? "OPEN_ADMIN_APPLICATIONS" : "CLOSE_ADMIN_APPLICATIONS",
+    actorUid: admin.uid,
+    targetUid: "system_config/admin_portal",
+    reason: applicationsOpen ? "เปิดประตูสมัคร Admin" : "ปิดประตูสมัคร Admin",
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  return res.json({ ok: true, applicationsOpen });
+});
+
+app.post("/api/admin/access-request", rateLimit(10), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+
+  try {
+    const decoded: any = await adminAuth.verifyIdToken(token);
+    const [profileSnap, config] = await Promise.all([
+      ordersDb.collection("users").doc(decoded.uid).get(),
+      getAdminPortalConfig(),
+    ]);
+    if (!profileSnap.exists) {
+      return res.status(409).json({ error: "ต้องสมัครบัญชี WINRIDER ให้เสร็จก่อน", code: "PROFILE_REQUIRED" });
+    }
+
+    const profile = profileSnap.data() || {};
+    const adminLevel = String(decoded.adminLevel || profile.adminLevel || "");
+    if ((decoded.admin === true || profile.isAdmin === true) && ADMIN_LEVELS.has(adminLevel)) {
+      return res.status(409).json({ error: "บัญชีนี้เป็น Admin อยู่แล้ว", code: "ALREADY_ADMIN" });
+    }
+    if (!config.applicationsOpen) {
+      return res.status(403).json({ error: "ขณะนี้ปิดรับคำขอ Admin", code: "ADMIN_APPLICATIONS_CLOSED" });
+    }
+
+    const note = String(req.body?.note || "").trim().slice(0, 500);
+    await ordersDb.collection("adminAccessRequests").doc(decoded.uid).set({
+      uid: decoded.uid,
+      winUid: String(profile.winUid || ""),
+      displayName: String(profile.displayName || ""),
+      email: String(profile.email || ""),
+      status: "pending",
+      note,
+      requestedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return res.json({ ok: true, requestStatus: "pending" });
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+  }
+});
+
+app.get("/api/admin/access-requests", rateLimit(30), async (req, res) => {
+  const admin = await requireSuperAdmin(req, res);
+  if (!admin) return;
+
+  const snapshot = await ordersDb.collection("adminAccessRequests")
+    .where("status", "==", "pending")
+    .limit(100)
+    .get();
+
+  return res.json({
+    requests: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+  });
+});
+
+app.post("/api/admin/revoke-role", rateLimit(20), async (req, res) => {
+  const admin = await requireSuperAdmin(req, res);
+  if (!admin) return;
+
+  const targetWinUid = normalizeWinUidServer(req.body?.targetWinUid);
+  if (!targetWinUid) {
+    return res.status(400).json({ error: "ต้องระบุ WIN UID ผู้ใช้", code: "TARGET_WIN_UID_REQUIRED" });
+  }
+
+  try {
+    const match = await ordersDb.collection("users").where("winUid", "==", targetWinUid).limit(1).get();
+    if (match.empty) return res.status(404).json({ error: "ไม่พบ WIN UID นี้", code: "WIN_UID_NOT_FOUND" });
+
+    const userDoc = match.docs[0];
+    const firebaseUid = userDoc.id;
+    if (firebaseUid === admin.uid) {
+      return res.status(409).json({ error: "ไม่สามารถถอดสิทธิ์ Admin ของบัญชีตัวเองจากหน้านี้ได้", code: "CANNOT_REVOKE_SELF" });
+    }
+
+    const record = await adminAuth.getUser(firebaseUid);
+    const nextClaims = { ...(record.customClaims || {}) };
+    delete (nextClaims as any).admin;
+    delete (nextClaims as any).adminLevel;
+    await adminAuth.setCustomUserClaims(firebaseUid, nextClaims);
+
+    const now = new Date().toISOString();
+    await Promise.all([
+      userDoc.ref.set({
+        isAdmin: false,
+        adminLevel: FieldValue.delete(),
+        adminRevokedAt: now,
+        adminRevokedBy: admin.uid,
+        updatedAt: now,
+      }, { merge: true }),
+      ordersDb.collection("adminAccess").doc(firebaseUid).set({
+        uid: firebaseUid,
+        winUid: targetWinUid,
+        active: false,
+        revokedBy: admin.uid,
+        revokedAt: now,
+        updatedAt: now,
+      }, { merge: true }),
+      ordersDb.collection("audit_logs").add({
+        action: "REVOKE_ADMIN_ROLE",
+        actorUid: admin.uid,
+        targetUid: firebaseUid,
+        targetWinUid,
+        reason: String(req.body?.reason || "").slice(0, 500),
+        createdAt: FieldValue.serverTimestamp(),
+      }),
+    ]);
+
+    return res.json({ ok: true, targetWinUid });
+  } catch (error: any) {
+    console.error("[Admin Revoke Role]", error?.message);
+    return res.status(503).json({ error: "ถอดสิทธิ์ Admin ไม่สำเร็จ", code: "REVOKE_ADMIN_FAILED" });
+  }
+});
 
 app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
   const admin = await requireSuperAdmin(req, res);
@@ -2749,6 +2968,14 @@ app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
         assignedBy: admin.uid,
         updatedAt: now,
         createdAt: now,
+      }, { merge: true }),
+      ordersDb.collection("adminAccessRequests").doc(firebaseUid).set({
+        uid: firebaseUid,
+        winUid: targetWinUid,
+        status: "approved",
+        approvedBy: admin.uid,
+        approvedAt: now,
+        updatedAt: now,
       }, { merge: true }),
       ordersDb.collection("audit_logs").add({
         action: "SET_ADMIN_ROLE",
