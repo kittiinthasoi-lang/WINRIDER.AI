@@ -2403,12 +2403,7 @@ async function releaseRideWalletHoldInTransaction(
 const adminAuth = getAuth();
 
 function isSuperAdminToken(user: any) {
-  const ownerEmail = String(process.env.ADMIN_OWNER_EMAIL || "").trim().toLowerCase();
-  const email = String(user?.email || "").trim().toLowerCase();
-  return user?.admin === true || user?.isAdmin === true || user?.adminLevel === "super" || user?.role === "admin"
-    || email === "kittiinthasoi@gmail.com"
-    || email.includes("kittiinthasoi")
-    || (ownerEmail && email === ownerEmail);
+  return user?.admin === true && user?.adminLevel === "super";
 }
 
 async function isAdminUser(user: any): Promise<boolean> {
@@ -3528,90 +3523,63 @@ app.post("/api/admin/system-payout-review", rateLimit(10), async (req, res) => {
 app.post("/api/users/profile", async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const uid = user.uid;
-  const body = req.body || {};
-  const isOwner = isSuperAdminToken(user) || String(body.email || "").toLowerCase() === "kittiinthasoi@gmail.com";
 
-  const userDoc: Record<string, any> = {
-    ...body,
-    uid,
-    email: body.email || user.email || "",
-    displayName: isOwner ? "กิตติ อินทะสร้อย" : (body.displayName || user.displayName || user.name || "ผู้ใช้งาน"),
+  const body = req.body || {};
+  const patch: Record<string, unknown> = {
     updatedAt: new Date().toISOString(),
   };
-
-  if (isOwner) {
-    userDoc.isAdmin = true;
-    userDoc.adminLevel = "super";
-    userDoc.role = body.role || "knight";
-    userDoc.level = 100;
-    userDoc.rating = 5.0;
-  }
+  if (typeof body.displayName === "string") patch.displayName = body.displayName.trim().slice(0, 120);
+  if (typeof body.phone === "string") patch.phone = body.phone.replace(/\s+/g, "").slice(0, 20);
+  if (typeof body.avatarUrl === "string") patch.avatarUrl = body.avatarUrl.trim().slice(0, 2500);
+  if (typeof body.avatarEmoji === "string") patch.avatarEmoji = body.avatarEmoji.trim().slice(0, 16);
+  if (typeof body.bioStatus === "string") patch.bioStatus = body.bioStatus.trim().slice(0, 280);
+  if (typeof body.themeColor === "string") patch.themeColor = body.themeColor.trim().slice(0, 40);
 
   try {
-    await ordersDb.collection("users").doc(uid).set(userDoc, { merge: true });
-    return res.json({ success: true, user: userDoc });
+    await ordersDb.collection("users").doc(user.uid).set(patch, { merge: true });
+    return res.json({ success: true, user: { ...user, ...patch } });
   } catch (err: any) {
-    console.error("[Profile Sync Error]:", err);
-    return res.status(500).json({ error: "Failed to persist user profile", message: err?.message });
+    console.error("[Profile Sync Error]:", err?.message);
+    return res.status(500).json({ error: "Failed to persist user profile" });
   }
 });
 
 app.get("/api/users/profile", async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  const uid = user.uid;
   try {
-    const snap = await ordersDb.collection("users").doc(uid).get();
-    if (snap.exists) {
-      return res.json({ success: true, user: snap.data() });
-    }
-    return res.json({ success: true, user: null });
-  } catch (err: any) {
-    return res.status(500).json({ error: "Failed to retrieve profile", message: err?.message });
+    const snap = await ordersDb.collection("users").doc(user.uid).get();
+    return res.json({ success: true, user: snap.exists ? snap.data() : null });
+  } catch {
+    return res.status(500).json({ error: "Failed to retrieve profile" });
   }
 });
 
 async function requireFirebaseUser(req: express.Request, res: express.Response) {
   const token = rawBearerToken(req);
   if (!token) {
-    res.status(401).json({ error: "Authentication required" });
+    res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
     return null;
   }
 
-
   try {
-    const winUser = await getWinAuthSessionUser(token);
-    if (winUser) {
-      if (winUser.status !== "active" && winUser.isAdmin !== true) {
-        res.status(403).json({ error: "Account pending admin approval", code: "ACCOUNT_PENDING_APPROVAL" });
-        return null;
-      }
-      return {
-        uid: winUser.uid,
-        email: winUser.email,
-        name: winUser.displayName,
-        displayName: winUser.displayName,
-        role: winUser.role,
-        status: winUser.status,
-        admin: winUser.isAdmin === true,
-        isAdmin: winUser.isAdmin === true,
-        adminLevel: winUser.adminLevel,
-        authProvider: "win_auth",
-      };
-    }
-  } catch (error: any) {
-    if (error?.code !== "WIN_AUTH_STORE_NOT_CONFIGURED") {
-      console.warn("[WIN Auth Session Verify]", error?.message);
-    }
-  }
+    const decoded = await adminAuth.verifyIdToken(token);
+    const profileSnap = await ordersDb.collection("users").doc(decoded.uid).get();
+    const profile = profileSnap.exists ? profileSnap.data() || {} : null;
 
-  // Temporary migration fallback: existing Firebase sessions remain accepted
-  // until every installed client has moved to WIN Auth.
-  try {
-    return await adminAuth.verifyIdToken(token);
+    if (!profile && !isSuperAdminToken(decoded)) {
+      res.status(403).json({ error: "Registration profile required", code: "PROFILE_REQUIRED" });
+      return null;
+    }
+
+    const user = { ...decoded, ...(profile || {}), uid: decoded.uid, email: decoded.email || profile?.email || "" };
+    if (!isSuperAdminToken(decoded) && profile?.status !== "active") {
+      res.status(403).json({ error: "Account pending admin approval", code: "ACCOUNT_PENDING_APPROVAL" });
+      return null;
+    }
+    return user;
   } catch {
-    res.status(401).json({ error: "Invalid authentication token" });
+    res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
     return null;
   }
 }
@@ -3620,24 +3588,12 @@ async function requireFirebaseUserOptional(req: express.Request) {
   const token = rawBearerToken(req);
   if (!token) return null;
   try {
-    const winUser = await getWinAuthSessionUser(token);
-    if (winUser && (winUser.status === "active" || winUser.isAdmin === true)) {
-      return {
-        uid: winUser.uid,
-        email: winUser.email,
-        name: winUser.displayName,
-        displayName: winUser.displayName,
-        role: winUser.role,
-        status: winUser.status,
-        admin: winUser.isAdmin === true,
-        isAdmin: winUser.isAdmin === true,
-        adminLevel: winUser.adminLevel,
-        authProvider: "win_auth",
-      };
-    }
-  } catch {}
-  try {
-    return await adminAuth.verifyIdToken(token);
+    const decoded = await adminAuth.verifyIdToken(token);
+    const profileSnap = await ordersDb.collection("users").doc(decoded.uid).get();
+    const profile = profileSnap.exists ? profileSnap.data() || {} : null;
+    if (!profile && !isSuperAdminToken(decoded)) return null;
+    if (!isSuperAdminToken(decoded) && profile?.status !== "active") return null;
+    return { ...decoded, ...(profile || {}), uid: decoded.uid, email: decoded.email || profile?.email || "" };
   } catch {
     return null;
   }
