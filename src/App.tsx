@@ -43,7 +43,8 @@ import {
   Rocket, 
   ChevronRight,
   BookOpen,
-  Loader2
+  Loader2,
+  Bike
 } from 'lucide-react';
 
 const CHAPTERS: { id: ChapterId; label: string; icon: React.ReactNode; num: string }[] = [
@@ -177,6 +178,12 @@ export default function App() {
 
   const handleAddCustomerItem = (item: MarketItem) => {
     setCustomerListedItems(prev => [item, ...prev]);
+  };
+
+  const handleOpenRideBooking = () => {
+    setActiveMode('passenger');
+    setPassengerTab('ride');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleRideToDestination = (name: string, address?: string, distanceKm?: number) => {
@@ -535,6 +542,7 @@ export default function App() {
             <HospitalCommandCenter
               audioEnabled={audioEnabled}
               onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
+              onRideToDestination={handleRideToDestination}
             />
           </ProtectedRoute>
         )}
@@ -658,6 +666,22 @@ export default function App() {
         onSignOut={handleSignOut}
         onToggleDriverPersona={handleToggleDriverPersona}
       />
+
+      {currentUserSession && activeMode !== 'admin' && !(activeMode === 'passenger' && passengerTab === 'ride') && (
+        <button
+          type="button"
+          onClick={() => {
+            if (audioEnabled) playTactileBlip(900);
+            handleOpenRideBooking();
+          }}
+          className="fixed bottom-24 right-4 z-40 flex items-center gap-2 rounded-2xl border border-cyan-300/40 bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-3 text-xs font-black text-slate-950 shadow-[0_12px_35px_rgba(0,210,255,0.35)] transition-transform active:scale-95 md:bottom-6 md:right-6"
+          aria-label="เปิดบริการเรียกพี่วิน"
+          title="เรียกพี่วินได้จากทุกบริการ"
+        >
+          <Bike className="h-4 w-4" />
+          <span>เรียกพี่วิน</span>
+        </button>
+      )}
 
       {/* Global Modals */}
       <WinBuddyModal
