@@ -38,12 +38,11 @@ export const ProtectedRoute: React.FC<Props> = ({
     return <AuthModalOrView />;
   }
 
-  const isOwnerAdmin =
-    userData?.isAdmin === true &&
-    userData?.adminLevel === 'super';
+  const isAssignedAdmin = userData?.isAdmin === true;
 
-  // เจ้าของระบบใช้ Firebase UID เดียวเพื่อควบคุมแอปและเปิดทุกบทบาท
-  if (isOwnerAdmin) return <>{children}</>;
+  // บัญชี Admin ที่ได้รับการแต่งตั้งสามารถเปิดดู 4 บทบาทผู้ใช้ได้
+  // โดยไม่เปลี่ยน role จริงใน Firestore และไม่ข้ามเงื่อนไขรับงานจริงของพี่วิน
+  if (isAssignedAdmin) return <>{children}</>;
 
   // 2. Compatibility guard for an incomplete legacy profile
   if (!userData || !userData.role) {
