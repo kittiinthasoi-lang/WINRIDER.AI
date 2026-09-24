@@ -2414,14 +2414,111 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
   }
 });
 
-app.get("/api/auth/me", rateLimit(60), async (req, res) => {
-  const decoded = await authenticateTokenOrSovereign(req);
-  if (!decoded) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+const OWNER_ADMIN_EMAIL = "kittiinthasoi@gmail.com";
+
+async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | null) {
+  const userRef = ordersDb.collection("users").doc(uid);
+  const [profileSnap, linkSnap] = await Promise.all([
+    userRef.get(),
+    ordersDb.collection("auth_identity_links").doc(uid).get().catch(() => null),
+  ]);
+
+  const profile = profileSnap.exists ? profileSnap.data() || {} : {};
+  const linked = linkSnap?.exists ? linkSnap.data() || {} : {};
+  const contactEmail = String(
+    profile.email ||
+    linked.googleEmail ||
+    decodedEmail ||
+    ""
+  ).trim().toLowerCase();
+
+  if (contactEmail !== OWNER_ADMIN_EMAIL) {
+    return { promoted: false, user: profileSnap.exists ? profile : null };
+  }
+
+  const authRecord = await adminAuth.getUser(uid);
+  const claims = authRecord.customClaims || {};
+  if (claims.admin !== true || claims.adminLevel !== "super") {
+    await adminAuth.setCustomUserClaims(uid, {
+      ...claims,
+      admin: true,
+      adminLevel: "super",
+    });
+  }
+
+  const now = new Date().toISOString();
+  await Promise.all([
+    userRef.set({
+      isAdmin: true,
+      adminLevel: "super",
+      status: "active",
+      adminAssignedAt: profile.adminAssignedAt || now,
+      adminAssignedBy: uid,
+      updatedAt: now,
+    }, { merge: true }),
+    ordersDb.collection("adminAccess").doc(uid).set({
+      uid,
+      winUid: String(profile.winUid || ""),
+      adminLevel: "super",
+      active: true,
+      owner: true,
+      assignedBy: uid,
+      updatedAt: now,
+      createdAt: profile.adminAssignedAt || now,
+    }, { merge: true }),
+    ordersDb.collection("system_config").doc("admin_bootstrap").set({
+      status: "active",
+      firstAdminUid: uid,
+      firstAdminWinUid: String(profile.winUid || ""),
+      completedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true }),
+  ]);
+
+  const updated = await userRef.get();
+  return { promoted: true, user: updated.exists ? updated.data() : profile };
+}
+
+app.post("/api/auth/ensure-owner-admin", rateLimit(20), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+
   try {
+    const decoded: any = await adminAuth.verifyIdToken(token);
+    const result = await ensureOwnerSuperAdminForUid(decoded.uid, decoded.email || null);
+
+    if (!result.promoted) {
+      return res.status(403).json({ error: "บัญชีนี้ไม่ใช่บัญชีเจ้าของระบบ", code: "NOT_OWNER_ACCOUNT" });
+    }
+
+    return res.json({
+      ok: true,
+      user: result.user,
+      adminLevel: "super",
+      forceTokenRefresh: true,
+    });
+  } catch (error: any) {
+    console.error("[Owner Admin Promotion]", error?.message);
+    return res.status(503).json({ error: "ตั้งสิทธิ์เจ้าของระบบไม่สำเร็จ", code: "OWNER_ADMIN_PROMOTION_FAILED" });
+  }
+});
+
+app.get("/api/auth/me", rateLimit(60), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+
+  try {
+    const decoded: any = await adminAuth.verifyIdToken(token);
+    const ownerResult = await ensureOwnerSuperAdminForUid(decoded.uid, decoded.email || null);
+    if (ownerResult.promoted && ownerResult.user) {
+      return res.json({ user: ownerResult.user, ownerPromoted: true, forceTokenRefresh: true });
+    }
+
     const snap = await ordersDb.collection("users").doc(decoded.uid).get();
     return res.json({ user: snap.exists ? snap.data() : decoded });
-  } catch {
-    return res.json({ user: decoded });
+  } catch (error: any) {
+    console.error("[Auth Me]", error?.message);
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
   }
 });
 
