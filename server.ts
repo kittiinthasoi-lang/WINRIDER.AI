@@ -1786,6 +1786,7 @@ function winUidFromAuthEmail(value: unknown): string {
 
 type RegistrationInput = {
   fullName: string;
+  email: string;
   phone: string;
   province: string;
   district: string;
@@ -1911,6 +1912,7 @@ async function authenticateTokenOrSovereign(req: express.Request): Promise<any> 
 function cleanRegistrationInput(role: FirebaseUserRole, raw: any): RegistrationInput {
   const base: RegistrationInput = {
     fullName: String(raw?.fullName || raw?.displayName || "").trim().slice(0, 120),
+    email: String(raw?.email || raw?.contactEmail || "").trim().toLowerCase().slice(0, 254),
     phone: String(raw?.phone || "").replace(/\s+/g, "").slice(0, 20),
     province: String(raw?.province || "").trim().slice(0, 100),
     district: String(raw?.district || "").trim().slice(0, 100),
@@ -1945,6 +1947,7 @@ function cleanRegistrationInput(role: FirebaseUserRole, raw: any): RegistrationI
 
 function validateRegistrationInput(role: FirebaseUserRole, profile: RegistrationInput): string | null {
   if (profile.fullName.length < 2) return "REGISTRATION_FULL_NAME_REQUIRED";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) return "REGISTRATION_EMAIL_INVALID";
   if (!/^0\d{9}$/.test(profile.phone)) return "REGISTRATION_PHONE_INVALID";
   if (!profile.province || !profile.district) return "REGISTRATION_LOCATION_REQUIRED";
   if (!profile.pdpaAccepted || !profile.gpsConsent || !profile.termsAccepted) return "REGISTRATION_CONSENT_REQUIRED";
@@ -1993,6 +1996,8 @@ async function createFirebaseRegistration(
     tx.create(userRef, {
       uid,
       winUid,
+      email: profile.email,
+      authEmail: `${winUid}${WIN_UID_EMAIL_SUFFIX}`,
       role,
       displayName: profile.fullName,
       phone: profile.phone,
@@ -2241,12 +2246,16 @@ app.post("/api/auth/complete-google-identity", rateLimit(10), async (req, res) =
     const winUid = normalizeWinUidServer(req.body?.winUid);
     const password = String(req.body?.password || "");
     const displayName = String(req.body?.displayName || "").trim().slice(0, 120);
+    const contactEmail = String(req.body?.contactEmail || "").trim().toLowerCase().slice(0, 254);
 
     if (!/^[a-z0-9][a-z0-9._-]{3,29}$/.test(winUid)) {
       return res.status(400).json({ error: "WIN UID ไม่ถูกต้อง", code: "WIN_UID_INVALID" });
     }
     if (password.length < 8 || password.length > 128) {
       return res.status(400).json({ error: "รหัสผ่านต้องมี 8-128 ตัวอักษร", code: "PASSWORD_INVALID" });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      return res.status(400).json({ error: "อีเมลไม่ถูกต้อง", code: "CONTACT_EMAIL_INVALID" });
     }
 
     const record = await adminAuth.getUser(decoded.uid);
@@ -2281,6 +2290,7 @@ app.post("/api/auth/complete-google-identity", rateLimit(10), async (req, res) =
       uid: decoded.uid,
       winUid,
       googleEmail: String(googleProvider.email || decoded.email || "").toLowerCase(),
+      contactEmail,
       providers: ["google.com", "password"],
       updatedAt: FieldValue.serverTimestamp(),
       createdAt: FieldValue.serverTimestamp(),
