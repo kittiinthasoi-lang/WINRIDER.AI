@@ -29,7 +29,6 @@ import { MobileBottomNavBar } from './components/MobileBottomNavBar';
 import { playTactileBlip } from './utils/audio';
 import { useAuth } from './context/AuthContext';
 import { AuthModalOrView } from './components/auth/AuthModalOrView';
-import { RoleSelectionAndRegistration } from './components/auth/RoleSelectionAndRegistration';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/admin/AdminRoute';
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -86,8 +85,7 @@ export default function App() {
     firebaseUser?.email === 'kittiinthasoi@gmail.com' ||
     userData?.email === 'kittiinthasoi@gmail.com' ||
     userData?.winUid === 'kitti' ||
-    userData?.winUid === 'kittiinthasoi' ||
-    Boolean(userData?.uid)
+    userData?.winUid === 'kittiinthasoi'
   );
 
   // Convert Firebase profile data to a local UI UserSession
@@ -413,8 +411,8 @@ export default function App() {
           onSignOut={handleSignOut}
           onToggleDriverPersona={() => {}}
         />
-        <main className="flex-1">
-          <RoleSelectionAndRegistration />
+        <main className="flex-1 flex items-center justify-center p-4">
+          <AuthModalOrView />
         </main>
       </div>
     );
