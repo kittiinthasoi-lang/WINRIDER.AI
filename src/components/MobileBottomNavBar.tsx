@@ -326,15 +326,7 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     },
   ];
 
-  const isAdminSession = Boolean(
-    userData?.isAdmin === true ||
-    userData?.adminLevel === 'super' ||
-    firebaseUser?.email === 'kittiinthasoi@gmail.com' ||
-    userData?.email === 'kittiinthasoi@gmail.com' ||
-    userData?.winUid === 'kitti' ||
-    userData?.winUid === 'kittiinthasoi' ||
-    Boolean(userData?.uid)
-  );
+  const isAdminSession = userData?.isAdmin === true;
 
   // Role-based allowed modes:
   // 1. Driver: Has access to passenger (8 pillars), driver cockpit/garage/nav, market (WIN SHOP), merchant, partner, hospital, codex.
