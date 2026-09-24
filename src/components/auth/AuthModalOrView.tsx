@@ -341,7 +341,7 @@ export const AuthModalOrView: React.FC = () => {
     } catch (cause: any) {
       const code = String(cause?.code || cause?.message || '');
       if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
-        setError('ยกเลิกการเข้าสู่ระบบด้วย Google');
+        setError('ปิดหน้าต่าง Google ก่อนเลือกบัญชี กรุณากดปุ่ม Google แล้วเลือกบัญชีอีกครั้ง');
       } else if (code.includes('operation-not-allowed')) {
         setError('ยังไม่ได้เปิด Google Sign-In ใน Firebase Authentication');
       } else {
@@ -516,7 +516,7 @@ export const AuthModalOrView: React.FC = () => {
                   <path fill="#FBBC05" d="M6.39 13.93A6 6 0 0 1 6.08 12c0-.67.12-1.32.31-1.93V7.45H3.04A10 10 0 0 0 2 12c0 1.61.39 3.13 1.04 4.55l3.35-2.62Z"/>
                   <path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.62 9.62 0 0 0 12 2 10 10 0 0 0 3.04 7.45l3.35 2.62C7.18 7.7 9.39 5.94 12 5.94Z"/>
                 </svg>
-                <span>{working ? 'กำลังเชื่อม Google...' : 'Sign in with Google'}</span>
+                <span>{working ? 'กำลังเปิด Google...' : 'ลงชื่อเข้าใช้ด้วย Google Account'}</span>
               </button>
             )}
             <div className="my-4 flex items-center gap-3 text-[10px] font-bold text-slate-500">

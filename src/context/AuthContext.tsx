@@ -78,11 +78,12 @@ function googleProvider() {
 
 function shouldFallbackToRedirect(error: any): boolean {
   const code = String(error?.code || error?.message || '').toLowerCase();
+  // Do not redirect after popup-blocked/cancelled on iOS: that produces the
+  // "reload back to the same page" behavior. Redirect is reserved only for
+  // environments where Firebase explicitly cannot run popup auth at all.
   return (
-    code.includes('popup-blocked') ||
     code.includes('operation-not-supported-in-this-environment') ||
-    code.includes('web-storage-unsupported') ||
-    code.includes('popup-request-cancelled')
+    code.includes('web-storage-unsupported')
   );
 }
 
@@ -313,12 +314,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async (): Promise<GoogleSignInResult | null> => {
     setLoading(true);
     try {
-      await authPersistenceReady;
       const provider = googleProvider();
 
       let credential;
       try {
-        credential = await signInWithPopup(auth, provider);
+        // IMPORTANT for iPhone/iPad: call signInWithPopup synchronously from the
+        // tap event before awaiting any promise. Otherwise Safari/Chrome on iOS
+        // can treat the Google chooser as a blocked popup and simply reload.
+        const popupPromise = signInWithPopup(auth, provider);
+        await authPersistenceReady.catch(() => {});
+        credential = await popupPromise;
       } catch (popupError: any) {
         if (!shouldFallbackToRedirect(popupError)) throw popupError;
         await signInWithRedirect(auth, provider);
