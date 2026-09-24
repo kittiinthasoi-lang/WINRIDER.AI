@@ -2232,6 +2232,76 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
   }
 });
 
+app.post("/api/auth/complete-google-identity", rateLimit(10), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+
+  try {
+    const decoded = await adminAuth.verifyIdToken(token);
+    const winUid = normalizeWinUidServer(req.body?.winUid);
+    const password = String(req.body?.password || "");
+    const displayName = String(req.body?.displayName || "").trim().slice(0, 120);
+
+    if (!/^[a-z0-9][a-z0-9._-]{3,29}$/.test(winUid)) {
+      return res.status(400).json({ error: "WIN UID ไม่ถูกต้อง", code: "WIN_UID_INVALID" });
+    }
+    if (password.length < 8 || password.length > 128) {
+      return res.status(400).json({ error: "รหัสผ่านต้องมี 8-128 ตัวอักษร", code: "PASSWORD_INVALID" });
+    }
+
+    const record = await adminAuth.getUser(decoded.uid);
+    const googleProvider = record.providerData.find((provider) => provider.providerId === "google.com");
+    if (!googleProvider) {
+      return res.status(403).json({ error: "บัญชีนี้ไม่ได้เข้าสู่ระบบด้วย Google", code: "GOOGLE_PROVIDER_REQUIRED" });
+    }
+
+    const internalEmail = `${winUid}${WIN_UID_EMAIL_SUFFIX}`;
+    try {
+      const existingByEmail = await adminAuth.getUserByEmail(internalEmail);
+      if (existingByEmail.uid !== decoded.uid) {
+        return res.status(409).json({ error: "WIN UID นี้ถูกใช้งานแล้ว", code: "WIN_UID_ALREADY_USED" });
+      }
+    } catch (lookupError: any) {
+      if (lookupError?.code !== "auth/user-not-found") throw lookupError;
+    }
+
+    const existingProfile = await ordersDb.collection("users").where("winUid", "==", winUid).limit(1).get();
+    if (!existingProfile.empty && existingProfile.docs[0].id !== decoded.uid) {
+      return res.status(409).json({ error: "WIN UID นี้ถูกใช้งานแล้ว", code: "WIN_UID_ALREADY_USED" });
+    }
+
+    await adminAuth.updateUser(decoded.uid, {
+      email: internalEmail,
+      emailVerified: true,
+      password,
+      ...(displayName ? { displayName } : {}),
+    });
+
+    await ordersDb.collection("auth_identity_links").doc(decoded.uid).set({
+      uid: decoded.uid,
+      winUid,
+      googleEmail: String(googleProvider.email || decoded.email || "").toLowerCase(),
+      providers: ["google.com", "password"],
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return res.json({
+      ok: true,
+      uid: decoded.uid,
+      winUid,
+      linkedProviders: ["google.com", "password"],
+      forceTokenRefresh: true,
+    });
+  } catch (error: any) {
+    console.error("[Google Identity Link]", error?.message);
+    if (error?.code === "auth/email-already-exists") {
+      return res.status(409).json({ error: "WIN UID นี้ถูกใช้งานแล้ว", code: "WIN_UID_ALREADY_USED" });
+    }
+    return res.status(503).json({ error: "เชื่อม Google กับ WIN UID ไม่สำเร็จ", code: "GOOGLE_WIN_UID_LINK_FAILED" });
+  }
+});
+
 app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
   const token = rawBearerToken(req);
   if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
