@@ -1768,7 +1768,6 @@ async function checkFirebaseReadiness() {
     credentialConfigured: firebaseAdminRuntimeStatus.credentialConfigured,
     credentialError: firebaseAdminRuntimeStatus.credentialError,
     checks: { firestore, storage },
-    temporaryAdminBypassEnabled: TEMPORARY_ADMIN_BYPASS_ENABLED,
     timestamp: new Date().toISOString(),
   };
 }
