@@ -192,7 +192,6 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         setUploadProgressText('กำลังบันทึกข้อมูลและจองสิทธิ์อัศวินผู้ก่อตั้ง...');
         await registerKnight({
           uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
           displayName,
           phone,
           province,
@@ -212,7 +211,6 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         setUploadProgressText('กำลังสร้างบัญชีพลเมืองอัศวิน...');
         await registerCitizen({
           uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
           displayName,
           phone,
           province,
@@ -232,7 +230,6 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         setUploadProgressText('กำลังบันทึกข้อมูลร้านค้าพันธมิตร...');
         await registerMerchant({
           uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
           displayName,
           phone,
           province,
@@ -254,7 +251,6 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         setUploadProgressText('กำลังบันทึกข้อมูลองค์กรพาร์ทเนอร์...');
         await registerPartner({
           uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
           displayName,
           phone,
           province,
@@ -295,7 +291,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-400 hidden sm:inline">
-            เข้าสู่ระบบด้วย: <strong className="text-slate-200">{firebaseUser?.email || firebaseUser?.displayName}</strong>
+            WIN UID: <strong className="text-slate-200">{firebaseUser?.email?.split('@')[0] || '-'}</strong>
           </span>
           <button
             onClick={() => signOut()}
