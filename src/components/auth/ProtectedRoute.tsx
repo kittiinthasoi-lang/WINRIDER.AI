@@ -34,18 +34,16 @@ export const ProtectedRoute: React.FC<Props> = ({
     );
   }
 
-  // 1. Not signed in to WIN Auth -> Show Auth
+  // 1. Not signed in to Firebase Authentication -> Show Auth
   if (!firebaseUser) {
     return <AuthModalOrView />;
   }
 
   const isOwnerAdmin =
-    firebaseUser.email === 'kittiinthasoi@gmail.com' ||
-    firebaseUser.email?.toLowerCase().includes('kittiinthasoi') ||
-    userData?.isAdmin === true ||
+    userData?.isAdmin === true &&
     userData?.adminLevel === 'super';
 
-  // เจ้าของระบบใช้ WIN Auth UID เดียวเพื่อควบคุมแอปและเปิดทุกบทบาท
+  // เจ้าของระบบใช้ Firebase UID เดียวเพื่อควบคุมแอปและเปิดทุกบทบาท
   if (isOwnerAdmin) return <>{children}</>;
 
   // 2. Compatibility guard for an incomplete legacy profile
