@@ -2,7 +2,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import type { UserDoc, UserRole } from '../types/auth';
-import { winUidToInternalEmail, normalizeWinUid } from '../auth/winUid';
+import { winUidToInternalEmail, normalizeWinUid, internalEmailToWinUid } from '../auth/winUid';
 import { uploadKycDocument } from '../utils/imageUpload';
 
 export interface BaseRegistrationPayload {
@@ -245,6 +245,42 @@ export async function registerFullAccountWithFirestore(
     await updateProfile(user, { displayName: fullName }).catch(() => {});
   }
 
+  // Google is an additional sign-in method, not a replacement for WIN UID.
+  // For a first-time Google user, convert the same Firebase UID into a dual-provider
+  // account by assigning the hidden WIN UID email + password on the server.
+  if (
+    user &&
+    user.providerData.some((provider) => provider.providerId === 'google.com') &&
+    !internalEmailToWinUid(user.email)
+  ) {
+    if (!input.password) throw new Error('กรุณาตั้งรหัสผ่าน WIN UID ก่อนยืนยันการสมัคร');
+    onProgress?.('กำลังเชื่อมบัญชี Google กับ WIN UID เดียวกัน...');
+    const token = await user.getIdToken();
+    const response = await fetch('/api/auth/complete-google-identity', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        winUid: normalizedUid,
+        password: input.password,
+        displayName: fullName,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(payload?.error || 'เชื่อม Google กับ WIN UID ไม่สำเร็จ');
+      (error as any).code = payload?.code || `HTTP_${response.status}`;
+      throw error;
+    }
+
+    await user.reload();
+    await user.getIdToken(true);
+    user = auth.currentUser || user;
+  }
+
   // If Firebase Auth provider is not enabled in Firebase Console, provide full sovereign session
   if (isSovereignFallback || !user) {
     onProgress?.('กำลังจัดสรรสิทธิบทบาทและบันทึกข้อมูลอธิปไตย...');
@@ -259,8 +295,7 @@ export async function registerFullAccountWithFirestore(
       district: input.district,
       role: input.role,
       status: 'active',
-      isAdmin: true,
-      adminLevel: 'super',
+      isAdmin: false,
       isFoundingKnight: input.role === 'knight',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -379,8 +414,7 @@ export async function registerFullAccountWithFirestore(
       district: input.district,
       role: input.role,
       status: 'active',
-      isAdmin: true,
-      adminLevel: 'super',
+      isAdmin: false,
       isFoundingKnight: input.role === 'knight',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

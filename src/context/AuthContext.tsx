@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
+  GoogleAuthProvider,
   User,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
@@ -19,63 +21,96 @@ interface SignUpPayload {
   password: string;
 }
 
+export interface GoogleOnboardingInfo {
+  email: string;
+  displayName: string;
+  firstName: string;
+  lastName: string;
+  photoURL?: string;
+}
+
+interface GoogleSignInResult {
+  existingProfile: boolean;
+  profile: UserDoc | null;
+  google: GoogleOnboardingInfo;
+}
+
 interface AuthContextType {
   firebaseUser: User | null;
   userData: UserDoc | null;
   role: UserDoc['role'] | null;
   loading: boolean;
+  googleOnboarding: GoogleOnboardingInfo | null;
   signInWithWinUid: (winUid: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<GoogleSignInResult>;
   signUpWithWinUid: (payload: SignUpPayload) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUserData: () => Promise<UserDoc | null>;
   adoptUserData: (profile: UserDoc) => void;
   promoteToSuperAdmin: () => void;
+  clearGoogleOnboarding: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const ONBOARDING_KEY = 'WINRIDER_PENDING_ONBOARDING';
 export const SESSION_CACHE_KEY = 'WINRIDER_ACTIVE_SESSION_PROFILE';
 
+function splitGoogleName(user: User): GoogleOnboardingInfo {
+  const displayName = String(user.displayName || '').trim();
+  const parts = displayName.split(/\s+/).filter(Boolean);
+  return {
+    email: String(user.providerData.find((p) => p.providerId === 'google.com')?.email || user.email || ''),
+    displayName,
+    firstName: parts[0] || '',
+    lastName: parts.slice(1).join(' '),
+    photoURL: user.photoURL || undefined,
+  };
+}
+
+function cachedProfile(): UserDoc | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(SESSION_CACHE_KEY);
+    return raw ? JSON.parse(raw) as UserDoc : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheProfile(profile: UserDoc | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (profile) window.localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(profile));
+    else window.localStorage.removeItem(SESSION_CACHE_KEY);
+  } catch {
+    // Embedded previews may restrict storage.
+  }
+}
+
 export function createSyntheticFirebaseUser(uid: string, displayName: string, email: string): User {
-  const getSovereignToken = () => {
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(SESSION_CACHE_KEY) : null;
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (cached?.uid) {
-          const isSuper = Boolean(
-            cached.isAdmin === true ||
-            cached.adminLevel === 'super' ||
-            (typeof cached.email === 'string' && /kittiinthasoi/i.test(cached.email)) ||
-            cached.winUid === 'kitti' ||
-            cached.uid === 'kitti-super-admin'
-          );
-          const payload = {
-            uid: cached.uid,
-            email: cached.email || (isSuper ? 'kittiinthasoi@gmail.com' : email),
-            displayName: cached.displayName || cached.fullName || displayName || 'ผู้ใช้งาน',
-            role: cached.role || (isSuper ? 'admin' : 'citizen'),
-            winUid: cached.winUid || (isSuper ? 'kitti' : ''),
-            isAdmin: isSuper,
-            adminLevel: isSuper ? 'super' : cached.adminLevel,
-            status: cached.status || 'active',
-          };
-          return `sovereign:${btoa(unescape(encodeURIComponent(JSON.stringify(payload))))}`;
-        }
-      }
-    } catch {}
-    const isSuper = /kittiinthasoi/i.test(email) || uid.includes('kitti');
-    const fallbackPayload = {
-      uid,
-      displayName,
-      email: isSuper ? 'kittiinthasoi@gmail.com' : email,
-      role: isSuper ? 'admin' : 'citizen',
-      winUid: isSuper ? 'kitti' : uid,
-      isAdmin: isSuper,
-      adminLevel: isSuper ? 'super' : undefined,
-      status: 'active',
+  const getCachedClaims = () => {
+    const cached = cachedProfile();
+    const isAdmin = cached?.isAdmin === true;
+    return {
+      admin: isAdmin,
+      adminLevel: isAdmin ? cached?.adminLevel : undefined,
     };
-    return `sovereign:${btoa(unescape(encodeURIComponent(JSON.stringify(fallbackPayload))))}`;
+  };
+
+  const getSovereignToken = () => {
+    const cached = cachedProfile();
+    const claims = getCachedClaims();
+    const payload = {
+      uid: cached?.uid || uid,
+      email: cached?.email || email,
+      displayName: cached?.displayName || cached?.fullName || displayName || 'ผู้ใช้งาน',
+      role: cached?.role || 'citizen',
+      winUid: cached?.winUid || internalEmailToWinUid(email) || uid,
+      isAdmin: claims.admin,
+      adminLevel: claims.adminLevel,
+      status: cached?.status || 'active',
+    };
+    return `sovereign:${btoa(unescape(encodeURIComponent(JSON.stringify(payload))))}`;
   };
 
   return {
@@ -93,30 +128,29 @@ export function createSyntheticFirebaseUser(uid: string, displayName: string, em
     tenantId: null,
     delete: async () => {},
     getIdToken: async () => getSovereignToken(),
-    getIdTokenResult: async () => ({
-      token: getSovereignToken(),
-      claims: { admin: true, adminLevel: 'super' },
-      authTime: new Date().toISOString(),
-      issuedAtTime: new Date().toISOString(),
-      expirationTime: new Date(Date.now() + 86400000).toISOString(),
-      signInProvider: 'custom',
-      signInSecondFactor: null,
-    }),
+    getIdTokenResult: async () => {
+      const claims = getCachedClaims();
+      return {
+        token: getSovereignToken(),
+        claims,
+        authTime: new Date().toISOString(),
+        issuedAtTime: new Date().toISOString(),
+        expirationTime: new Date(Date.now() + 86400000).toISOString(),
+        signInProvider: 'custom',
+        signInSecondFactor: null,
+      };
+    },
     reload: async () => {},
     toJSON: () => ({ uid, displayName, email }),
     phoneNumber: null,
     photoURL: null,
     providerId: 'winrider.local',
-  };
+  } as User;
 }
 
 async function readUserProfile(user: User): Promise<UserDoc | null> {
   if (user.refreshToken === 'synthetic-session') {
-    try {
-      const raw = window.localStorage.getItem(SESSION_CACHE_KEY);
-      if (raw) return JSON.parse(raw) as UserDoc;
-    } catch {}
-    return null;
+    return cachedProfile();
   }
 
   const token = await user.getIdToken();
@@ -128,42 +162,30 @@ async function readUserProfile(user: User): Promise<UserDoc | null> {
     cache: 'no-store',
   });
 
-  if (response.status === 401) {
-    throw new Error('AUTH_SESSION_INVALID');
-  }
-  if (!response.ok) {
-    throw new Error(`PROFILE_FETCH_FAILED_${response.status}`);
-  }
+  if (response.status === 401) throw new Error('AUTH_SESSION_INVALID');
+  if (!response.ok) throw new Error(`PROFILE_FETCH_FAILED_${response.status}`);
 
   const payload = await response.json().catch(() => ({}));
-  return payload?.user ? payload.user as UserDoc : null;
+  const profile = payload?.user ? payload.user as UserDoc : null;
+  return profile?.role ? profile : null;
 }
 
 function rememberPendingOnboarding(winUid: string, displayName: string) {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(ONBOARDING_KEY, JSON.stringify({
-      winUid,
-      displayName,
-      createdAt: Date.now(),
-    }));
-  } catch {
-    // Embedded previews may block localStorage. Firebase persistence remains authoritative.
-  }
+    window.localStorage.setItem(ONBOARDING_KEY, JSON.stringify({ winUid, displayName, createdAt: Date.now() }));
+  } catch {}
 }
 
 function clearPendingOnboarding() {
   if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.removeItem(ONBOARDING_KEY);
-  } catch {
-    // Ignore storage restrictions.
-  }
+  try { window.localStorage.removeItem(ONBOARDING_KEY); } catch {}
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserDoc | null>(null);
+  const [googleOnboarding, setGoogleOnboarding] = useState<GoogleOnboardingInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -177,93 +199,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(true);
 
         if (!user) {
-          // Check for cached local session if Firebase Auth provider is not enabled
-          try {
-            const raw = window.localStorage.getItem(SESSION_CACHE_KEY);
-            if (raw) {
-              const cached = JSON.parse(raw) as UserDoc;
-              if (cached?.uid && cached?.role) {
-                // Ensure Super Admin privileges for system owner
-                cached.isAdmin = true;
-                cached.adminLevel = 'super';
-                try {
-                  window.localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(cached));
-                } catch {}
-
-                const synthetic = createSyntheticFirebaseUser(
-                  cached.uid,
-                  cached.displayName || cached.fullName || 'กิตติ อินทะสร้อย (Super Admin)',
-                  winUidToInternalEmail(cached.winUid || cached.uid)
-                );
-                setFirebaseUser(synthetic);
-                setUserData(cached);
-                setLoading(false);
-                return;
-              }
-            }
-          } catch {
-            // Ignore storage errors
+          const cached = cachedProfile();
+          if (cached?.uid && cached?.role) {
+            const synthetic = createSyntheticFirebaseUser(
+              cached.uid,
+              cached.displayName || cached.fullName || 'ผู้ใช้งาน',
+              cached.email || winUidToInternalEmail(cached.winUid || cached.uid)
+            );
+            setFirebaseUser(synthetic);
+            setUserData(cached);
+          } else {
+            setFirebaseUser(null);
+            setUserData(null);
           }
-
-          setFirebaseUser(null);
-          setUserData(null);
+          setGoogleOnboarding(null);
           setLoading(false);
           return;
         }
 
-        // Keep the authenticated identity in state immediately. Profile hydration
-        // must never make the UI look signed out while onboarding is in progress.
         setFirebaseUser(user);
-
         try {
           const profile = await readUserProfile(user);
           if (!active) return;
-          const enhancedProfile: UserDoc = {
-            ...(profile || {
-              uid: user.uid,
-              winUid: user.email?.split('@')[0] || user.uid,
-              displayName: user.displayName || 'กิตติ อินทะสร้อย (Super Admin)',
-              fullName: user.displayName || 'กิตติ อินทะสร้อย',
-              email: user.email || 'kittiinthasoi@gmail.com',
-              role: 'knight',
-              phone: '0812345678',
-              province: 'กรุงเทพมหานคร',
-              district: 'จตุจักร',
-              status: 'active',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            }),
-            isAdmin: true,
-            adminLevel: 'super',
-          };
-          setUserData(enhancedProfile);
-          try {
-            window.localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(enhancedProfile));
-          } catch {}
-          if (enhancedProfile?.role) clearPendingOnboarding();
+          setUserData(profile);
+          if (profile?.role) {
+            cacheProfile(profile);
+            clearPendingOnboarding();
+            setGoogleOnboarding(null);
+          } else if (user.providerData.some((p) => p.providerId === 'google.com')) {
+            setGoogleOnboarding(splitGoogleName(user));
+          }
         } catch (error) {
-          console.warn('Firebase auth hydration fallback to owner admin profile:', error);
+          console.warn('Firebase auth profile hydration failed:', error);
           if (!active) return;
-          const fallbackProfile: UserDoc = {
-            uid: user.uid,
-            winUid: user.email?.split('@')[0] || user.uid,
-            displayName: user.displayName || 'กิตติ อินทะสร้อย (Super Admin)',
-            fullName: user.displayName || 'กิตติ อินทะสร้อย',
-            email: user.email || 'kittiinthasoi@gmail.com',
-            role: 'knight',
-            phone: '0812345678',
-            province: 'กรุงเทพมหานคร',
-            district: 'จตุจักร',
-            status: 'active',
-            isAdmin: true,
-            adminLevel: 'super',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          setUserData(fallbackProfile);
-          try {
-            window.localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(fallbackProfile));
-          } catch {}
+          setUserData(null);
+          if (user.providerData.some((p) => p.providerId === 'google.com')) {
+            setGoogleOnboarding(splitGoogleName(user));
+          }
         } finally {
           if (active) setLoading(false);
         }
@@ -281,28 +253,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authPersistenceReady;
       const normalizedUid = normalizeWinUid(winUid);
-      try {
-        const credential = await signInWithEmailAndPassword(auth, winUidToInternalEmail(normalizedUid), password);
-        setFirebaseUser(credential.user);
-        const profile = await readUserProfile(credential.user);
-        setUserData(profile);
-        if (profile?.role) clearPendingOnboarding();
-      } catch (authError: any) {
-        if (authError?.code === 'auth/operation-not-allowed' || String(authError?.message).includes('operation-not-allowed')) {
-          // Fallback to local session if available
-          try {
-            const raw = window.localStorage.getItem(SESSION_CACHE_KEY);
-            if (raw) {
-              const cached = JSON.parse(raw) as UserDoc;
-              if (cached.winUid === normalizedUid || cached.uid === normalizedUid) {
-                adoptUserData(cached);
-                return;
-              }
-            }
-          } catch {}
-        }
-        throw authError;
+      const credential = await signInWithEmailAndPassword(auth, winUidToInternalEmail(normalizedUid), password);
+      setFirebaseUser(credential.user);
+      const profile = await readUserProfile(credential.user);
+      setUserData(profile);
+      setGoogleOnboarding(null);
+      if (profile?.role) {
+        cacheProfile(profile);
+        clearPendingOnboarding();
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signInWithGoogle = async (): Promise<GoogleSignInResult> => {
+    setLoading(true);
+    try {
+      await authPersistenceReady;
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const credential = await signInWithPopup(auth, provider);
+      const google = splitGoogleName(credential.user);
+      setFirebaseUser(credential.user);
+
+      let profile: UserDoc | null = null;
+      try {
+        profile = await readUserProfile(credential.user);
+      } catch {
+        profile = null;
+      }
+
+      if (profile?.role) {
+        setUserData(profile);
+        cacheProfile(profile);
+        setGoogleOnboarding(null);
+        clearPendingOnboarding();
+        return { existingProfile: true, profile, google };
+      }
+
+      setUserData(null);
+      setGoogleOnboarding(google);
+      return { existingProfile: false, profile: null, google };
     } finally {
       setLoading(false);
     }
@@ -313,72 +305,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authPersistenceReady;
       const normalizedWinUid = normalizeWinUid(winUid);
-      const credential = await createUserWithEmailAndPassword(
-        auth,
-        winUidToInternalEmail(normalizedWinUid),
-        password
-      );
-
+      const credential = await createUserWithEmailAndPassword(auth, winUidToInternalEmail(normalizedWinUid), password);
       const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-      if (displayName) {
-        await updateProfile(credential.user, { displayName });
-      }
-
-      // Force Firebase to finish issuing a usable token before moving to the role
-      // screen. This avoids a race in embedded previews after account creation.
+      if (displayName) await updateProfile(credential.user, { displayName });
       await credential.user.getIdToken(true);
       rememberPendingOnboarding(normalizedWinUid, displayName);
       setFirebaseUser(credential.user);
       setUserData(null);
+      setGoogleOnboarding(null);
     } finally {
       setLoading(false);
     }
   };
 
   const adoptUserData = (profile: UserDoc) => {
-    const adminEnhancedProfile: UserDoc = {
-      ...profile,
-      isAdmin: true,
-      adminLevel: 'super',
-    };
-
-    try {
-      window.localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(adminEnhancedProfile));
-    } catch {}
-
+    cacheProfile(profile);
     const activeUser = auth.currentUser || createSyntheticFirebaseUser(
-      adminEnhancedProfile.uid,
-      adminEnhancedProfile.displayName || adminEnhancedProfile.fullName || 'กิตติ อินทะสร้อย (Super Admin)',
-      winUidToInternalEmail(adminEnhancedProfile.winUid || adminEnhancedProfile.uid)
+      profile.uid,
+      profile.displayName || profile.fullName || 'ผู้ใช้งาน',
+      profile.email || winUidToInternalEmail(profile.winUid || profile.uid)
     );
     setFirebaseUser(activeUser);
-    setUserData(adminEnhancedProfile);
-    if (adminEnhancedProfile?.role) clearPendingOnboarding();
+    setUserData(profile);
+    setGoogleOnboarding(null);
+    if (profile.role) clearPendingOnboarding();
   };
 
   const promoteToSuperAdmin = () => {
     setUserData((current) => {
-      const updated: UserDoc = {
-        ...(current || {
-          uid: firebaseUser?.uid || 'kitti-super-admin',
-          winUid: 'kitti.admin',
-          displayName: 'กิตติ อินทะสร้อย (Super Admin)',
-          fullName: 'กิตติ อินทะสร้อย',
-          email: 'kittiinthasoi@gmail.com',
-          phone: '0812345678',
-          province: 'กรุงเทพมหานคร',
-          district: 'จตุจักร',
-          role: 'knight' as const,
-          status: 'active' as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }),
-        isAdmin: true,
-        adminLevel: 'super',
-      };
-      try {
-        window.localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(updated));
-      } catch {}
+      if (!current) return current;
+      const updated: UserDoc = { ...current, isAdmin: true, adminLevel: 'super' };
+      cacheProfile(updated);
       return updated;
     });
   };
@@ -388,12 +345,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       clearUserSession();
       clearPendingOnboarding();
-      try {
-        window.localStorage.removeItem(SESSION_CACHE_KEY);
-      } catch {}
+      cacheProfile(null);
       await firebaseSignOut(auth).catch(() => {});
       setUserData(null);
       setFirebaseUser(null);
+      setGoogleOnboarding(null);
     } finally {
       setLoading(false);
     }
@@ -401,45 +357,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUserData = async (): Promise<UserDoc | null> => {
     const user = auth.currentUser;
-    if (!user) {
-      setUserData(null);
-      return null;
-    }
-
+    if (!user) return userData;
     await user.reload();
     setFirebaseUser(user);
     const profile = await readUserProfile(user);
-    if (profile) {
-      const adminProfile: UserDoc = {
-        ...profile,
-        isAdmin: true,
-        adminLevel: 'super',
-      };
-      setUserData(adminProfile);
-      try {
-        window.localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(adminProfile));
-      } catch {}
-      if (profile.role) clearPendingOnboarding();
-      return adminProfile;
+    setUserData(profile);
+    if (profile?.role) {
+      cacheProfile(profile);
+      clearPendingOnboarding();
+      setGoogleOnboarding(null);
     }
     return profile;
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        firebaseUser,
-        userData,
-        role: userData?.role ?? null,
-        loading,
-        signInWithWinUid,
-        signUpWithWinUid,
-        signOut,
-        refreshUserData,
-        adoptUserData,
-        promoteToSuperAdmin,
-      }}
-    >
+    <AuthContext.Provider value={{
+      firebaseUser,
+      userData,
+      role: userData?.role ?? null,
+      loading,
+      googleOnboarding,
+      signInWithWinUid,
+      signInWithGoogle,
+      signUpWithWinUid,
+      signOut,
+      refreshUserData,
+      adoptUserData,
+      promoteToSuperAdmin,
+      clearGoogleOnboarding: () => setGoogleOnboarding(null),
+    }}>
       {children}
     </AuthContext.Provider>
   );
