@@ -166,7 +166,7 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    if (!firebaseUser || !userData?.uid || userData?.isAdmin === true) {
+    if (!firebaseUser || userData?.isAdmin === true) {
       setAdminBootstrapOpen(false);
       return;
     }
@@ -182,7 +182,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [firebaseUser?.uid, userData?.uid, userData?.isAdmin]);
+  }, [firebaseUser?.uid, userData?.isAdmin]);
 
   useEffect(() => {
     let active = true;
@@ -434,7 +434,20 @@ export default function App() {
           onSignOut={handleSignOut}
           onToggleDriverPersona={() => {}}
         />
-        <main className="flex-1 flex items-center justify-center p-4">
+        <main className="flex-1 flex flex-col items-center justify-center gap-4 p-4">
+          {adminBootstrapOpen && (
+            <button
+              type="button"
+              onClick={() => {
+                playTactileBlip(1000);
+                setActiveMode('admin');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="w-full max-w-md rounded-2xl border border-amber-300/60 bg-gradient-to-r from-amber-300 to-amber-500 px-5 py-4 text-sm font-black text-slate-950 shadow-[0_12px_35px_rgba(245,158,11,0.35)] active:scale-95"
+            >
+              👑 ลงทะเบียน Admin • ตั้งบัญชีนี้เป็น Super Admin คนแรก
+            </button>
+          )}
           <AuthModalOrView />
         </main>
       </div>
