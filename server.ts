@@ -788,7 +788,7 @@ app.post("/api/shop/listings", rateLimit(RATE_LIMITS["/api/shop/listings"]), asy
       id,
       sellerUserId: user.uid,
       sellerType: sellerRole === "merchant" ? "merchant" : "citizen",
-      sellerName: String(sellerProfile.displayName || userData.displayName || user.name || "ผู้ขาย WIN"),
+      sellerName: String(sellerProfile.displayName || userData.displayName || user.email || "ผู้ขาย WIN"),
       sellerWalletId: sellerWallet.walletId,
       sellerWalletRole: sellerWallet.role,
       sellerAvatar: String(sellerProfile.avatarEmoji || userData.avatarEmoji || "👤"),
