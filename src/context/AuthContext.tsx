@@ -3,7 +3,6 @@ import {
   User,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
-  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -27,45 +26,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function authError(code: string, message: string) {
-  const error = new Error(message);
-  (error as any).code = code;
-  return error;
-}
-
 async function readUserProfile(uid: string): Promise<UserDoc | null> {
   const snap = await getDoc(doc(db, 'users', uid));
   return snap.exists() ? snap.data() as UserDoc : null;
-}
-
-async function bootstrapOwnerIfEligible(user: User): Promise<void> {
-  const token = await user.getIdToken();
-  const response = await fetch('/api/auth/bootstrap-owner', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: '{}',
-  });
-
-  // The endpoint intentionally returns owner:false for normal users.
-  if (response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    if (payload?.owner === true && payload?.claimsUpdated === true) {
-      await user.getIdToken(true);
-    }
-    return;
-  }
-
-  const payload = await response.json().catch(() => ({}));
-  if (response.status === 412 && payload?.code === 'OWNER_EMAIL_NOT_VERIFIED') {
-    throw authError('auth/email-not-verified', 'กรุณายืนยันอีเมลเจ้าของระบบก่อนเข้าสู่ Super Admin');
-  }
-  if (response.status >= 500) {
-    console.warn('Owner bootstrap endpoint unavailable:', payload?.code || response.status);
-  }
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -89,19 +52,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          // Email/password identities must prove ownership of the mailbox before
-          // onboarding or owner elevation. Federated providers already expose a
-          // verified email when Firebase marks emailVerified=true.
-          if (user.providerData.some((provider) => provider.providerId === 'password') && !user.emailVerified) {
-            // Keep the short-lived Firebase user object intact while sign-up sends
-            // the verification email. signUpWithEmail/signInWithEmail explicitly
-            // signs the unverified session out after the message is sent.
-            setFirebaseUser(null);
-            setUserData(null);
-            return;
-          }
-
-          await bootstrapOwnerIfEligible(user);
           const profile = await readUserProfile(user.uid);
           if (!active) return;
           setFirebaseUser(user);
@@ -128,20 +78,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authPersistenceReady;
       const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const user = credential.user;
-
-      if (!user.emailVerified) {
-        await sendEmailVerification(user).catch(() => undefined);
-        await firebaseSignOut(auth);
-        throw authError(
-          'auth/email-not-verified',
-          'อีเมลนี้ยังไม่ได้ยืนยัน ระบบส่งลิงก์ยืนยันให้อีกครั้งแล้ว'
-        );
-      }
-
-      await bootstrapOwnerIfEligible(user);
-      const profile = await readUserProfile(user.uid);
-      setFirebaseUser(user);
+      const profile = await readUserProfile(credential.user.uid);
+      setFirebaseUser(credential.user);
       setUserData(profile);
     } finally {
       setLoading(false);
@@ -153,9 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authPersistenceReady;
       const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      await sendEmailVerification(credential.user);
-      await firebaseSignOut(auth);
-      setFirebaseUser(null);
+      setFirebaseUser(credential.user);
       setUserData(null);
     } finally {
       setLoading(false);
@@ -186,7 +122,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     await user.reload();
-    await bootstrapOwnerIfEligible(user);
     const profile = await readUserProfile(user.uid);
     setFirebaseUser(user);
     setUserData(profile);
