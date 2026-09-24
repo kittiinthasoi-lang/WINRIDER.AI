@@ -101,7 +101,8 @@ export default function App() {
 
       return {
         id: firebaseUser.uid,
-        email: firebaseUser.email || '',
+        winUid: userData?.winUid || '',
+        email: '',
         name: userData?.displayName || firebaseUser.displayName || 'เจ้าของระบบ',
         phone: userData?.phone || '',
         role: mappedRole,
@@ -139,7 +140,8 @@ export default function App() {
 
     return {
       id: userData.uid,
-      email: userData.email,
+      winUid: userData.winUid,
+      email: '',
       name: isOwnerAdmin ? 'กิตติ อินทะสร้อย' : (userData.displayName || 'อัศวินผู้กล้า'),
       phone: userData.phone || '',
       role: mappedRole,
@@ -197,7 +199,7 @@ export default function App() {
       else if (userData.role === 'merchant') setActiveMode('merchant');
       else if (userData.role === 'partner') setActiveMode('partner');
     }
-  }, [userData?.role, userData?.uid, firebaseUser?.email, userData?.isAdmin, isOwnerAdmin]);
+  }, [userData?.role, userData?.uid, firebaseUser?.uid, userData?.isAdmin, isOwnerAdmin]);
 
   const handleAddCustomerItem = (item: MarketItem) => {
     setCustomerListedItems(prev => [item, ...prev]);
@@ -376,7 +378,7 @@ export default function App() {
               <Crown className="w-4 h-4 text-amber-400 animate-bounce shrink-0" />
               <span className="font-bold">ระบบตรวจพบสิทธิ์ผู้ดูแลระบบสูงสุด (SUPER ADMIN):</span>
               <span className="text-white font-mono bg-black/40 px-2 py-0.5 rounded border border-amber-400/40">
-                {firebaseUser?.email || currentUserSession?.email || 'Super Admin'}
+                {userData?.winUid || currentUserSession?.winUid || 'Super Admin'}
               </span>
             </div>
             <button
@@ -632,7 +634,7 @@ export default function App() {
             {(claims) => (
               <AdminLayout
                 adminLevel={isOwnerAdmin ? 'super' : claims.adminLevel}
-                adminEmail={firebaseUser?.email || currentUserSession?.email || 'Admin'}
+                adminEmail={userData?.winUid || currentUserSession?.winUid || 'Admin'}
                 onExitAdmin={handleExitAdmin}
                 onSelectOwnerPersona={handleSelectOwnerPersona}
               />
