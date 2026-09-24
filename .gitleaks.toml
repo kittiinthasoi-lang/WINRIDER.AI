@@ -1,0 +1,7 @@
+title = "WINRIDER.AI gitleaks configuration"
+
+[allowlist]
+description = "Firebase Web API key is public client configuration by design"
+regexes = [
+  '''AIzaSyAwylYBJUebylfy4aRPC1RByn79zfowMJA'''
+]
