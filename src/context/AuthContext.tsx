@@ -93,7 +93,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // onboarding or owner elevation. Federated providers already expose a
           // verified email when Firebase marks emailVerified=true.
           if (user.providerData.some((provider) => provider.providerId === 'password') && !user.emailVerified) {
-            await firebaseSignOut(auth);
+            // Keep the short-lived Firebase user object intact while sign-up sends
+            // the verification email. signUpWithEmail/signInWithEmail explicitly
+            // signs the unverified session out after the message is sent.
             setFirebaseUser(null);
             setUserData(null);
             return;
