@@ -7,7 +7,6 @@ type Mode = 'login' | 'register' | 'reset';
 
 function friendlyError(error: any) {
   const code = String(error?.code || error?.message || '');
-  if (code.includes('email-not-verified')) return 'กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ';
   if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
   if (code.includes('email-already-in-use')) return 'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบ';
   if (code.includes('weak-password')) return 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร';
@@ -45,7 +44,7 @@ export const AuthModalOrView: React.FC = () => {
         await signUpWithEmail(email.trim(), password);
         setPassword('');
         setMode('login');
-        setNotice('สร้างบัญชีแล้ว กรุณาเปิดอีเมล กดลิงก์ยืนยัน แล้วกลับมาเข้าสู่ระบบ');
+        setNotice('สร้างบัญชีแล้ว เข้าสู่ระบบเรียบร้อย กรุณาเลือกบทบาทเพื่อเริ่มใช้งาน');
       } else if (mode === 'reset') {
         await resetPassword(email.trim());
         setMode('login');
@@ -75,7 +74,7 @@ export const AuthModalOrView: React.FC = () => {
             <p className="mt-2 text-sm font-semibold text-slate-300">
               {mode === 'register' ? 'สมัครบัญชีใหม่' : mode === 'reset' ? 'ตั้งรหัสผ่านใหม่' : 'เข้าสู่ระบบ'}
             </p>
-            <p className="mt-1 text-xs text-slate-500">รหัสผ่านอยู่ใน Firebase Authentication เท่านั้น ไม่เก็บ passwordHash ใน Firestore</p>
+            <p className="mt-1 text-xs text-slate-500">สมัครแล้วเข้าใช้งานได้ทันที รหัสผ่านจัดการโดย Firebase Authentication</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
