@@ -32,7 +32,7 @@ import { AuthModalOrView } from './components/auth/AuthModalOrView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/admin/AdminRoute';
 import { AdminLayout } from './components/admin/AdminLayout';
-import { getAdminBootstrapStatus } from './services/adminService';
+import { getAdminBootstrapStatus, getAdminPortalStatus } from './services/adminService';
 import { 
   Crown, 
   Coins, 
@@ -75,6 +75,8 @@ export default function App() {
   const [driverCitizenPersona, setDriverCitizenPersona] = useState<'driver' | 'customer'>('driver');
   const [ownerPersona, setOwnerPersona] = useState<'customer' | 'driver' | 'merchant' | 'partner'>('driver');
   const [adminBootstrapOpen, setAdminBootstrapOpen] = useState(false);
+  const [adminApplicationsOpen, setAdminApplicationsOpen] = useState(false);
+  const [adminRequestStatus, setAdminRequestStatus] = useState<string | null>(null);
 
   // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดได้ครบทั้ง 5 บทบาท
   // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Super Admin)
@@ -160,7 +162,7 @@ export default function App() {
     if (currentUserSession) void saveUserSession(currentUserSession);
   }, [currentUserSession]);
 
-  const isSuperAdminUser = isOwnerAdmin;
+  const isSuperAdminUser = userData?.isAdmin === true && userData?.adminLevel === 'super';
 
   useEffect(() => {
     let active = true;
@@ -175,6 +177,31 @@ export default function App() {
       })
       .catch(() => {
         if (active) setAdminBootstrapOpen(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [firebaseUser?.uid, userData?.uid, userData?.isAdmin]);
+
+  useEffect(() => {
+    let active = true;
+    if (!firebaseUser || !userData?.uid || userData?.isAdmin === true) {
+      setAdminApplicationsOpen(false);
+      setAdminRequestStatus(null);
+      return;
+    }
+
+    getAdminPortalStatus()
+      .then((state) => {
+        if (!active) return;
+        setAdminApplicationsOpen(state.applicationsOpen === true);
+        setAdminRequestStatus(state.requestStatus || null);
+      })
+      .catch(() => {
+        if (!active) return;
+        setAdminApplicationsOpen(false);
+        setAdminRequestStatus(null);
       });
 
     return () => {
@@ -626,12 +653,11 @@ export default function App() {
 
         {activeMode === 'admin' && (
           <AdminRoute
-            isOwnerAdmin={isOwnerAdmin}
             onRedirectHome={handleExitAdmin}
           >
             {(claims) => (
               <AdminLayout
-                adminLevel={isOwnerAdmin ? 'super' : claims.adminLevel}
+                adminLevel={claims.adminLevel}
                 adminEmail={userData?.winUid || currentUserSession?.winUid || 'Admin'}
                 onExitAdmin={handleExitAdmin}
                 onSelectOwnerPersona={handleSelectOwnerPersona}
@@ -640,6 +666,20 @@ export default function App() {
           </AdminRoute>
         )}
       </main>
+
+      {adminApplicationsOpen && !isOwnerAdmin && !adminBootstrapOpen && activeMode !== 'admin' && (
+        <button
+          type="button"
+          onClick={() => {
+            playTactileBlip(900);
+            setActiveMode('admin');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className="fixed top-20 right-3 z-[60] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-purple-300/50 bg-gradient-to-r from-purple-400 to-cyan-400 px-4 py-3 text-xs font-black text-slate-950 shadow-[0_12px_35px_rgba(168,85,247,0.3)] active:scale-95"
+        >
+          {adminRequestStatus === 'pending' ? '⏳ คำขอ Admin รออนุมัติ' : '🛡️ สมัครขอสิทธิ์ Admin'}
+        </button>
+      )}
 
       {adminBootstrapOpen && activeMode !== 'admin' && (
         <button

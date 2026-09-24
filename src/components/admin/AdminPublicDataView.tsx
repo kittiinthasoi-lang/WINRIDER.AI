@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Database, Download, CheckCircle2, XCircle, RefreshCw, ShieldCheck, MapPin, CalendarDays } from 'lucide-react';
-import { getAuthHeaders } from '../../utils/dispatchSync';
+import { auth } from '../../firebase';
 
 type DataKind = 'events' | 'attractions' | 'restaurants' | 'accommodations' | 'souvenirs';
 type PendingRecord = { id:string; kind?:DataKind; name?:string; title?:string; category?:string; address?:string; province?:string; district?:string; latitude?:number|null; longitude?:number|null; startAt?:string; endAt?:string; };
@@ -14,7 +14,16 @@ const DATASETS = [
 ] as const;
 
 async function api(path:string, init?:RequestInit) {
-  const response = await fetch(path, { ...init, headers:{ ...(await getAuthHeaders()), Accept:'application/json', ...(init?.headers || {}) }});
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('เซสชัน Admin หมดอายุ กรุณาเข้าสู่ระบบใหม่');
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(init?.headers || {}),
+    },
+  });
   const payload = await response.json().catch(()=>({}));
   if(!response.ok) throw new Error(payload.error || payload.message || `HTTP ${response.status}`);
   return payload;

@@ -76,6 +76,10 @@ export interface AdminUserSummary {
   xp?: number;
   rating?: number;
   avatarUrl?: string;
+  isAdmin?: boolean;
+  adminLevel?: AdminLevel;
+  walletBalanceSatang?: number;
+  isOnline?: boolean;
   isFoundingKnight?: boolean;
   plateNumber?: string;
   licenseNumber?: string;

@@ -1408,9 +1408,8 @@ app.get("/api/admin/public-data/catalog", async (req, res) => {
 
 // Backward-compatible admin trigger. It now means "sync source", not "approve records".
 app.post("/api/admin/public-data/import-tat", rateLimit(5), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireAdmin(req, res);
   if (!user) return;
-  if (!(await isAdminUser(user))) return res.status(403).json({ error: "Admin only" });
 
   const requestedKinds = Array.isArray(req.body?.kinds)
     ? req.body.kinds.map((value: unknown) => String(value))
@@ -2109,8 +2108,14 @@ async function adminBootstrapState(requesterUid?: string) {
 }
 
 app.get("/api/admin/bootstrap-status", rateLimit(30), async (req, res) => {
-  const decoded = await authenticateTokenOrSovereign(req);
-  if (!decoded) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  let decoded: any;
+  try {
+    decoded = await adminAuth.verifyIdToken(token);
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+  }
   try {
     const state = await adminBootstrapState(decoded.uid);
     let winUid = decoded.winUid || winUidFromAuthEmail(decoded.email);
@@ -2120,28 +2125,33 @@ app.get("/api/admin/bootstrap-status", rateLimit(30), async (req, res) => {
     } catch {}
     return res.json({
       ...state,
-      currentWinUid: String(winUid || "kitti"),
+      currentWinUid: String(winUid || ""),
     });
   } catch {
-    return res.json({
-      bootstrapOpen: false,
-      status: "ready",
-      currentWinUid: "kitti",
+    return res.status(503).json({
+      error: "ตรวจสอบสถานะ Admin bootstrap ไม่สำเร็จ",
+      code: "ADMIN_BOOTSTRAP_STATUS_FAILED",
     });
   }
 });
 
 app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
-  const decoded = await authenticateTokenOrSovereign(req);
-  if (!decoded) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  let decoded: any;
+  try {
+    decoded = await adminAuth.verifyIdToken(token);
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+  }
 
   try {
     const targetWinUid = normalizeWinUidServer(req.body?.targetWinUid);
     const userRef = ordersDb.collection("users").doc(decoded.uid);
     const userSnap = await userRef.get().catch(() => null);
-    const currentWinUid = normalizeWinUidServer(userSnap?.data?.()?.winUid || winUidFromAuthEmail(decoded.email) || decoded.winUid || "kitti");
+    const currentWinUid = normalizeWinUidServer(userSnap?.data?.()?.winUid || winUidFromAuthEmail(decoded.email));
 
-    if (!targetWinUid || (targetWinUid !== currentWinUid && !isSuperAdminToken(decoded))) {
+    if (!targetWinUid || targetWinUid !== currentWinUid) {
       return res.status(400).json({
         error: "การตั้ง Admin ครั้งแรกต้องใช้ WIN UID ของบัญชีที่กำลังล็อกอิน",
         code: "BOOTSTRAP_SELF_WIN_UID_REQUIRED",
@@ -2675,31 +2685,250 @@ async function releaseRideWalletHoldInTransaction(
 
 const adminAuth = getAuth();
 
+const ADMIN_LEVELS = new Set(["super", "reviewer", "support"]);
+
+function isAdminToken(user: any) {
+  return user?.admin === true && ADMIN_LEVELS.has(String(user?.adminLevel || ""));
+}
+
 function isSuperAdminToken(user: any) {
-  return (
-    (user?.admin === true && user?.adminLevel === "super") ||
-    (typeof user?.email === "string" && /kittiinthasoi/i.test(user.email)) ||
-    user?.winUid === "kitti" ||
-    user?.winUid === "kittiinthasoi" ||
-    user?.uid === "kitti-super-admin" ||
-    user?.uid === "kitti"
-  );
+  return isAdminToken(user) && user?.adminLevel === "super";
 }
 
 async function isAdminUser(user: any): Promise<boolean> {
-  return isSuperAdminToken(user);
+  return isAdminToken(user);
+}
+
+async function requireFirebaseAdmin(
+  req: express.Request,
+  res: express.Response,
+  requiredLevel?: "super"
+) {
+  const token = rawBearerToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+    return null;
+  }
+
+  let decoded: any;
+  try {
+    decoded = await adminAuth.verifyIdToken(token);
+  } catch {
+    res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+    return null;
+  }
+
+  try {
+    const profileSnap = await ordersDb.collection("users").doc(decoded.uid).get();
+    const profile = profileSnap.exists ? profileSnap.data() || {} : {};
+    const adminLevel = String(decoded.adminLevel || profile.adminLevel || "");
+    const isAdmin = decoded.admin === true || profile.isAdmin === true;
+
+    if (!isAdmin || !ADMIN_LEVELS.has(adminLevel)) {
+      res.status(403).json({ error: "Admin access required", code: "ADMIN_ACCESS_REQUIRED" });
+      return null;
+    }
+    if (requiredLevel === "super" && adminLevel !== "super") {
+      res.status(403).json({ error: "Super Admin access required", code: "SUPER_ADMIN_REQUIRED" });
+      return null;
+    }
+
+    return {
+      ...decoded,
+      ...profile,
+      uid: decoded.uid,
+      admin: true,
+      adminLevel,
+    };
+  } catch (error: any) {
+    console.error("[Admin Auth]", error?.message);
+    res.status(503).json({ error: "Admin authorization unavailable", code: "ADMIN_AUTH_UNAVAILABLE" });
+    return null;
+  }
+}
+
+async function requireAdmin(req: express.Request, res: express.Response) {
+  return requireFirebaseAdmin(req, res);
 }
 
 async function requireSuperAdmin(req: express.Request, res: express.Response) {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return null;
-  if (!isSuperAdminToken(user)) {
-    res.status(403).json({ error: "Super Admin access required" });
-    return null;
-  }
-  return user;
+  return requireFirebaseAdmin(req, res, "super");
 }
 
+
+const ADMIN_PORTAL_CONFIG_REF = () => ordersDb.collection("system_config").doc("admin_portal");
+
+async function getAdminPortalConfig() {
+  const snap = await ADMIN_PORTAL_CONFIG_REF().get();
+  const data = snap.exists ? snap.data() || {} : {};
+  return {
+    applicationsOpen: data.applicationsOpen === true,
+    updatedAt: data.updatedAt || null,
+    updatedBy: String(data.updatedBy || ""),
+  };
+}
+
+app.get("/api/admin/portal-status", rateLimit(60), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+
+  try {
+    const decoded: any = await adminAuth.verifyIdToken(token);
+    const [profileSnap, config] = await Promise.all([
+      ordersDb.collection("users").doc(decoded.uid).get(),
+      getAdminPortalConfig(),
+    ]);
+    const profile = profileSnap.exists ? profileSnap.data() || {} : {};
+    const adminLevel = String(decoded.adminLevel || profile.adminLevel || "");
+    const admin = (decoded.admin === true || profile.isAdmin === true) && ADMIN_LEVELS.has(adminLevel);
+    const requestSnap = await ordersDb.collection("adminAccessRequests").doc(decoded.uid).get();
+
+    return res.json({
+      applicationsOpen: config.applicationsOpen,
+      isAdmin: admin,
+      adminLevel: admin ? adminLevel : null,
+      requestStatus: requestSnap.exists ? String(requestSnap.data()?.status || "pending") : null,
+    });
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+  }
+});
+
+app.post("/api/admin/portal-status", rateLimit(20), async (req, res) => {
+  const admin = await requireSuperAdmin(req, res);
+  if (!admin) return;
+
+  const applicationsOpen = req.body?.applicationsOpen === true;
+  await ADMIN_PORTAL_CONFIG_REF().set({
+    applicationsOpen,
+    updatedBy: admin.uid,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  await ordersDb.collection("audit_logs").add({
+    action: applicationsOpen ? "OPEN_ADMIN_APPLICATIONS" : "CLOSE_ADMIN_APPLICATIONS",
+    actorUid: admin.uid,
+    targetUid: "system_config/admin_portal",
+    reason: applicationsOpen ? "เปิดประตูสมัคร Admin" : "ปิดประตูสมัคร Admin",
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  return res.json({ ok: true, applicationsOpen });
+});
+
+app.post("/api/admin/access-request", rateLimit(10), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+
+  try {
+    const decoded: any = await adminAuth.verifyIdToken(token);
+    const [profileSnap, config] = await Promise.all([
+      ordersDb.collection("users").doc(decoded.uid).get(),
+      getAdminPortalConfig(),
+    ]);
+    if (!profileSnap.exists) {
+      return res.status(409).json({ error: "ต้องสมัครบัญชี WINRIDER ให้เสร็จก่อน", code: "PROFILE_REQUIRED" });
+    }
+
+    const profile = profileSnap.data() || {};
+    const adminLevel = String(decoded.adminLevel || profile.adminLevel || "");
+    if ((decoded.admin === true || profile.isAdmin === true) && ADMIN_LEVELS.has(adminLevel)) {
+      return res.status(409).json({ error: "บัญชีนี้เป็น Admin อยู่แล้ว", code: "ALREADY_ADMIN" });
+    }
+    if (!config.applicationsOpen) {
+      return res.status(403).json({ error: "ขณะนี้ปิดรับคำขอ Admin", code: "ADMIN_APPLICATIONS_CLOSED" });
+    }
+
+    const note = String(req.body?.note || "").trim().slice(0, 500);
+    await ordersDb.collection("adminAccessRequests").doc(decoded.uid).set({
+      uid: decoded.uid,
+      winUid: String(profile.winUid || ""),
+      displayName: String(profile.displayName || ""),
+      email: String(profile.email || ""),
+      status: "pending",
+      note,
+      requestedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return res.json({ ok: true, requestStatus: "pending" });
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+  }
+});
+
+app.get("/api/admin/access-requests", rateLimit(30), async (req, res) => {
+  const admin = await requireSuperAdmin(req, res);
+  if (!admin) return;
+
+  const snapshot = await ordersDb.collection("adminAccessRequests")
+    .where("status", "==", "pending")
+    .limit(100)
+    .get();
+
+  return res.json({
+    requests: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+  });
+});
+
+app.post("/api/admin/revoke-role", rateLimit(20), async (req, res) => {
+  const admin = await requireSuperAdmin(req, res);
+  if (!admin) return;
+
+  const targetWinUid = normalizeWinUidServer(req.body?.targetWinUid);
+  if (!targetWinUid) {
+    return res.status(400).json({ error: "ต้องระบุ WIN UID ผู้ใช้", code: "TARGET_WIN_UID_REQUIRED" });
+  }
+
+  try {
+    const match = await ordersDb.collection("users").where("winUid", "==", targetWinUid).limit(1).get();
+    if (match.empty) return res.status(404).json({ error: "ไม่พบ WIN UID นี้", code: "WIN_UID_NOT_FOUND" });
+
+    const userDoc = match.docs[0];
+    const firebaseUid = userDoc.id;
+    if (firebaseUid === admin.uid) {
+      return res.status(409).json({ error: "ไม่สามารถถอดสิทธิ์ Admin ของบัญชีตัวเองจากหน้านี้ได้", code: "CANNOT_REVOKE_SELF" });
+    }
+
+    const record = await adminAuth.getUser(firebaseUid);
+    const nextClaims = { ...(record.customClaims || {}) };
+    delete (nextClaims as any).admin;
+    delete (nextClaims as any).adminLevel;
+    await adminAuth.setCustomUserClaims(firebaseUid, nextClaims);
+
+    const now = new Date().toISOString();
+    await Promise.all([
+      userDoc.ref.set({
+        isAdmin: false,
+        adminLevel: FieldValue.delete(),
+        adminRevokedAt: now,
+        adminRevokedBy: admin.uid,
+        updatedAt: now,
+      }, { merge: true }),
+      ordersDb.collection("adminAccess").doc(firebaseUid).set({
+        uid: firebaseUid,
+        winUid: targetWinUid,
+        active: false,
+        revokedBy: admin.uid,
+        revokedAt: now,
+        updatedAt: now,
+      }, { merge: true }),
+      ordersDb.collection("audit_logs").add({
+        action: "REVOKE_ADMIN_ROLE",
+        actorUid: admin.uid,
+        targetUid: firebaseUid,
+        targetWinUid,
+        reason: String(req.body?.reason || "").slice(0, 500),
+        createdAt: FieldValue.serverTimestamp(),
+      }),
+    ]);
+
+    return res.json({ ok: true, targetWinUid });
+  } catch (error: any) {
+    console.error("[Admin Revoke Role]", error?.message);
+    return res.status(503).json({ error: "ถอดสิทธิ์ Admin ไม่สำเร็จ", code: "REVOKE_ADMIN_FAILED" });
+  }
+});
 
 app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
   const admin = await requireSuperAdmin(req, res);
@@ -2749,6 +2978,14 @@ app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
         assignedBy: admin.uid,
         updatedAt: now,
         createdAt: now,
+      }, { merge: true }),
+      ordersDb.collection("adminAccessRequests").doc(firebaseUid).set({
+        uid: firebaseUid,
+        winUid: targetWinUid,
+        status: "approved",
+        approvedBy: admin.uid,
+        approvedAt: now,
+        updatedAt: now,
       }, { merge: true }),
       ordersDb.collection("audit_logs").add({
         action: "SET_ADMIN_ROLE",
@@ -3299,9 +3536,8 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
 });
 
 app.post("/api/admin/manual-topup", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
   if (!getManualSettlementConfig().configured) {
     return res.status(503).json({ error: "ยังไม่ได้ตั้งค่าบัญชีบริษัทสำหรับรับเงิน" });
   }
@@ -3431,9 +3667,8 @@ app.post("/api/admin/manual-topup", rateLimit(20), async (req, res) => {
 });
 
 app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
 
   type HealthStatus = "ok" | "warning" | "error";
   const checks: Array<{ id: string; name: string; status: HealthStatus; detail: string; actionUrl?: string; guideKey?: string }> = [
@@ -3571,17 +3806,15 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
 });
 
 app.get("/api/admin/withdrawal-requests", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
   const snap = await ordersDb.collection("withdrawal_requests").where("status", "==", "WAITING_ADMIN").limit(50).get();
   return res.json({ withdrawals: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) });
 });
 
 app.post("/api/admin/withdrawal-review", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
 
   const withdrawalId = String(req.body?.withdrawalId || "").trim();
   const decision = String(req.body?.decision || "").trim().toUpperCase();
@@ -3690,9 +3923,8 @@ app.post("/api/admin/withdrawal-review", rateLimit(20), async (req, res) => {
 });
 
 app.get("/api/admin/system-payouts", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
   const [poolSnap, pendingSnap] = await Promise.all([
     ordersDb.collection("wallets").doc("SYSTEM_POOLS").get(),
     ordersDb.collection("system_payout_requests").where("status", "==", "WAITING_BANK_TRANSFER").limit(30).get()
@@ -3709,9 +3941,8 @@ app.get("/api/admin/system-payouts", rateLimit(20), async (req, res) => {
 });
 
 app.post("/api/admin/system-payout-request", rateLimit(10), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
 
   const amountSatang = Math.round(Number(req.body?.amount) * 100);
   const bankName = String(req.body?.bankName || "").trim().slice(0, 120);
@@ -3768,9 +3999,8 @@ app.post("/api/admin/system-payout-request", rateLimit(10), async (req, res) => 
 });
 
 app.post("/api/admin/system-payout-review", rateLimit(10), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
 
   const payoutId = String(req.body?.payoutId || "").trim();
   const decision = String(req.body?.decision || "").trim().toUpperCase();
@@ -4591,7 +4821,9 @@ app.get("/api/knights/:driverUserId/location", async (req, res) => {
   }
 });
 
-app.get("/api/admin/dashboard-metrics", rateLimit(30), async (_req, res) => {
+app.get("/api/admin/dashboard-metrics", rateLimit(30), async (req, res) => {
+  const adminUser = await requireAdmin(req, res);
+  if (!adminUser) return;
   try {
     let totalUsersCount = 1;
     let newUsersToday = 1;
@@ -4673,9 +4905,8 @@ app.get("/api/admin/dashboard-metrics", rateLimit(30), async (_req, res) => {
 });
 
 app.get("/api/admin/ops/overview", rateLimit(30), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Admin access required" });
   try {
     const [ridesSnap, sosSnap, knightsSnap, topupsSnap] = await Promise.all([
       ordersDb.collection("rides").orderBy("createdAt", "desc").limit(200).get(),
