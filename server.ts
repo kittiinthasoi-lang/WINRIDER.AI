@@ -1937,10 +1937,31 @@ function rawBearerToken(req: express.Request): string {
   return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
 }
 
-const OWNER_ADMIN_EMAIL = "kittiinthasoi@gmail.com";
+function requiredOwnerBootstrapEnvironment() {
+  const email = normalizeWinAuthEmail(process.env.ADMIN_OWNER_EMAIL);
+  const bootstrapPassword = String(process.env.ADMIN_BOOTSTRAP_PASSWORD || "");
+
+  const missing: string[] = [];
+  if (!email) missing.push("ADMIN_OWNER_EMAIL");
+  if (!bootstrapPassword) missing.push("ADMIN_BOOTSTRAP_PASSWORD");
+
+  if (missing.length) {
+    throw new Error(
+      "[Environment] Missing required environment variables: " + missing.join(", ")
+    );
+  }
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    throw new Error("[Environment] ADMIN_OWNER_EMAIL must be a valid email address");
+  }
+  if (bootstrapPassword.length < 12 || bootstrapPassword.length > 200) {
+    throw new Error("[Environment] ADMIN_BOOTSTRAP_PASSWORD must be 12-200 characters");
+  }
+
+  return { email, bootstrapPassword };
+}
 
 function ownerAdminEmail(): string {
-  return normalizeWinAuthEmail(process.env.WINRIDER_ADMIN_EMAIL || process.env.ADMIN_OWNER_EMAIL || OWNER_ADMIN_EMAIL);
+  return requiredOwnerBootstrapEnvironment().email;
 }
 
 function isOwnerAdminEmail(value: unknown): boolean {
@@ -1948,17 +1969,7 @@ function isOwnerAdminEmail(value: unknown): boolean {
 }
 
 async function ensureOwnerAdminBootstrapAccount() {
-  const bootstrapPassword = String(process.env.ADMIN_BOOTSTRAP_PASSWORD || "");
-  if (!bootstrapPassword) {
-    console.info("[Owner Bootstrap] ADMIN_BOOTSTRAP_PASSWORD is not configured; existing owner login only.");
-    return;
-  }
-  if (bootstrapPassword.length < 12 || bootstrapPassword.length > 200) {
-    console.error("[Owner Bootstrap] ADMIN_BOOTSTRAP_PASSWORD must be 12-200 characters. Owner account was not created.");
-    return;
-  }
-
-  const email = ownerAdminEmail();
+  const { email, bootstrapPassword } = requiredOwnerBootstrapEnvironment();
   try {
     const existing = await getWinAuthUserByEmail(email);
     if (existing) {
