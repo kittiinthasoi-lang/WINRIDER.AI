@@ -30,10 +30,10 @@ import { playTactileBlip } from './utils/audio';
 import { useAuth } from './context/AuthContext';
 import { AuthModalOrView } from './components/auth/AuthModalOrView';
 import { RoleSelectionAndRegistration } from './components/auth/RoleSelectionAndRegistration';
-import { PendingReviewView } from './components/auth/PendingReviewView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/admin/AdminRoute';
 import { AdminLayout } from './components/admin/AdminLayout';
+import { getAdminBootstrapStatus } from './services/adminService';
 import { 
   Crown, 
   Coins, 
@@ -75,6 +75,7 @@ export default function App() {
   const [customerListedItems, setCustomerListedItems] = useState<MarketItem[]>([]);
   const [driverCitizenPersona, setDriverCitizenPersona] = useState<'driver' | 'customer'>('driver');
   const [ownerPersona, setOwnerPersona] = useState<'customer' | 'driver' | 'merchant' | 'partner'>('driver');
+  const [adminBootstrapOpen, setAdminBootstrapOpen] = useState(false);
 
   // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดได้ครบทั้ง 5 บทบาท
   // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Super Admin)
@@ -160,6 +161,26 @@ export default function App() {
   }, [currentUserSession]);
 
   const isSuperAdminUser = isOwnerAdmin;
+
+  useEffect(() => {
+    let active = true;
+    if (!firebaseUser || !userData?.uid || userData?.isAdmin === true) {
+      setAdminBootstrapOpen(false);
+      return;
+    }
+
+    getAdminBootstrapStatus()
+      .then((state) => {
+        if (active) setAdminBootstrapOpen(state.bootstrapOpen === true);
+      })
+      .catch(() => {
+        if (active) setAdminBootstrapOpen(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [firebaseUser?.uid, userData?.uid, userData?.isAdmin]);
 
   // Set default active mode according to registered role or super admin
   useEffect(() => {
@@ -393,32 +414,7 @@ export default function App() {
     );
   }
 
-  // 4. Pending review state (for knight, merchant, partner)
-  if (userData?.status === 'pending_review' && !isOwnerAdmin && activeMode !== 'admin') {
-    return (
-      <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans flex flex-col">
-        <Navbar
-          activeMode={activeMode}
-          onSelectMode={handleSelectMode}
-          activeChapter={activeChapter}
-          onSelectChapter={handleSelectChapter}
-          audioEnabled={audioEnabled}
-          onToggleAudio={() => setAudioEnabled(prev => !prev)}
-          onOpenCustomerVoice={() => setIsCustomerVoiceOpen(true)}
-          onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
-          onOpenWebhookModal={() => setIsWebhookModalOpen(true)}
-          currentUserSession={currentUserSession}
-          onSignOut={handleSignOut}
-          onToggleDriverPersona={handleToggleDriverPersona}
-        />
-        <main className="flex-1">
-          <PendingReviewView />
-        </main>
-      </div>
-    );
-  }
-
-  // 5. Active User Dashboard / Admin View
+  // 4. Active User Dashboard / Admin View
   return (
     <div className="min-h-screen bg-[#070D1E] text-slate-100 flex flex-col font-sans pb-24 md:pb-0">
       {/* Sovereign Navigation Bar */}
@@ -436,7 +432,7 @@ export default function App() {
         currentUserSession={currentUserSession}
         onSignOut={handleSignOut}
         onToggleDriverPersona={handleToggleDriverPersona}
-        onSelectOwnerPersona={handleSelectOwnerPersona}
+        onSelectOwnerPersona={isOwnerAdmin ? handleSelectOwnerPersona : undefined}
       />
 
       {/* Main Viewport Content with ProtectedRoute */}
@@ -636,7 +632,7 @@ export default function App() {
             {(claims) => (
               <AdminLayout
                 adminLevel={isOwnerAdmin ? 'super' : claims.adminLevel}
-                adminEmail={firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}
+                adminEmail={firebaseUser?.email || currentUserSession?.email || 'Admin'}
                 onExitAdmin={handleExitAdmin}
                 onSelectOwnerPersona={handleSelectOwnerPersona}
               />
@@ -644,6 +640,20 @@ export default function App() {
           </AdminRoute>
         )}
       </main>
+
+      {adminBootstrapOpen && activeMode !== 'admin' && (
+        <button
+          type="button"
+          onClick={() => {
+            playTactileBlip(1000);
+            setActiveMode('admin');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className="fixed top-20 right-3 z-[60] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-amber-300/50 bg-gradient-to-r from-amber-300 to-amber-500 px-4 py-3 text-xs font-black text-slate-950 shadow-[0_12px_35px_rgba(245,158,11,0.35)] active:scale-95"
+        >
+          👑 ตั้งค่า Super Admin คนแรกด้วย UID
+        </button>
+      )}
 
       {/* Sovereign Mobile Bottom Navigation Bar */}
       <MobileBottomNavBar

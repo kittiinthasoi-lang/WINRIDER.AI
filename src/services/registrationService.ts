@@ -58,8 +58,6 @@ export function subscribeFoundingKnightCounter(callback: (data: { count: number;
 async function submitRegistration(role: 'knight' | 'citizen' | 'merchant' | 'partner', registration: Record<string, unknown>) {
   const user = auth.currentUser;
   if (!user) throw new Error('กรุณาเข้าสู่ระบบใหม่');
-  if (!user.emailVerified) throw new Error('กรุณายืนยันอีเมลก่อนลงทะเบียน');
-
   const token = await user.getIdToken();
   const response = await fetch('/api/auth/register-profile', {
     method: 'POST',

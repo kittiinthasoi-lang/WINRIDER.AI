@@ -3,7 +3,6 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types/auth';
 import { AuthModalOrView } from './AuthModalOrView';
 import { RoleSelectionAndRegistration } from './RoleSelectionAndRegistration';
-import { PendingReviewView } from './PendingReviewView';
 import { ShieldAlert, ArrowRight, Loader2 } from 'lucide-react';
 import { playTactileBlip } from '../../utils/audio';
 
@@ -49,11 +48,6 @@ export const ProtectedRoute: React.FC<Props> = ({
   // 2. Compatibility guard for an incomplete legacy profile
   if (!userData || !userData.role) {
     return <RoleSelectionAndRegistration />;
-  }
-
-  // 3. Every new registration requires admin approval, including Citizen.
-  if (userData.status === 'pending_review' && !allowCustomerView) {
-    return <PendingReviewView />;
   }
 
   // 4. Role mismatch check

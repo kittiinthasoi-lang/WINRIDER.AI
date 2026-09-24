@@ -88,17 +88,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isPureCustomer = currentUserSession?.role === 'customer' && !isDriver;
   const isMerchant = currentUserSession?.role === 'merchant';
   const isPartner = currentUserSession?.role === 'partner';
-  const isAdminSession =
-    userData?.isAdmin === true &&
-    userData?.adminLevel === 'super';
+  const isAdminSession = userData?.isAdmin === true;
 
   // Role details for profile avatar, icon, and label
   const profileInfo = (() => {
     if (isAdminSession) {
       return {
         name: currentUserSession?.name || userData?.displayName || 'Super Admin',
-        title: `ผู้ดูแลระบบสูงสุด (Super Admin): ${firebaseUser?.email || currentUserSession?.email || 'Super Admin'}`,
-        roleLabel: 'Super Admin',
+        title: `ผู้ดูแลระบบ (${userData?.adminLevel || 'support'}): ${firebaseUser?.email || currentUserSession?.email || 'Admin'}`,
+        roleLabel: userData?.adminLevel === 'super' ? 'Super Admin' : userData?.adminLevel === 'reviewer' ? 'Reviewer Admin' : 'Support Admin',
         avatar: '/avatars/partner.jpg',
         badgeBorder: 'border-amber-400 shadow-[0_0_12px_rgba(255,201,60,0.6)]',
         buttonClass: 'bg-gradient-to-r from-amber-500/25 to-yellow-500/25 hover:from-amber-500/35 hover:to-yellow-500/35 text-amber-300 border-amber-400/70 shadow-[0_0_15px_rgba(255,201,60,0.35)]',
@@ -230,7 +228,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isAdminSession ? (
               <span className="inline-flex items-center gap-1.5 text-amber-300 font-mono text-[11px] truncate">
                 <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                <span className="font-bold">SUPER ADMIN:</span>
+                <span className="font-bold">ADMIN:</span>
                 <span className="text-white/90 truncate">{currentUserSession?.email || 'kittiinthasoi@gmail.com'}</span>
               </span>
             ) : (

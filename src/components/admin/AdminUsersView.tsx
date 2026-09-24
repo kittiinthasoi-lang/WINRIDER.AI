@@ -56,6 +56,8 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   // Set Role Dialog
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [targetAdminLevel, setTargetAdminLevel] = useState<'super' | 'reviewer' | 'support'>('reviewer');
+  const [manualAdminUid, setManualAdminUid] = useState('');
+  const [manualAdminLevel, setManualAdminLevel] = useState<AdminLevel>('support');
 
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -175,6 +177,22 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
     }
   };
 
+  const handleManualSetAdmin = async () => {
+    const uid = manualAdminUid.trim();
+    if (!uid) return;
+    setActionLoading(true);
+    try {
+      await setAdminRole(uid, manualAdminLevel, `แต่งตั้ง Admin ด้วย UID ระดับ ${manualAdminLevel}`);
+      alert(`ตั้ง UID ${uid} เป็น Admin ระดับ ${manualAdminLevel} เรียบร้อยแล้ว`);
+      setManualAdminUid('');
+      await fetchUsers();
+    } catch (err: any) {
+      alert(`ตั้ง Admin ไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -192,7 +210,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
             จัดการบัญชีผู้ใช้งานและบทบาท
           </h1>
           <p className="text-xs text-slate-300 mt-1">
-            ผู้สมัครใหม่จะอยู่สถานะ Pending Review จน Super Admin กดอนุมัติ พร้อมค้นหาและตรวจสอบบัญชีทั้งหมด
+            บัญชีใหม่เข้าใช้งานได้ทันที ส่วน Super Admin สามารถกำหนดผู้ช่วย Admin ด้วย Firebase UID และระดับสิทธิ์
           </p>
         </div>
 
@@ -205,6 +223,43 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
           <span>รีเฟรชรายชื่อ</span>
         </button>
       </div>
+
+      {adminLevel === 'super' && (
+        <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-500/10 to-yellow-500/5 p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Crown className="w-5 h-5 text-amber-300" />
+            <h2 className="text-base font-black text-white">ตั้ง Admin ด้วย Firebase UID</h2>
+          </div>
+          <p className="text-xs text-slate-400 mb-4">
+            กรอก UID ของบัญชีที่สมัครแล้ว เลือกระดับสิทธิ์ แล้วกดตั้ง Admin บัญชีนั้นจะได้รับ Firebase Custom Claim ในครั้งถัดไปที่ token รีเฟรช
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
+            <input
+              value={manualAdminUid}
+              onChange={(e) => setManualAdminUid(e.target.value)}
+              placeholder="Firebase UID เช่น AbCdEf123..."
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-xs font-mono text-white outline-none focus:border-amber-400"
+            />
+            <select
+              value={manualAdminLevel}
+              onChange={(e) => setManualAdminLevel(e.target.value as AdminLevel)}
+              className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-xs text-white outline-none focus:border-amber-400"
+            >
+              <option value="support">Support</option>
+              <option value="reviewer">Reviewer</option>
+              <option value="super">Super Admin</option>
+            </select>
+            <button
+              type="button"
+              onClick={handleManualSetAdmin}
+              disabled={actionLoading || !manualAdminUid.trim()}
+              className="rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-slate-950 disabled:opacity-50"
+            >
+              ตั้ง Admin
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filters & Search Toolbar */}
       <div className="bg-[#0A1633] p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
