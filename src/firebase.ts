@@ -2,9 +2,9 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
+import { browserLocalPersistence, getAuth, setPersistence } from 'firebase/auth';
 import fallbackConfig from '../firebase-applet-config.json';
 import { installGoogleMapsCostGuard } from './services/googleMapsCostGuard';
-import { auth as winAuth } from './auth/winAuthClient';
 
 const metaEnv = typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env : {};
 
@@ -23,9 +23,10 @@ const databaseId = (!rawDbId || rawDbId === '(default)') ? undefined : rawDbId;
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
-// Authentication is owned by WINRIDER server sessions. Firebase remains only for legacy data services during migration.
-export const auth: any = winAuth;
-export const authPersistenceReady = Promise.resolve();
+export const auth = getAuth(app);
+export const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.warn('Firebase Auth persistence could not be enabled:', error);
+});
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
 

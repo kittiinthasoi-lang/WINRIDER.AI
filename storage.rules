@@ -6,15 +6,45 @@ service firebase.storage {
     }
 
     function isAdmin() {
-      return signedIn()
-        && (
-          request.auth.token.admin == true
-          || request.auth.token.email == 'kittiinthasoi@gmail.com'
-        );
+      return signedIn() && request.auth.token.admin == true;
     }
 
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
+    }
+
+    // KYC documents are private to the owner and admins.
+    match /kyc/{uid}/{fileName} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid)
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Profile images can be written only by the authenticated owner.
+    match /profiles/{uid}/{fileName} {
+      allow read: if signedIn();
+      allow write: if isOwner(uid)
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    match /products/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(uid)
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    match /service-completion/{uid}/{fileName} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid)
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isOwner(uid) || isAdmin();
     }
 
     // Payment QR codes uploaded by drivers, merchants, partners, and citizens

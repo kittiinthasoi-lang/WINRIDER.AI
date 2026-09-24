@@ -326,10 +326,8 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
     },
   ];
 
-  const isAdminSession = 
-    currentUserSession?.email === 'kittiinthasoi@gmail.com' ||
-    currentUserSession?.email?.toLowerCase().includes('kittiinthasoi') ||
-    userData?.isAdmin === true ||
+  const isAdminSession =
+    userData?.isAdmin === true &&
     userData?.adminLevel === 'super';
 
   // Role-based allowed modes:

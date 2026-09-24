@@ -232,7 +232,7 @@ Admin UI ปัจจุบันรองรับ:
 
 โครงสร้างปัจจุบันใช้:
 
-- WIN Auth server sessions สำหรับ authentication และ sensitive APIs
+- Firebase Authentication + Firebase ID tokens สำหรับ authentication และ sensitive APIs
 - Firestore deny-by-default rules
 - server-authoritative ride mutation
 - server-controlled wallet / ledger / top-up
@@ -252,7 +252,7 @@ React 19 + Vite + PWA
         │
         ├── Citizen / Knight / Merchant / Partner / Admin UI
         │
-        ├── WIN Auth / Firestore / Storage
+        ├── Firebase Authentication / Firestore / Storage
         │
         ├── Express server.ts
         │     ├── Orders / Dispatch
@@ -278,7 +278,7 @@ React 19 + Vite + PWA
 - Tailwind CSS 4
 - Node.js 20+
 - Express 4
-- WIN Auth / Firestore / Storage
+- Firebase Authentication / Firestore / Storage
 - Firebase Functions
 - Recharts / Lucide React / Motion
 - vite-plugin-pwa
@@ -304,14 +304,17 @@ Backend ใช้:
 
 เมื่อรัน backend นอก Google-managed environment ต้องมี Firebase Admin credentials ที่เหมาะสม เช่น application default credentials หรือ service-account configuration ที่ code รองรับ
 
-### Owner / Google AI Studio required environment variables
+### Owner / Super Admin
 
-เมื่อเปิดแอปใน Google AI Studio ให้กรอก 2 ช่องแยกกันในหน้าต่าง **Enter your environment variable to continue**:
+ตั้ง `ADMIN_OWNER_EMAIL` ฝั่ง server เป็นอีเมลเจ้าของระบบ
 
-- `ADMIN_OWNER_EMAIL` — อีเมลบัญชีเจ้าของ / Super Admin
-- `ADMIN_BOOTSTRAP_PASSWORD` — รหัสผ่านสำหรับสร้างบัญชีเจ้าของครั้งแรก (12-200 ตัวอักษร)
+ลำดับสร้าง Super Admin ใหม่:
+1. สมัครด้วยอีเมลเจ้าของผ่าน Firebase Authentication
+2. กดยืนยันอีเมลจากลิงก์ที่ Firebase ส่งให้
+3. เข้าสู่ระบบอีกครั้ง
+4. backend ตรวจว่าอีเมลตรงกับ `ADMIN_OWNER_EMAIL` แล้วกำหนด Firebase custom claims `admin: true` และ `adminLevel: super`
 
-ทั้งสองค่าถูกอ่านจาก environment ฝั่ง server เท่านั้น และไม่มีค่า fallback ในโค้ด จึงต้องตั้งก่อนเริ่มแอป
+ไม่มี `ADMIN_BOOTSTRAP_PASSWORD` และไม่มี passwordHash ของแอป รหัสผ่านทั้งหมดอยู่ใน Firebase Authentication เท่านั้น
 
 **ห้าม commit รหัสผ่าน, secret หรือ service-account private key ลง repository**
 
@@ -365,7 +368,7 @@ WINRIDER มี PWA manifest และ service worker แบบ auto-update
 - เครื่องที่ 1: Citizen
 - เครื่องที่ 2: Knight
 
-ใช้บัญชี WIN Auth คนละ UID เพื่อทดสอบ dispatch จริง
+ใช้บัญชี Firebase Authentication คนละ UID เพื่อทดสอบ dispatch จริง
 
 หลังทดสอบผ่าน browser แล้วสามารถ Add to Home Screen เพื่อทดสอบ standalone PWA ต่อได้
 

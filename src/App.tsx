@@ -8,7 +8,8 @@ import { HospitalCommandCenter } from './components/HospitalCommandCenter';
 import { PartnerProfileView } from './components/PartnerProfileView';
 import { WinShopHubView } from './components/WinShopHubView';
 import { 
-  UserSession, 
+  UserSession,
+  saveUserSession,
   isDriverAccount,
   isDriverInCitizenMode,
   switchDriverPersona
@@ -77,17 +78,14 @@ export default function App() {
 
   // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดได้ครบทั้ง 5 บทบาท
   // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Super Admin)
-  // โดยใช้ WIN Auth UID เดิมเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
+  // โดยใช้ Firebase UID เดียวเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
   const isOwnerAdmin = Boolean(
-    firebaseUser && (
-      firebaseUser.email === 'kittiinthasoi@gmail.com' ||
-      firebaseUser.email?.toLowerCase().includes('kittiinthasoi') ||
-      userData?.isAdmin === true ||
-      userData?.adminLevel === 'super'
-    )
+    firebaseUser &&
+    userData?.isAdmin === true &&
+    userData?.adminLevel === 'super'
   );
 
-  // Convert WIN Auth userData to live UserSession
+  // Convert Firebase profile data to a local UI UserSession
   const currentUserSession: UserSession | null = useMemo(() => {
     if (isOwnerAdmin && firebaseUser) {
       const mappedRole = ownerPersona;
@@ -102,8 +100,8 @@ export default function App() {
 
       return {
         id: firebaseUser.uid,
-        email: firebaseUser.email || 'kittiinthasoi@gmail.com',
-        name: 'กิตติ อินทะสร้อย',
+        email: firebaseUser.email || '',
+        name: userData?.displayName || firebaseUser.displayName || 'เจ้าของระบบ',
         phone: userData?.phone || '',
         role: mappedRole,
         primaryRole: mappedRole,
@@ -156,6 +154,10 @@ export default function App() {
       registeredAt: userData.createdAt || new Date().toISOString(),
     };
   }, [firebaseUser, userData, driverCitizenPersona, isOwnerAdmin, ownerPersona]);
+
+  useEffect(() => {
+    if (currentUserSession) void saveUserSession(currentUserSession);
+  }, [currentUserSession]);
 
   const isSuperAdminUser = isOwnerAdmin;
 
@@ -353,7 +355,7 @@ export default function App() {
               <Crown className="w-4 h-4 text-amber-400 animate-bounce shrink-0" />
               <span className="font-bold">ระบบตรวจพบสิทธิ์ผู้ดูแลระบบสูงสุด (SUPER ADMIN):</span>
               <span className="text-white font-mono bg-black/40 px-2 py-0.5 rounded border border-amber-400/40">
-                {firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}
+                {firebaseUser?.email || currentUserSession?.email || 'Super Admin'}
               </span>
             </div>
             <button

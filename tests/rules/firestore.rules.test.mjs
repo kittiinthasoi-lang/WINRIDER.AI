@@ -55,16 +55,19 @@ test('knight cannot self-approve KYC or manipulate dispatch privilege fields', a
   await seed('knights/knight-1', { kycStatus:'pending_review', level:1, activeRideId:null, displayName:'Knight' });
   const db = env.authenticatedContext('knight-1').firestore();
 
-  await assertSucceeds(updateDoc(doc(db,'knights/knight-1'), { displayName:'Knight Updated' }));
+  await assertSucceeds(updateDoc(doc(db,'knights/knight-1'), {
+    profileCustomization: { displayName:'Knight Updated' }
+  }));
+  await assertFails(updateDoc(doc(db,'knights/knight-1'), { displayName:'Knight Privilege Bypass' }));
   await assertFails(updateDoc(doc(db,'knights/knight-1'), { kycStatus:'approved' }));
   await assertFails(updateDoc(doc(db,'knights/knight-1'), { level:100 }));
   await assertFails(updateDoc(doc(db,'knights/knight-1'), { activeRideId:'ride-admin-injected' }));
   await assertFails(updateDoc(doc(db,'knights/knight-1'), { dispatchJobsAccepted:999 }));
 });
 
-test('admin claim may perform privileged user moderation', async () => {
+test('privileged moderation remains server-authoritative even for an admin client', async () => {
   await env.clearFirestore();
   await seed('users/alice', { role:'citizen', status:'active' });
   const adminDb = env.authenticatedContext('admin-1', { admin:true, adminLevel:'super' }).firestore();
-  await assertSucceeds(updateDoc(doc(adminDb,'users/alice'), { status:'suspended' }));
+  await assertFails(updateDoc(doc(adminDb,'users/alice'), { status:'suspended' }));
 });
