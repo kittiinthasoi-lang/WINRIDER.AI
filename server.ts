@@ -1895,7 +1895,7 @@ async function createFirebaseRegistration(
       province: profile.province,
       district: profile.district,
       registration: profile,
-      status: "pending_review",
+      status: "active",
       isAdmin: false,
       level: 1,
       xp: 0,
@@ -1983,56 +1983,138 @@ async function createFirebaseRegistration(
   });
 }
 
-app.post("/api/auth/bootstrap-owner", rateLimit(20), async (req, res) => {
+async function adminBootstrapState(requesterUid?: string) {
+  const bootstrapRef = ordersDb.collection("system_config").doc("admin_bootstrap");
+  const [bootstrapSnap, existingAdmins] = await Promise.all([
+    bootstrapRef.get(),
+    ordersDb.collection("users").where("isAdmin", "==", true).limit(1).get(),
+  ]);
+  const data = bootstrapSnap.exists ? bootstrapSnap.data() || {} : {};
+  const hasAdmin = !existingAdmins.empty || data.status === "active";
+  const reservedByRequester = data.status === "reserved" && requesterUid && data.reservedUid === requesterUid;
+  return {
+    bootstrapOpen: !hasAdmin && (!data.status || data.status === "failed" || reservedByRequester),
+    status: String(data.status || "open"),
+    reservedUid: String(data.reservedUid || ""),
+  };
+}
+
+app.get("/api/admin/bootstrap-status", rateLimit(30), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+  try {
+    const decoded = await adminAuth.verifyIdToken(token);
+    const state = await adminBootstrapState(decoded.uid);
+    return res.json({
+      ...state,
+      currentUid: decoded.uid,
+      currentEmail: decoded.email || "",
+    });
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+  }
+});
+
+app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
   const token = rawBearerToken(req);
   if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
 
   try {
     const decoded = await adminAuth.verifyIdToken(token);
-    const configuredOwner = String(process.env.ADMIN_OWNER_EMAIL || "").trim().toLowerCase();
-    const tokenEmail = String(decoded.email || "").trim().toLowerCase();
+    const targetUid = String(req.body?.targetUid || "").trim();
 
-    if (!configuredOwner || tokenEmail !== configuredOwner) {
-      return res.json({ owner: false, claimsUpdated: false });
-    }
-    if (decoded.email_verified !== true) {
-      return res.status(412).json({ error: "Owner email must be verified", code: "OWNER_EMAIL_NOT_VERIFIED" });
-    }
-
-    const record = await adminAuth.getUser(decoded.uid);
-    const existingClaims = record.customClaims || {};
-    const claimsUpdated = existingClaims.admin !== true || existingClaims.adminLevel !== "super";
-    if (claimsUpdated) {
-      await adminAuth.setCustomUserClaims(decoded.uid, {
-        ...existingClaims,
-        admin: true,
-        adminLevel: "super",
+    if (!targetUid || targetUid !== decoded.uid) {
+      return res.status(400).json({
+        error: "การตั้ง Admin ครั้งแรกต้องใช้ UID ของบัญชีที่กำลังล็อกอิน",
+        code: "BOOTSTRAP_SELF_UID_REQUIRED",
       });
     }
 
-    const now = new Date().toISOString();
-    await ordersDb.collection("users").doc(decoded.uid).set({
-      uid: decoded.uid,
-      email: tokenEmail,
-      role: "knight",
-      displayName: record.displayName || tokenEmail.split("@")[0] || "Owner",
-      phone: record.phoneNumber || "",
-      status: "active",
-      isAdmin: true,
-      adminLevel: "super",
-      level: 100,
-      xp: 0,
-      authProvider: "firebase",
-      approvedAt: now,
-      approvedBy: decoded.uid,
-      updatedAt: now,
-      createdAt: record.metadata.creationTime || now,
-    }, { merge: true });
+    const userRef = ordersDb.collection("users").doc(targetUid);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+      return res.status(409).json({
+        error: "กรุณาเลือกบทบาทและลงทะเบียนโปรไฟล์ให้เสร็จก่อนตั้ง Admin",
+        code: "PROFILE_REQUIRED",
+      });
+    }
 
-    return res.json({ owner: true, claimsUpdated });
+    const state = await adminBootstrapState(decoded.uid);
+    if (!state.bootstrapOpen) {
+      return res.status(409).json({ error: "Admin bootstrap is already closed", code: "ADMIN_BOOTSTRAP_CLOSED" });
+    }
+
+    const bootstrapRef = ordersDb.collection("system_config").doc("admin_bootstrap");
+    await ordersDb.runTransaction(async (tx) => {
+      const snap = await tx.get(bootstrapRef);
+      const data = snap.exists ? snap.data() || {} : {};
+      if (data.status === "active") throw new Error("ADMIN_BOOTSTRAP_CLOSED");
+      if (data.status === "reserved" && data.reservedUid && data.reservedUid !== decoded.uid) {
+        throw new Error("ADMIN_BOOTSTRAP_RESERVED");
+      }
+      tx.set(bootstrapRef, {
+        status: "reserved",
+        reservedUid: decoded.uid,
+        reservedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    const record = await adminAuth.getUser(targetUid);
+    await adminAuth.setCustomUserClaims(targetUid, {
+      ...(record.customClaims || {}),
+      admin: true,
+      adminLevel: "super",
+    });
+
+    const now = new Date().toISOString();
+    await Promise.all([
+      userRef.set({
+        isAdmin: true,
+        adminLevel: "super",
+        status: "active",
+        adminAssignedAt: now,
+        adminAssignedBy: targetUid,
+        updatedAt: now,
+      }, { merge: true }),
+      ordersDb.collection("adminAccess").doc(targetUid).set({
+        uid: targetUid,
+        adminLevel: "super",
+        active: true,
+        bootstrap: true,
+        assignedBy: targetUid,
+        createdAt: now,
+        updatedAt: now,
+      }, { merge: true }),
+      bootstrapRef.set({
+        status: "active",
+        firstAdminUid: targetUid,
+        completedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true }),
+      ordersDb.collection("audit_logs").add({
+        action: "BOOTSTRAP_FIRST_SUPER_ADMIN",
+        actorUid: targetUid,
+        targetUid,
+        adminLevel: "super",
+        createdAt: FieldValue.serverTimestamp(),
+      }),
+    ]);
+
+    return res.json({
+      ok: true,
+      targetUid,
+      adminLevel: "super",
+      bootstrapClosed: true,
+      forceTokenRefresh: true,
+    });
   } catch (error: any) {
-    console.error("[Firebase Owner Bootstrap]", error?.message);
-    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
+    const code = String(error?.message || "");
+    if (code === "ADMIN_BOOTSTRAP_CLOSED" || code === "ADMIN_BOOTSTRAP_RESERVED") {
+      return res.status(409).json({ error: code, code });
+    }
+    console.error("[Admin Bootstrap]", error?.message);
+    return res.status(503).json({ error: "ตั้งค่า Admin ครั้งแรกไม่สำเร็จ", code: "ADMIN_BOOTSTRAP_FAILED" });
   }
 });
 
@@ -2042,16 +2124,13 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
 
   try {
     const decoded = await adminAuth.verifyIdToken(token);
-    if (!decoded.email || decoded.email_verified !== true) {
-      return res.status(403).json({ error: "Verified email required", code: "EMAIL_NOT_VERIFIED" });
+    if (!decoded.email) {
+      return res.status(403).json({ error: "Email identity required", code: "EMAIL_REQUIRED" });
     }
 
     const role = String(req.body?.role || "") as FirebaseUserRole;
     if (!FIREBASE_USER_ROLES.has(role)) {
       return res.status(400).json({ error: "Invalid role", code: "INVALID_ROLE" });
-    }
-    if (isSuperAdminToken(decoded)) {
-      return res.status(409).json({ error: "Super Admin does not use member registration", code: "OWNER_PROFILE_PROTECTED" });
     }
 
     const profile = cleanRegistrationInput(role, req.body?.registration || {});
@@ -2060,7 +2139,7 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
 
     const result = await createFirebaseRegistration(decoded.uid, String(decoded.email).toLowerCase(), role, profile);
     const userSnap = await ordersDb.collection("users").doc(decoded.uid).get();
-    return res.status(201).json({ user: userSnap.data(), approvalRequired: true, ...result });
+    return res.status(201).json({ user: userSnap.data(), approvalRequired: false, ...result });
   } catch (error: any) {
     if (error?.message === "PROFILE_ALREADY_REGISTERED") {
       return res.status(409).json({ error: "Profile already registered", code: "PROFILE_ALREADY_REGISTERED" });
