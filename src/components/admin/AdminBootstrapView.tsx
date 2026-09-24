@@ -9,15 +9,16 @@ interface AdminBootstrapViewProps {
 }
 
 export const AdminBootstrapView: React.FC<AdminBootstrapViewProps> = ({ onCompleted, onExit }) => {
-  const { firebaseUser, refreshUserData } = useAuth();
-  const [uid, setUid] = useState(firebaseUser?.uid || '');
+  const { userData, refreshUserData } = useAuth();
+  const currentWinUid = userData?.winUid || '';
+  const [winUid, setWinUid] = useState(currentWinUid);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
 
   const copyUid = async () => {
-    if (!firebaseUser?.uid) return;
+    if (!currentWinUid) return;
     try {
-      await navigator.clipboard.writeText(firebaseUser.uid);
+      await navigator.clipboard.writeText(currentWinUid);
     } catch {
       // Clipboard may be unavailable in embedded previews.
     }
@@ -25,17 +26,17 @@ export const AdminBootstrapView: React.FC<AdminBootstrapViewProps> = ({ onComple
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!firebaseUser || working) return;
+    if (!currentWinUid || working) return;
     setError('');
 
-    if (uid.trim() !== firebaseUser.uid) {
-      setError('Admin คนแรกต้องใช้ UID ของบัญชีที่กำลังล็อกอินอยู่');
+    if (winUid.trim().toLowerCase() !== currentWinUid.toLowerCase()) {
+      setError('Admin คนแรกต้องใช้ WIN UID ของบัญชีที่กำลังล็อกอินอยู่');
       return;
     }
 
     setWorking(true);
     try {
-      await bootstrapFirstAdmin(uid.trim());
+      await bootstrapFirstAdmin(winUid.trim().toLowerCase());
       await refreshUserData();
       onCompleted();
     } catch (cause: any) {
@@ -54,17 +55,17 @@ export const AdminBootstrapView: React.FC<AdminBootstrapViewProps> = ({ onComple
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white">ตั้งค่า Admin คนแรก</h1>
           <p className="mt-2 text-sm text-slate-300 leading-relaxed">
-            ระบบยังไม่มีผู้ดูแล คุณสามารถใช้ UID ของบัญชีที่กำลังล็อกอินเพื่อตั้งตัวเองเป็น Super Admin ได้ครั้งเดียว
+            ระบบยังไม่มีผู้ดูแล ใช้ WIN UID ที่คุณตั้งตอนสมัครเพื่อแต่งตั้งบัญชีนี้เป็น Super Admin ครั้งแรก
           </p>
         </div>
 
         <div className="mb-5 rounded-2xl border border-cyan-400/25 bg-cyan-400/5 p-4">
-          <div className="text-xs font-bold text-cyan-300 mb-2">UID ของบัญชีนี้</div>
+          <div className="text-xs font-bold text-cyan-300 mb-2">WIN UID ของบัญชีนี้</div>
           <div className="flex gap-2">
             <code className="flex-1 break-all rounded-xl bg-black/30 px-3 py-2.5 text-xs text-white border border-white/10">
-              {firebaseUser?.uid || '-'}
+              {currentWinUid || '-'}
             </code>
-            <button type="button" onClick={copyUid} className="rounded-xl border border-cyan-400/30 px-3 text-cyan-300 hover:bg-cyan-400/10" aria-label="คัดลอก UID">
+            <button type="button" onClick={copyUid} className="rounded-xl border border-cyan-400/30 px-3 text-cyan-300 hover:bg-cyan-400/10" aria-label="คัดลอก WIN UID">
               <Copy className="w-4 h-4" />
             </button>
           </div>
@@ -72,31 +73,27 @@ export const AdminBootstrapView: React.FC<AdminBootstrapViewProps> = ({ onComple
 
         <form onSubmit={submit} className="space-y-4">
           <label className="block">
-            <span className="block text-xs font-bold text-slate-300 mb-1.5">กรอก UID ที่ต้องการตั้งเป็น Admin</span>
+            <span className="block text-xs font-bold text-slate-300 mb-1.5">กรอก WIN UID ที่ต้องการตั้งเป็น Admin</span>
             <input
-              value={uid}
-              onChange={(event) => setUid(event.target.value)}
+              value={winUid}
+              onChange={(event) => setWinUid(event.target.value.toLowerCase())}
               required
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-400"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-mono text-white outline-none focus:border-amber-400"
             />
           </label>
 
           <label className="block">
             <span className="block text-xs font-bold text-slate-300 mb-1.5">ระดับ Admin คนแรก</span>
             <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm font-bold text-amber-200 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4" />
-              Super Admin
+              <ShieldCheck className="w-4 h-4" /> Super Admin
             </div>
-            <p className="mt-1.5 text-[11px] text-slate-500">
-              Admin คนแรกต้องเป็น Super Admin เพื่อให้สามารถแต่งตั้งผู้ช่วยระดับ Reviewer / Support / Super ได้ภายหลัง
-            </p>
           </label>
 
           {error && <div className="rounded-xl border border-rose-400/30 bg-rose-500/10 p-3 text-xs text-rose-200">{error}</div>}
 
           <button
             type="submit"
-            disabled={working || !uid.trim()}
+            disabled={working || !winUid.trim()}
             className="w-full rounded-xl bg-gradient-to-r from-amber-300 to-amber-500 px-4 py-3.5 text-sm font-black text-slate-950 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {working ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserCog className="w-5 h-5" />}
