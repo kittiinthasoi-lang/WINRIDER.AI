@@ -30,7 +30,6 @@ import { playTactileBlip } from './utils/audio';
 import { useAuth } from './context/AuthContext';
 import { AuthModalOrView } from './components/auth/AuthModalOrView';
 import { RoleSelectionAndRegistration } from './components/auth/RoleSelectionAndRegistration';
-import { PendingReviewView } from './components/auth/PendingReviewView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/admin/AdminRoute';
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -433,7 +432,7 @@ export default function App() {
         currentUserSession={currentUserSession}
         onSignOut={handleSignOut}
         onToggleDriverPersona={handleToggleDriverPersona}
-        onSelectOwnerPersona={handleSelectOwnerPersona}
+        onSelectOwnerPersona={isOwnerAdmin ? handleSelectOwnerPersona : undefined}
       />
 
       {/* Main Viewport Content with ProtectedRoute */}
@@ -633,7 +632,7 @@ export default function App() {
             {(claims) => (
               <AdminLayout
                 adminLevel={isOwnerAdmin ? 'super' : claims.adminLevel}
-                adminEmail={firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'}
+                adminEmail={firebaseUser?.email || currentUserSession?.email || 'Admin'}
                 onExitAdmin={handleExitAdmin}
                 onSelectOwnerPersona={handleSelectOwnerPersona}
               />
