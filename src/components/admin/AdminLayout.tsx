@@ -234,12 +234,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-cyan-300" />
-                  <h2 className="text-sm font-black text-white">ศูนย์โปรไฟล์ 4 บทบาท</h2>
+                  <h2 className="text-sm font-black text-white">ศูนย์สลับ 5 บทบาท</h2>
                   <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-300">REAL ACCOUNT</span>
                 </div>
-                <p className="mt-1 text-[10px] text-slate-400">เปิดใช้งานโปรไฟล์จริงของบัญชีแอดมินด้วย WIN Auth UID เดิม ไม่สร้างข้อมูลผู้ใช้จำลอง</p>
+                <p className="mt-1 text-[10px] text-slate-400">บัญชี Admin เดียวสลับดู ลูกค้า / พี่วิน / ร้านค้า / พาร์ทเนอร์ / Admin โดยไม่สร้างบัญชีจำลองเพิ่ม</p>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {([
                   ['customer', 'ลูกค้า', '🛡️', UserRound],
                   ['driver', 'พี่วิน', '🏍️', Bike],
@@ -259,6 +259,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     </span>
                   </button>
                 ))}
+                <div className="group flex min-w-[112px] items-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-3 py-2.5 text-left">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/30 text-base">👑</span>
+                  <span className="min-w-0">
+                    <span className="block text-[10px] font-black text-amber-200">Admin</span>
+                    <span className="mt-0.5 flex items-center gap-1 text-[8px] text-amber-300"><Crown className="h-3 w-3" /> หน้าปัจจุบัน</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
