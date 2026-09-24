@@ -1684,7 +1684,9 @@ function getAdminDb() {
         credentialConfigured = true;
       } catch (error) {
         credentialSource = "service_account_json";
-        credentialError = error instanceof Error ? error.message : "SERVICE_ACCOUNT_INVALID";
+        credentialError = error instanceof SyntaxError
+          ? "SERVICE_ACCOUNT_JSON_INVALID"
+          : (error instanceof Error && error.message.startsWith("SERVICE_ACCOUNT_") ? error.message : "SERVICE_ACCOUNT_INVALID");
         console.error("[Firebase Admin] FIREBASE_SERVICE_ACCOUNT is invalid; Firebase readiness checks will remain unavailable until the Replit Secret is replaced.");
       }
     }
@@ -1746,7 +1748,8 @@ async function checkFirebaseReadiness() {
     await ordersDb.collection("_connection_test").doc("ping").get();
     firestore.ok = true;
   } catch (error) {
-    firestore.error = error instanceof Error ? error.message : "FIRESTORE_READ_FAILED";
+    console.warn("[Firebase Readiness] Firestore read failed:", error instanceof Error ? error.message : error);
+    firestore.error = "FIRESTORE_READ_FAILED";
   }
 
   try {
@@ -1754,7 +1757,8 @@ async function checkFirebaseReadiness() {
     await bucket.getMetadata();
     storage.ok = true;
   } catch (error) {
-    storage.error = error instanceof Error ? error.message : "STORAGE_READ_FAILED";
+    console.warn("[Firebase Readiness] Storage read failed:", error instanceof Error ? error.message : error);
+    storage.error = "STORAGE_READ_FAILED";
   }
 
   const ready = firestore.ok && storage.ok;
