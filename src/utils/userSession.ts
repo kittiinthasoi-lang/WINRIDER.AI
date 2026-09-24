@@ -4,6 +4,7 @@ export type UserRole = 'customer' | 'driver' | 'merchant' | 'partner';
 
 export interface UserSession {
   id: string;
+  winUid?: string;
   email?: string;
   name: string;
   phone: string;
