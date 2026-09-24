@@ -2253,7 +2253,7 @@ app.post("/api/verifications/evidence", rateLimit(20), async (req, res) => {
 });
 
 app.get("/api/admin/verifications", rateLimit(40), async (req, res) => {
-  const admin = await requireWinAuthAdmin(req, res);
+  const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
   const requestedStatus = String(req.query.status || "pending_review");
   const status = ["pending_review", "approved", "rejected", "all"].includes(requestedStatus) ? requestedStatus : "pending_review";
@@ -2275,7 +2275,7 @@ app.get("/api/admin/verifications", rateLimit(40), async (req, res) => {
 });
 
 app.post("/api/admin/verifications/:id/review", rateLimit(40), async (req, res) => {
-  const admin = await requireWinAuthAdmin(req, res);
+  const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
   const approved = req.body?.approved === true;
   const reason = String(req.body?.reason || "").trim().slice(0, 1000);
@@ -5493,8 +5493,6 @@ function getDistPath(): string {
 
 // Vite / Static Middleware Integration
 async function startServer() {
-  await ensureOwnerAdminBootstrapAccount();
-
   const distPath = getDistPath();
   const hasDist = fs.existsSync(path.join(distPath, "index.html"));
 
