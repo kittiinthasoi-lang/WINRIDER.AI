@@ -114,6 +114,9 @@ export async function bootstrapFirstAdmin(targetWinUid: string): Promise<{ ok: b
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'ตั้งค่า Super Admin คนแรกไม่สำเร็จ');
+  if (data.forceTokenRefresh === true && auth.currentUser) {
+    await auth.currentUser.getIdToken(true);
+  }
   return { ok: true, adminLevel: 'super' };
 }
 

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Copy, Crown, Loader2, ShieldCheck, UserCog } from 'lucide-react';
-import { bootstrapFirstAdmin } from '../../services/adminService';
+import { bootstrapFirstAdmin, getAdminBootstrapStatus } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 
 interface AdminBootstrapViewProps {
@@ -10,10 +10,25 @@ interface AdminBootstrapViewProps {
 
 export const AdminBootstrapView: React.FC<AdminBootstrapViewProps> = ({ onCompleted, onExit }) => {
   const { userData, refreshUserData } = useAuth();
-  const currentWinUid = userData?.winUid || '';
-  const [winUid, setWinUid] = useState(currentWinUid);
+  const [currentWinUid, setCurrentWinUid] = useState(userData?.winUid || '');
+  const [winUid, setWinUid] = useState(userData?.winUid || '');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getAdminBootstrapStatus()
+      .then((status) => {
+        if (!active) return;
+        const suggested = String(status.currentWinUid || userData?.winUid || '').trim().toLowerCase();
+        setCurrentWinUid(suggested);
+        if (suggested) setWinUid((value) => value || suggested);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [userData?.winUid]);
 
   const copyUid = async () => {
     if (!currentWinUid) return;
@@ -26,17 +41,22 @@ export const AdminBootstrapView: React.FC<AdminBootstrapViewProps> = ({ onComple
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!currentWinUid || working) return;
+    if (working) return;
+    const normalized = winUid.trim().toLowerCase();
+    if (!normalized) {
+      setError('กรุณากรอก WIN UID');
+      return;
+    }
     setError('');
 
-    if (winUid.trim().toLowerCase() !== currentWinUid.toLowerCase()) {
-      setError('Admin คนแรกต้องใช้ WIN UID ของบัญชีที่กำลังล็อกอินอยู่');
+    if (currentWinUid && normalized !== currentWinUid.toLowerCase()) {
+      setError('WIN UID ไม่ตรงกับบัญชีที่กำลังล็อกอิน');
       return;
     }
 
     setWorking(true);
     try {
-      await bootstrapFirstAdmin(winUid.trim().toLowerCase());
+      await bootstrapFirstAdmin(normalized);
       await refreshUserData();
       onCompleted();
     } catch (cause: any) {
@@ -63,7 +83,7 @@ export const AdminBootstrapView: React.FC<AdminBootstrapViewProps> = ({ onComple
           <div className="text-xs font-bold text-cyan-300 mb-2">WIN UID ของบัญชีนี้</div>
           <div className="flex gap-2">
             <code className="flex-1 break-all rounded-xl bg-black/30 px-3 py-2.5 text-xs text-white border border-white/10">
-              {currentWinUid || '-'}
+              {currentWinUid || 'ยังไม่มี WIN UID — กรอกด้านล่างเพื่อสร้างพร้อม Admin'}
             </code>
             <button type="button" onClick={copyUid} className="rounded-xl border border-cyan-400/30 px-3 text-cyan-300 hover:bg-cyan-400/10" aria-label="คัดลอก WIN UID">
               <Copy className="w-4 h-4" />

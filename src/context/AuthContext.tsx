@@ -180,7 +180,7 @@ async function readUserProfile(user: User): Promise<UserDoc | null> {
     const snap = await getDoc(doc(db, 'users', user.uid));
     if (snap.exists()) {
       const profile = snap.data() as UserDoc;
-      if (profile?.role) return profile;
+      if (profile?.role || profile?.isAdmin === true) return profile;
     }
   } catch (firestoreError) {
     console.warn('Direct Firestore profile read failed, trying API fallback:', firestoreError);
@@ -200,7 +200,7 @@ async function readUserProfile(user: User): Promise<UserDoc | null> {
 
   const payload = await response.json().catch(() => ({}));
   const profile = payload?.user ? payload.user as UserDoc : null;
-  return profile?.role ? profile : null;
+  return profile?.role || profile?.isAdmin === true ? profile : null;
 }
 
 function rememberPendingOnboarding(winUid: string, displayName: string) {
@@ -266,7 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profile = await readUserProfile(user);
           if (!active) return;
           setUserData(profile);
-          if (profile?.role) {
+          if (profile?.role || profile?.isAdmin === true) {
             cacheProfile(profile);
             clearPendingOnboarding();
             setGoogleOnboarding(null);
@@ -302,7 +302,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profile = await readUserProfile(credential.user);
       setUserData(profile);
       setGoogleOnboarding(null);
-      if (profile?.role) {
+      if (profile?.role || profile?.isAdmin === true) {
         cacheProfile(profile);
         clearPendingOnboarding();
       }

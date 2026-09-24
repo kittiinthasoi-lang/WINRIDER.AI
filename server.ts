@@ -2098,11 +2098,13 @@ async function adminBootstrapState(requesterUid?: string) {
     ordersDb.collection("users").where("isAdmin", "==", true).limit(1).get(),
   ]);
   const data = bootstrapSnap.exists ? bootstrapSnap.data() || {} : {};
-  const hasAdmin = !existingAdmins.empty || data.status === "active";
+  const hasAdmin = !existingAdmins.empty;
   const reservedByRequester = data.status === "reserved" && requesterUid && data.reservedUid === requesterUid;
   return {
-    bootstrapOpen: !hasAdmin && (!data.status || data.status === "failed" || reservedByRequester),
-    status: String(data.status || "open"),
+    // A stale "active" flag must never lock the owner out when no real Admin
+    // profile exists. Once an Admin profile exists, bootstrap closes.
+    bootstrapOpen: !hasAdmin && (data.status !== "reserved" || Boolean(reservedByRequester)),
+    status: hasAdmin ? "active" : String(data.status || "open"),
     reservedUid: String(data.reservedUid || ""),
   };
 }
@@ -2120,8 +2122,12 @@ app.get("/api/admin/bootstrap-status", rateLimit(30), async (req, res) => {
     const state = await adminBootstrapState(decoded.uid);
     let winUid = decoded.winUid || winUidFromAuthEmail(decoded.email);
     try {
-      const profileSnap = await ordersDb.collection("users").doc(decoded.uid).get();
+      const [profileSnap, identitySnap] = await Promise.all([
+        ordersDb.collection("users").doc(decoded.uid).get(),
+        ordersDb.collection("auth_identity_links").doc(decoded.uid).get(),
+      ]);
       if (profileSnap.exists) winUid = profileSnap.data()?.winUid || winUid;
+      if (!winUid && identitySnap.exists) winUid = identitySnap.data()?.winUid || "";
     } catch {}
     return res.json({
       ...state,
@@ -2147,20 +2153,41 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
 
   try {
     const targetWinUid = normalizeWinUidServer(req.body?.targetWinUid);
-    const userRef = ordersDb.collection("users").doc(decoded.uid);
-    const userSnap = await userRef.get().catch(() => null);
-    const currentWinUid = normalizeWinUidServer(userSnap?.data?.()?.winUid || winUidFromAuthEmail(decoded.email));
-
-    if (!targetWinUid || targetWinUid !== currentWinUid) {
+    if (!/^[a-z0-9][a-z0-9._-]{3,29}$/.test(targetWinUid)) {
       return res.status(400).json({
-        error: "การตั้ง Admin ครั้งแรกต้องใช้ WIN UID ของบัญชีที่กำลังล็อกอิน",
+        error: "WIN UID ต้องมี 4-30 ตัว ใช้ a-z, 0-9, จุด, ขีดกลาง หรือขีดล่าง",
+        code: "WIN_UID_INVALID",
+      });
+    }
+
+    const userRef = ordersDb.collection("users").doc(decoded.uid);
+    const [userSnap, identitySnap, duplicateUsers, duplicateLinks] = await Promise.all([
+      userRef.get(),
+      ordersDb.collection("auth_identity_links").doc(decoded.uid).get(),
+      ordersDb.collection("users").where("winUid", "==", targetWinUid).limit(1).get(),
+      ordersDb.collection("auth_identity_links").where("winUid", "==", targetWinUid).limit(1).get(),
+    ]);
+
+    const currentWinUid = normalizeWinUidServer(
+      userSnap.data()?.winUid ||
+      identitySnap.data()?.winUid ||
+      winUidFromAuthEmail(decoded.email)
+    );
+
+    if (currentWinUid && targetWinUid !== currentWinUid) {
+      return res.status(400).json({
+        error: "WIN UID ไม่ตรงกับบัญชีที่กำลังล็อกอิน",
         code: "BOOTSTRAP_SELF_WIN_UID_REQUIRED",
       });
     }
-    if (!userSnap.exists) {
+
+    if (
+      (!duplicateUsers.empty && duplicateUsers.docs[0].id !== decoded.uid) ||
+      (!duplicateLinks.empty && duplicateLinks.docs[0].id !== decoded.uid)
+    ) {
       return res.status(409).json({
-        error: "กรุณาเลือกบทบาทและลงทะเบียนโปรไฟล์ให้เสร็จก่อนตั้ง Admin",
-        code: "PROFILE_REQUIRED",
+        error: "WIN UID นี้ถูกใช้งานแล้ว",
+        code: "WIN_UID_ALREADY_USED",
       });
     }
 
@@ -2173,10 +2200,20 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
     await ordersDb.runTransaction(async (tx) => {
       const snap = await tx.get(bootstrapRef);
       const data = snap.exists ? snap.data() || {} : {};
-      if (data.status === "active") throw new Error("ADMIN_BOOTSTRAP_CLOSED");
+
+      if (data.status === "active" && data.firstAdminUid) {
+        const firstAdminSnap = await tx.get(ordersDb.collection("users").doc(String(data.firstAdminUid)));
+        if (firstAdminSnap.exists && firstAdminSnap.data()?.isAdmin === true) {
+          throw new Error("ADMIN_BOOTSTRAP_CLOSED");
+        }
+        // Stale bootstrap marker: the recorded Admin no longer exists/has access,
+        // so the first real signed-in account may recover ownership.
+      }
+
       if (data.status === "reserved" && data.reservedUid && data.reservedUid !== decoded.uid) {
         throw new Error("ADMIN_BOOTSTRAP_RESERVED");
       }
+
       tx.set(bootstrapRef, {
         status: "reserved",
         reservedUid: decoded.uid,
@@ -2186,6 +2223,12 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
     });
 
     const record = await adminAuth.getUser(decoded.uid);
+    const googleEmail = String(record.providerData.find((provider) => provider.providerId === "google.com")?.email || "");
+    const realEmail = googleEmail || (
+      decoded.email && !String(decoded.email).endsWith(WIN_UID_EMAIL_SUFFIX)
+        ? String(decoded.email)
+        : ""
+    );
     await adminAuth.setCustomUserClaims(decoded.uid, {
       ...(record.customClaims || {}),
       admin: true,
@@ -2195,12 +2238,29 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
     const now = new Date().toISOString();
     await Promise.all([
       userRef.set({
+        uid: decoded.uid,
+        winUid: targetWinUid,
+        ...(userSnap.exists ? {} : {
+          displayName: record.displayName || targetWinUid,
+          email: realEmail,
+          authEmail: record.email || "",
+          level: 1,
+          xp: 0,
+          createdAt: now,
+        }),
         isAdmin: true,
         adminLevel: "super",
         status: "active",
         adminAssignedAt: now,
         adminAssignedBy: decoded.uid,
         updatedAt: now,
+      }, { merge: true }),
+      ordersDb.collection("auth_identity_links").doc(decoded.uid).set({
+        uid: decoded.uid,
+        winUid: targetWinUid,
+        ...(realEmail ? { googleEmail: realEmail } : {}),
+        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       }, { merge: true }),
       ordersDb.collection("adminAccess").doc(decoded.uid).set({
         uid: decoded.uid,
