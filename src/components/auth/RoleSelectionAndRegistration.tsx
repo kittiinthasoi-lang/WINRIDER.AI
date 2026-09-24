@@ -55,7 +55,12 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
   });
 
   // Form states - Common
+  const initialGoogleEmail =
+    firebaseUser?.providerData.find((provider) => provider.providerId === 'google.com')?.email || '';
   const [displayName, setDisplayName] = useState(firebaseUser?.displayName || '');
+  const [contactEmail, setContactEmail] = useState(
+    initialGoogleEmail && !initialGoogleEmail.endsWith('@auth.winrider.local') ? initialGoogleEmail.toLowerCase() : ''
+  );
   const [phone, setPhone] = useState('');
   const [province, setProvince] = useState('กรุงเทพมหานคร');
   const [district, setDistrict] = useState('');
@@ -150,6 +155,10 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
       setFormError('กรุณาระบุชื่อ-นามสกุลจริง');
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim().toLowerCase())) {
+      setFormError('กรุณากรอกอีเมลจริงให้ถูกต้อง');
+      return;
+    }
     if (!validatePhone(phone)) {
       setFormError('เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลักและขึ้นต้นด้วย 0 (เช่น 0812345678)');
       return;
@@ -196,6 +205,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         registrationResult = await registerKnight({
           uid: firebaseUser.uid,
           displayName,
+          email: contactEmail.trim().toLowerCase(),
           phone,
           province,
           district,
@@ -215,6 +225,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         registrationResult = await registerCitizen({
           uid: firebaseUser.uid,
           displayName,
+          email: contactEmail.trim().toLowerCase(),
           phone,
           province,
           district,
@@ -234,6 +245,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         registrationResult = await registerMerchant({
           uid: firebaseUser.uid,
           displayName,
+          email: contactEmail.trim().toLowerCase(),
           phone,
           province,
           district,
@@ -255,6 +267,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         registrationResult = await registerPartner({
           uid: firebaseUser.uid,
           displayName,
+          email: contactEmail.trim().toLowerCase(),
           phone,
           province,
           district,
@@ -601,6 +614,20 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
                   <div className="text-sm font-bold text-white">{displayName || '-'}</div>
                   <div className="text-[10px] font-mono text-cyan-300 mt-0.5">WIN UID: {firebaseUser?.email?.split('@')[0] || '-'}</div>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  อีเมลจริง *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value.trimStart().toLowerCase())}
+                  placeholder="name@example.com"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00D4FF]"
+                />
               </div>
 
               <div>
