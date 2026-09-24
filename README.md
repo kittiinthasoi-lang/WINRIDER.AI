@@ -304,11 +304,16 @@ Backend ใช้:
 
 เมื่อรัน backend นอก Google-managed environment ต้องมี Firebase Admin credentials ที่เหมาะสม เช่น application default credentials หรือ service-account configuration ที่ code รองรับ
 
-### Owner
+### Owner / Google AI Studio required environment variables
 
-- `ADMIN_OWNER_EMAIL`
+เมื่อเปิดแอปใน Google AI Studio ให้กรอก 2 ช่องแยกกันในหน้าต่าง **Enter your environment variable to continue**:
 
-**ห้าม commit secret หรือ service-account private key ลง repository**
+- `ADMIN_OWNER_EMAIL` — อีเมลบัญชีเจ้าของ / Super Admin
+- `ADMIN_BOOTSTRAP_PASSWORD` — รหัสผ่านสำหรับสร้างบัญชีเจ้าของครั้งแรก (12-200 ตัวอักษร)
+
+ทั้งสองค่าถูกอ่านจาก environment ฝั่ง server เท่านั้น และไม่มีค่า fallback ในโค้ด จึงต้องตั้งก่อนเริ่มแอป
+
+**ห้าม commit รหัสผ่าน, secret หรือ service-account private key ลง repository**
 
 ## Run Locally
 
