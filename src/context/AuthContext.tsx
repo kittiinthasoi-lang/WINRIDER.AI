@@ -173,34 +173,49 @@ async function readUserProfile(user: User): Promise<UserDoc | null> {
     return cachedProfile();
   }
 
-  // The authenticated Firebase UID is the canonical account key. Read the
-  // persistent profile directly from the configured Firestore database first,
-  // so login still works even if the Express/Admin API is temporarily unavailable.
+  let localProfile: UserDoc | null = null;
+
   try {
     const snap = await getDoc(doc(db, 'users', user.uid));
     if (snap.exists()) {
-      const profile = snap.data() as UserDoc;
-      if (profile?.role || profile?.isAdmin === true) return profile;
+      localProfile = snap.data() as UserDoc;
     }
   } catch (firestoreError) {
-    console.warn('Direct Firestore profile read failed, trying API fallback:', firestoreError);
+    console.warn('Direct Firestore profile read failed:', firestoreError);
   }
 
-  const token = await user.getIdToken();
-  const response = await fetch('/api/auth/me', {
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    cache: 'no-store',
-  });
+  // Always let the backend confirm the authenticated account once. This is
+  // where the existing owner account is promoted to Super Admin when its real
+  // contact email matches the configured owner email.
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch('/api/auth/me', {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store',
+    });
 
-  if (response.status === 401) throw new Error('AUTH_SESSION_INVALID');
-  if (!response.ok) throw new Error(`PROFILE_FETCH_FAILED_${response.status}`);
+    if (response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      if (payload?.forceTokenRefresh === true) {
+        await user.getIdToken(true);
+      }
+      const serverProfile = payload?.user ? payload.user as UserDoc : null;
+      if (serverProfile?.role || serverProfile?.isAdmin === true) {
+        return serverProfile;
+      }
+    } else if (response.status === 401) {
+      console.warn('Backend auth profile check returned 401; using Firestore profile if available.');
+    }
+  } catch (serverError) {
+    console.warn('Backend profile check failed; using Firestore profile:', serverError);
+  }
 
-  const payload = await response.json().catch(() => ({}));
-  const profile = payload?.user ? payload.user as UserDoc : null;
-  return profile?.role || profile?.isAdmin === true ? profile : null;
+  return localProfile && (localProfile.role || localProfile.isAdmin === true)
+    ? localProfile
+    : null;
 }
 
 function rememberPendingOnboarding(winUid: string, displayName: string) {
