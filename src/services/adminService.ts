@@ -34,45 +34,38 @@ import { UserDoc } from '../types/auth';
  */
 export async function getAdminClaims(): Promise<AdminClaims | null> {
   const currentUser = auth.currentUser;
+  if (!currentUser) return null;
 
-  // Check cached session profile
   try {
-    const raw = typeof window !== 'undefined' ? window.localStorage.getItem('WINRIDER_ACTIVE_SESSION_PROFILE') : null;
-    if (raw) {
-      const cached = JSON.parse(raw);
-      if (cached.isAdmin === true || cached.adminLevel === 'super' || cached.email === 'kittiinthasoi@gmail.com' || cached.winUid?.includes('kitti')) {
-        return {
-          admin: true,
-          adminLevel: (cached.adminLevel as AdminLevel) || 'super'
-        };
-      }
+    const tokenResult = await currentUser.getIdTokenResult(true);
+    const claimedLevel = tokenResult.claims.adminLevel as AdminLevel | undefined;
+    if (
+      tokenResult.claims.admin === true &&
+      claimedLevel &&
+      ['super', 'reviewer', 'support'].includes(claimedLevel)
+    ) {
+      return { admin: true, adminLevel: claimedLevel };
     }
-  } catch {}
+  } catch (err) {
+    console.warn('Error fetching admin token claims:', err);
+  }
 
-  // Firebase Custom Claims is the single source of truth for admin authorization.
-  if (currentUser) {
-    if (currentUser.email === 'kittiinthasoi@gmail.com' || currentUser.email?.startsWith('kitti')) {
-      return {
-        admin: true,
-        adminLevel: 'super'
-      };
-    }
-    try {
-      const tokenResult = await currentUser.getIdTokenResult(true);
-      if (tokenResult.claims.admin === true) {
-        return {
-          admin: true,
-          adminLevel: (tokenResult.claims.adminLevel as AdminLevel) || 'support'
-        };
+  // Firestore profile is a short-lived fallback while custom claims are refreshing.
+  try {
+    const snap = await getDoc(doc(db, 'users', currentUser.uid));
+    if (snap.exists()) {
+      const profile = snap.data() as UserDoc;
+      const level = profile.adminLevel as AdminLevel | undefined;
+      if (profile.isAdmin === true && level && ['super', 'reviewer', 'support'].includes(level)) {
+        return { admin: true, adminLevel: level };
       }
-    } catch (err) {
-      console.warn('Error fetching admin token claims:', err);
     }
+  } catch (err) {
+    console.warn('Error checking admin profile:', err);
   }
 
   return null;
 }
-
 
 export interface AdminBootstrapStatus {
   bootstrapOpen: boolean;
@@ -82,69 +75,34 @@ export interface AdminBootstrapStatus {
 }
 
 async function getAdminAuthHeaders(extraHeaders: HeadersInit = {}): Promise<Headers> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อน');
+
+  const token = await user.getIdToken();
+  if (!token) throw new Error('ไม่พบ Firebase authentication token');
+
   const headers = new Headers(extraHeaders);
   headers.set('Accept', 'application/json');
-
-  let token = await auth.currentUser?.getIdToken().catch(() => '');
-  let b64 = '';
-
-  if (!token || token.includes('synthetic')) {
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem('WINRIDER_ACTIVE_SESSION_PROFILE') : null;
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (cached?.uid) {
-          const payload = {
-            uid: cached.uid,
-            email: cached.email || 'kittiinthasoi@gmail.com',
-            displayName: cached.displayName || cached.fullName || 'กิตติ อินทะสร้อย (Super Admin)',
-            role: 'admin',
-            winUid: cached.winUid || 'kitti',
-            isAdmin: true,
-            adminLevel: 'super',
-            status: 'active',
-          };
-          b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-          token = `sovereign:${b64}`;
-        }
-      }
-    } catch {}
-  }
-
-  if (!token) {
-    const defaultPayload = {
-      uid: 'kitti-super-admin',
-      email: 'kittiinthasoi@gmail.com',
-      displayName: 'กิตติ อินทะสร้อย (Super Admin)',
-      role: 'admin',
-      winUid: 'kitti',
-      isAdmin: true,
-      adminLevel: 'super',
-      status: 'active',
-    };
-    b64 = btoa(unescape(encodeURIComponent(JSON.stringify(defaultPayload))));
-    token = `sovereign:${b64}`;
-  }
-
   headers.set('Authorization', `Bearer ${token}`);
-  if (b64) headers.set('X-Winrider-Session', b64);
-  headers.set('X-Winrider-UID', 'kitti-super-admin');
+  return headers;
+}
 
+async function getSignedInHeaders(extraHeaders: HeadersInit = {}): Promise<Headers> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อน');
+  const token = await user.getIdToken();
+  const headers = new Headers(extraHeaders);
+  headers.set('Accept', 'application/json');
+  headers.set('Authorization', `Bearer ${token}`);
   return headers;
 }
 
 export async function getAdminBootstrapStatus(): Promise<AdminBootstrapStatus> {
-  try {
-    const headers = await getAdminAuthHeaders();
-    const res = await fetch('/api/admin/bootstrap-status', { headers });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      return { bootstrapOpen: false, status: 'ready', currentWinUid: 'kitti' };
-    }
-    return data as AdminBootstrapStatus;
-  } catch {
-    return { bootstrapOpen: false, status: 'ready', currentWinUid: 'kitti' };
-  }
+  const headers = await getSignedInHeaders();
+  const res = await fetch('/api/admin/bootstrap-status', { headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'ตรวจสอบสถานะ Admin bootstrap ไม่สำเร็จ');
+  return data as AdminBootstrapStatus;
 }
 
 export async function bootstrapFirstAdmin(targetWinUid: string): Promise<{ ok: boolean; adminLevel: AdminLevel }> {
@@ -157,6 +115,77 @@ export async function bootstrapFirstAdmin(targetWinUid: string): Promise<{ ok: b
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'ตั้งค่า Super Admin คนแรกไม่สำเร็จ');
   return { ok: true, adminLevel: 'super' };
+}
+
+
+export interface AdminPortalStatus {
+  applicationsOpen: boolean;
+  isAdmin: boolean;
+  adminLevel: AdminLevel | null;
+  requestStatus: string | null;
+}
+
+export interface AdminAccessRequest {
+  id: string;
+  uid: string;
+  winUid: string;
+  displayName: string;
+  email?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  note?: string;
+  requestedAt?: any;
+}
+
+export async function getAdminPortalStatus(): Promise<AdminPortalStatus> {
+  const headers = await getSignedInHeaders();
+  const res = await fetch('/api/admin/portal-status', { headers, cache: 'no-store' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'ตรวจสอบประตู Admin ไม่สำเร็จ');
+  return data as AdminPortalStatus;
+}
+
+export async function setAdminPortalOpen(applicationsOpen: boolean): Promise<AdminPortalStatus> {
+  const headers = await getAdminAuthHeaders({ 'Content-Type': 'application/json' });
+  const res = await fetch('/api/admin/portal-status', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ applicationsOpen }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'เปลี่ยนสถานะประตู Admin ไม่สำเร็จ');
+  return {
+    applicationsOpen: data.applicationsOpen === true,
+    isAdmin: true,
+    adminLevel: 'super',
+    requestStatus: null,
+  };
+}
+
+export async function requestAdminAccess(note?: string): Promise<{ ok: boolean; requestStatus: string }> {
+  const headers = await getSignedInHeaders({ 'Content-Type': 'application/json' });
+  const res = await fetch('/api/admin/access-request', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ note: note || '' }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'ส่งคำขอเป็น Admin ไม่สำเร็จ');
+  return data;
+}
+
+export async function getAdminAccessRequests(): Promise<AdminAccessRequest[]> {
+  const headers = await getAdminAuthHeaders();
+  const res = await fetch('/api/admin/access-requests', { headers, cache: 'no-store' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'โหลดคำขอ Admin ไม่สำเร็จ');
+  return Array.isArray(data.requests) ? data.requests : [];
+}
+
+export async function revokeAdminRole(targetWinUid: string, reason?: string) {
+  return callAdminEndpoint('revokeAdminRole', '/api/admin/revoke-role', {
+    targetWinUid,
+    reason: reason || 'Super Admin ถอดสิทธิ์ Admin',
+  });
 }
 
 /**
