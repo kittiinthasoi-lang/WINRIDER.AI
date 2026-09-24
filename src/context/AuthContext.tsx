@@ -6,6 +6,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
@@ -42,7 +44,7 @@ interface AuthContextType {
   loading: boolean;
   googleOnboarding: GoogleOnboardingInfo | null;
   signInWithWinUid: (winUid: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<GoogleSignInResult>;
+  signInWithGoogle: () => Promise<GoogleSignInResult | null>;
   signUpWithWinUid: (payload: SignUpPayload) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUserData: () => Promise<UserDoc | null>;
@@ -65,6 +67,22 @@ function splitGoogleName(user: User): GoogleOnboardingInfo {
     lastName: parts.slice(1).join(' '),
     photoURL: user.photoURL || undefined,
   };
+}
+
+function googleProvider() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  return provider;
+}
+
+function shouldFallbackToRedirect(error: any): boolean {
+  const code = String(error?.code || error?.message || '').toLowerCase();
+  return (
+    code.includes('popup-blocked') ||
+    code.includes('operation-not-supported-in-this-environment') ||
+    code.includes('web-storage-unsupported') ||
+    code.includes('popup-request-cancelled')
+  );
 }
 
 function cachedProfile(): UserDoc | null {
@@ -192,7 +210,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let active = true;
     let unsubscribe = () => {};
 
-    authPersistenceReady.finally(() => {
+    authPersistenceReady.finally(async () => {
+      if (!active) return;
+
+      try {
+        const redirectCredential = await getRedirectResult(auth);
+        if (redirectCredential?.user && active) {
+          setFirebaseUser(redirectCredential.user);
+        }
+      } catch (redirectError) {
+        console.warn('Google redirect completion failed:', redirectError);
+      }
+
       if (!active) return;
       unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (!active) return;
@@ -267,13 +296,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithGoogle = async (): Promise<GoogleSignInResult> => {
+  const signInWithGoogle = async (): Promise<GoogleSignInResult | null> => {
     setLoading(true);
     try {
       await authPersistenceReady;
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const credential = await signInWithPopup(auth, provider);
+      const provider = googleProvider();
+
+      let credential;
+      try {
+        credential = await signInWithPopup(auth, provider);
+      } catch (popupError: any) {
+        if (!shouldFallbackToRedirect(popupError)) throw popupError;
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
+
       const google = splitGoogleName(credential.user);
       setFirebaseUser(credential.user);
 

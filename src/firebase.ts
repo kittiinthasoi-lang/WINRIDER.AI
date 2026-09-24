@@ -6,37 +6,42 @@ import { browserLocalPersistence, getAuth, setPersistence } from 'firebase/auth'
 import fallbackConfig from '../firebase-applet-config.json';
 import { installGoogleMapsCostGuard } from './services/googleMapsCostGuard';
 
-const metaEnv = typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env : {};
-
+// WINRIDER.AI is intentionally pinned to the Firebase project below.
+// Google AI Studio or hosting environment variables must not silently redirect
+// authentication to a different Firebase project.
 const firebaseConfig = {
-  apiKey: metaEnv.VITE_FIREBASE_API_KEY || fallbackConfig.apiKey,
-  authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || fallbackConfig.authDomain,
-  projectId: metaEnv.VITE_FIREBASE_PROJECT_ID || fallbackConfig.projectId,
-  storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || fallbackConfig.storageBucket || 'decoded-robot-6lkcn.firebasestorage.app',
-  messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || fallbackConfig.messagingSenderId,
-  appId: metaEnv.VITE_FIREBASE_APP_ID || fallbackConfig.appId,
+  apiKey: fallbackConfig.apiKey,
+  authDomain: fallbackConfig.authDomain,
+  projectId: fallbackConfig.projectId,
+  storageBucket: fallbackConfig.storageBucket || 'decoded-robot-6lkcn.firebasestorage.app',
+  messagingSenderId: fallbackConfig.messagingSenderId,
+  appId: fallbackConfig.appId,
 };
 
-const rawDbId = metaEnv.VITE_FIREBASE_DATABASE_ID || metaEnv.VITE_FIRESTORE_DATABASE_ID || fallbackConfig.firestoreDatabaseId;
+if (firebaseConfig.projectId !== 'decoded-robot-6lkcn') {
+  throw new Error('WINRIDER_FIREBASE_PROJECT_MISMATCH');
+}
+
+const rawDbId = fallbackConfig.firestoreDatabaseId;
 const databaseId = (!rawDbId || rawDbId === '(default)') ? undefined : rawDbId;
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 export const auth = getAuth(app);
+export const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
+export const FIREBASE_AUTH_DOMAIN = firebaseConfig.authDomain;
+
 export const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.warn('Firebase Auth persistence could not be enabled:', error);
 });
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
 
-// Prevent accidental Google Maps/Places/Routes request loops in the browser.
-// This is an optimization/safety layer; Cloud billing quotas remain authoritative.
 if (typeof window !== 'undefined') {
   installGoogleMapsCostGuard();
 
   getDocFromServer(doc(db, '_connection_test', 'ping')).catch((err) => {
-    // Non-blocking connectivity test
     if (err?.message?.includes('the client is offline')) {
       console.warn('Firebase network warning:', err.message);
     }
