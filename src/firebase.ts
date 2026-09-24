@@ -6,31 +6,40 @@ import { browserLocalPersistence, getAuth, setPersistence } from 'firebase/auth'
 import fallbackConfig from '../firebase-applet-config.json';
 import { installGoogleMapsCostGuard } from './services/googleMapsCostGuard';
 
-// WINRIDER.AI is intentionally pinned to the Firebase project below.
-// Google AI Studio or hosting environment variables must not silently redirect
-// authentication to a different Firebase project.
+const FIREBASE_APP_NAME = 'winrider-decoded-robot-6lkcn';
+const FIREBASE_PROJECT_ID = 'decoded-robot-6lkcn';
+const FIREBASE_AUTH_DOMAIN = 'decoded-robot-6lkcn.firebaseapp.com';
+
+// This auth runtime is pinned to the WINRIDER Firebase project. We intentionally
+// use a named Firebase app so an older/default app left alive by AI Studio HMR
+// cannot redirect Google Authentication to another Firebase project.
 const firebaseConfig = {
   apiKey: fallbackConfig.apiKey,
-  authDomain: fallbackConfig.authDomain,
-  projectId: fallbackConfig.projectId,
-  storageBucket: fallbackConfig.storageBucket || 'decoded-robot-6lkcn.firebasestorage.app',
-  messagingSenderId: fallbackConfig.messagingSenderId,
-  appId: fallbackConfig.appId,
+  authDomain: FIREBASE_AUTH_DOMAIN,
+  projectId: FIREBASE_PROJECT_ID,
+  storageBucket: 'decoded-robot-6lkcn.firebasestorage.app',
+  messagingSenderId: '522447939215',
+  appId: '1:522447939215:web:3c3f76e8251a2ad32cf2fa',
 };
 
-if (firebaseConfig.projectId !== 'decoded-robot-6lkcn') {
-  throw new Error('WINRIDER_FIREBASE_PROJECT_MISMATCH');
+if (
+  fallbackConfig.projectId !== FIREBASE_PROJECT_ID ||
+  fallbackConfig.authDomain !== FIREBASE_AUTH_DOMAIN
+) {
+  throw new Error('WINRIDER_FIREBASE_CONFIG_MISMATCH');
 }
 
 const rawDbId = fallbackConfig.firestoreDatabaseId;
 const databaseId = (!rawDbId || rawDbId === '(default)') ? undefined : rawDbId;
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = getApps().some((candidate) => candidate.name === FIREBASE_APP_NAME)
+  ? getApp(FIREBASE_APP_NAME)
+  : initializeApp(firebaseConfig, FIREBASE_APP_NAME);
 
 export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 export const auth = getAuth(app);
-export const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
-export const FIREBASE_AUTH_DOMAIN = firebaseConfig.authDomain;
+export { FIREBASE_PROJECT_ID, FIREBASE_AUTH_DOMAIN };
+export const FIREBASE_GOOGLE_REDIRECT_HANDLER = `https://${FIREBASE_AUTH_DOMAIN}/__/auth/handler`;
 
 export const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.warn('Firebase Auth persistence could not be enabled:', error);
