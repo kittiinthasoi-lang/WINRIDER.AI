@@ -1947,6 +1947,56 @@ function isOwnerAdminEmail(value: unknown): boolean {
   return normalizeWinAuthEmail(value) === ownerAdminEmail();
 }
 
+async function ensureOwnerAdminBootstrapAccount() {
+  const bootstrapPassword = String(process.env.ADMIN_BOOTSTRAP_PASSWORD || "");
+  if (!bootstrapPassword) {
+    console.info("[Owner Bootstrap] ADMIN_BOOTSTRAP_PASSWORD is not configured; existing owner login only.");
+    return;
+  }
+  if (bootstrapPassword.length < 12 || bootstrapPassword.length > 200) {
+    console.error("[Owner Bootstrap] ADMIN_BOOTSTRAP_PASSWORD must be 12-200 characters. Owner account was not created.");
+    return;
+  }
+
+  const email = ownerAdminEmail();
+  try {
+    const existing = await getWinAuthUserByEmail(email);
+    if (existing) {
+      if (existing.isAdmin !== true || existing.adminLevel !== "super" || existing.status !== "active") {
+        const now = new Date().toISOString();
+        const promoted = await saveWinAuthUser({
+          ...existing,
+          role: "knight",
+          status: "active",
+          isAdmin: true,
+          adminLevel: "super",
+          approvedAt: existing.approvedAt || now,
+          approvedBy: existing.approvedBy || "OWNER_BOOTSTRAP",
+        });
+        await mirrorWinAuthUser(promoted);
+        console.info("[Owner Bootstrap] Existing owner account promoted to Super Admin.");
+      } else {
+        console.info("[Owner Bootstrap] Existing Super Admin account found; bootstrap password was not applied.");
+      }
+      return;
+    }
+
+    const created = await createWinAuthUser({
+      email,
+      password: bootstrapPassword,
+      role: "knight",
+      displayName: "กิตติ อินทะสร้อย",
+      status: "active",
+      isAdmin: true,
+      adminLevel: "super",
+    });
+    await mirrorWinAuthUser(created);
+    console.info("[Owner Bootstrap] Super Admin account created successfully. Remove ADMIN_BOOTSTRAP_PASSWORD after the first successful login.");
+  } catch (error) {
+    console.error("[Owner Bootstrap] Unable to provision owner account:", error instanceof Error ? error.message : error);
+  }
+}
+
 async function promoteAuthenticatedOwner(user: WinAuthStoredUser): Promise<WinAuthStoredUser> {
   if (!isOwnerAdminEmail(user.email)) return user;
   if (user.isAdmin === true && user.adminLevel === "super" && user.status === "active") return user;
@@ -5527,6 +5577,8 @@ function getDistPath(): string {
 
 // Vite / Static Middleware Integration
 async function startServer() {
+  await ensureOwnerAdminBootstrapAccount();
+
   const distPath = getDistPath();
   const hasDist = fs.existsSync(path.join(distPath, "index.html"));
 
