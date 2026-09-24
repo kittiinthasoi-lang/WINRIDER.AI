@@ -2200,10 +2200,20 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
     await ordersDb.runTransaction(async (tx) => {
       const snap = await tx.get(bootstrapRef);
       const data = snap.exists ? snap.data() || {} : {};
-      if (data.status === "active") throw new Error("ADMIN_BOOTSTRAP_CLOSED");
+
+      if (data.status === "active" && data.firstAdminUid) {
+        const firstAdminSnap = await tx.get(ordersDb.collection("users").doc(String(data.firstAdminUid)));
+        if (firstAdminSnap.exists && firstAdminSnap.data()?.isAdmin === true) {
+          throw new Error("ADMIN_BOOTSTRAP_CLOSED");
+        }
+        // Stale bootstrap marker: the recorded Admin no longer exists/has access,
+        // so the first real signed-in account may recover ownership.
+      }
+
       if (data.status === "reserved" && data.reservedUid && data.reservedUid !== decoded.uid) {
         throw new Error("ADMIN_BOOTSTRAP_RESERVED");
       }
+
       tx.set(bootstrapRef, {
         status: "reserved",
         reservedUid: decoded.uid,
