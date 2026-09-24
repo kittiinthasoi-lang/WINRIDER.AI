@@ -160,7 +160,7 @@ export default function App() {
     if (currentUserSession) void saveUserSession(currentUserSession);
   }, [currentUserSession]);
 
-  const isSuperAdminUser = isOwnerAdmin;
+  const isSuperAdminUser = userData?.isAdmin === true && userData?.adminLevel === 'super';
 
   useEffect(() => {
     let active = true;
@@ -626,12 +626,11 @@ export default function App() {
 
         {activeMode === 'admin' && (
           <AdminRoute
-            isOwnerAdmin={isOwnerAdmin}
             onRedirectHome={handleExitAdmin}
           >
             {(claims) => (
               <AdminLayout
-                adminLevel={isOwnerAdmin ? 'super' : claims.adminLevel}
+                adminLevel={claims.adminLevel}
                 adminEmail={userData?.winUid || currentUserSession?.winUid || 'Admin'}
                 onExitAdmin={handleExitAdmin}
                 onSelectOwnerPersona={handleSelectOwnerPersona}
