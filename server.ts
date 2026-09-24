@@ -1408,9 +1408,8 @@ app.get("/api/admin/public-data/catalog", async (req, res) => {
 
 // Backward-compatible admin trigger. It now means "sync source", not "approve records".
 app.post("/api/admin/public-data/import-tat", rateLimit(5), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireAdmin(req, res);
   if (!user) return;
-  if (!(await isAdminUser(user))) return res.status(403).json({ error: "Admin only" });
 
   const requestedKinds = Array.isArray(req.body?.kinds)
     ? req.body.kinds.map((value: unknown) => String(value))
@@ -3526,9 +3525,8 @@ app.post("/api/wallet/withdraw", rateLimit(10), async (req, res) => {
 });
 
 app.post("/api/admin/manual-topup", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
   if (!getManualSettlementConfig().configured) {
     return res.status(503).json({ error: "ยังไม่ได้ตั้งค่าบัญชีบริษัทสำหรับรับเงิน" });
   }
@@ -3658,9 +3656,8 @@ app.post("/api/admin/manual-topup", rateLimit(20), async (req, res) => {
 });
 
 app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
 
   type HealthStatus = "ok" | "warning" | "error";
   const checks: Array<{ id: string; name: string; status: HealthStatus; detail: string; actionUrl?: string; guideKey?: string }> = [
@@ -3798,17 +3795,15 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
 });
 
 app.get("/api/admin/withdrawal-requests", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
   const snap = await ordersDb.collection("withdrawal_requests").where("status", "==", "WAITING_ADMIN").limit(50).get();
   return res.json({ withdrawals: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) });
 });
 
 app.post("/api/admin/withdrawal-review", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
 
   const withdrawalId = String(req.body?.withdrawalId || "").trim();
   const decision = String(req.body?.decision || "").trim().toUpperCase();
@@ -3917,9 +3912,8 @@ app.post("/api/admin/withdrawal-review", rateLimit(20), async (req, res) => {
 });
 
 app.get("/api/admin/system-payouts", rateLimit(20), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
   const [poolSnap, pendingSnap] = await Promise.all([
     ordersDb.collection("wallets").doc("SYSTEM_POOLS").get(),
     ordersDb.collection("system_payout_requests").where("status", "==", "WAITING_BANK_TRANSFER").limit(30).get()
@@ -3936,9 +3930,8 @@ app.get("/api/admin/system-payouts", rateLimit(20), async (req, res) => {
 });
 
 app.post("/api/admin/system-payout-request", rateLimit(10), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
 
   const amountSatang = Math.round(Number(req.body?.amount) * 100);
   const bankName = String(req.body?.bankName || "").trim().slice(0, 120);
@@ -3995,9 +3988,8 @@ app.post("/api/admin/system-payout-request", rateLimit(10), async (req, res) => 
 });
 
 app.post("/api/admin/system-payout-review", rateLimit(10), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Super Admin only" });
 
   const payoutId = String(req.body?.payoutId || "").trim();
   const decision = String(req.body?.decision || "").trim().toUpperCase();
@@ -4818,7 +4810,9 @@ app.get("/api/knights/:driverUserId/location", async (req, res) => {
   }
 });
 
-app.get("/api/admin/dashboard-metrics", rateLimit(30), async (_req, res) => {
+app.get("/api/admin/dashboard-metrics", rateLimit(30), async (req, res) => {
+  const adminUser = await requireAdmin(req, res);
+  if (!adminUser) return;
   try {
     let totalUsersCount = 1;
     let newUsersToday = 1;
@@ -4900,9 +4894,8 @@ app.get("/api/admin/dashboard-metrics", rateLimit(30), async (_req, res) => {
 });
 
 app.get("/api/admin/ops/overview", rateLimit(30), async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireSuperAdmin(req, res);
   if (!user) return;
-  if (!isSuperAdminToken(user)) return res.status(403).json({ error: "Admin access required" });
   try {
     const [ridesSnap, sosSnap, knightsSnap, topupsSnap] = await Promise.all([
       ordersDb.collection("rides").orderBy("createdAt", "desc").limit(200).get(),
