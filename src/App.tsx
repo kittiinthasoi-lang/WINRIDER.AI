@@ -81,11 +81,7 @@ export default function App() {
   // โดยใช้ Firebase UID เดียวเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
   const isOwnerAdmin = Boolean(
     userData?.isAdmin === true ||
-    userData?.adminLevel === 'super' ||
-    firebaseUser?.email === 'kittiinthasoi@gmail.com' ||
-    userData?.email === 'kittiinthasoi@gmail.com' ||
-    userData?.winUid === 'kitti' ||
-    userData?.winUid === 'kittiinthasoi'
+    userData?.adminLevel === 'super'
   );
 
   // Convert Firebase profile data to a local UI UserSession
