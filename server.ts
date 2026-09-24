@@ -1943,32 +1943,6 @@ function isOwnerAdminEmail(value: unknown): boolean {
   return normalizeWinAuthEmail(value) === ownerAdminEmail();
 }
 
-const TEMPORARY_ADMIN_BYPASS_ENABLED = false;
-const TEMPORARY_ADMIN_BYPASS_TOKEN = "WINRIDER-TEMP-ADMIN-BYPASS-V1";
-
-function isTemporaryAdminBypassToken(token: string): boolean {
-  return TEMPORARY_ADMIN_BYPASS_ENABLED && token === TEMPORARY_ADMIN_BYPASS_TOKEN;
-}
-
-function temporaryAdminUser(): WinAuthStoredUser {
-  const now = new Date().toISOString();
-  return {
-    uid: "WIN-TEMP-OWNER-ADMIN",
-    email: ownerAdminEmail(),
-    passwordHash: "",
-    role: "knight",
-    status: "active",
-    displayName: "กิตติ อินทะสร้อย",
-    phone: "",
-    isAdmin: true,
-    adminLevel: "super",
-    createdAt: now,
-    updatedAt: now,
-    approvedAt: now,
-    approvedBy: "TEMPORARY_ADMIN_BYPASS",
-  };
-}
-
 async function promoteAuthenticatedOwner(user: WinAuthStoredUser): Promise<WinAuthStoredUser> {
   if (!isOwnerAdminEmail(user.email)) return user;
   if (user.isAdmin === true && user.adminLevel === "super" && user.status === "active") return user;
@@ -1998,9 +1972,6 @@ async function requireWinAuthAdmin(req: express.Request, res: express.Response) 
     res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
     return null;
   }
-  if (isTemporaryAdminBypassToken(token)) {
-    return temporaryAdminUser();
-  }
   try {
     const user = await getWinAuthSessionUser(token);
     if (!user || user.status !== "active" || user.isAdmin !== true || user.adminLevel !== "super") {
@@ -2015,14 +1986,9 @@ async function requireWinAuthAdmin(req: express.Request, res: express.Response) 
 }
 
 app.post("/api/auth/temporary-admin-entry", rateLimit(30), async (_req, res) => {
-  if (!TEMPORARY_ADMIN_BYPASS_ENABLED) {
-    return res.status(404).json({ error: "Temporary admin access is disabled", code: "TEMP_ADMIN_DISABLED" });
-  }
-  const user = temporaryAdminUser();
-  return res.json({
-    token: TEMPORARY_ADMIN_BYPASS_TOKEN,
-    user: publicWinAuthUser(user),
-    temporaryAdminBypass: true,
+  return res.status(404).json({
+    error: "Temporary admin access is disabled",
+    code: "TEMP_ADMIN_DISABLED",
   });
 });
 
@@ -2091,10 +2057,6 @@ app.post("/api/auth/login", rateLimit(20), async (req, res) => {
 app.get("/api/auth/me", rateLimit(60), async (req, res) => {
   const token = rawBearerToken(req);
   if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
-  if (isTemporaryAdminBypassToken(token)) {
-    const user = temporaryAdminUser();
-    return res.json({ user: publicWinAuthUser(user), approvalRequired: false, temporaryAdminBypass: true });
-  }
   try {
     let user = await getWinAuthSessionUser(token);
     if (!user) return res.status(401).json({ error: "Invalid session", code: "INVALID_SESSION" });
@@ -2108,7 +2070,6 @@ app.get("/api/auth/me", rateLimit(60), async (req, res) => {
 app.post("/api/auth/logout", rateLimit(30), async (req, res) => {
   const token = rawBearerToken(req);
   try {
-    if (isTemporaryAdminBypassToken(token)) return res.json({ ok: true });
     if (token) await deleteWinAuthSession(token);
     return res.json({ ok: true });
   } catch {
@@ -3604,21 +3565,6 @@ async function requireFirebaseUser(req: express.Request, res: express.Response) 
     return null;
   }
 
-  if (isTemporaryAdminBypassToken(token)) {
-    const user = temporaryAdminUser();
-    return {
-      uid: user.uid,
-      email: user.email,
-      name: user.displayName,
-      displayName: user.displayName,
-      role: user.role,
-      status: user.status,
-      admin: true,
-      isAdmin: true,
-      adminLevel: "super",
-      authProvider: "temporary_admin_bypass",
-    };
-  }
 
   try {
     const winUser = await getWinAuthSessionUser(token);
@@ -3659,21 +3605,6 @@ async function requireFirebaseUser(req: express.Request, res: express.Response) 
 async function requireFirebaseUserOptional(req: express.Request) {
   const token = rawBearerToken(req);
   if (!token) return null;
-  if (isTemporaryAdminBypassToken(token)) {
-    const user = temporaryAdminUser();
-    return {
-      uid: user.uid,
-      email: user.email,
-      name: user.displayName,
-      displayName: user.displayName,
-      role: user.role,
-      status: user.status,
-      admin: true,
-      isAdmin: true,
-      adminLevel: "super",
-      authProvider: "temporary_admin_bypass",
-    };
-  }
   try {
     const winUser = await getWinAuthSessionUser(token);
     if (winUser && (winUser.status === "active" || winUser.isAdmin === true)) {
