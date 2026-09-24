@@ -35,7 +35,10 @@ export interface PdpaConsent {
 
 export interface UserDoc {
   uid: string;
-  email: string;
+  email?: string;
+  winUid: string;
+  firstName?: string;
+  lastName?: string;
   role: UserRole;
   displayName: string;
   phone: string;

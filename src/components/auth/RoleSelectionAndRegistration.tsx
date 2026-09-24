@@ -192,7 +192,6 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         setUploadProgressText('กำลังบันทึกข้อมูลและจองสิทธิ์อัศวินผู้ก่อตั้ง...');
         await registerKnight({
           uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
           displayName,
           phone,
           province,
@@ -212,7 +211,6 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         setUploadProgressText('กำลังสร้างบัญชีพลเมืองอัศวิน...');
         await registerCitizen({
           uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
           displayName,
           phone,
           province,
@@ -232,7 +230,6 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         setUploadProgressText('กำลังบันทึกข้อมูลร้านค้าพันธมิตร...');
         await registerMerchant({
           uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
           displayName,
           phone,
           province,
@@ -254,7 +251,6 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         setUploadProgressText('กำลังบันทึกข้อมูลองค์กรพาร์ทเนอร์...');
         await registerPartner({
           uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
           displayName,
           phone,
           province,
@@ -295,7 +291,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-400 hidden sm:inline">
-            เข้าสู่ระบบด้วย: <strong className="text-slate-200">{firebaseUser?.email || firebaseUser?.displayName}</strong>
+            WIN UID: <strong className="text-slate-200">{firebaseUser?.email?.split('@')[0] || '-'}</strong>
           </span>
           <button
             onClick={() => signOut()}
@@ -583,22 +579,18 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
           <div className="bg-[#0A1633] rounded-2xl border border-slate-800 p-6 space-y-4">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#00D4FF]" />
-              <span>1. ข้อมูลประจำตัวและช่องทางติดต่อ</span>
+              <span>1. ข้อมูลบัญชีและช่องทางติดต่อ</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  ชื่อ-นามสกุล (ภาษาไทย) *
+                  ชื่อ-นามสกุลจากบัญชี
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="เช่น นายสมชาย ใจกล้า"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00D4FF]"
-                />
+                <div className="w-full bg-slate-950/80 border border-cyan-500/20 rounded-xl px-4 py-2.5">
+                  <div className="text-sm font-bold text-white">{displayName || '-'}</div>
+                  <div className="text-[10px] font-mono text-cyan-300 mt-0.5">WIN UID: {firebaseUser?.email?.split('@')[0] || '-'}</div>
+                </div>
               </div>
 
               <div>

@@ -66,6 +66,7 @@ export interface FeeRule {
 
 export interface AdminUserSummary {
   uid: string;
+  winUid?: string;
   displayName: string;
   email: string;
   phone: string;

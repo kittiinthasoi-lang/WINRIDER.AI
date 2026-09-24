@@ -58,8 +58,7 @@ export interface AdminBootstrapStatus {
   bootstrapOpen: boolean;
   status: string;
   reservedUid?: string;
-  currentUid: string;
-  currentEmail?: string;
+  currentWinUid: string;
 }
 
 export async function getAdminBootstrapStatus(): Promise<AdminBootstrapStatus> {
@@ -77,7 +76,7 @@ export async function getAdminBootstrapStatus(): Promise<AdminBootstrapStatus> {
   return data as AdminBootstrapStatus;
 }
 
-export async function bootstrapFirstAdmin(targetUid: string): Promise<{ ok: boolean; adminLevel: AdminLevel }> {
+export async function bootstrapFirstAdmin(targetWinUid: string): Promise<{ ok: boolean; adminLevel: AdminLevel }> {
   const user = auth.currentUser;
   if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อน');
   const token = await user.getIdToken();
@@ -88,7 +87,7 @@ export async function bootstrapFirstAdmin(targetUid: string): Promise<{ ok: bool
       Accept: 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ targetUid }),
+    body: JSON.stringify({ targetWinUid }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'ตั้งค่า Super Admin คนแรกไม่สำเร็จ');
@@ -293,9 +292,9 @@ export async function updateFeeRule(ruleId: string, patch: any, reason?: string)
 /**
  * 7. setAdminRole
  */
-export async function setAdminRole(targetUid: string, level: AdminLevel, reason?: string) {
-  const result = await callAdminEndpoint('setAdminRole', '/api/admin/set-role', { targetUid, level, reason });
-  if (auth.currentUser?.uid === targetUid) {
+export async function setAdminRole(targetWinUid: string, level: AdminLevel, reason?: string) {
+  const result = await callAdminEndpoint('setAdminRole', '/api/admin/set-role', { targetWinUid, level, reason });
+  if (result?.forceTokenRefresh === true && auth.currentUser) {
     await auth.currentUser.getIdToken(true);
   }
   return result;

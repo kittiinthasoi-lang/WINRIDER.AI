@@ -1773,6 +1773,17 @@ void checkFirebaseReadiness()
 type FirebaseUserRole = "citizen" | "knight" | "merchant" | "partner";
 const FIREBASE_USER_ROLES = new Set<FirebaseUserRole>(["citizen", "knight", "merchant", "partner"]);
 
+const WIN_UID_EMAIL_SUFFIX = "@auth.winrider.local";
+function normalizeWinUidServer(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
+}
+function winUidFromAuthEmail(value: unknown): string {
+  const email = String(value || "").trim().toLowerCase();
+  if (!email.endsWith(WIN_UID_EMAIL_SUFFIX)) return "";
+  const winUid = email.slice(0, -WIN_UID_EMAIL_SUFFIX.length);
+  return /^[a-z0-9][a-z0-9._-]{3,29}$/.test(winUid) ? winUid : "";
+}
+
 type RegistrationInput = {
   fullName: string;
   phone: string;
@@ -1861,7 +1872,7 @@ function validateRegistrationInput(role: FirebaseUserRole, profile: Registration
 
 async function createFirebaseRegistration(
   uid: string,
-  email: string,
+  winUid: string,
   role: FirebaseUserRole,
   profile: RegistrationInput,
 ) {
@@ -1888,7 +1899,7 @@ async function createFirebaseRegistration(
 
     tx.create(userRef, {
       uid,
-      email,
+      winUid,
       role,
       displayName: profile.fullName,
       phone: profile.phone,
@@ -1908,7 +1919,7 @@ async function createFirebaseRegistration(
     if (role === "citizen") {
       tx.create(ordersDb.collection("citizens").doc(uid), {
         displayName: profile.fullName,
-        email,
+        winUid,
         phone: profile.phone,
         province: profile.province,
         district: profile.district,
@@ -1924,7 +1935,7 @@ async function createFirebaseRegistration(
     } else if (role === "knight") {
       tx.create(ordersDb.collection("knights").doc(uid), {
         displayName: profile.fullName,
-        email,
+        winUid,
         phone: profile.phone,
         province: profile.province,
         district: profile.district,
@@ -1947,7 +1958,7 @@ async function createFirebaseRegistration(
       tx.create(ordersDb.collection("merchants").doc(uid), {
         displayName: profile.fullName,
         ownerName: profile.fullName,
-        email,
+        winUid,
         phone: profile.phone,
         province: profile.province,
         district: profile.district,
@@ -1964,7 +1975,7 @@ async function createFirebaseRegistration(
       tx.create(ordersDb.collection("partners").doc(uid), {
         displayName: profile.orgName || profile.fullName,
         contactPerson: profile.contactPerson || profile.fullName,
-        contactEmail: email,
+        winUid,
         phone: profile.phone,
         province: profile.province,
         district: profile.district,
@@ -2005,10 +2016,10 @@ app.get("/api/admin/bootstrap-status", rateLimit(30), async (req, res) => {
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     const state = await adminBootstrapState(decoded.uid);
+    const profileSnap = await ordersDb.collection("users").doc(decoded.uid).get();
     return res.json({
       ...state,
-      currentUid: decoded.uid,
-      currentEmail: decoded.email || "",
+      currentWinUid: String(profileSnap.data()?.winUid || winUidFromAuthEmail(decoded.email)),
     });
   } catch {
     return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
@@ -2021,17 +2032,17 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
 
   try {
     const decoded = await adminAuth.verifyIdToken(token);
-    const targetUid = String(req.body?.targetUid || "").trim();
+    const targetWinUid = normalizeWinUidServer(req.body?.targetWinUid);
+    const userRef = ordersDb.collection("users").doc(decoded.uid);
+    const userSnap = await userRef.get();
+    const currentWinUid = normalizeWinUidServer(userSnap.data()?.winUid || winUidFromAuthEmail(decoded.email));
 
-    if (!targetUid || targetUid !== decoded.uid) {
+    if (!targetWinUid || targetWinUid !== currentWinUid) {
       return res.status(400).json({
-        error: "การตั้ง Admin ครั้งแรกต้องใช้ UID ของบัญชีที่กำลังล็อกอิน",
-        code: "BOOTSTRAP_SELF_UID_REQUIRED",
+        error: "การตั้ง Admin ครั้งแรกต้องใช้ WIN UID ของบัญชีที่กำลังล็อกอิน",
+        code: "BOOTSTRAP_SELF_WIN_UID_REQUIRED",
       });
     }
-
-    const userRef = ordersDb.collection("users").doc(targetUid);
-    const userSnap = await userRef.get();
     if (!userSnap.exists) {
       return res.status(409).json({
         error: "กรุณาเลือกบทบาทและลงทะเบียนโปรไฟล์ให้เสร็จก่อนตั้ง Admin",
@@ -2060,8 +2071,8 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
       }, { merge: true });
     });
 
-    const record = await adminAuth.getUser(targetUid);
-    await adminAuth.setCustomUserClaims(targetUid, {
+    const record = await adminAuth.getUser(decoded.uid);
+    await adminAuth.setCustomUserClaims(decoded.uid, {
       ...(record.customClaims || {}),
       admin: true,
       adminLevel: "super",
@@ -2074,28 +2085,31 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
         adminLevel: "super",
         status: "active",
         adminAssignedAt: now,
-        adminAssignedBy: targetUid,
+        adminAssignedBy: decoded.uid,
         updatedAt: now,
       }, { merge: true }),
-      ordersDb.collection("adminAccess").doc(targetUid).set({
-        uid: targetUid,
+      ordersDb.collection("adminAccess").doc(decoded.uid).set({
+        uid: decoded.uid,
+        winUid: targetWinUid,
         adminLevel: "super",
         active: true,
         bootstrap: true,
-        assignedBy: targetUid,
+        assignedBy: decoded.uid,
         createdAt: now,
         updatedAt: now,
       }, { merge: true }),
       bootstrapRef.set({
         status: "active",
-        firstAdminUid: targetUid,
+        firstAdminUid: decoded.uid,
+        firstAdminWinUid: targetWinUid,
         completedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true }),
       ordersDb.collection("audit_logs").add({
         action: "BOOTSTRAP_FIRST_SUPER_ADMIN",
-        actorUid: targetUid,
-        targetUid,
+        actorUid: decoded.uid,
+        targetUid: decoded.uid,
+        winUid: targetWinUid,
         adminLevel: "super",
         createdAt: FieldValue.serverTimestamp(),
       }),
@@ -2103,7 +2117,8 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
 
     return res.json({
       ok: true,
-      targetUid,
+      targetUid: decoded.uid,
+      winUid: targetWinUid,
       adminLevel: "super",
       bootstrapClosed: true,
       forceTokenRefresh: true,
@@ -2124,8 +2139,9 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
 
   try {
     const decoded = await adminAuth.verifyIdToken(token);
-    if (!decoded.email) {
-      return res.status(403).json({ error: "Email identity required", code: "EMAIL_REQUIRED" });
+    const winUid = winUidFromAuthEmail(decoded.email);
+    if (!winUid) {
+      return res.status(403).json({ error: "WIN UID identity required", code: "WIN_UID_REQUIRED" });
     }
 
     const role = String(req.body?.role || "") as FirebaseUserRole;
@@ -2137,7 +2153,7 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
     const validationError = validateRegistrationInput(role, profile);
     if (validationError) return res.status(400).json({ error: "Registration details are incomplete", code: validationError });
 
-    const result = await createFirebaseRegistration(decoded.uid, String(decoded.email).toLowerCase(), role, profile);
+    const result = await createFirebaseRegistration(decoded.uid, winUid, role, profile);
     const userSnap = await ordersDb.collection("users").doc(decoded.uid).get();
     return res.status(201).json({ user: userSnap.data(), approvalRequired: false, ...result });
   } catch (error: any) {
@@ -2504,25 +2520,26 @@ app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
   const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
 
-  const targetUid = String(req.body?.targetUid || "").trim();
+  const targetWinUid = normalizeWinUidServer(req.body?.targetWinUid);
   const level = String(req.body?.level || "").trim();
   const validLevels = new Set(["super", "reviewer", "support"]);
 
-  if (!targetUid) return res.status(400).json({ error: "ต้องระบุ UID ผู้ใช้", code: "TARGET_UID_REQUIRED" });
+  if (!targetWinUid) return res.status(400).json({ error: "ต้องระบุ WIN UID ผู้ใช้", code: "TARGET_WIN_UID_REQUIRED" });
   if (!validLevels.has(level)) {
     return res.status(400).json({ error: "ระดับ Admin ไม่ถูกต้อง", code: "INVALID_ADMIN_LEVEL" });
   }
 
   try {
-    const [record, userSnap] = await Promise.all([
-      adminAuth.getUser(targetUid),
-      ordersDb.collection("users").doc(targetUid).get(),
-    ]);
-    if (!userSnap.exists) {
-      return res.status(404).json({ error: "ไม่พบโปรไฟล์ UID นี้ใน WINRIDER", code: "USER_PROFILE_NOT_FOUND" });
+    const match = await ordersDb.collection("users").where("winUid", "==", targetWinUid).limit(1).get();
+    if (match.empty) {
+      return res.status(404).json({ error: "ไม่พบ WIN UID นี้ใน WINRIDER", code: "WIN_UID_NOT_FOUND" });
     }
 
-    await adminAuth.setCustomUserClaims(targetUid, {
+    const userDoc = match.docs[0];
+    const firebaseUid = userDoc.id;
+    const record = await adminAuth.getUser(firebaseUid);
+
+    await adminAuth.setCustomUserClaims(firebaseUid, {
       ...(record.customClaims || {}),
       admin: true,
       adminLevel: level,
@@ -2530,7 +2547,7 @@ app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
 
     const now = new Date().toISOString();
     await Promise.all([
-      ordersDb.collection("users").doc(targetUid).set({
+      userDoc.ref.set({
         isAdmin: true,
         adminLevel: level,
         status: "active",
@@ -2538,8 +2555,9 @@ app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
         adminAssignedBy: admin.uid,
         updatedAt: now,
       }, { merge: true }),
-      ordersDb.collection("adminAccess").doc(targetUid).set({
-        uid: targetUid,
+      ordersDb.collection("adminAccess").doc(firebaseUid).set({
+        uid: firebaseUid,
+        winUid: targetWinUid,
         adminLevel: level,
         active: true,
         bootstrap: false,
@@ -2550,18 +2568,16 @@ app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
       ordersDb.collection("audit_logs").add({
         action: "SET_ADMIN_ROLE",
         actorUid: admin.uid,
-        targetUid,
+        targetUid: firebaseUid,
+        targetWinUid,
         adminLevel: level,
         reason: String(req.body?.reason || "").slice(0, 500),
         createdAt: FieldValue.serverTimestamp(),
       }),
     ]);
 
-    return res.json({ ok: true, targetUid, adminLevel: level, forceTokenRefresh: true });
+    return res.json({ ok: true, targetWinUid, adminLevel: level, forceTokenRefresh: firebaseUid === admin.uid });
   } catch (error: any) {
-    if (error?.code === "auth/user-not-found") {
-      return res.status(404).json({ error: "ไม่พบ UID นี้ใน Firebase Authentication", code: "FIREBASE_USER_NOT_FOUND" });
-    }
     console.error("[Admin Set Role]", error?.message);
     return res.status(503).json({ error: "ตั้งสิทธิ์ Admin ไม่สำเร็จ", code: "SET_ADMIN_ROLE_FAILED" });
   }

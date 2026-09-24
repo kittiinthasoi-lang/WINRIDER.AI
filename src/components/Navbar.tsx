@@ -95,7 +95,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (isAdminSession) {
       return {
         name: currentUserSession?.name || userData?.displayName || 'Super Admin',
-        title: `ผู้ดูแลระบบ (${userData?.adminLevel || 'support'}): ${firebaseUser?.email || currentUserSession?.email || 'Admin'}`,
+        title: `ผู้ดูแลระบบ (${userData?.adminLevel || 'support'}): ${userData?.winUid || currentUserSession?.winUid || 'Admin'}`,
         roleLabel: userData?.adminLevel === 'super' ? 'Super Admin' : userData?.adminLevel === 'reviewer' ? 'Reviewer Admin' : 'Support Admin',
         avatar: '/avatars/partner.jpg',
         badgeBorder: 'border-amber-400 shadow-[0_0_12px_rgba(255,201,60,0.6)]',
@@ -229,7 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="inline-flex items-center gap-1.5 text-amber-300 font-mono text-[11px] truncate">
                 <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" />
                 <span className="font-bold">ADMIN:</span>
-                <span className="text-white/90 truncate">{currentUserSession?.email || 'kittiinthasoi@gmail.com'}</span>
+                <span className="text-white/90 truncate">{userData?.winUid || currentUserSession?.winUid || 'Admin'}</span>
               </span>
             ) : (
               <span className="hidden md:inline text-slate-300 text-[11px] truncate">
@@ -822,7 +822,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <span>👑 เปิดหน้าจอคุมระบบหลังบ้าน (ADMIN CONSOLE)</span>
                   </button>
                   <p className="text-[10px] text-center text-amber-300/80 font-mono">
-                    สิทธิ์ Super Admin ({firebaseUser?.email || currentUserSession?.email || 'kittiinthasoi@gmail.com'})
+                    สิทธิ์ Super Admin ({firebaseUser?.email || userData?.winUid || currentUserSession?.winUid || 'Admin'})
                   </p>
                 </div>
               )}
