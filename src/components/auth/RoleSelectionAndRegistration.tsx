@@ -13,7 +13,8 @@ import {
   registerKnight,
   registerCitizen,
   registerMerchant,
-  registerPartner
+  registerPartner,
+  RegistrationResult
 } from '../../services/registrationService';
 import { uploadKycDocument } from '../../utils/imageUpload';
 import { playTactileBlip } from '../../utils/audio';
@@ -41,7 +42,7 @@ interface Props {
 }
 
 export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) => {
-  const { firebaseUser, refreshUserData, signOut } = useAuth();
+  const { firebaseUser, adoptUserData, signOut } = useAuth();
 
   // State
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
@@ -168,6 +169,8 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
     playTactileBlip(800);
 
     try {
+      let registrationResult: RegistrationResult | null = null;
+
       if (selectedRole === 'knight') {
         if (!plateNumber.trim()) {
           throw new Error('กรุณาระบุหมายเลขทะเบียนรถให้ถูกต้อง');
@@ -190,7 +193,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         }
 
         setUploadProgressText('กำลังบันทึกข้อมูลและจองสิทธิ์อัศวินผู้ก่อตั้ง...');
-        await registerKnight({
+        registrationResult = await registerKnight({
           uid: firebaseUser.uid,
           displayName,
           phone,
@@ -209,7 +212,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         }
 
         setUploadProgressText('กำลังสร้างบัญชีพลเมืองอัศวิน...');
-        await registerCitizen({
+        registrationResult = await registerCitizen({
           uid: firebaseUser.uid,
           displayName,
           phone,
@@ -228,7 +231,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         }
 
         setUploadProgressText('กำลังบันทึกข้อมูลร้านค้าพันธมิตร...');
-        await registerMerchant({
+        registrationResult = await registerMerchant({
           uid: firebaseUser.uid,
           displayName,
           phone,
@@ -249,7 +252,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         }
 
         setUploadProgressText('กำลังบันทึกข้อมูลองค์กรพาร์ทเนอร์...');
-        await registerPartner({
+        registrationResult = await registerPartner({
           uid: firebaseUser.uid,
           displayName,
           phone,
@@ -263,7 +266,14 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         });
       }
 
-      await refreshUserData();
+      if (!registrationResult?.user?.role) {
+        throw new Error('ระบบบันทึกบทบาทแล้วแต่ไม่ได้รับโปรไฟล์กลับมา กรุณาลองอีกครั้ง');
+      }
+
+      // Use the server response immediately instead of waiting for a second
+      // Firestore read. This prevents the onboarding screen from reappearing
+      // while the newly-created profile is still hydrating in the client.
+      adoptUserData(registrationResult.user);
       if (onCompleted) onCompleted();
     } catch (err: any) {
       console.error('Registration failed:', err);
