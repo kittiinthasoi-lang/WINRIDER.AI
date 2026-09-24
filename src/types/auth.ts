@@ -3,6 +3,7 @@ export type UserStatus = 'pending_review' | 'active' | 'suspended';
 
 export interface RegistrationProfile {
   fullName: string;
+  email?: string;
   phone: string;
   province: string;
   district: string;
@@ -36,7 +37,10 @@ export interface PdpaConsent {
 
 export interface UserDoc {
   uid: string;
+  /** Real user/contact email shown in WINRIDER profiles and admin data. */
   email?: string;
+  /** Hidden Firebase Email/Password identity derived from WIN UID. */
+  authEmail?: string;
   winUid: string;
   firstName?: string;
   lastName?: string;
