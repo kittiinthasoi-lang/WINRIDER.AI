@@ -77,7 +77,7 @@ function friendlyError(error: any) {
 }
 
 export const AuthModalOrView: React.FC = () => {
-  const { signInWithWinUid, adoptUserData } = useAuth();
+  const { signInWithWinUid, signInWithGoogle, googleOnboarding, adoptUserData } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
 
   // Multi-step Registration: Step 1 (Info), Step 2 (Select Role), Step 3 (Role Details), Step 4 (Confirm & Save)
@@ -146,6 +146,15 @@ export const AuthModalOrView: React.FC = () => {
       return () => unsub();
     }
   }, [mode]);
+
+  useEffect(() => {
+    if (!googleOnboarding) return;
+    setMode('register');
+    setRegStep(1);
+    setError('');
+    if (!firstName.trim() && googleOnboarding.firstName) setFirstName(googleOnboarding.firstName);
+    if (!lastName.trim() && googleOnboarding.lastName) setLastName(googleOnboarding.lastName);
+  }, [googleOnboarding]);
 
   const changeMode = (next: Mode) => {
     setMode(next);
@@ -308,6 +317,33 @@ export const AuthModalOrView: React.FC = () => {
       setError(friendlyError(cause));
       setWorking(false);
       setProgressMsg('');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    if (working) return;
+    setError('');
+    setWorking(true);
+    playTactileBlip(900);
+    try {
+      const result = await signInWithGoogle();
+      if (!result.existingProfile) {
+        setMode('register');
+        setRegStep(1);
+        if (result.google.firstName) setFirstName(result.google.firstName);
+        if (result.google.lastName) setLastName(result.google.lastName);
+      }
+    } catch (cause: any) {
+      const code = String(cause?.code || cause?.message || '');
+      if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
+        setError('ยกเลิกการเข้าสู่ระบบด้วย Google');
+      } else if (code.includes('operation-not-allowed')) {
+        setError('ยังไม่ได้เปิด Google Sign-In ใน Firebase Authentication');
+      } else {
+        setError(friendlyError(cause));
+      }
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -479,6 +515,36 @@ export const AuthModalOrView: React.FC = () => {
             </div>
           )}
 
+          <div className="max-w-md mx-auto">
+            {googleOnboarding ? (
+              <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100">
+                <div className="font-black text-emerald-300">✓ เชื่อมบัญชี Google แล้ว</div>
+                <div className="mt-1 text-slate-300">
+                  {googleOnboarding.displayName || 'Google Account'}
+                  {googleOnboarding.email ? ` • ${googleOnboarding.email}` : ''}
+                </div>
+                <div className="mt-1 text-[11px] text-slate-400">
+                  ขั้นต่อไปยังต้องตั้ง WIN UID และรหัสผ่านของ WINRIDER ตามปกติ
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleGoogleSignIn()}
+                disabled={working}
+                className="w-full rounded-xl border border-white/15 bg-white px-4 py-3 text-sm font-black text-slate-900 shadow-md hover:bg-slate-100 disabled:opacity-50 flex items-center justify-center gap-3"
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-black text-blue-600">G</span>
+                <span>{working ? 'กำลังเชื่อม Google...' : 'เข้าสู่ระบบด้วย Google'}</span>
+              </button>
+            )}
+            <div className="my-4 flex items-center gap-3 text-[10px] font-bold text-slate-500">
+              <div className="h-px flex-1 bg-white/10" />
+              <span>{googleOnboarding ? 'ตั้ง WIN UID ต่อด้านล่าง' : 'หรือใช้ WIN UID'}</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+          </div>
+
           {/* ======================================================== */}
           {/* LOGIN MODE */}
           {/* ======================================================== */}
@@ -606,7 +672,7 @@ export const AuthModalOrView: React.FC = () => {
                       <span>ขั้นตอนที่ 1: กรอกข้อมูลบัญชีและข้อมูลส่วนตัว</span>
                     </h3>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      กรอกข้อมูลพื้นฐานสำหรับสร้างบัญชีในระบบ
+                      {googleOnboarding ? 'Google ช่วยยืนยันบัญชีและเติมชื่อให้ แต่ยังต้องตั้ง WIN UID + รหัสผ่าน' : 'กรอกข้อมูลพื้นฐานสำหรับสร้างบัญชีในระบบ'}
                     </p>
                   </div>
 
