@@ -20,9 +20,24 @@ import {
   X, 
   RefreshCw,
   Loader2,
-  Crown
+  Crown,
+  Power,
+  UserPlus,
+  ShieldOff
 } from 'lucide-react';
-import { approveRegistration, getAllUsers, getUserLedgerHistory, suspendUser, unsuspendUser, setAdminRole } from '../../services/adminService';
+import {
+  approveRegistration,
+  getAllUsers,
+  getUserLedgerHistory,
+  suspendUser,
+  unsuspendUser,
+  setAdminRole,
+  revokeAdminRole,
+  getAdminPortalStatus,
+  setAdminPortalOpen,
+  getAdminAccessRequests,
+  AdminAccessRequest,
+} from '../../services/adminService';
 import { AdminUserSummary, AdminLevel, LedgerTransaction } from '../../types/admin';
 
 interface AdminUsersViewProps {
@@ -58,6 +73,9 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   const [targetAdminLevel, setTargetAdminLevel] = useState<'super' | 'reviewer' | 'support'>('reviewer');
   const [manualAdminWinUid, setManualAdminWinUid] = useState('');
   const [manualAdminLevel, setManualAdminLevel] = useState<AdminLevel>('support');
+  const [adminPortalOpen, setAdminPortalOpenState] = useState(false);
+  const [adminRequests, setAdminRequests] = useState<AdminAccessRequest[]>([]);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -76,6 +94,27 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const fetchAdminAccessControl = async () => {
+    if (adminLevel !== 'super') return;
+    setPortalLoading(true);
+    try {
+      const [portal, requests] = await Promise.all([
+        getAdminPortalStatus(),
+        getAdminAccessRequests(),
+      ]);
+      setAdminPortalOpenState(portal.applicationsOpen === true);
+      setAdminRequests(requests);
+    } catch (err) {
+      console.error('fetchAdminAccessControl error:', err);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchAdminAccessControl();
+  }, [adminLevel]);
 
     const handleSelectUser = async (u: AdminUserSummary) => {
     // กันไว้ถ้าข้อมูลผู้ใช้ไม่มี UID
@@ -169,7 +208,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
       alert(`แต่งตั้งสิทธิ์ ${targetAdminLevel} ให้แก่ ${selectedUser.displayName} เรียบร้อยแล้ว`);
       setShowRoleModal(false);
       fetchUsers();
-      setSelectedUser(prev => prev ? { ...prev, adminLevel: targetAdminLevel } : null);
+      setSelectedUser(prev => prev ? { ...prev, isAdmin: true, adminLevel: targetAdminLevel } : null);
     } catch (err: any) {
       alert(`แต่งตั้งสิทธิ์ไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
     } finally {
@@ -188,6 +227,50 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
       await fetchUsers();
     } catch (err: any) {
       alert(`ตั้ง Admin ไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleToggleAdminPortal = async () => {
+    if (adminLevel !== 'super' || portalLoading) return;
+    const next = !adminPortalOpen;
+    setPortalLoading(true);
+    try {
+      const result = await setAdminPortalOpen(next);
+      setAdminPortalOpenState(result.applicationsOpen === true);
+    } catch (err: any) {
+      alert(`เปลี่ยนสถานะประตู Admin ไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  const handleApproveAdminRequest = async (request: AdminAccessRequest, level: AdminLevel) => {
+    if (!request.winUid) return;
+    setActionLoading(true);
+    try {
+      await setAdminRole(request.winUid, level, `อนุมัติคำขอ Admin ระดับ ${level}`);
+      await Promise.all([fetchUsers(), fetchAdminAccessControl()]);
+      alert(`ตั้ง WIN UID ${request.winUid} เป็น Admin ระดับ ${level} เรียบร้อยแล้ว`);
+    } catch (err: any) {
+      alert(`อนุมัติ Admin ไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRevokeSelectedAdmin = async () => {
+    if (!selectedUser?.winUid || selectedUser.isAdmin !== true) return;
+    if (!window.confirm(`ถอดสิทธิ์ Admin ของ WIN UID "${selectedUser.winUid}" ใช่หรือไม่?`)) return;
+    setActionLoading(true);
+    try {
+      await revokeAdminRole(selectedUser.winUid, 'Super Admin ถอดสิทธิ์จากหน้าจัดการผู้ใช้งาน');
+      await Promise.all([fetchUsers(), fetchAdminAccessControl()]);
+      setSelectedUser(prev => prev ? { ...prev, isAdmin: false, adminLevel: undefined } : null);
+      alert('ถอดสิทธิ์ Admin เรียบร้อยแล้ว');
+    } catch (err: any) {
+      alert(`ถอดสิทธิ์ Admin ไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
     } finally {
       setActionLoading(false);
     }
@@ -225,39 +308,102 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
       </div>
 
       {adminLevel === 'super' && (
-        <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-500/10 to-yellow-500/5 p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <Crown className="w-5 h-5 text-amber-300" />
-            <h2 className="text-base font-black text-white">ตั้ง Admin ด้วย WIN UID</h2>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/5 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Power className={`w-5 h-5 ${adminPortalOpen ? 'text-emerald-300' : 'text-rose-300'}`} />
+                  <h2 className="text-base font-black text-white">ประตูหน้า Admin สำหรับผู้ที่ยังไม่เป็น Admin</h2>
+                </div>
+                <p className="mt-1 text-xs text-slate-400 max-w-2xl">
+                  {adminPortalOpen
+                    ? 'เปิดอยู่: ผู้ใช้ทั่วไปเข้าได้เฉพาะหน้าส่งคำขอเป็น Admin แต่ยังใช้เครื่องมือ Admin ไม่ได้'
+                    : 'ปิดอยู่: ผู้ที่ไม่ได้รับสิทธิ์ Admin จะถูกบล็อกหน้า Admin ทั้งหมด'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleAdminPortal}
+                disabled={portalLoading}
+                className={`rounded-xl px-5 py-3 text-xs font-black border disabled:opacity-50 ${
+                  adminPortalOpen
+                    ? 'bg-emerald-400/15 border-emerald-400/50 text-emerald-200'
+                    : 'bg-rose-500/15 border-rose-400/50 text-rose-200'
+                }`}
+              >
+                {portalLoading ? 'กำลังบันทึก...' : adminPortalOpen ? 'เปิดรับสมัคร Admin อยู่' : 'ปิดรับสมัคร Admin อยู่'}
+              </button>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 mb-4">
-            กรอก WIN UID ของบัญชีที่สมัครแล้ว เลือกระดับสิทธิ์ แล้วกดตั้ง Admin บัญชีนั้นจะได้รับ Firebase Custom Claim ในครั้งถัดไปที่ token รีเฟรช
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
-            <input
-              value={manualAdminWinUid}
-              onChange={(e) => setManualAdminWinUid(e.target.value.toLowerCase())}
-              placeholder="WIN UID เช่น kitti001"
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-xs font-mono text-white outline-none focus:border-amber-400"
-            />
-            <select
-              value={manualAdminLevel}
-              onChange={(e) => setManualAdminLevel(e.target.value as AdminLevel)}
-              className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-xs text-white outline-none focus:border-amber-400"
-            >
-              <option value="support">Support</option>
-              <option value="reviewer">Reviewer</option>
-              <option value="super">Super Admin</option>
-            </select>
-            <button
-              type="button"
-              onClick={handleManualSetAdmin}
-              disabled={actionLoading || !manualAdminWinUid.trim()}
-              className="rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-slate-950 disabled:opacity-50"
-            >
-              ตั้ง Admin
-            </button>
+
+          <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-500/10 to-yellow-500/5 p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Crown className="w-5 h-5 text-amber-300" />
+              <h2 className="text-base font-black text-white">ตั้ง Admin ด้วย WIN UID</h2>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">
+              กรอก WIN UID ของบัญชีที่สมัครแล้ว เลือกระดับสิทธิ์ แล้วกดตั้ง Admin บัญชีนั้นจะใช้ได้ครบ 5 โหมด: ลูกค้า / พี่วิน / ร้านค้า / พาร์ทเนอร์ / Admin
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
+              <input
+                value={manualAdminWinUid}
+                onChange={(e) => setManualAdminWinUid(e.target.value.toLowerCase())}
+                placeholder="WIN UID เช่น kitti001"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-xs font-mono text-white outline-none focus:border-amber-400"
+              />
+              <select
+                value={manualAdminLevel}
+                onChange={(e) => setManualAdminLevel(e.target.value as AdminLevel)}
+                className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-xs text-white outline-none focus:border-amber-400"
+              >
+                <option value="support">Support</option>
+                <option value="reviewer">Reviewer</option>
+                <option value="super">Super Admin</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleManualSetAdmin}
+                disabled={actionLoading || !manualAdminWinUid.trim()}
+                className="rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-slate-950 disabled:opacity-50"
+              >
+                ตั้ง Admin
+              </button>
+            </div>
           </div>
+
+          {adminRequests.length > 0 && (
+            <div className="rounded-2xl border border-purple-400/30 bg-purple-500/5 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <UserPlus className="w-5 h-5 text-purple-300" />
+                <h2 className="text-base font-black text-white">คำขอเป็น Admin ({adminRequests.length})</h2>
+              </div>
+              <div className="space-y-2">
+                {adminRequests.map((request) => (
+                  <div key={request.uid} className="rounded-xl border border-white/10 bg-slate-950/60 p-3 flex flex-col lg:flex-row lg:items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-white">{request.displayName || request.winUid}</div>
+                      <div className="text-xs font-mono text-cyan-300">WIN UID: {request.winUid}</div>
+                      {request.note && <div className="text-xs text-slate-400 mt-1">{request.note}</div>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(['support', 'reviewer', 'super'] as AdminLevel[]).map((level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          onClick={() => void handleApproveAdminRequest(request, level)}
+                          disabled={actionLoading}
+                          className="rounded-lg border border-purple-400/30 bg-purple-400/10 px-3 py-2 text-[11px] font-bold text-purple-200 disabled:opacity-50"
+                        >
+                          ตั้งเป็น {level}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -480,6 +626,17 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
                 >
                   <Crown className="w-3.5 h-3.5" />
                   <span>สิทธิ์แอดมิน</span>
+                </button>
+              )}
+
+              {adminLevel === 'super' && selectedUser.isAdmin === true && (
+                <button
+                  onClick={() => void handleRevokeSelectedAdmin()}
+                  disabled={actionLoading}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-mono font-bold flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <ShieldOff className="w-3.5 h-3.5" />
+                  <span>ถอด Admin</span>
                 </button>
               )}
 
