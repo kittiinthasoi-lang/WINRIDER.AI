@@ -39,11 +39,10 @@ export async function getAdminClaims(): Promise<AdminClaims | null> {
   if (currentUser) {
     try {
       const tokenResult = await currentUser.getIdTokenResult(true);
-      const isOwnerSuperAdmin = currentUser.email?.toLowerCase() === 'kittiinthasoi@gmail.com';
-      if (tokenResult.claims.admin === true || isOwnerSuperAdmin) {
+      if (tokenResult.claims.admin === true) {
         return {
           admin: true,
-          adminLevel: isOwnerSuperAdmin ? 'super' : ((tokenResult.claims.adminLevel as AdminLevel) || 'support')
+          adminLevel: (tokenResult.claims.adminLevel as AdminLevel) || 'support'
         };
       }
     } catch (err) {
@@ -76,7 +75,7 @@ async function callAdminEndpoint(functionName: string, apiPath: string, payload:
   return data;
 }
 
-async function callWinAuthAdmin(apiPath: string, init: RequestInit = {}): Promise<any> {
+async function callFirebaseAdmin(apiPath: string, init: RequestInit = {}): Promise<any> {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('กรุณาเข้าสู่ระบบ Super Admin ใหม่');
   const headers = new Headers(init.headers || {});
@@ -106,7 +105,7 @@ export async function approveKyc(uid: string, reason?: string) {
     }
     await addDoc(collection(db, 'audit_logs'), {
       adminUid: auth.currentUser?.uid || 'ADMIN',
-      adminEmail: auth.currentUser?.email || 'kittiinthasoi@gmail.com',
+      adminEmail: auth.currentUser?.email || '',
       action: 'APPROVE_KYC',
       targetUid: uid,
       targetCollection: 'users/knights',
@@ -142,7 +141,7 @@ export async function rejectKyc(uid: string, reason: string, detail: string) {
     }
     await addDoc(collection(db, 'audit_logs'), {
       adminUid: auth.currentUser?.uid || 'ADMIN',
-      adminEmail: auth.currentUser?.email || 'kittiinthasoi@gmail.com',
+      adminEmail: auth.currentUser?.email || '',
       action: 'REJECT_KYC',
       targetUid: uid,
       targetCollection: 'users/knights',
@@ -159,7 +158,7 @@ export async function rejectKyc(uid: string, reason: string, detail: string) {
  * 3. suspendUser
  */
 export async function suspendUser(uid: string, reason: string) {
-  return callWinAuthAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/status`, {
+  return callFirebaseAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/status`, {
     method: 'POST',
     body: JSON.stringify({ status: 'suspended', reason })
   });
@@ -169,17 +168,17 @@ export async function suspendUser(uid: string, reason: string) {
  * 4. unsuspendUser
  */
 export async function unsuspendUser(uid: string, reason: string) {
-  return callWinAuthAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/status`, {
+  return callFirebaseAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/status`, {
     method: 'POST',
     body: JSON.stringify({ status: 'active', reason })
   });
 }
 
 /**
- * อนุมัติบัญชีที่สมัครใหม่ใน WIN Auth
+ * อนุมัติบัญชีที่สมัครใหม่ใน Firebase
  */
 export async function approveRegistration(uid: string) {
-  return callWinAuthAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/approve`, {
+  return callFirebaseAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/approve`, {
     method: 'POST',
     body: '{}'
   });
@@ -214,7 +213,7 @@ export async function adjustWallet(
   try {
     await addDoc(collection(db, 'audit_logs'), {
       adminUid: auth.currentUser?.uid || 'ADMIN',
-      adminEmail: auth.currentUser?.email || 'kittiinthasoi@gmail.com',
+      adminEmail: auth.currentUser?.email || '',
       action: 'ADJUST_WALLET',
       targetUid: payload.uid,
       targetCollection: 'wallets',
@@ -235,7 +234,7 @@ export async function updateFeeRule(ruleId: string, patch: any, reason?: string)
   try {
     await addDoc(collection(db, 'audit_logs'), {
       adminUid: auth.currentUser?.uid || 'ADMIN',
-      adminEmail: auth.currentUser?.email || 'kittiinthasoi@gmail.com',
+      adminEmail: auth.currentUser?.email || '',
       action: 'UPDATE_FEE_RULE',
       targetUid: ruleId,
       targetCollection: 'fee_rules',
@@ -261,7 +260,7 @@ export async function setAdminRole(targetUid: string, level: AdminLevel, reason?
     });
     await addDoc(collection(db, 'audit_logs'), {
       adminUid: auth.currentUser?.uid || 'ADMIN',
-      adminEmail: auth.currentUser?.email || 'kittiinthasoi@gmail.com',
+      adminEmail: auth.currentUser?.email || '',
       action: 'SET_ADMIN_ROLE',
       targetUid,
       targetCollection: 'users',
@@ -448,25 +447,7 @@ export async function getUsersList(queryText: string = '', roleFilter: string = 
       list.push({ uid: d.id, ...data });
     });
 
-    // หากยังไม่มีข้อมูลใน users แต่มี auth currentUser (เช่น Super Admin ที่เพิ่งเข้าสู่ระบบ)
-    if (list.length === 0 && auth.currentUser) {
-      const cur = auth.currentUser;
-      const isSuper = cur.email === 'kittiinthasoi@gmail.com' || cur.email?.toLowerCase().includes('kittiinthasoi');
-      list.push({
-        uid: cur.uid,
-        displayName: cur.displayName || 'กิตติ อินทะสร้อย',
-        email: cur.email,
-        phone: cur.phoneNumber || '',
-        role: 'partner',
-        status: 'active',
-        isAdmin: true,
-        adminLevel: isSuper ? 'super' : 'support',
-        level: 1,
-        xp: 0,
-        rating: 5.0,
-        createdAt: new Date().toISOString()
-      });
-    }
+
 
     // กรองตามตัวกรอง
     return list.filter((u) => {
@@ -524,32 +505,14 @@ export async function getUserFullProfileAndLedger(uid: string) {
   }
 
   if (!userDocData) {
-    if (auth.currentUser && auth.currentUser.uid === uid) {
-      userDocData = {
-        uid,
-        displayName: auth.currentUser.displayName || 'กิตติ อินทะสร้อย',
-        email: auth.currentUser.email || 'kittiinthasoi@gmail.com',
-        phone: auth.currentUser.phoneNumber || '',
-        role: 'partner',
-        status: 'active',
-        isAdmin: true,
-        adminLevel: 'super',
-        level: 1,
-        xp: 0
-      };
-    } else {
-      userDocData = {
-        uid,
-        displayName: 'ผู้ใช้งานระบบ',
-        email: '',
-        phone: '',
-        role: 'citizen',
-        status: 'active',
-        level: 1,
-        xp: 0
-      };
-    }
+    return {
+      user: null,
+      wallet: walletData,
+      knight: knightData,
+      ledger: ledgerEntries
+    };
   }
+
 
   if (!walletData) {
     walletData = {
@@ -579,7 +542,7 @@ export async function getUserFullProfileAndLedger(uid: string) {
  */
 export async function getAllUsers(): Promise<AdminUserSummary[]> {
   try {
-    const data = await callWinAuthAdmin('/api/admin/auth/users', { method: 'GET' });
+    const data = await callFirebaseAdmin('/api/admin/auth/users', { method: 'GET' });
     const users = Array.isArray(data?.users) ? data.users : [];
     return users.map((user: any) => ({
       ...user,
@@ -592,7 +555,7 @@ export async function getAllUsers(): Promise<AdminUserSummary[]> {
       walletBalanceSatang: Number(user.walletBalanceSatang || 0)
     })) as AdminUserSummary[];
   } catch (error) {
-    console.warn('getAllUsers via WIN Auth failed:', error);
+    console.warn('getAllUsers via Firebase failed:', error);
     return [];
   }
 }
@@ -602,7 +565,7 @@ export async function getAllUsers(): Promise<AdminUserSummary[]> {
  */
 export async function getUserLedgerHistory(uid: string): Promise<LedgerTransaction[]> {
   try {
-    const data = await callWinAuthAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/ledger`, { method: 'GET' });
+    const data = await callFirebaseAdmin(`/api/admin/auth/users/${encodeURIComponent(uid)}/ledger`, { method: 'GET' });
     return Array.isArray(data?.ledger) ? data.ledger as LedgerTransaction[] : [];
   } catch (error) {
     console.warn('getUserLedgerHistory via server failed:', error);
