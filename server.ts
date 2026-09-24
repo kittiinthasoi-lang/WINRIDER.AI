@@ -1770,334 +1770,303 @@ void checkFirebaseReadiness()
     console.warn("[Firebase Readiness] Unable to complete startup Firebase checks.");
   });
 
-const WIN_AUTH_ROLES = new Set<WinAuthRole>(["citizen", "knight", "merchant", "partner"]);
+type FirebaseUserRole = "citizen" | "knight" | "merchant" | "partner";
+const FIREBASE_USER_ROLES = new Set<FirebaseUserRole>(["citizen", "knight", "merchant", "partner"]);
 
-function publicWinAuthUser(user: WinAuthStoredUser) {
-  return {
-    uid: user.uid,
-    email: user.email,
-    role: user.role,
-    displayName: user.displayName,
-    phone: user.phone,
-    province: user.registration?.province || "",
-    district: user.registration?.district || "",
-    registration: user.registration,
-    status: user.status,
-    isAdmin: user.isAdmin === true,
-    adminLevel: user.adminLevel,
-    level: user.isAdmin ? 100 : 1,
-    xp: 0,
-    rating: user.isAdmin ? 5 : undefined,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  };
-}
-
-async function mirrorWinAuthUser(user: WinAuthStoredUser) {
-  await ordersDb.collection("users").doc(user.uid).set({
-    ...publicWinAuthUser(user),
-    authProvider: "win_auth",
-    updatedAt: new Date().toISOString(),
-  }, { merge: true });
-}
-
-function cleanRegistrationProfile(role: WinAuthRole, raw: any): WinAuthRegistrationProfile {
-  const phone = String(raw?.phone || "").replace(/\s+/g, "");
-  const profile: WinAuthRegistrationProfile = {
-    fullName: String(raw?.fullName || "").trim().slice(0, 120),
-    phone,
-    province: String(raw?.province || "").trim().slice(0, 100),
-    district: String(raw?.district || "").trim().slice(0, 100),
-    pdpaAccepted: raw?.pdpaAccepted === true,
-    gpsConsent: raw?.gpsConsent === true,
-    termsAccepted: raw?.termsAccepted === true,
-  };
-  if (role === "citizen") {
-    profile.emergencyContactName = String(raw?.emergencyContactName || "").trim().slice(0, 120);
-    profile.emergencyContactPhone = String(raw?.emergencyContactPhone || "").replace(/\s+/g, "").slice(0, 20);
-  } else if (role === "knight") {
-    profile.winStation = String(raw?.winStation || "").trim().slice(0, 160);
-    profile.vestNumber = String(raw?.vestNumber || "").trim().slice(0, 40);
-    profile.plateNumber = String(raw?.plateNumber || "").trim().slice(0, 40);
-    profile.publicLicenseNumber = String(raw?.publicLicenseNumber || "").trim().slice(0, 80);
-    profile.vehicleModel = String(raw?.vehicleModel || "").trim().slice(0, 120);
-    profile.yellowPlateConfirmed = raw?.yellowPlateConfirmed === true;
-  } else if (role === "merchant") {
-    profile.shopName = String(raw?.shopName || "").trim().slice(0, 160);
-    profile.shopType = String(raw?.shopType || "").trim().slice(0, 120);
-    profile.shopAddress = String(raw?.shopAddress || "").trim().slice(0, 300);
-    profile.taxId = String(raw?.taxId || "").trim().slice(0, 40);
-  } else if (role === "partner") {
-    profile.orgName = String(raw?.orgName || "").trim().slice(0, 180);
-    profile.orgType = String(raw?.orgType || "").trim().slice(0, 120);
-    profile.contactPerson = String(raw?.contactPerson || "").trim().slice(0, 120);
-    profile.orgAddress = String(raw?.orgAddress || "").trim().slice(0, 300);
-    profile.estimatedUsers = Math.max(1, Math.min(1_000_000, Number(raw?.estimatedUsers) || 1));
-  }
-  return profile;
-}
-
-function validateRegistrationProfile(role: WinAuthRole, profile: WinAuthRegistrationProfile): string | null {
-  if (profile.fullName.length < 2) return "REGISTRATION_FULL_NAME_REQUIRED";
-  if (!/^0\d{9}$/.test(profile.phone)) return "REGISTRATION_PHONE_INVALID";
-  if (!profile.province || !profile.district) return "REGISTRATION_AREA_REQUIRED";
-  if (!profile.pdpaAccepted || !profile.gpsConsent || !profile.termsAccepted) return "REGISTRATION_CONSENT_REQUIRED";
-  if (role === "citizen") {
-    if (!profile.emergencyContactName || !/^0\d{9}$/.test(String(profile.emergencyContactPhone || ""))) return "REGISTRATION_EMERGENCY_CONTACT_REQUIRED";
-  }
-  if (role === "knight") {
-    if (!profile.winStation || !profile.vestNumber || !profile.plateNumber || !profile.publicLicenseNumber || !profile.vehicleModel) return "REGISTRATION_KNIGHT_DETAILS_REQUIRED";
-    if (profile.yellowPlateConfirmed !== true) return "REGISTRATION_YELLOW_PLATE_REQUIRED";
-  }
-  if (role === "merchant") {
-    if (!profile.shopName || !profile.shopType || !profile.shopAddress) return "REGISTRATION_MERCHANT_DETAILS_REQUIRED";
-  }
-  if (role === "partner") {
-    if (!profile.orgName || !profile.orgType || !profile.contactPerson || !profile.orgAddress) return "REGISTRATION_PARTNER_DETAILS_REQUIRED";
-  }
-  return null;
-}
-
-async function ensureApprovedRoleProfile(user: WinAuthStoredUser) {
-  const p = user.registration;
-  if (!p) return;
-  const base = {
-    displayName: user.displayName,
-    name: user.displayName,
-    email: user.email,
-    phone: user.phone,
-    province: p.province,
-    district: p.district,
-    level: user.isAdmin ? 100 : 1,
-    xp: 0,
-    updatedAt: new Date().toISOString(),
-  };
-  if (user.role === "citizen") {
-    await ordersDb.collection("citizens").doc(user.uid).set({
-      ...base,
-      savedAddresses: [],
-      emergencyContact: { name: p.emergencyContactName || "", phone: p.emergencyContactPhone || "" },
-    }, { merge: true });
-  } else if (user.role === "knight") {
-    await ordersDb.collection("knights").doc(user.uid).set({
-      ...base,
-      isOnline: false,
-      vehicleType: "motorcycle",
-      vehicleModel: p.vehicleModel || "",
-      plateNumber: p.plateNumber || "",
-      licenseNumber: p.publicLicenseNumber || "",
-      winStation: p.winStation || "",
-      vestNumber: p.vestNumber || "",
-      yellowPlateConfirmed: p.yellowPlateConfirmed === true,
-      kycStatus: "verified",
-      certifications: [],
-    }, { merge: true });
-  } else if (user.role === "merchant") {
-    await ordersDb.collection("merchants").doc(user.uid).set({
-      ...base,
-      shopName: p.shopName || "",
-      shopType: p.shopType || "",
-      address: p.shopAddress || "",
-      taxId: p.taxId || "",
-      gpRate: 10,
-    }, { merge: true });
-  } else if (user.role === "partner") {
-    await ordersDb.collection("partners").doc(user.uid).set({
-      ...base,
-      orgName: p.orgName || "",
-      orgType: p.orgType || "",
-      contactPerson: p.contactPerson || "",
-      address: p.orgAddress || "",
-      estimatedUsers: Number(p.estimatedUsers || 1),
-      gpRate: 10,
-    }, { merge: true });
-  }
-}
+type RegistrationInput = {
+  fullName: string;
+  phone: string;
+  province: string;
+  district: string;
+  pdpaAccepted: boolean;
+  gpsConsent: boolean;
+  termsAccepted: boolean;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  plateNumber?: string;
+  publicLicenseNumber?: string;
+  vehicleType?: "motorcycle" | "car";
+  driverLicenseUrl?: string;
+  vehiclePhotoUrl?: string;
+  shopName?: string;
+  shopType?: string;
+  shopAddress?: string;
+  taxId?: string;
+  orgName?: string;
+  orgType?: string;
+  contactPerson?: string;
+  orgAddress?: string;
+  estimatedUsers?: number;
+};
 
 function rawBearerToken(req: express.Request): string {
   const header = String(req.headers.authorization || "");
   return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
 }
 
-function requiredOwnerBootstrapEnvironment() {
-  const email = normalizeWinAuthEmail(process.env.ADMIN_OWNER_EMAIL);
-  const bootstrapPassword = String(process.env.ADMIN_BOOTSTRAP_PASSWORD || "");
+function cleanRegistrationInput(role: FirebaseUserRole, raw: any): RegistrationInput {
+  const base: RegistrationInput = {
+    fullName: String(raw?.fullName || raw?.displayName || "").trim().slice(0, 120),
+    phone: String(raw?.phone || "").replace(/\s+/g, "").slice(0, 20),
+    province: String(raw?.province || "").trim().slice(0, 100),
+    district: String(raw?.district || "").trim().slice(0, 100),
+    pdpaAccepted: raw?.pdpaAccepted === true || raw?.pdpaConsentAccepted === true,
+    gpsConsent: raw?.gpsConsent === true || raw?.pdpaConsentAccepted === true,
+    termsAccepted: raw?.termsAccepted === true || raw?.pdpaConsentAccepted === true,
+  };
 
-  const missing: string[] = [];
-  if (!email) missing.push("ADMIN_OWNER_EMAIL");
-  if (!bootstrapPassword) missing.push("ADMIN_BOOTSTRAP_PASSWORD");
-
-  if (missing.length) {
-    throw new Error(
-      "[Environment] Missing required environment variables: " + missing.join(", ")
-    );
+  if (role === "citizen") {
+    base.emergencyContactName = String(raw?.emergencyContactName || "").trim().slice(0, 120);
+    base.emergencyContactPhone = String(raw?.emergencyContactPhone || "").replace(/\s+/g, "").slice(0, 20);
+  } else if (role === "knight") {
+    base.plateNumber = String(raw?.plateNumber || "").trim().slice(0, 40);
+    base.publicLicenseNumber = String(raw?.publicLicenseNumber || raw?.licenseNumber || "").trim().slice(0, 80);
+    base.vehicleType = raw?.vehicleType === "car" ? "car" : "motorcycle";
+    base.driverLicenseUrl = String(raw?.driverLicenseUrl || "").trim().slice(0, 2500);
+    base.vehiclePhotoUrl = String(raw?.vehiclePhotoUrl || "").trim().slice(0, 2500);
+  } else if (role === "merchant") {
+    base.shopName = String(raw?.shopName || "").trim().slice(0, 160);
+    base.shopType = String(raw?.shopType || "").trim().slice(0, 120);
+    base.shopAddress = String(raw?.shopAddress || raw?.address || "").trim().slice(0, 300);
+    base.taxId = String(raw?.taxId || "").trim().slice(0, 40);
+  } else if (role === "partner") {
+    base.orgName = String(raw?.orgName || "").trim().slice(0, 180);
+    base.orgType = String(raw?.orgType || "").trim().slice(0, 120);
+    base.contactPerson = String(raw?.contactPerson || "").trim().slice(0, 120);
+    base.orgAddress = String(raw?.orgAddress || raw?.address || "").trim().slice(0, 300);
+    base.estimatedUsers = Math.max(1, Math.min(1_000_000, Number(raw?.estimatedUsers) || 1));
   }
-  if (!/^\S+@\S+\.\S+$/.test(email)) {
-    throw new Error("[Environment] ADMIN_OWNER_EMAIL must be a valid email address");
-  }
-  if (bootstrapPassword.length < 12 || bootstrapPassword.length > 200) {
-    throw new Error("[Environment] ADMIN_BOOTSTRAP_PASSWORD must be 12-200 characters");
-  }
-
-  return { email, bootstrapPassword };
+  return base;
 }
 
-function ownerAdminEmail(): string {
-  return requiredOwnerBootstrapEnvironment().email;
+function validateRegistrationInput(role: FirebaseUserRole, profile: RegistrationInput): string | null {
+  if (profile.fullName.length < 2) return "REGISTRATION_FULL_NAME_REQUIRED";
+  if (!/^0\d{9}$/.test(profile.phone)) return "REGISTRATION_PHONE_INVALID";
+  if (!profile.province || !profile.district) return "REGISTRATION_LOCATION_REQUIRED";
+  if (!profile.pdpaAccepted || !profile.gpsConsent || !profile.termsAccepted) return "REGISTRATION_CONSENT_REQUIRED";
+  if (role === "citizen" && (!profile.emergencyContactName || !/^0\d{9}$/.test(profile.emergencyContactPhone || ""))) {
+    return "REGISTRATION_EMERGENCY_CONTACT_REQUIRED";
+  }
+  if (role === "knight" && (!profile.plateNumber || !profile.publicLicenseNumber)) {
+    return "REGISTRATION_KNIGHT_DOCUMENTS_REQUIRED";
+  }
+  if (role === "merchant" && (!profile.shopName || !profile.shopAddress)) {
+    return "REGISTRATION_MERCHANT_DETAILS_REQUIRED";
+  }
+  if (role === "partner" && (!profile.orgName || !profile.contactPerson)) {
+    return "REGISTRATION_PARTNER_DETAILS_REQUIRED";
+  }
+  return null;
 }
 
-function isOwnerAdminEmail(value: unknown): boolean {
-  return normalizeWinAuthEmail(value) === ownerAdminEmail();
-}
+async function createFirebaseRegistration(
+  uid: string,
+  email: string,
+  role: FirebaseUserRole,
+  profile: RegistrationInput,
+) {
+  const userRef = ordersDb.collection("users").doc(uid);
+  const now = new Date().toISOString();
 
-async function ensureOwnerAdminBootstrapAccount() {
-  const { email, bootstrapPassword } = requiredOwnerBootstrapEnvironment();
-  try {
-    const existing = await getWinAuthUserByEmail(email);
-    if (existing) {
-      if (existing.isAdmin !== true || existing.adminLevel !== "super" || existing.status !== "active") {
-        const now = new Date().toISOString();
-        const promoted = await saveWinAuthUser({
-          ...existing,
-          role: "knight",
-          status: "active",
-          isAdmin: true,
-          adminLevel: "super",
-          approvedAt: existing.approvedAt || now,
-          approvedBy: existing.approvedBy || "OWNER_BOOTSTRAP",
-        });
-        await mirrorWinAuthUser(promoted);
-        console.info("[Owner Bootstrap] Existing owner account promoted to Super Admin.");
-      } else {
-        console.info("[Owner Bootstrap] Existing Super Admin account found; bootstrap password was not applied.");
-      }
-      return;
+  return ordersDb.runTransaction(async (tx) => {
+    const existing = await tx.get(userRef);
+    if (existing.exists) throw new Error("PROFILE_ALREADY_REGISTERED");
+
+    let isFoundingKnight = false;
+    if (role === "knight") {
+      const counterRef = ordersDb.collection("counters").doc("foundingKnights");
+      const counter = await tx.get(counterRef);
+      const count = Number(counter.data()?.count || 0);
+      const limit = Number(counter.data()?.limit || 1000);
+      isFoundingKnight = count < limit;
+      tx.set(counterRef, {
+        count: isFoundingKnight ? count + 1 : count,
+        limit,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
     }
 
-    const created = await createWinAuthUser({
+    tx.create(userRef, {
+      uid,
       email,
-      password: bootstrapPassword,
+      role,
+      displayName: profile.fullName,
+      phone: profile.phone,
+      province: profile.province,
+      district: profile.district,
+      registration: profile,
+      status: "pending_review",
+      isAdmin: false,
+      level: 1,
+      xp: 0,
+      pdpaConsent: { version: "1.0", acceptedAt: now },
+      authProvider: "firebase",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    if (role === "citizen") {
+      tx.create(ordersDb.collection("citizens").doc(uid), {
+        displayName: profile.fullName,
+        email,
+        phone: profile.phone,
+        province: profile.province,
+        district: profile.district,
+        savedAddresses: [],
+        emergencyContact: {
+          name: profile.emergencyContactName || "",
+          phone: profile.emergencyContactPhone || "",
+        },
+        level: 1,
+        xp: 0,
+        createdAt: now,
+      });
+    } else if (role === "knight") {
+      tx.create(ordersDb.collection("knights").doc(uid), {
+        displayName: profile.fullName,
+        email,
+        phone: profile.phone,
+        province: profile.province,
+        district: profile.district,
+        isOnline: false,
+        vehicleType: profile.vehicleType || "motorcycle",
+        plateNumber: profile.plateNumber || "",
+        licenseNumber: profile.publicLicenseNumber || "",
+        kycStatus: "pending",
+        isFoundingKnight,
+        certifications: [],
+        documents: {
+          driverLicenseUrl: profile.driverLicenseUrl || "",
+          vehiclePhotoUrl: profile.vehiclePhotoUrl || "",
+        },
+        level: 1,
+        xp: 0,
+        createdAt: now,
+      });
+    } else if (role === "merchant") {
+      tx.create(ordersDb.collection("merchants").doc(uid), {
+        displayName: profile.fullName,
+        ownerName: profile.fullName,
+        email,
+        phone: profile.phone,
+        province: profile.province,
+        district: profile.district,
+        shopName: profile.shopName || "",
+        shopType: profile.shopType || "",
+        address: profile.shopAddress || "",
+        taxId: profile.taxId || "",
+        gpRate: 10,
+        level: 1,
+        xp: 0,
+        createdAt: now,
+      });
+    } else {
+      tx.create(ordersDb.collection("partners").doc(uid), {
+        displayName: profile.orgName || profile.fullName,
+        contactPerson: profile.contactPerson || profile.fullName,
+        contactEmail: email,
+        phone: profile.phone,
+        province: profile.province,
+        district: profile.district,
+        orgName: profile.orgName || "",
+        orgType: profile.orgType || "",
+        address: profile.orgAddress || "",
+        estimatedUsers: Number(profile.estimatedUsers || 1),
+        gpRate: 10,
+        level: 1,
+        xp: 0,
+        createdAt: now,
+      });
+    }
+
+    return { isFoundingKnight };
+  });
+}
+
+app.post("/api/auth/bootstrap-owner", rateLimit(20), async (req, res) => {
+  const token = rawBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+
+  try {
+    const decoded = await adminAuth.verifyIdToken(token);
+    const configuredOwner = String(process.env.ADMIN_OWNER_EMAIL || "").trim().toLowerCase();
+    const tokenEmail = String(decoded.email || "").trim().toLowerCase();
+
+    if (!configuredOwner || tokenEmail !== configuredOwner) {
+      return res.json({ owner: false, claimsUpdated: false });
+    }
+    if (decoded.email_verified !== true) {
+      return res.status(412).json({ error: "Owner email must be verified", code: "OWNER_EMAIL_NOT_VERIFIED" });
+    }
+
+    const record = await adminAuth.getUser(decoded.uid);
+    const existingClaims = record.customClaims || {};
+    const claimsUpdated = existingClaims.admin !== true || existingClaims.adminLevel !== "super";
+    if (claimsUpdated) {
+      await adminAuth.setCustomUserClaims(decoded.uid, {
+        ...existingClaims,
+        admin: true,
+        adminLevel: "super",
+      });
+    }
+
+    const now = new Date().toISOString();
+    await ordersDb.collection("users").doc(decoded.uid).set({
+      uid: decoded.uid,
+      email: tokenEmail,
       role: "knight",
-      displayName: "กิตติ อินทะสร้อย",
+      displayName: record.displayName || tokenEmail.split("@")[0] || "Owner",
+      phone: record.phoneNumber || "",
       status: "active",
       isAdmin: true,
       adminLevel: "super",
-    });
-    await mirrorWinAuthUser(created);
-    console.info("[Owner Bootstrap] Super Admin account created successfully. Remove ADMIN_BOOTSTRAP_PASSWORD after the first successful login.");
-  } catch (error) {
-    console.error("[Owner Bootstrap] Unable to provision owner account:", error instanceof Error ? error.message : error);
+      level: 100,
+      xp: 0,
+      authProvider: "firebase",
+      approvedAt: now,
+      approvedBy: decoded.uid,
+      updatedAt: now,
+      createdAt: record.metadata.creationTime || now,
+    }, { merge: true });
+
+    return res.json({ owner: true, claimsUpdated });
+  } catch (error: any) {
+    console.error("[Firebase Owner Bootstrap]", error?.message);
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
   }
-}
+});
 
-async function promoteAuthenticatedOwner(user: WinAuthStoredUser): Promise<WinAuthStoredUser> {
-  if (!isOwnerAdminEmail(user.email)) return user;
-  if (user.isAdmin === true && user.adminLevel === "super" && user.status === "active") return user;
-
-  const now = new Date().toISOString();
-  const promoted = await saveWinAuthUser({
-    ...user,
-    role: "knight",
-    status: "active",
-    isAdmin: true,
-    adminLevel: "super",
-    approvedAt: user.approvedAt || now,
-    approvedBy: user.approvedBy || "OWNER_SESSION_BOOTSTRAP",
-  });
-
-  await mirrorWinAuthUser(promoted);
-  await ensureApprovedRoleProfile(promoted).catch((error) => {
-    console.warn("[Owner Session Bootstrap Profile]", error instanceof Error ? error.message : error);
-  });
-  console.info("[WIN Auth] Authenticated owner promoted to Super Admin:", promoted.uid);
-  return promoted;
-}
-
-async function requireWinAuthAdmin(req: express.Request, res: express.Response) {
+app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
   const token = rawBearerToken(req);
-  if (!token) {
-    res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
-    return null;
-  }
-  try {
-    const user = await getWinAuthSessionUser(token);
-    if (!user || user.status !== "active" || user.isAdmin !== true || user.adminLevel !== "super") {
-      res.status(403).json({ error: "Super Admin access required", code: "ADMIN_REQUIRED" });
-      return null;
-    }
-    return user;
-  } catch (error: any) {
-    res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
-    return null;
-  }
-}
-
-app.post("/api/auth/temporary-admin-entry", rateLimit(30), async (_req, res) => {
-  return res.status(404).json({
-    error: "Temporary admin access is disabled",
-    code: "TEMP_ADMIN_DISABLED",
-  });
-});
-
-app.post("/api/auth/register", rateLimit(10), async (req, res) => {
-  const email = normalizeWinAuthEmail(req.body?.email);
-  const password = String(req.body?.password || "");
-  const role = String(req.body?.role || "") as WinAuthRole;
-
-  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: "Invalid email", code: "INVALID_EMAIL" });
-  if (password.length < 8 || password.length > 200) return res.status(400).json({ error: "Password must contain at least 8 characters", code: "WEAK_PASSWORD" });
-  if (!WIN_AUTH_ROLES.has(role)) return res.status(400).json({ error: "Invalid role", code: "INVALID_ROLE" });
-  if (isOwnerAdminEmail(email)) return res.status(409).json({ error: "Owner account uses direct admin login", code: "EMAIL_ALREADY_REGISTERED" });
-
-  const registration = cleanRegistrationProfile(role, req.body?.registration || {});
-  const registrationError = validateRegistrationProfile(role, registration);
-  if (registrationError) {
-    return res.status(400).json({ error: "Registration details are incomplete", code: registrationError });
-  }
+  if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
 
   try {
-    const user = await createWinAuthUser({
-      email,
-      password,
-      role,
-      displayName: registration.fullName,
-      phone: registration.phone,
-      registration,
-      status: "pending_review",
-    });
-    await mirrorWinAuthUser(user);
-    const token = await createWinAuthSession(user.uid);
-    return res.status(201).json({ token, user: publicWinAuthUser(user), approvalRequired: true });
+    const decoded = await adminAuth.verifyIdToken(token);
+    if (!decoded.email || decoded.email_verified !== true) {
+      return res.status(403).json({ error: "Verified email required", code: "EMAIL_NOT_VERIFIED" });
+    }
+
+    const role = String(req.body?.role || "") as FirebaseUserRole;
+    if (!FIREBASE_USER_ROLES.has(role)) {
+      return res.status(400).json({ error: "Invalid role", code: "INVALID_ROLE" });
+    }
+    if (isSuperAdminToken(decoded)) {
+      return res.status(409).json({ error: "Super Admin does not use member registration", code: "OWNER_PROFILE_PROTECTED" });
+    }
+
+    const profile = cleanRegistrationInput(role, req.body?.registration || {});
+    const validationError = validateRegistrationInput(role, profile);
+    if (validationError) return res.status(400).json({ error: "Registration details are incomplete", code: validationError });
+
+    const result = await createFirebaseRegistration(decoded.uid, String(decoded.email).toLowerCase(), role, profile);
+    const userSnap = await ordersDb.collection("users").doc(decoded.uid).get();
+    return res.status(201).json({ user: userSnap.data(), approvalRequired: true, ...result });
   } catch (error: any) {
-    if (error?.code === "EMAIL_ALREADY_REGISTERED" || error?.message === "EMAIL_ALREADY_REGISTERED") {
-      return res.status(409).json({ error: "Email already registered", code: "EMAIL_ALREADY_REGISTERED" });
+    if (error?.message === "PROFILE_ALREADY_REGISTERED") {
+      return res.status(409).json({ error: "Profile already registered", code: "PROFILE_ALREADY_REGISTERED" });
     }
-    console.error("[WIN Auth Register]", error?.message);
-    return res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
-  }
-});
-
-app.post("/api/auth/login", rateLimit(20), async (req, res) => {
-  const email = normalizeWinAuthEmail(req.body?.email);
-  const password = String(req.body?.password || "");
-  if (!email || !password) return res.status(400).json({ error: "Email and password required", code: "INVALID_CREDENTIALS" });
-
-  try {
-    let user = await getWinAuthUserByEmail(email);
-    if (!user || !verifyWinAuthPassword(password, user.passwordHash)) {
-      return res.status(401).json({ error: "Invalid credentials", code: "INVALID_CREDENTIALS" });
-    }
-    if (user.status === "suspended" && !isOwnerAdminEmail(user.email)) {
-      return res.status(403).json({ error: "Account suspended", code: "ACCOUNT_SUSPENDED" });
-    }
-
-    user = await promoteAuthenticatedOwner(user);
-
-    const token = await createWinAuthSession(user.uid);
-    return res.json({ token, user: publicWinAuthUser(user), approvalRequired: user.status === "pending_review" });
-  } catch (error: any) {
-    console.error("[WIN Auth Login]", error?.message);
-    return res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+    console.error("[Firebase Registration]", error?.message);
+    return res.status(503).json({ error: "Registration service unavailable", code: "REGISTRATION_FAILED" });
   }
 });
 
@@ -2105,110 +2074,108 @@ app.get("/api/auth/me", rateLimit(60), async (req, res) => {
   const token = rawBearerToken(req);
   if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
   try {
-    let user = await getWinAuthSessionUser(token);
-    if (!user) return res.status(401).json({ error: "Invalid session", code: "INVALID_SESSION" });
-    user = await promoteAuthenticatedOwner(user);
-    return res.json({ user: publicWinAuthUser(user), approvalRequired: user.status === "pending_review" });
-  } catch (error: any) {
-    return res.status(503).json({ error: "WIN Auth storage unavailable", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+    const decoded = await adminAuth.verifyIdToken(token);
+    const snap = await ordersDb.collection("users").doc(decoded.uid).get();
+    return res.json({ user: snap.exists ? snap.data() : null });
+  } catch {
+    return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
   }
 });
 
-app.post("/api/auth/logout", rateLimit(30), async (req, res) => {
-  const token = rawBearerToken(req);
-  try {
-    if (token) await deleteWinAuthSession(token);
-    return res.json({ ok: true });
-  } catch {
-    return res.json({ ok: true });
-  }
+// Legacy WIN Auth entry points are deliberately disabled. Password handling now
+// belongs exclusively to Firebase Authentication.
+app.post(["/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/temporary-admin-entry"], (_req, res) => {
+  return res.status(410).json({ error: "Legacy WIN Auth is disabled", code: "USE_FIREBASE_AUTH" });
 });
 
 app.get("/api/admin/auth/users", rateLimit(30), async (req, res) => {
-  const admin = await requireWinAuthAdmin(req, res);
+  const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
   try {
-    const users = await listWinAuthUsers();
-    const summaries = await Promise.all(users.map(async (user) => {
-      let walletBalanceSatang = 0;
-      try {
-        const wallet = await ordersDb.collection("wallets").doc(user.uid).get();
-        walletBalanceSatang = Number(wallet.data()?.balanceSatang || 0);
-      } catch {}
-      return { ...publicWinAuthUser(user), walletBalanceSatang };
+    const snapshot = await ordersDb.collection("users").limit(500).get();
+    const users = await Promise.all(snapshot.docs.map(async (doc) => {
+      const data = doc.data();
+      const wallet = await ordersDb.collection("wallets").doc(doc.id).get().catch(() => null);
+      return {
+        uid: doc.id,
+        ...data,
+        walletBalanceSatang: Number(wallet?.data()?.balanceSatang || 0),
+      };
     }));
-    summaries.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-    return res.json({ users: summaries });
+    users.sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    return res.json({ users });
   } catch (error: any) {
-    return res.status(503).json({ error: "Unable to load WIN Auth users", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+    console.error("[Admin Users]", error?.message);
+    return res.status(503).json({ error: "Unable to load users", code: "USER_LIST_UNAVAILABLE" });
   }
 });
 
 app.get("/api/admin/auth/users/:uid/ledger", rateLimit(30), async (req, res) => {
-  const admin = await requireWinAuthAdmin(req, res);
+  const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
   const uid = String(req.params.uid || "").trim();
   if (!uid) return res.status(400).json({ error: "Invalid user id", code: "INVALID_USER_ID" });
   try {
     const snapshot = await ordersDb.collection("ledger").where("referenceId", "==", uid).limit(50).get();
-    const ledger = snapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
-      .sort((a: any, b: any) => {
-        const av = (a?.createdAt?.toMillis?.() ?? Date.parse(String(a?.createdAt || ""))) || 0;
-        const bv = (b?.createdAt?.toMillis?.() ?? Date.parse(String(b?.createdAt || ""))) || 0;
-        return bv - av;
-      });
+    const ledger = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     return res.json({ ledger });
-  } catch (error: any) {
-    console.warn("[WIN Auth Admin Ledger]", error?.message);
+  } catch {
     return res.status(503).json({ error: "Unable to load ledger", code: "LEDGER_UNAVAILABLE" });
   }
 });
 
 app.post("/api/admin/auth/users/:uid/approve", rateLimit(30), async (req, res) => {
-  const admin = await requireWinAuthAdmin(req, res);
+  const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
-  try {
-    const user = await getWinAuthUserById(String(req.params.uid || ""));
-    if (!user) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
-    const next = await saveWinAuthUser({
-      ...user,
-      status: "active",
-      approvedAt: new Date().toISOString(),
-      approvedBy: admin.uid,
-      rejectionReason: undefined,
-    });
-    await mirrorWinAuthUser(next);
-    await ensureApprovedRoleProfile(next);
-    return res.json({ ok: true, user: publicWinAuthUser(next) });
-  } catch (error: any) {
-    return res.status(503).json({ error: "Approval failed", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+  const uid = String(req.params.uid || "").trim();
+  const ref = ordersDb.collection("users").doc(uid);
+  const snap = await ref.get();
+  if (!snap.exists) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+  const current = snap.data() || {};
+  if (current.isAdmin === true) return res.status(409).json({ error: "Admin account is protected", code: "OWNER_PROTECTED" });
+
+  const now = new Date().toISOString();
+  await ref.set({ status: "active", approvedAt: now, approvedBy: admin.uid, updatedAt: now }, { merge: true });
+  if (current.role === "knight") {
+    await ordersDb.collection("knights").doc(uid).set({ kycStatus: "approved", updatedAt: now }, { merge: true });
   }
+  await ordersDb.collection("audit_logs").add({
+    adminUid: admin.uid,
+    action: "APPROVE_REGISTRATION",
+    targetUid: uid,
+    reason: "Admin approved Firebase registration",
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  const updated = await ref.get();
+  return res.json({ ok: true, user: updated.data() });
 });
 
 app.post("/api/admin/auth/users/:uid/status", rateLimit(30), async (req, res) => {
-  const admin = await requireWinAuthAdmin(req, res);
+  const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
   const status = String(req.body?.status || "");
   if (!["active", "pending_review", "suspended"].includes(status)) {
     return res.status(400).json({ error: "Invalid status", code: "INVALID_STATUS" });
   }
-  try {
-    const user = await getWinAuthUserById(String(req.params.uid || ""));
-    if (!user) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
-    if (user.isAdmin) return res.status(409).json({ error: "Owner admin status is protected", code: "OWNER_PROTECTED" });
-    const next = await saveWinAuthUser({
-      ...user,
-      status: status as any,
-      rejectionReason: String(req.body?.reason || "").slice(0, 500) || undefined,
-      ...(status === "active" ? { approvedAt: new Date().toISOString(), approvedBy: admin.uid } : {}),
-    });
-    await mirrorWinAuthUser(next);
-    if (status === "active") await ensureApprovedRoleProfile(next);
-    return res.json({ ok: true, user: publicWinAuthUser(next) });
-  } catch (error: any) {
-    return res.status(503).json({ error: "Account status update failed", code: error?.code || "WIN_AUTH_STORE_ERROR" });
+
+  const uid = String(req.params.uid || "").trim();
+  const ref = ordersDb.collection("users").doc(uid);
+  const snap = await ref.get();
+  if (!snap.exists) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+  if (snap.data()?.isAdmin === true) return res.status(409).json({ error: "Admin account is protected", code: "OWNER_PROTECTED" });
+
+  const now = new Date().toISOString();
+  await ref.set({
+    status,
+    rejectionReason: String(req.body?.reason || "").slice(0, 500),
+    ...(status === "active" ? { approvedAt: now, approvedBy: admin.uid } : {}),
+    updatedAt: now,
+  }, { merge: true });
+
+  if (status === "active" && snap.data()?.role === "knight") {
+    await ordersDb.collection("knights").doc(uid).set({ kycStatus: "approved", updatedAt: now }, { merge: true });
   }
+  return res.json({ ok: true, user: (await ref.get()).data() });
 });
 
 type VerificationStatus = "pending_review" | "approved" | "rejected";
