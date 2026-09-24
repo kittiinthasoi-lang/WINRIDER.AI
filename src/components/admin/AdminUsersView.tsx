@@ -237,7 +237,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
             <input
               value={manualAdminWinUid}
               onChange={(e) => setManualAdminWinUid(e.target.value.toLowerCase())}
-              placeholder="WIN UID เช่น AbCdEf123..."
+              placeholder="WIN UID เช่น kitti001"
               className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-xs font-mono text-white outline-none focus:border-amber-400"
             />
             <select
