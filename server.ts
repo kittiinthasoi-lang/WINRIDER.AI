@@ -2088,8 +2088,8 @@ app.post("/api/admin/bootstrap", rateLimit(10), async (req, res) => {
         adminAssignedBy: decoded.uid,
         updatedAt: now,
       }, { merge: true }),
-      ordersDb.collection("adminAccess").doc(targetUid).set({
-        uid: targetUid: decoded.uid,
+      ordersDb.collection("adminAccess").doc(decoded.uid).set({
+        uid: decoded.uid,
         winUid: targetWinUid,
         adminLevel: "super",
         active: true,
