@@ -61,8 +61,12 @@ const PROVINCES = [
 
 function friendlyError(error: any) {
   const code = String(error?.code || error?.message || '');
+  if (code.includes('unauthorized-domain')) {
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    return `โดเมน ${host || 'ปัจจุบัน'} ยังไม่ได้รับอนุญาตใน Firebase Authentication ของโปรเจกต์ decoded-robot-6lkcn`;
+  }
   if (code.includes('operation-not-allowed')) {
-    return 'Firebase Authentication: ยังไม่ได้เปิด Email/Password Provider ใน Firebase Console ของโปรเจกต์ decoded-robot-6lkcn';
+    return 'Firebase Authentication Provider ที่เรียกใช้ยังไม่ได้เปิดในโปรเจกต์ decoded-robot-6lkcn';
   }
   if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) {
     return 'WIN UID หรือรหัสผ่านไม่ถูกต้อง';
@@ -327,6 +331,7 @@ export const AuthModalOrView: React.FC = () => {
     playTactileBlip(900);
     try {
       const result = await signInWithGoogle();
+      if (!result) return;
       if (!result.existingProfile) {
         setMode('register');
         setRegStep(1);
@@ -392,46 +397,7 @@ export const AuthModalOrView: React.FC = () => {
     }
   };
 
-  const handleQuickSovereignBypass = () => {
-    const normalized = normalizeWinUid(winUid || 'knight.rider');
-    const name = `${firstName || 'อัศวิน'} ${lastName || 'ไรเดอร์'}`.trim();
-    adoptUserData({
-      uid: normalized,
-      winUid: normalized,
-      email: `${normalized}@auth.winrider.local`,
-      displayName: name,
-      fullName: name,
-      phone: phone || '0812345678',
-      province: province || 'กรุงเทพมหานคร',
-      district: district || 'จตุจักร',
-      role: selectedRole || 'knight',
-      status: 'active',
-      isAdmin: true,
-      adminLevel: 'super',
-      isFoundingKnight: selectedRole === 'knight',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      registration: {
-        fullName: name,
-        phone: phone || '0812345678',
-        province: province || 'กรุงเทพมหานคร',
-        district: district || 'จตุจักร',
-        vehicleType,
-        plateNumber: plateNumber || '1กข 1234',
-        publicLicenseNumber: licenseNumber || '99887766',
-        emergencyContactName: emergencyName || 'ผู้ติดต่อฉุกเฉิน',
-        emergencyContactPhone: emergencyPhone || '0899999999',
-        shopName: shopName || 'ร้านค้า WINRIDER',
-        shopType,
-        shopAddress,
-        taxId,
-        orgName: orgName || 'องค์กรพันธมิตร WINRIDER',
-        orgType,
-        contactPerson,
-        estimatedUsers,
-      },
-    });
-  };
+
 
   return (
     <div className="min-h-[82vh] w-full flex items-center justify-center px-4 py-6">
@@ -492,25 +458,8 @@ export const AuthModalOrView: React.FC = () => {
                 <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                 <span className="font-semibold leading-relaxed">{error}</span>
               </div>
-              <div className="pt-1 flex flex-wrap gap-2 items-center">
-                <button
-                  type="button"
-                  onClick={handleQuickSovereignBypass}
-                  className="rounded-lg bg-cyan-500/25 hover:bg-cyan-500/35 border border-cyan-400/50 px-3 py-1.5 text-cyan-200 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md shadow-cyan-900/30"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-                  <span>เข้าสู่ระบบทันทีด้วย Sovereign Session (ทดสอบบทบาททันที)</span>
-                </button>
-                {error.includes('Firebase') && (
-                  <a
-                    href="https://console.firebase.google.com/project/decoded-robot-6lkcn/authentication/providers"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/20 px-3 py-1.5 text-slate-300 text-xs transition-colors underline"
-                  >
-                    เปิด Firebase Console เพื่อเปิด Email/Password
-                  </a>
-                )}
+              <div className="pt-1 text-[10px] font-mono text-slate-400">
+                Firebase project: decoded-robot-6lkcn
               </div>
             </div>
           )}
