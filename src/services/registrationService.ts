@@ -243,8 +243,6 @@ async function persistRegistrationDirectly(
       vehicleType: input.vehicleType,
       plateNumber: input.plateNumber,
       publicLicenseNumber: input.licenseNumber,
-      driverLicenseUrl,
-      vehiclePhotoUrl,
       emergencyContactName: input.emergencyContactName,
       emergencyContactPhone: input.emergencyContactPhone,
       shopName: input.shopName,
