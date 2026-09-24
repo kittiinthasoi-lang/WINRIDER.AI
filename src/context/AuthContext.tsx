@@ -11,7 +11,8 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
-import { auth, authPersistenceReady } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, authPersistenceReady, db } from '../firebase';
 import { UserDoc } from '../types/auth';
 import { clearUserSession } from '../utils/userSession';
 import { internalEmailToWinUid, normalizeWinUid, winUidToInternalEmail } from '../auth/winUid';
@@ -169,6 +170,19 @@ export function createSyntheticFirebaseUser(uid: string, displayName: string, em
 async function readUserProfile(user: User): Promise<UserDoc | null> {
   if (user.refreshToken === 'synthetic-session') {
     return cachedProfile();
+  }
+
+  // The authenticated Firebase UID is the canonical account key. Read the
+  // persistent profile directly from the configured Firestore database first,
+  // so login still works even if the Express/Admin API is temporarily unavailable.
+  try {
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    if (snap.exists()) {
+      const profile = snap.data() as UserDoc;
+      if (profile?.role) return profile;
+    }
+  } catch (firestoreError) {
+    console.warn('Direct Firestore profile read failed, trying API fallback:', firestoreError);
   }
 
   const token = await user.getIdToken();

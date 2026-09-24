@@ -1,4 +1,4 @@
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import type { UserDoc, UserRole } from '../types/auth';
@@ -206,6 +206,148 @@ export async function registerPartner(payload: PartnerRegistrationPayload): Prom
   });
 }
 
+
+async function persistRegistrationDirectly(
+  input: FullRegistrationInput,
+  user: NonNullable<typeof auth.currentUser>,
+  fullName: string,
+  driverLicenseUrl: string,
+  vehiclePhotoUrl: string
+): Promise<RegistrationResult> {
+  const normalizedUid = normalizeWinUid(input.winUid);
+  const now = new Date().toISOString();
+  const batch = writeBatch(db);
+
+  const userRef = doc(db, 'users', user.uid);
+  const userDoc: UserDoc = {
+    uid: user.uid,
+    winUid: normalizedUid,
+    email: user.email || winUidToInternalEmail(normalizedUid),
+    displayName: fullName || user.displayName || normalizedUid,
+    fullName,
+    phone: input.phone,
+    province: input.province,
+    district: input.district,
+    role: input.role,
+    status: 'active',
+    isAdmin: false,
+    level: 1,
+    xp: 0,
+    createdAt: now,
+    updatedAt: now,
+    registration: {
+      fullName,
+      phone: input.phone,
+      province: input.province,
+      district: input.district,
+      vehicleType: input.vehicleType,
+      plateNumber: input.plateNumber,
+      publicLicenseNumber: input.licenseNumber,
+      emergencyContactName: input.emergencyContactName,
+      emergencyContactPhone: input.emergencyContactPhone,
+      shopName: input.shopName,
+      shopType: input.shopType,
+      shopAddress: input.shopAddress,
+      taxId: input.taxId,
+      orgName: input.orgName,
+      orgType: input.orgType,
+      contactPerson: input.contactPerson,
+      estimatedUsers: input.estimatedUsers,
+    },
+  };
+
+  batch.set(userRef, {
+    ...userDoc,
+    serverUpdatedAt: serverTimestamp(),
+  }, { merge: true });
+
+  if (input.role === 'knight') {
+    batch.set(doc(db, 'knights', user.uid), {
+      uid: user.uid,
+      winUid: normalizedUid,
+      displayName: userDoc.displayName,
+      phone: input.phone,
+      province: input.province,
+      district: input.district,
+      isOnline: false,
+      vehicleType: input.vehicleType || 'motorcycle',
+      plateNumber: input.plateNumber || '',
+      licenseNumber: input.licenseNumber || '',
+      kycStatus: 'pending',
+      documents: {
+        driverLicenseUrl,
+        vehiclePhotoUrl,
+      },
+      level: 1,
+      xp: 0,
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
+  } else if (input.role === 'citizen') {
+    batch.set(doc(db, 'citizens', user.uid), {
+      uid: user.uid,
+      winUid: normalizedUid,
+      displayName: userDoc.displayName,
+      phone: input.phone,
+      province: input.province,
+      district: input.district,
+      savedAddresses: [],
+      emergencyContact: {
+        name: input.emergencyContactName || '',
+        phone: input.emergencyContactPhone || '',
+      },
+      level: 1,
+      xp: 0,
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
+  } else if (input.role === 'merchant') {
+    batch.set(doc(db, 'merchants', user.uid), {
+      uid: user.uid,
+      winUid: normalizedUid,
+      displayName: userDoc.displayName,
+      phone: input.phone,
+      province: input.province,
+      district: input.district,
+      shopName: input.shopName || '',
+      shopType: input.shopType || '',
+      address: input.shopAddress || '',
+      taxId: input.taxId || '',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
+  } else if (input.role === 'partner') {
+    batch.set(doc(db, 'partners', user.uid), {
+      uid: user.uid,
+      winUid: normalizedUid,
+      displayName: userDoc.displayName,
+      phone: input.phone,
+      province: input.province,
+      district: input.district,
+      orgName: input.orgName || '',
+      orgType: input.orgType || '',
+      contactPerson: input.contactPerson || '',
+      estimatedUsers: input.estimatedUsers || 100,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
+  }
+
+  await batch.commit();
+
+  const saved = await getDoc(userRef);
+  if (!saved.exists() || !saved.data()?.role) {
+    throw new Error('บันทึกโปรไฟล์ลง Cloud Firestore ไม่สำเร็จ');
+  }
+
+  return {
+    user: saved.data() as UserDoc,
+    approvalRequired: false,
+  };
+}
+
 export async function registerFullAccountWithFirestore(
   input: FullRegistrationInput,
   onProgress?: (message: string) => void
@@ -213,7 +355,6 @@ export async function registerFullAccountWithFirestore(
   let user = auth.currentUser;
   const fullName = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
   const normalizedUid = normalizeWinUid(input.winUid);
-  let isSovereignFallback = false;
 
   // 1. Create Firebase Auth user if not signed in
   if (!user) {
@@ -235,11 +376,11 @@ export async function registerFullAccountWithFirestore(
     } catch (authError: any) {
       const errStr = String(authError?.code || authError?.message || '');
       if (errStr.includes('operation-not-allowed')) {
-        console.warn('Firebase Email/Password provider not enabled in Console. Activating Sovereign Session...');
-        isSovereignFallback = true;
-      } else {
-        throw authError;
+        const error = new Error('ต้องเปิด Email/Password ใน Firebase Authentication ของโปรเจกต์ decoded-robot-6lkcn เพื่อใช้ WIN UID + รหัสผ่าน');
+        (error as any).code = 'EMAIL_PASSWORD_PROVIDER_REQUIRED';
+        throw error;
       }
+      throw authError;
     }
   } else if (fullName && !user.displayName) {
     await updateProfile(user, { displayName: fullName }).catch(() => {});
@@ -281,52 +422,6 @@ export async function registerFullAccountWithFirestore(
     user = auth.currentUser || user;
   }
 
-  // If Firebase Auth provider is not enabled in Firebase Console, provide full sovereign session
-  if (isSovereignFallback || !user) {
-    onProgress?.('กำลังจัดสรรสิทธิบทบาทและบันทึกข้อมูลอธิปไตย...');
-    const userDoc: UserDoc = {
-      uid: normalizedUid,
-      winUid: normalizedUid,
-      email: winUidToInternalEmail(normalizedUid),
-      displayName: fullName || normalizedUid,
-      fullName,
-      phone: input.phone,
-      province: input.province,
-      district: input.district,
-      role: input.role,
-      status: 'active',
-      isAdmin: false,
-      isFoundingKnight: input.role === 'knight',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      registration: {
-        fullName,
-        phone: input.phone,
-        province: input.province,
-        district: input.district,
-        vehicleType: input.vehicleType,
-        plateNumber: input.plateNumber,
-        publicLicenseNumber: input.licenseNumber,
-        emergencyContactName: input.emergencyContactName,
-        emergencyContactPhone: input.emergencyContactPhone,
-        shopName: input.shopName,
-        shopType: input.shopType,
-        shopAddress: input.shopAddress,
-        taxId: input.taxId,
-        orgName: input.orgName,
-        orgType: input.orgType,
-        contactPerson: input.contactPerson,
-        estimatedUsers: input.estimatedUsers,
-      },
-    };
-
-    onProgress?.('บันทึกข้อมูลอธิปไตยสำเร็จ! กำลังเข้าสู่ระบบ...');
-    return {
-      user: userDoc,
-      approvalRequired: false,
-      isFoundingKnight: input.role === 'knight',
-    };
-  }
 
   // 2. Upload any KYC documents for knight
   let driverLicenseUrl = '';
@@ -402,47 +497,15 @@ export async function registerFullAccountWithFirestore(
       throw new Error('ไม่พบบทบาทที่เลือก');
     }
   } catch (firestoreErr) {
-    console.warn('Firestore write error during registration, falling back to local user profile:', firestoreErr);
-    const fallbackUserDoc: UserDoc = {
-      uid: user.uid,
-      winUid: normalizedUid,
-      email: user.email || winUidToInternalEmail(normalizedUid),
-      displayName: fullName || user.displayName || normalizedUid,
+    console.warn('Backend registration write failed; writing the authenticated user profile directly to Cloud Firestore:', firestoreErr);
+    onProgress?.('กำลังบันทึกโปรไฟล์จริงลง Cloud Firestore...');
+    result = await persistRegistrationDirectly(
+      input,
+      user,
       fullName,
-      phone: input.phone,
-      province: input.province,
-      district: input.district,
-      role: input.role,
-      status: 'active',
-      isAdmin: false,
-      isFoundingKnight: input.role === 'knight',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      registration: {
-        fullName,
-        phone: input.phone,
-        province: input.province,
-        district: input.district,
-        vehicleType: input.vehicleType,
-        plateNumber: input.plateNumber,
-        publicLicenseNumber: input.licenseNumber,
-        emergencyContactName: input.emergencyContactName,
-        emergencyContactPhone: input.emergencyContactPhone,
-        shopName: input.shopName,
-        shopType: input.shopType,
-        shopAddress: input.shopAddress,
-        taxId: input.taxId,
-        orgName: input.orgName,
-        orgType: input.orgType,
-        contactPerson: input.contactPerson,
-        estimatedUsers: input.estimatedUsers,
-      },
-    };
-    result = {
-      user: fallbackUserDoc,
-      approvalRequired: false,
-      isFoundingKnight: input.role === 'knight',
-    };
+      driverLicenseUrl,
+      vehiclePhotoUrl
+    );
   }
 
   onProgress?.('บันทึกลง Cloud Firestore สำเร็จ! กำลังเข้าสู่ระบบ...');
