@@ -48,14 +48,14 @@ export const AuthModalOrView: React.FC = () => {
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-[11px] font-black tracking-wide text-emerald-300">
               <LockKeyhole className="h-3.5 w-3.5" />
-              SECURE SIGN-IN
+              FIREBASE AUTHENTICATION
             </div>
             <h1 className="mt-3 text-3xl font-black tracking-tight text-white">
               <span className="text-cyan-300">WINRIDER</span><span className="text-amber-300">.AI</span>
             </h1>
             <p className="mt-2 text-sm font-semibold text-slate-300">เข้าสู่ระบบด้วยบัญชีที่ได้รับอนุญาต</p>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              ทางเข้า Super Admin แบบไม่ใช้รหัสถูกปิดแล้ว ระบบจะตรวจบัญชีจากฐานข้อมูลจริง
+              Firebase Authentication เป็นระบบยืนยันตัวตนหลักเพียงระบบเดียว
             </p>
           </div>
 
