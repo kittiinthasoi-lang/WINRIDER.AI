@@ -293,7 +293,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
             จัดการบัญชีผู้ใช้งานและบทบาท
           </h1>
           <p className="text-xs text-slate-300 mt-1">
-            ผู้สมัครใหม่ทุกบทบาทจะอยู่สถานะรออนุมัติ และเข้าใช้งานไม่ได้จนกว่า Super Admin จะกดอนุมัติ
+            ผู้สมัครใหม่ทุกบทบาทเปิดใช้งานทันทีหลังลงทะเบียน • อีเมลเจ้าของระบบที่กำหนดไว้จะได้รับสิทธิ์ Super Admin อัตโนมัติ
           </p>
         </div>
 
