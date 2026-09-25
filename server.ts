@@ -581,28 +581,35 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   try {
-    const snapshot = await ordersDb.collection("users").limit(300).get();
-    const eligible = snapshot.docs
-      .map((doc) => ({ uid: doc.id, ...doc.data() } as any))
-      .filter((entry) => entry.status === "active" && (entry.role === "merchant" || entry.role === "partner"));
-    const profiles = await Promise.all(eligible.map(async (entry) => {
-      const roleCollection = entry.role === "merchant" ? "merchants" : "partners";
-      const roleData = (await ordersDb.collection(roleCollection).doc(entry.uid).get()).data() || {};
+    const [usersSnap, merchantsSnap, partnersSnap] = await Promise.all([
+      ordersDb.collection("users").where("status", "==", "active").limit(500).get(),
+      ordersDb.collection("merchants").limit(500).get(),
+      ordersDb.collection("partners").limit(500).get(),
+    ]);
+
+    const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, { uid: doc.id, ...doc.data() } as any]));
+    const stringArray = (value: unknown) => Array.isArray(value) ? value.filter((item) => typeof item === "string").slice(0, 30) : [];
+    const recordArray = (value: unknown) => Array.isArray(value)
+      ? value.filter((item) => item && typeof item === "object").slice(0, 50)
+      : [];
+
+    const buildProfile = (role: "merchant" | "partner", doc: any) => {
+      const roleData = doc.data() || {};
+      const entry = usersById.get(doc.id);
+      if (!entry) return null;
       const custom = roleData.profileCustomization || entry.profileCustomization || {};
-      const stringArray = (value: unknown) => Array.isArray(value) ? value.filter((item) => typeof item === "string").slice(0, 30) : [];
-      const recordArray = (value: unknown) => Array.isArray(value)
-        ? value.filter((item) => item && typeof item === "object").slice(0, 50)
-        : [];
       return {
-        id: entry.uid,
-        role: entry.role,
-        name: String(custom.displayName || roleData.shopName || roleData.orgName || entry.displayName || "").trim(),
+        id: doc.id,
+        role,
+        name: String(custom.displayName || (role === "merchant" ? roleData.shopName : roleData.orgName) || roleData.displayName || entry.displayName || "").trim(),
         description: String(custom.bioStatus || roleData.description || "").trim(),
         avatarUrl: String(custom.avatarUrl || entry.avatarUrl || ""),
-        avatarEmoji: String(custom.avatarEmoji || entry.avatarEmoji || (entry.role === "merchant" ? "🏪" : "🏢")),
+        avatarEmoji: String(custom.avatarEmoji || entry.avatarEmoji || (role === "merchant" ? "🏪" : "🏢")),
         address: String(roleData.address || [entry.district, entry.province].filter(Boolean).join(" ") || "").trim(),
         phone: String(entry.phone || roleData.phone || ""),
-        category: String(roleData.shopType || roleData.orgType || roleData.category || ""),
+        email: String(entry.email || ""),
+        contactPerson: String(roleData.contactPerson || entry.displayName || ""),
+        category: String(role === "merchant" ? (roleData.shopType || roleData.category || "ร้านค้า WINRIDER") : (roleData.orgType || roleData.category || "พาร์ทเนอร์ WINRIDER")),
         products: recordArray(roleData.products),
         services: recordArray(roleData.services),
         promotions: recordArray(roleData.promotions),
@@ -610,8 +617,14 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
         highlights: stringArray(roleData.highlights || roleData.amenities),
         updatedAt: roleData.updatedAt || entry.updatedAt || null,
       };
-    }));
-    return res.json({ profiles: profiles.filter((profile) => profile.name), source: "Firestore verified registrations" });
+    };
+
+    const profiles = [
+      ...merchantsSnap.docs.map((doc) => buildProfile("merchant", doc)),
+      ...partnersSnap.docs.map((doc) => buildProfile("partner", doc)),
+    ].filter((profile): profile is NonNullable<typeof profile> => Boolean(profile?.name));
+
+    return res.json({ profiles, source: "Firestore active five-role profiles" });
   } catch (error) {
     console.error("[Shop Directory]", error instanceof Error ? error.message : error);
     return res.status(503).json({ error: "โหลดรายชื่อร้านค้าและพาร์ทเนอร์จริงไม่ได้", profiles: [] });
@@ -2038,11 +2051,13 @@ async function createFirebaseRegistration(
         phone: profile.phone,
         province: profile.province,
         district: profile.district,
-        isOnline: false,
+        isOnline: true,
         vehicleType: profile.vehicleType || "motorcycle",
         plateNumber: profile.plateNumber || "",
         licenseNumber: profile.publicLicenseNumber || "",
-        kycStatus: "pending",
+        kycStatus: "approved",
+        approvedAt: now,
+        approvedBy: "registration-auto-approval",
         isFoundingKnight,
         certifications: [],
         documents: {
@@ -2405,6 +2420,8 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
     if (validationError) return res.status(400).json({ error: "Registration details are incomplete", code: validationError });
 
     const result = await createFirebaseRegistration(decoded.uid, winUid, role, profile);
+    const createdUserSnap = await ordersDb.collection("users").doc(decoded.uid).get();
+    await ensureFiveRoleDocumentsForUid(decoded.uid, createdUserSnap.data() || { uid: decoded.uid, winUid, role, registration: profile });
 
     const authRecord = await adminAuth.getUser(decoded.uid);
     await adminAuth.setCustomUserClaims(decoded.uid, {
@@ -2445,6 +2462,96 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
 
 const OWNER_ADMIN_EMAIL = "kittiinthasoi@gmail.com";
 
+async function ensureFiveRoleDocumentsForUid(uid: string, profile: any) {
+  const now = new Date().toISOString();
+  const displayName = String(profile.displayName || profile.fullName || "ผู้ใช้งาน WINRIDER");
+  const winUid = String(profile.winUid || "");
+  const phone = String(profile.phone || "");
+  const province = String(profile.province || "");
+  const district = String(profile.district || "");
+  const registration = profile.registration || {};
+
+  await Promise.all([
+    ordersDb.collection("citizens").doc(uid).set({
+      uid,
+      winUid,
+      displayName,
+      phone,
+      province,
+      district,
+      savedAddresses: [],
+      emergencyContact: {
+        name: String(registration.emergencyContactName || ""),
+        phone: String(registration.emergencyContactPhone || ""),
+      },
+      level: Number(profile.level || 1),
+      xp: Number(profile.xp || 0),
+      updatedAt: now,
+      createdAt: profile.createdAt || now,
+    }, { merge: true }),
+
+    ordersDb.collection("knights").doc(uid).set({
+      uid,
+      winUid,
+      displayName,
+      phone,
+      province,
+      district,
+      isOnline: profile.role === "knight" ? true : false,
+      vehicleType: registration.vehicleType || "motorcycle",
+      plateNumber: String(registration.plateNumber || ""),
+      licenseNumber: String(registration.publicLicenseNumber || registration.licenseNumber || ""),
+      kycStatus: "approved",
+      approvedAt: now,
+      approvedBy: "five-role-auto-approval",
+      certifications: [],
+      level: Number(profile.level || 1),
+      xp: Number(profile.xp || 0),
+      fiveRoleAccess: true,
+      updatedAt: now,
+      createdAt: profile.createdAt || now,
+    }, { merge: true }),
+
+    ordersDb.collection("merchants").doc(uid).set({
+      uid,
+      winUid,
+      displayName,
+      ownerName: displayName,
+      phone,
+      province,
+      district,
+      shopName: String(registration.shopName || displayName),
+      shopType: String(registration.shopType || "ร้านค้า WINRIDER"),
+      address: String(registration.shopAddress || [district, province].filter(Boolean).join(" ")),
+      taxId: String(registration.taxId || ""),
+      gpRate: 10,
+      status: "active",
+      fiveRoleAccess: true,
+      updatedAt: now,
+      createdAt: profile.createdAt || now,
+    }, { merge: true }),
+
+    ordersDb.collection("partners").doc(uid).set({
+      uid,
+      winUid,
+      displayName,
+      contactPerson: String(registration.contactPerson || displayName),
+      phone,
+      province,
+      district,
+      orgName: String(registration.orgName || displayName),
+      orgType: String(registration.orgType || "พาร์ทเนอร์ WINRIDER"),
+      address: String(registration.orgAddress || [district, province].filter(Boolean).join(" ")),
+      estimatedUsers: Number(registration.estimatedUsers || 1),
+      gpRate: 10,
+      status: "active",
+      fiveRoleAccess: true,
+      updatedAt: now,
+      createdAt: profile.createdAt || now,
+    }, { merge: true }),
+  ]);
+}
+
 async function ensureDefaultSuperAdminForUid(uid: string) {
   const userRef = ordersDb.collection("users").doc(uid);
   const profileSnap = await userRef.get();
@@ -2454,20 +2561,23 @@ async function ensureDefaultSuperAdminForUid(uid: string) {
   if (profile.adminRevokedAt || profile.adminRevokedBy) {
     return { promoted: false, user: profile };
   }
-  if (profile.isAdmin === true && ADMIN_LEVELS.has(String(profile.adminLevel || ""))) {
-    return { promoted: false, user: profile };
-  }
 
   const record = await adminAuth.getUser(uid);
-  await adminAuth.setCustomUserClaims(uid, {
-    ...(record.customClaims || {}),
-    admin: true,
-    adminLevel: "super",
-  });
+  const claims = record.customClaims || {};
+  const needsClaimUpdate = claims.admin !== true || claims.adminLevel !== "super";
+  const needsProfileUpdate = profile.isAdmin !== true || profile.adminLevel !== "super" || profile.defaultFiveRoleAccess !== true;
+
+  if (needsClaimUpdate) {
+    await adminAuth.setCustomUserClaims(uid, {
+      ...claims,
+      admin: true,
+      adminLevel: "super",
+    });
+  }
 
   const now = new Date().toISOString();
-  await Promise.all([
-    userRef.set({
+  if (needsProfileUpdate) {
+    await userRef.set({
       isAdmin: true,
       adminLevel: "super",
       defaultFiveRoleAccess: true,
@@ -2475,23 +2585,25 @@ async function ensureDefaultSuperAdminForUid(uid: string) {
       adminAssignedAt: profile.adminAssignedAt || now,
       adminAssignedBy: "system-default-super-admin",
       updatedAt: now,
-    }, { merge: true }),
-    ordersDb.collection("adminAccess").doc(uid).set({
-      uid,
-      winUid: String(profile.winUid || ""),
-      adminLevel: "super",
-      active: true,
-      defaultAccess: true,
-      assignedBy: "system-default-super-admin",
-      createdAt: profile.adminAssignedAt || now,
-      updatedAt: now,
-    }, { merge: true }),
-  ]);
+    }, { merge: true });
+  }
+
+  await ordersDb.collection("adminAccess").doc(uid).set({
+    uid,
+    winUid: String(profile.winUid || ""),
+    adminLevel: "super",
+    active: true,
+    defaultAccess: true,
+    assignedBy: "system-default-super-admin",
+    createdAt: profile.adminAssignedAt || now,
+    updatedAt: now,
+  }, { merge: true });
 
   const updated = await userRef.get();
-  return { promoted: true, user: updated.data() || profile };
+  const updatedProfile = updated.data() || profile;
+  await ensureFiveRoleDocumentsForUid(uid, updatedProfile);
+  return { promoted: needsClaimUpdate || needsProfileUpdate, user: updatedProfile };
 }
-
 async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | null) {
   const userRef = ordersDb.collection("users").doc(uid);
   const [profileSnap, linkSnap] = await Promise.all([
@@ -4494,7 +4606,7 @@ async function buildDispatchCandidates(order: ServerOrder) {
   if (!order.pickupCoord || !validCoordinates(order.pickupCoord)) return [] as string[];
   try {
     const [usersSnap, knightsSnap] = await Promise.all([
-      ordersDb.collection("users").where("role", "==", "knight").where("status", "==", "active").get(),
+      ordersDb.collection("users").where("status", "==", "active").get(),
       ordersDb.collection("knights").where("isOnline", "==", true).get(),
     ]);
     const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
@@ -4502,9 +4614,15 @@ async function buildDispatchCandidates(order: ServerOrder) {
     const candidates = knightsSnap.docs.flatMap((doc) => {
       const knight = doc.data();
       const registeredUser = usersById.get(doc.id);
-      const userData = registeredUser || (knight.ownerManagedDriver === true
-        ? { role: "knight", status: "active", displayName: knight.displayName || "กิตติ อินทะสร้อย", level: 100, gender: knight.gender || "male" }
-        : null);
+      const userData = registeredUser && (
+        registeredUser.role === "knight" ||
+        registeredUser.defaultFiveRoleAccess === true ||
+        registeredUser.isAdmin === true
+      )
+        ? { ...registeredUser, role: "knight" }
+        : (knight.ownerManagedDriver === true
+          ? { role: "knight", status: "active", displayName: knight.displayName || "พี่วิน WINRIDER", level: 100, gender: knight.gender || "male" }
+          : null);
       const kyc = String(knight.kycStatus || "").toLowerCase();
       const location = knight.lastDispatchLocation;
       const heartbeatMs = Date.parse(String(knight.dispatchHeartbeatAt || ""));
