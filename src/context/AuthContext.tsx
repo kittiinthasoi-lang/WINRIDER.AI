@@ -15,11 +15,12 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, authPersistenceReady, db } from '../firebase';
 import { UserDoc } from '../types/auth';
 import { clearUserSession } from '../utils/userSession';
-import { internalEmailToWinUid, normalizeWinUid, winUidToInternalEmail } from '../auth/winUid';
+import { internalEmailToWinUid, normalizeWinUid } from '../auth/winUid';
 
 interface SignUpPayload {
   firstName: string;
   lastName: string;
+  email: string;
   winUid: string;
   password: string;
 }
@@ -44,9 +45,9 @@ interface AuthContextType {
   role: UserDoc['role'] | null;
   loading: boolean;
   googleOnboarding: GoogleOnboardingInfo | null;
-  signInWithWinUid: (winUid: string, password: string) => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<GoogleSignInResult | null>;
-  signUpWithWinUid: (payload: SignUpPayload) => Promise<void>;
+  signUpWithEmail: (payload: SignUpPayload) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUserData: () => Promise<UserDoc | null>;
   adoptUserData: (profile: UserDoc) => void;
@@ -299,12 +300,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signInWithWinUid = async (winUid: string, password: string) => {
+  const signInWithEmail = async (email: string, password: string) => {
     setLoading(true);
     try {
       await authPersistenceReady;
-      const normalizedUid = normalizeWinUid(winUid);
-      const credential = await signInWithEmailAndPassword(auth, winUidToInternalEmail(normalizedUid), password);
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       setFirebaseUser(credential.user);
       const profile = await readUserProfile(credential.user);
       setUserData(profile);
@@ -363,12 +364,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUpWithWinUid = async ({ firstName, lastName, winUid, password }: SignUpPayload) => {
+  const signUpWithEmail = async ({ firstName, lastName, email, winUid, password }: SignUpPayload) => {
     setLoading(true);
     try {
       await authPersistenceReady;
       const normalizedWinUid = normalizeWinUid(winUid);
-      const credential = await createUserWithEmailAndPassword(auth, winUidToInternalEmail(normalizedWinUid), password);
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
       const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
       if (displayName) await updateProfile(credential.user, { displayName });
       await credential.user.getIdToken(true);
@@ -386,7 +388,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const activeUser = auth.currentUser || createSyntheticFirebaseUser(
       profile.uid,
       profile.displayName || profile.fullName || 'ผู้ใช้งาน',
-      profile.email || winUidToInternalEmail(profile.winUid || profile.uid)
+      profile.email || ''
     );
     setFirebaseUser(activeUser);
     setUserData(profile);
@@ -440,9 +442,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       role: userData?.role ?? null,
       loading,
       googleOnboarding,
-      signInWithWinUid,
+      signInWithEmail,
       signInWithGoogle,
-      signUpWithWinUid,
+      signUpWithEmail,
       signOut,
       refreshUserData,
       adoptUserData,
