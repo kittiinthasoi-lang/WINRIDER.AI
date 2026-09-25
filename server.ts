@@ -1756,6 +1756,11 @@ function getAdminDb() {
         ...(storageBucket ? { storageBucket } : {}),
       });
       credentialSource = "application_default";
+      // Cloud Run / AI Studio supplies Application Default Credentials from
+      // the runtime service account. Credential presence and IAM permission
+      // are separate concerns; readiness checks below verify actual access.
+      credentialConfigured = true;
+      credentialError = null;
     }
   } else {
     credentialConfigured = true;
@@ -1777,25 +1782,75 @@ function getAdminDb() {
 
 const ordersDb = getAdminDb();
 
+function firebasePermissionDiagnosis(error: any): { code: string; detail: string } {
+  const rawCode = String(error?.code ?? "");
+  const rawMessage = String(error?.message || "");
+  const permissionDenied = rawCode === "7"
+    || /PERMISSION_DENIED|permission.?denied|insufficient permission/i.test(rawMessage);
+  if (permissionDenied) {
+    return {
+      code: "FIRESTORE_IAM_PERMISSION_DENIED",
+      detail: "Runtime Service Account ไม่มีสิทธิ์อ่าน Firestore database นี้ ต้องให้ roles/datastore.user (หรือสิทธิ์ที่สูงกว่า) ในโปรเจกต์ Firebase เดียวกัน",
+    };
+  }
+  if (rawCode === "5" || /NOT_FOUND|database.*not.*found/i.test(rawMessage)) {
+    return {
+      code: "FIRESTORE_DATABASE_NOT_FOUND",
+      detail: `ไม่พบ Firestore database ${firebaseAdminRuntimeStatus.databaseId} ในโปรเจกต์ ${firebaseAdminRuntimeStatus.projectId}`,
+    };
+  }
+  return {
+    code: rawCode || "FIRESTORE_READ_FAILED",
+    detail: rawMessage || "อ่าน Firestore ไม่สำเร็จ",
+  };
+}
+
+async function getRuntimeServiceAccountEmail(): Promise<string> {
+  if (firebaseAdminRuntimeStatus.credentialSource !== "application_default") {
+    return process.env.FIREBASE_CLIENT_EMAIL || "explicit-service-account";
+  }
+  try {
+    const response = await fetch(
+      "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email",
+      { headers: { "Metadata-Flavor": "Google" }, signal: AbortSignal.timeout(1500) }
+    );
+    if (response.ok) return (await response.text()).trim();
+  } catch {}
+  return "application-default-runtime-account";
+}
+
 async function checkFirebaseReadiness() {
-  const firestore = { ok: false, error: "" };
-  const storage = { ok: false, error: "" };
+  const firestore: { ok: boolean; error: string; detail?: string } = { ok: false, error: "" };
+  const storage: { ok: boolean; error: string; detail?: string } = { ok: false, error: "" };
+  const runtimeServiceAccount = await getRuntimeServiceAccountEmail();
 
   try {
     await ordersDb.collection("_connection_test").doc("ping").get();
     firestore.ok = true;
-  } catch (error) {
-    console.warn("[Firebase Readiness] Firestore read failed:", error instanceof Error ? error.message : error);
-    firestore.error = "FIRESTORE_READ_FAILED";
+  } catch (error: any) {
+    const diagnosis = firebasePermissionDiagnosis(error);
+    console.warn("[Firebase Readiness] Firestore read failed:", error?.message || error);
+    firestore.error = diagnosis.code;
+    firestore.detail = diagnosis.detail;
   }
 
   try {
     const bucket = getStorage().bucket(firebaseAdminRuntimeStatus.storageBucket || undefined);
-    await bucket.getMetadata();
+    // Test the object API that WINRIDER actually uses instead of bucket metadata.
+    // bucket.getMetadata() needs storage.buckets.get and can return 403 even when
+    // object upload/read permissions are correctly configured.
+    await bucket.file("__winrider_healthcheck__/permission-probe").exists();
     storage.ok = true;
-  } catch (error) {
-    console.warn("[Firebase Readiness] Storage read failed:", error instanceof Error ? error.message : error);
-    storage.error = "STORAGE_READ_FAILED";
+  } catch (error: any) {
+    const rawCode = String(error?.code ?? "");
+    const rawMessage = String(error?.message || "");
+    const permissionDenied = rawCode === "403"
+      || /403|PERMISSION_DENIED|permission.?denied|forbidden/i.test(rawMessage);
+    console.warn("[Firebase Readiness] Storage object access failed:", rawMessage || error);
+    storage.error = permissionDenied ? "STORAGE_IAM_PERMISSION_DENIED" : (rawCode || "STORAGE_READ_FAILED");
+    storage.detail = permissionDenied
+      ? "Runtime Service Account ไม่มีสิทธิ์เข้าถึง object ใน Firebase Storage; ให้สิทธิ์ Storage Object Admin (หรือสิทธิ์ object ที่เหมาะสม) กับ bucket นี้"
+      : (rawMessage || "ตรวจ Firebase Storage ไม่สำเร็จ");
   }
 
   const ready = firestore.ok && storage.ok;
@@ -1808,6 +1863,7 @@ async function checkFirebaseReadiness() {
     credentialSource: firebaseAdminRuntimeStatus.credentialSource,
     credentialConfigured: firebaseAdminRuntimeStatus.credentialConfigured,
     credentialError: firebaseAdminRuntimeStatus.credentialError,
+    runtimeServiceAccount,
     checks: { firestore, storage },
     timestamp: new Date().toISOString(),
   };
@@ -4035,11 +4091,25 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
   const add = (id: string, name: string, status: HealthStatus, detail: string, actionUrl?: string, guideKey?: string) =>
     checks.push({ id, name, status, detail, actionUrl, guideKey });
 
+  let firestoreReady = false;
+  let firestoreFailureDetail = "";
+  const runtimeServiceAccount = await getRuntimeServiceAccountEmail();
+
   try {
     await ordersDb.collection("users").limit(1).get();
-    add("firestore", "Firestore", "ok", `เชื่อมฐานข้อมูล ${process.env.FIRESTORE_DATABASE_ID || "configured database"} สำเร็จ`);
+    firestoreReady = true;
+    add("firestore", "Firestore", "ok", `เชื่อมฐานข้อมูล ${firebaseAdminRuntimeStatus.databaseId} สำเร็จ • Runtime: ${runtimeServiceAccount}`);
   } catch (error: any) {
-    add("firestore", "Firestore", "error", `อ่านฐานข้อมูลไม่ได้: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`);
+    const diagnosis = firebasePermissionDiagnosis(error);
+    firestoreFailureDetail = diagnosis.detail;
+    add(
+      "firestore",
+      "Firestore",
+      "error",
+      `${diagnosis.detail} • Runtime: ${runtimeServiceAccount} • Project: ${firebaseAdminRuntimeStatus.projectId} • Database: ${firebaseAdminRuntimeStatus.databaseId}`,
+      `https://console.cloud.google.com/iam-admin/iam?project=${firebaseAdminRuntimeStatus.projectId}`,
+      "firestore_iam_permission"
+    );
   }
 
   let defaultStorageBucket = "decoded-robot-6lkcn.firebasestorage.app";
@@ -4053,20 +4123,21 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
   const targetBucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
 
   try {
-    const [metadata] = await getStorage().bucket().getMetadata();
-    add("storage", "Firebase Storage", "ok", `เชื่อม bucket ${metadata.name || "สำเร็จ"}`);
+    const bucket = getStorage().bucket(targetBucket);
+    await bucket.file("__winrider_healthcheck__/permission-probe").exists();
+    add("storage", "Firebase Storage", "ok", `Object access พร้อมใช้งานบน bucket ${targetBucket}`);
   } catch (error: any) {
     const errMsg = String(error?.code || error?.message || "unknown");
-    const is403 = errMsg.includes("403") || errMsg.includes("denied") || error?.code === 403;
-    const is404 = errMsg.includes("404") || errMsg.includes("not exist") || error?.code === 404;
-    const consoleUrl = `https://console.firebase.google.com/project/${process.env.FIREBASE_PROJECT_ID || "decoded-robot-6lkcn"}/storage`;
+    const is403 = errMsg.includes("403") || /denied|forbidden|PERMISSION_DENIED/i.test(errMsg) || error?.code === 403;
+    const is404 = errMsg.includes("404") || /not exist|NOT_FOUND/i.test(errMsg) || error?.code === 404;
+    const consoleUrl = `https://console.firebase.google.com/project/${firebaseAdminRuntimeStatus.projectId}/storage`;
 
     if (is403) {
       add(
         "storage",
         "Firebase Storage",
         "warning",
-        `Bucket 403: บัญชียังไม่ได้เปิดใช้งาน Storage หรือไม่มีสิทธิ์เข้าถึง GCS Bucket (${targetBucket}) • ระบบเปิดโหมดสำรอง Firestore Fallback อัตโนมัติ (อัปโหลดสลิปและรูปภาพทำงานได้ปกติ 100%)`,
+        `Storage object access ถูกปฏิเสธสำหรับ Runtime: ${runtimeServiceAccount} • Bucket: ${targetBucket} • ต้องเพิ่มสิทธิ์ object ให้ Service Account; Firestore fallback จะใช้ได้ก็ต่อเมื่อ Firestore พร้อม`,
         consoleUrl,
         "firebase_storage_403"
       );
@@ -4075,7 +4146,7 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
         "storage",
         "Firebase Storage",
         "warning",
-        `ยังไม่พบบักเก็ต ${targetBucket} ใน Firebase Console • เปิดโหมดสำรอง Firestore Fallback ให้เรียบร้อย`,
+        `ยังไม่พบ bucket ${targetBucket} • ตรวจว่าเปิด Firebase Storage ในโปรเจกต์ ${firebaseAdminRuntimeStatus.projectId} แล้ว`,
         consoleUrl,
         "firebase_storage_404"
       );
@@ -4084,7 +4155,7 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
         "storage",
         "Firebase Storage",
         "warning",
-        `ตรวจ bucket (${errMsg.slice(0, 50)}): ระบบเปิด Firestore Fallback สำรองข้อมูลสลิปให้อัตโนมัติ`,
+        `ตรวจ object access ไม่สำเร็จ: ${errMsg.slice(0, 100)} • Firestore fallback ไม่ถูกนับว่าพร้อมจนกว่า Firestore จะผ่าน`,
         consoleUrl,
         "firebase_storage_generic"
       );
@@ -4112,7 +4183,14 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
     pendingOrders = pending.size;
     add("dispatch", "Dispatch Engine", "ok", `ออนไลน์ด้วย GPS จริง ${onlineKnights} คน • ออเดอร์รอจับคู่ ${pendingOrders} รายการ`);
   } catch (error: any) {
-    add("dispatch", "Dispatch Engine", "error", `อ่านสถานะ Dispatch ไม่ได้: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`);
+    add(
+      "dispatch",
+      "Dispatch Engine",
+      "error",
+      firestoreReady
+        ? `อ่านสถานะ Dispatch ไม่ได้: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`
+        : `Dispatch ถูกบล็อกเพราะ Firestore ยังไม่มีสิทธิ์: ${firestoreFailureDetail || "Firestore unavailable"}`
+    );
   }
 
   let recentOrders: any[] = [];
@@ -4147,7 +4225,14 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
       };
     });
   } catch (error: any) {
-    add("order_audit", "Order Flow Audit", "error", `อ่านออเดอร์ล่าสุดไม่ได้: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`);
+    add(
+      "order_audit",
+      "Order Flow Audit",
+      "error",
+      firestoreReady
+        ? `อ่านออเดอร์ล่าสุดไม่ได้: ${String(error?.code || error?.message || "unknown").slice(0, 100)}`
+        : `Order Flow Audit ถูกบล็อกเพราะ Firestore ยังไม่มีสิทธิ์: ${firestoreFailureDetail || "Firestore unavailable"}`
+    );
   }
   if (!checks.some((item) => item.id === "order_audit")) {
     const completed = recentOrders.filter((order) => order.status === "completed" && order.issues.length === 0).length;
@@ -4159,7 +4244,21 @@ app.get("/api/admin/system-health", rateLimit(10), async (req, res) => {
     warning: checks.filter((item) => item.status === "warning").length,
     error: checks.filter((item) => item.status === "error").length,
   };
-  return res.json({ status: summary.error ? "action_required" : summary.warning ? "degraded" : "operational", summary, checks, dispatch: { onlineKnights, pendingOrders }, recentOrders, checkedAt: new Date().toISOString() });
+  return res.json({
+    status: summary.error ? "action_required" : summary.warning ? "degraded" : "operational",
+    summary,
+    checks,
+    firebaseRuntime: {
+      projectId: firebaseAdminRuntimeStatus.projectId,
+      databaseId: firebaseAdminRuntimeStatus.databaseId,
+      storageBucket: firebaseAdminRuntimeStatus.storageBucket,
+      credentialSource: firebaseAdminRuntimeStatus.credentialSource,
+      serviceAccount: runtimeServiceAccount,
+    },
+    dispatch: { onlineKnights, pendingOrders },
+    recentOrders,
+    checkedAt: new Date().toISOString(),
+  });
 });
 
 app.get("/api/admin/withdrawal-requests", rateLimit(20), async (req, res) => {
