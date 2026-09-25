@@ -61,6 +61,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
   const [selectedProfile, setSelectedProfile] = useState<ShopProfile | null>(null);
   const [purchaseProduct, setPurchaseProduct] = useState<{ profile: ShopProfile; record: Record<string, unknown> } | null>(null);
   const [officialPurchase, setOfficialPurchase] = useState<(typeof WIN_SHOP_ITEMS)[number] | null>(null);
+  const [selectedOfficialItem, setSelectedOfficialItem] = useState<(typeof WIN_SHOP_ITEMS)[number] | null>(null);
   const [officialWalletId, setOfficialWalletId] = useState('');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -261,7 +262,19 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {WIN_SHOP_ITEMS.map((item) => (
-              <article key={item.id} className="overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-b from-[#0B1830] to-[#071126] shadow-lg">
+              <article
+                key={item.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedOfficialItem(item)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedOfficialItem(item);
+                  }
+                }}
+                className="cursor-pointer overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-b from-[#0B1830] to-[#071126] shadow-lg transition-all hover:-translate-y-0.5 hover:border-amber-300/50"
+              >
                 <div className="h-44 bg-slate-950">
                   <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
                 </div>
@@ -280,10 +293,17 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
                       {item.inStock ? `คงเหลือ ${item.stockCount}` : 'หมด'}
                     </span>
                   </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-500">
+                    <span>แตะสินค้าเพื่อดูรายละเอียดทั้งหมด</span>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </div>
                   <button
                     type="button"
                     disabled={!item.inStock || !officialWalletId}
-                    onClick={() => setOfficialPurchase(item)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setOfficialPurchase(item);
+                    }}
                     className="w-full rounded-xl bg-amber-400 px-3 py-2.5 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <ShoppingBag className="mr-1 inline h-4 w-4" />
@@ -475,6 +495,129 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
                     })}</div>}
                 </section>;
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedOfficialItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/85 p-0 backdrop-blur-md sm:items-center sm:p-4"
+          onClick={() => setSelectedOfficialItem(null)}
+        >
+          <div
+            className="max-h-[96vh] w-full max-w-4xl overflow-y-auto rounded-t-[30px] border border-amber-400/30 bg-[#071126] text-white shadow-2xl sm:rounded-3xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[#071126]/95 px-4 py-3 backdrop-blur-xl sm:px-6">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-300">WIN SHOP OFFICIAL</p>
+                <p className="text-xs text-slate-400">{selectedOfficialItem.code}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOfficialItem(null)}
+                className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10"
+                aria-label="ปิดรายละเอียดสินค้า"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-0 lg:grid-cols-[1.15fr_1fr]">
+              <div className="bg-black">
+                <img
+                  src={selectedOfficialItem.imageUrl}
+                  alt={selectedOfficialItem.name}
+                  className="h-auto max-h-[72vh] w-full object-contain"
+                />
+              </div>
+
+              <div className="space-y-5 p-5 sm:p-6">
+                <div>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${selectedOfficialItem.badgeColor}`}>
+                      {selectedOfficialItem.badge}
+                    </span>
+                    <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold text-cyan-300">
+                      {selectedOfficialItem.categoryTh}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-black leading-snug text-white sm:text-2xl">{selectedOfficialItem.name}</h3>
+                  <p className="mt-1 text-xs text-slate-500">{selectedOfficialItem.nameEn}</p>
+                </div>
+
+                <div className="flex flex-wrap items-end gap-3">
+                  <span className="text-3xl font-black text-amber-300">฿{selectedOfficialItem.price.toLocaleString()}</span>
+                  {selectedOfficialItem.originalPrice > selectedOfficialItem.price && (
+                    <span className="pb-1 text-sm text-slate-500 line-through">฿{selectedOfficialItem.originalPrice.toLocaleString()}</span>
+                  )}
+                  <span className={`ml-auto rounded-full px-3 py-1 text-xs font-black ${selectedOfficialItem.inStock ? 'bg-emerald-400/10 text-emerald-300' : 'bg-rose-400/10 text-rose-300'}`}>
+                    {selectedOfficialItem.inStock ? `คงเหลือ ${selectedOfficialItem.stockCount}` : 'สินค้าหมด'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-sm font-black text-amber-300">★ {selectedOfficialItem.rating}</div>
+                    <div className="mt-1 text-[9px] text-slate-500">{selectedOfficialItem.reviewsCount.toLocaleString()} รีวิว</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-sm font-black text-cyan-300">{selectedOfficialItem.salesCount.toLocaleString()}</div>
+                    <div className="mt-1 text-[9px] text-slate-500">ขายแล้ว</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-sm font-black text-white">{selectedOfficialItem.pointsCost.toLocaleString()}</div>
+                    <div className="mt-1 text-[9px] text-slate-500">แต้มอ้างอิง</div>
+                  </div>
+                </div>
+
+                <section>
+                  <h4 className="text-xs font-black text-white">รายละเอียดสินค้า</h4>
+                  <p className="mt-2 text-sm leading-7 text-slate-300">{selectedOfficialItem.description}</p>
+                </section>
+
+                <section>
+                  <h4 className="text-xs font-black text-cyan-300">คุณสมบัติหลัก</h4>
+                  <div className="mt-2 space-y-2">
+                    {selectedOfficialItem.keySpecs.map((spec) => (
+                      <div key={spec} className="flex gap-2 rounded-xl border border-white/8 bg-white/[0.03] p-3 text-xs leading-relaxed text-slate-300">
+                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
+                        <span>{spec}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-wider text-cyan-300">Tactical Advantage</h4>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-300">{selectedOfficialItem.tacticalAdvantage}</p>
+                  </div>
+                  <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-wider text-amber-300">Gold Accent Detail</h4>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-300">{selectedOfficialItem.goldAccentDetail}</p>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">การชำระ / ผ่อน</h4>
+                  <p className="mt-2 text-xs font-bold text-white">{selectedOfficialItem.installment}</p>
+                </section>
+
+                <button
+                  type="button"
+                  disabled={!selectedOfficialItem.inStock || !officialWalletId}
+                  onClick={() => {
+                    setOfficialPurchase(selectedOfficialItem);
+                    setSelectedOfficialItem(null);
+                  }}
+                  className="w-full rounded-2xl bg-gradient-to-r from-amber-300 to-amber-500 px-4 py-3.5 text-sm font-black text-slate-950 shadow-[0_0_24px_rgba(251,191,36,0.22)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ShoppingBag className="mr-1.5 inline h-4 w-4" />
+                  {selectedOfficialItem.inStock ? `ซื้อสินค้า ฿${selectedOfficialItem.price.toLocaleString()}` : 'สินค้าหมด'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
