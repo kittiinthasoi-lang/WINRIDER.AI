@@ -78,9 +78,9 @@ export default function App() {
   const [adminApplicationsOpen, setAdminApplicationsOpen] = useState(false);
   const [adminRequestStatus, setAdminRequestStatus] = useState<string | null>(null);
 
-  // บัญชีเจ้าของระบบหนึ่งบัญชีสามารถเปิดได้ครบทั้ง 5 บทบาท
-  // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Super Admin)
-  // โดยใช้ Firebase UID เดียวเสมอ ไม่สร้างบัญชีผู้ใช้จำลองเพิ่ม
+  // บัญชี Super Admin ทุกบัญชีสามารถเปิดได้ครบทั้ง 5 บทบาท
+  // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Admin)
+  // โดยยังคงชื่อและ Firebase UID ของเจ้าของบัญชีนั้นเอง
   const isOwnerAdmin = Boolean(
     userData?.isAdmin === true ||
     userData?.adminLevel === 'super'
@@ -90,10 +90,10 @@ export default function App() {
   const currentUserSession: UserSession | null = useMemo(() => {
     if (isOwnerAdmin && firebaseUser) {
       const mappedRole = ownerPersona;
-      const roleTitle = mappedRole === 'driver' ? 'บัญชีเจ้าของ • อัศวินไรเดอร์'
-        : mappedRole === 'customer' ? 'บัญชีเจ้าของ • พลเมืองอัศวิน'
-        : mappedRole === 'merchant' ? 'บัญชีเจ้าของ • ร้านค้าพันธมิตร'
-        : 'บัญชีเจ้าของ • องค์กรพาร์ทเนอร์';
+      const roleTitle = mappedRole === 'driver' ? 'Super Admin • อัศวินไรเดอร์'
+        : mappedRole === 'customer' ? 'Super Admin • พลเมืองอัศวิน'
+        : mappedRole === 'merchant' ? 'Super Admin • ร้านค้าพันธมิตร'
+        : 'Super Admin • องค์กรพาร์ทเนอร์';
       const avatar = mappedRole === 'driver' ? '🏍️'
         : mappedRole === 'customer' ? '🛡️'
         : mappedRole === 'merchant' ? '🏪'
@@ -103,7 +103,7 @@ export default function App() {
         id: firebaseUser.uid,
         winUid: userData?.winUid || '',
         email: '',
-        name: userData?.displayName || firebaseUser.displayName || 'เจ้าของระบบ',
+        name: userData?.displayName || firebaseUser.displayName || 'ผู้ใช้งาน WINRIDER',
         phone: userData?.phone || '',
         role: mappedRole,
         primaryRole: mappedRole,
@@ -128,10 +128,10 @@ export default function App() {
 
     const mappedRole = isOwnerAdmin ? ownerPersona : registeredRole;
 
-    const roleTitle = mappedRole === 'driver' ? 'บัญชีเจ้าของ • อัศวินไรเดอร์'
-      : mappedRole === 'customer' ? 'บัญชีเจ้าของ • พลเมืองอัศวิน'
-      : mappedRole === 'merchant' ? 'บัญชีเจ้าของ • ร้านค้าพันธมิตร'
-      : 'บัญชีเจ้าของ • องค์กรพาร์ทเนอร์';
+    const roleTitle = mappedRole === 'driver' ? 'Super Admin • อัศวินไรเดอร์'
+      : mappedRole === 'customer' ? 'Super Admin • พลเมืองอัศวิน'
+      : mappedRole === 'merchant' ? 'Super Admin • ร้านค้าพันธมิตร'
+      : 'Super Admin • องค์กรพาร์ทเนอร์';
 
     const avatar = mappedRole === 'driver' ? '🏍️'
       : mappedRole === 'customer' ? '🛡️'
@@ -142,7 +142,7 @@ export default function App() {
       id: userData.uid,
       winUid: userData.winUid,
       email: '',
-      name: isOwnerAdmin ? 'กิตติ อินทะสร้อย' : (userData.displayName || 'อัศวินผู้กล้า'),
+      name: userData.displayName || userData.fullName || 'ผู้ใช้งาน WINRIDER',
       phone: userData.phone || '',
       role: mappedRole,
       primaryRole: mappedRole,
@@ -214,7 +214,7 @@ export default function App() {
     if (isOwnerAdmin) {
       setOwnerPersona('driver');
       setDriverCitizenPersona('driver');
-      // บัญชีเจ้าของเข้าศูนย์ควบคุมโดยตรง ไม่ต้องสร้างทะเบียนผู้ใช้งานใหม่
+      // Super Admin เข้าศูนย์ควบคุมได้โดยตรง
       setActiveMode('admin');
       return;
     }
