@@ -636,8 +636,16 @@ app.get("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"
   if (!user) return;
   try {
     const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
-    const role = userData.role === "partner" ? "partner" : userData.role === "merchant" ? "merchant" : null;
-    if (!role) return res.status(403).json({ error: "บัญชีนี้ไม่มีสิทธิ์จัดการโปรไฟล์ร้านค้า/พาร์ทเนอร์" });
+    const requestedRole = String(req.query?.role || "").toLowerCase();
+    const role = requestedRole === "partner" ? "partner"
+      : requestedRole === "merchant" ? "merchant"
+      : userData.role === "partner" ? "partner"
+      : userData.role === "merchant" ? "merchant"
+      : null;
+    const fiveRoleAccess = userData.defaultFiveRoleAccess === true || userData.isAdmin === true;
+    if (!role || (!fiveRoleAccess && userData.role !== role)) {
+      return res.status(403).json({ error: "บัญชีนี้ไม่มีสิทธิ์จัดการโปรไฟล์ร้านค้า/พาร์ทเนอร์" });
+    }
     const collectionName = role === "merchant" ? "merchants" : "partners";
     const roleSnapshot = await ordersDb.collection(collectionName).doc(user.uid).get();
     const roleData = roleSnapshot.data() || {};
@@ -659,8 +667,16 @@ app.put("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"
   if (!user) return;
   try {
     const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
-    const role = userData.role === "partner" ? "partner" : userData.role === "merchant" ? "merchant" : null;
-    if (!role) return res.status(403).json({ error: "บัญชีนี้ไม่มีสิทธิ์จัดการโปรไฟล์ร้านค้า/พาร์ทเนอร์" });
+    const requestedRole = String(req.body?.role || req.query?.role || "").toLowerCase();
+    const role = requestedRole === "partner" ? "partner"
+      : requestedRole === "merchant" ? "merchant"
+      : userData.role === "partner" ? "partner"
+      : userData.role === "merchant" ? "merchant"
+      : null;
+    const fiveRoleAccess = userData.defaultFiveRoleAccess === true || userData.isAdmin === true;
+    if (!role || (!fiveRoleAccess && userData.role !== role)) {
+      return res.status(403).json({ error: "บัญชีนี้ไม่มีสิทธิ์จัดการโปรไฟล์ร้านค้า/พาร์ทเนอร์" });
+    }
     const collectionName = role === "merchant" ? "merchants" : "partners";
     const cleanArray = (value: unknown, max: number) => Array.isArray(value) ? value.filter((item) => item && typeof item === "object").slice(0, max) : [];
     const cleanStrings = (value: unknown, max: number) => Array.isArray(value) ? value.filter((item) => typeof item === "string").slice(0, max) : [];
@@ -682,7 +698,11 @@ app.post("/api/shop/profile-content/product-submissions", rateLimit(20), async (
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
-  if (String(userData.role || (user as any).role || "") !== "merchant") {
+  const canSellAsMerchant =
+    userData.role === "merchant" ||
+    userData.defaultFiveRoleAccess === true ||
+    userData.isAdmin === true;
+  if (!canSellAsMerchant) {
     return res.status(403).json({ error: "เฉพาะบัญชีร้านค้าที่อนุมัติแล้วเท่านั้น" });
   }
 
