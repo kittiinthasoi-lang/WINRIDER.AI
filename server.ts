@@ -675,14 +675,21 @@ app.put("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"
     const collectionName = role === "merchant" ? "merchants" : "partners";
     const cleanArray = (value: unknown, max: number) => Array.isArray(value) ? value.filter((item) => item && typeof item === "object").slice(0, max) : [];
     const cleanStrings = (value: unknown, max: number) => Array.isArray(value) ? value.filter((item) => typeof item === "string").slice(0, max) : [];
-    const products = cleanArray(req.body?.products, 100);
-    const services = cleanArray(req.body?.services, 100);
-    const promotions = cleanArray(req.body?.promotions, 100);
-    const highlights = cleanStrings(req.body?.highlights, 30);
-    await ordersDb.collection(collectionName).doc(user.uid).set({
-      products, services, promotions, highlights, updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    return res.json({ ok: true, role, products, services, promotions, highlights });
+    const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    if (Array.isArray(req.body?.products)) patch.products = cleanArray(req.body.products, 100);
+    if (Array.isArray(req.body?.services)) patch.services = cleanArray(req.body.services, 100);
+    if (Array.isArray(req.body?.promotions)) patch.promotions = cleanArray(req.body.promotions, 100);
+    if (Array.isArray(req.body?.highlights)) patch.highlights = cleanStrings(req.body.highlights, 30);
+    await ordersDb.collection(collectionName).doc(user.uid).set(patch, { merge: true });
+    const saved = (await ordersDb.collection(collectionName).doc(user.uid).get()).data() || {};
+    return res.json({
+      ok: true,
+      role,
+      products: Array.isArray(saved.products) ? saved.products : [],
+      services: Array.isArray(saved.services) ? saved.services : [],
+      promotions: Array.isArray(saved.promotions) ? saved.promotions : [],
+      highlights: Array.isArray(saved.highlights) ? saved.highlights : [],
+    });
   } catch (error) {
     console.error("[Shop Profile Content PUT]", error instanceof Error ? error.message : error);
     return res.status(503).json({ error: "บันทึกข้อมูลหน้าร้านไม่สำเร็จ" });
@@ -2563,18 +2570,11 @@ async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | 
       uid,
       displayName: ownerDisplayName,
       ownerName: ownerDisplayName,
-      shopName: String(profile.registration?.shopName || profile.merchantShopName || ownerDisplayName),
-      shopType: String(profile.registration?.shopType || "ร้านค้า WINRIDER"),
-      address: String(profile.registration?.shopAddress || [ownerDistrict, ownerProvince].filter(Boolean).join(" ")),
       phone: ownerPhone,
       province: ownerProvince,
       district: ownerDistrict,
       level: 1,
       xp: 0,
-      products: [],
-      services: [],
-      promotions: [],
-      highlights: [],
       status: "active",
       updatedAt: now,
       createdAt: profile.createdAt || now,
@@ -2583,9 +2583,6 @@ async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | 
       uid,
       displayName: ownerDisplayName,
       contactPerson: ownerDisplayName,
-      orgName: String(profile.registration?.orgName || profile.partnerOrgName || ownerDisplayName),
-      orgType: String(profile.registration?.orgType || "พาร์ทเนอร์ WINRIDER"),
-      address: String(profile.registration?.orgAddress || [ownerDistrict, ownerProvince].filter(Boolean).join(" ")),
       phone: ownerPhone,
       province: ownerProvince,
       district: ownerDistrict,
