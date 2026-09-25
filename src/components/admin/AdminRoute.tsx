@@ -1,13 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ShieldAlert, Loader2, KeyRound } from 'lucide-react';
-import {
-  getAdminBootstrapStatus,
-  getAdminClaims,
-  getAdminPortalStatus,
-} from '../../services/adminService';
+import { getAdminClaims } from '../../services/adminService';
 import { AdminClaims, AdminLevel } from '../../types/admin';
-import { AdminBootstrapView } from './AdminBootstrapView';
-import { AdminAccessRequestView } from './AdminAccessRequestView';
 
 interface AdminRouteProps {
   children: (claims: AdminClaims) => React.ReactNode;
@@ -22,16 +16,11 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [claims, setClaims] = useState<AdminClaims | null>(null);
-  const [bootstrapOpen, setBootstrapOpen] = useState(false);
-  const [applicationsOpen, setApplicationsOpen] = useState(false);
-  const [requestStatus, setRequestStatus] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
 
   const checkAccess = async () => {
     setLoading(true);
     setClaims(null);
-    setBootstrapOpen(false);
-    setApplicationsOpen(false);
     setAccessDenied(false);
 
     try {
@@ -45,21 +34,9 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
         return;
       }
 
-      // First ever admin: keep the one-time bootstrap flow.
-      try {
-        const bootstrap = await getAdminBootstrapStatus();
-        if (bootstrap.bootstrapOpen) {
-          setBootstrapOpen(true);
-          return;
-        }
-      } catch {
-        // Continue to controlled application gate.
-      }
-
-      const portal = await getAdminPortalStatus();
-      setApplicationsOpen(portal.applicationsOpen === true);
-      setRequestStatus(portal.requestStatus || null);
-      setAccessDenied(portal.applicationsOpen !== true);
+      // Ordinary registered users never enter Admin Console.
+      // Admin access exists only after a Super Admin explicitly grants the user's Firebase UID.
+      setAccessDenied(true);
     } catch (error) {
       console.warn('AdminRoute access check failed:', error);
       setAccessDenied(true);
@@ -85,24 +62,6 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
     );
   }
 
-  if (bootstrapOpen) {
-    return (
-      <AdminBootstrapView
-        onExit={onRedirectHome}
-        onCompleted={checkAccess}
-      />
-    );
-  }
-
-  if (!claims && applicationsOpen) {
-    return (
-      <AdminAccessRequestView
-        requestStatus={requestStatus}
-        onExit={onRedirectHome}
-      />
-    );
-  }
-
   if (accessDenied || !claims) {
     return (
       <div className="min-h-screen bg-[#0A1633] text-white flex flex-col items-center justify-center p-6 text-center">
@@ -111,7 +70,7 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
         </div>
         <h1 className="text-2xl font-black text-white mb-2">Admin Console ปิดสำหรับบัญชีนี้</h1>
         <p className="text-slate-300 max-w-md mb-6 text-sm leading-relaxed">
-          บัญชีนี้ยังไม่ได้รับสิทธิ์ Admin และ Super Admin ปิดประตูรับคำขออยู่
+          บัญชีนี้ยังไม่ได้รับสิทธิ์ Admin ต้องให้ Super Admin เพิ่ม Firebase UID ของบัญชีนี้ก่อน
         </p>
         <button
           onClick={onRedirectHome}
