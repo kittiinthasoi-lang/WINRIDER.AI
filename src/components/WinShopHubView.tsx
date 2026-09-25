@@ -10,6 +10,7 @@ import { useRealGeolocation } from '../hooks/useRealGeolocation';
 import { WinStreetMarketView } from './WinStreetMarketView';
 import { getExternalGoogleMapsNavUrl } from '../services/googleRoutesService';
 import { WIN_SHOP_ITEMS } from '../data/winShopItems';
+import { CustomerPaymentQrCodeModal } from './CustomerPaymentQrCodeModal';
 
 interface ShopProfile {
   id: string;
@@ -20,6 +21,7 @@ interface ShopProfile {
   avatarEmoji: string;
   address: string;
   phone: string;
+  walletId?: string;
   email?: string;
   contactPerson?: string;
   category: string;
@@ -57,6 +59,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
   const [activeTab, setActiveTab] = useState<'official' | 'merchants' | 'partners' | 'community'>('official');
   const [profiles, setProfiles] = useState<ShopProfile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<ShopProfile | null>(null);
+  const [purchaseProduct, setPurchaseProduct] = useState<{ profile: ShopProfile; record: Record<string, unknown> } | null>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -342,7 +345,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
             </div>
 
             <div className="space-y-5 p-4 sm:p-5">
-              {(selectedProfile.phone || selectedProfile.email || selectedProfile.contactPerson) && <section className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4"><h4 className="text-xs font-black text-emerald-300">ช่องทางติดต่อจริง</h4><div className="mt-2 grid gap-2 sm:grid-cols-3">{selectedProfile.contactPerson && <div className="rounded-xl bg-black/15 p-2.5"><p className="text-[9px] text-slate-500">ผู้ติดต่อ</p><p className="text-xs font-bold text-white">{selectedProfile.contactPerson}</p></div>}{selectedProfile.phone && <div className="rounded-xl bg-black/15 p-2.5"><p className="text-[9px] text-slate-500">โทรศัพท์</p><p className="text-xs font-bold text-white">{selectedProfile.phone}</p></div>}{selectedProfile.email && <div className="rounded-xl bg-black/15 p-2.5"><p className="text-[9px] text-slate-500">อีเมล</p><p className="truncate text-xs font-bold text-white">{selectedProfile.email}</p></div>}</div><p className="mt-2 text-[10px] text-slate-500">ข้อมูลจากการลงทะเบียนจริงของบัญชีใน WINRIDER.AI</p></section>}
+              {(selectedProfile.phone || selectedProfile.email || selectedProfile.contactPerson) && <section className="rounded-2xl border border-white/10 bg-white/5 p-4"><h4 className="text-xs font-black text-white">ช่องทางติดต่อ</h4><div className="mt-2 grid gap-2 sm:grid-cols-3">{selectedProfile.contactPerson && <div className="rounded-xl bg-black/15 p-2.5"><p className="text-[9px] text-slate-500">ผู้ติดต่อ</p><p className="text-xs font-bold text-white">{selectedProfile.contactPerson}</p></div>}{selectedProfile.phone && <div className="rounded-xl bg-black/15 p-2.5"><p className="text-[9px] text-slate-500">โทรศัพท์</p><p className="text-xs font-bold text-white">{selectedProfile.phone}</p></div>}{selectedProfile.email && <div className="rounded-xl bg-black/15 p-2.5"><p className="text-[9px] text-slate-500">อีเมล</p><p className="truncate text-xs font-bold text-white">{selectedProfile.email}</p></div>}</div></section>}
               {selectedProfile.address && (
                 <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between">
@@ -393,7 +396,17 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
                             </div>
                           </div>
                         </div>
-                        {key === 'products' && <div className="border-t border-white/5 px-3.5 py-2.5 text-[10px] text-slate-400">สินค้าในหน้าร้านจริง • ตรวจสอบราคา/สต็อกก่อนสั่งซื้อ</div>}
+                        {key === 'products' && <div className="border-t border-white/5 px-3.5 py-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setPurchaseProduct({ profile: selectedProfile, record })}
+                            disabled={!selectedProfile.walletId || Number(record.stock ?? 1) < 1 || Number(record.price ?? 0) <= 0}
+                            className="w-full rounded-xl bg-cyan-400 px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <ShoppingBag className="mr-1 inline h-3.5 w-3.5" />
+                            {Number(record.stock ?? 1) < 1 ? 'สินค้าหมด' : 'ซื้อสินค้า'}
+                          </button>
+                        </div>}
                         {key === 'services' && <div className="border-t border-white/5 px-3.5 py-2.5 text-[10px] text-slate-400">บริการจากพาร์ทเนอร์ • ติดต่อเพื่อยืนยันคิวและเงื่อนไข</div>}
                       </article>;
                     })}</div>}
@@ -402,6 +415,18 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {purchaseProduct && (
+        <CustomerPaymentQrCodeModal
+          isOpen={Boolean(purchaseProduct)}
+          onClose={() => setPurchaseProduct(null)}
+          customerName={purchaseProduct.profile.name}
+          defaultItemTitle={valueText(purchaseProduct.record, ['title', 'name', 'label']) || 'สินค้าใน WIN SHOP'}
+          defaultAmount={Number(purchaseProduct.record.price || 0)}
+          customerWalletId={purchaseProduct.profile.walletId || ''}
+          audioEnabled={audioEnabled !== false}
+        />
       )}
     </div>
   );
