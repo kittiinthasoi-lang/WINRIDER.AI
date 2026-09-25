@@ -56,10 +56,12 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
   audioEnabled, customerListedItems, onAddNewCustomerItem, onBackToMain, onRideToDestination, onOpenBusinessProfile,
 }) => {
   const geo = useRealGeolocation(true);
-  const [activeTab, setActiveTab] = useState<'official' | 'merchants' | 'partners' | 'community'>('official');
+  const [activeTab, setActiveTab] = useState<'home' | 'official' | 'street' | 'merchants' | 'partners' | 'community'>('home');
   const [profiles, setProfiles] = useState<ShopProfile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<ShopProfile | null>(null);
   const [purchaseProduct, setPurchaseProduct] = useState<{ profile: ShopProfile; record: Record<string, unknown> } | null>(null);
+  const [officialPurchase, setOfficialPurchase] = useState<(typeof WIN_SHOP_ITEMS)[number] | null>(null);
+  const [officialWalletId, setOfficialWalletId] = useState('');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -77,6 +79,16 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
         const payload = await response.json() as { profiles?: ShopProfile[]; error?: string };
         if (!response.ok) throw new Error(payload.error || 'โหลดร้านค้าและพาร์ทเนอร์ไม่สำเร็จ');
         if (!cancelled) setProfiles(Array.isArray(payload.profiles) ? payload.profiles : []);
+        try {
+          const walletResponse = await fetch('/api/shop/official-wallet', {
+            headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+            cache: 'no-store',
+          });
+          const walletPayload = await walletResponse.json().catch(() => ({})) as { walletId?: string };
+          if (!cancelled && walletResponse.ok) setOfficialWalletId(String(walletPayload.walletId || ''));
+        } catch {
+          if (!cancelled) setOfficialWalletId('');
+        }
       } catch (error) {
         if (!cancelled) {
           setProfiles([]);
@@ -90,7 +102,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
   }, []);
 
   const filteredProfiles = useMemo(() => {
-    if (activeTab === 'official' || activeTab === 'community') return [];
+    if (activeTab !== 'merchants' && activeTab !== 'partners') return [];
     const role = activeTab === 'merchants' ? 'merchant' : 'partner';
     const search = query.trim().toLowerCase();
     return profiles.filter((profile) => {
@@ -181,25 +193,62 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
             {onBackToMain && <button type="button" onClick={onBackToMain} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black text-white hover:bg-white/10">← กลับหน้าหลัก</button>}
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {([
-              ['official', 'WIN Official', 'สินค้าที่แอปขายเอง', ShieldCheck],
-              ['merchants', 'ร้านค้า', 'ดูสินค้าหน้าร้าน', Store],
-              ['partners', 'พาร์ทเนอร์', 'ดูบริการ/สิทธิพิเศษ', Building2],
-              ['community', 'WIN Street Market', 'ของที่ประชาชนขาย', ShoppingBag],
-            ] as const).map(([id, label, sub, Icon]) => (
-              <button key={id} type="button" onClick={() => { setActiveTab(id); setSelectedProfile(null); setQuery(''); }}
-                className={`group rounded-2xl border p-3 text-left transition-all sm:p-4 ${activeTab === id ? 'border-cyan-300 bg-cyan-400 text-slate-950 shadow-[0_0_25px_rgba(0,210,255,0.2)]' : 'border-white/10 bg-black/20 text-slate-300 hover:border-cyan-400/40'}`}>
-                <Icon className="mb-2 h-5 w-5" />
-                <div className="text-xs font-black sm:text-sm">{label}</div>
-                <div className={`mt-0.5 text-[9px] sm:text-[10px] ${activeTab === id ? 'text-slate-800/80' : 'text-slate-500'}`}>{sub}</div>
+          {activeTab === 'home' ? (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('official'); setSelectedProfile(null); setQuery(''); }}
+                className="rounded-3xl border border-amber-400/30 bg-amber-400/5 p-5 text-left transition-all hover:border-amber-300 hover:bg-amber-400/10"
+              >
+                <ShieldCheck className="mb-3 h-7 w-7 text-amber-300" />
+                <div className="text-lg font-black text-white">WIN SHOP OFFICIAL</div>
+                <div className="mt-1 text-xs text-slate-400">สินค้าทางการของแอป WINRIDER.AI</div>
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('street'); setSelectedProfile(null); setQuery(''); }}
+                className="rounded-3xl border border-cyan-400/30 bg-cyan-400/5 p-5 text-left transition-all hover:border-cyan-300 hover:bg-cyan-400/10"
+              >
+                <ShoppingBag className="mb-3 h-7 w-7 text-cyan-300" />
+                <div className="text-lg font-black text-white">WIN Street Market</div>
+                <div className="mt-1 text-xs text-slate-400">ร้านค้า • พาร์ทเนอร์ • ตลาดชุมชน</div>
+              </button>
+            </div>
+          ) : activeTab === 'street' ? (
+            <div className="mt-5">
+              <button type="button" onClick={() => setActiveTab('home')} className="mb-3 text-xs font-black text-cyan-300">← กลับ WIN SHOP</button>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <button type="button" onClick={() => { setActiveTab('merchants'); setQuery(''); }} className="rounded-3xl border border-white/10 bg-black/20 p-5 text-left hover:border-cyan-400/50">
+                  <Store className="mb-3 h-6 w-6 text-cyan-300" />
+                  <div className="font-black text-white">ร้านค้า</div>
+                  <div className="mt-1 text-[10px] text-slate-500">โปรไฟล์ร้านค้าทั้งหมด เรียงใกล้สุดก่อน</div>
+                </button>
+                <button type="button" onClick={() => { setActiveTab('partners'); setQuery(''); }} className="rounded-3xl border border-white/10 bg-black/20 p-5 text-left hover:border-cyan-400/50">
+                  <Building2 className="mb-3 h-6 w-6 text-cyan-300" />
+                  <div className="font-black text-white">พาร์ทเนอร์</div>
+                  <div className="mt-1 text-[10px] text-slate-500">โปรไฟล์พาร์ทเนอร์ทั้งหมด เรียงใกล้สุดก่อน</div>
+                </button>
+                <button type="button" onClick={() => setActiveTab('community')} className="rounded-3xl border border-white/10 bg-black/20 p-5 text-left hover:border-amber-400/50">
+                  <UserRound className="mb-3 h-6 w-6 text-amber-300" />
+                  <div className="font-black text-white">ตลาดชุมชน</div>
+                  <div className="mt-1 text-[10px] text-slate-500">สินค้าที่พลเมืองลงขายในแอป</div>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setActiveTab(activeTab === 'official' ? 'home' : 'street')} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-cyan-300">
+                ← {activeTab === 'official' ? 'กลับ WIN SHOP' : 'กลับ WIN Street Market'}
+              </button>
+              <span className="text-xs text-slate-400">
+                {activeTab === 'official' ? 'WIN SHOP OFFICIAL' : activeTab === 'merchants' ? 'ร้านค้าทั้งหมด' : activeTab === 'partners' ? 'พาร์ทเนอร์ทั้งหมด' : 'ตลาดชุมชน'}
+              </span>
+            </div>
+          )}
         </div>
       </section>
 
-      {activeTab === 'official' ? (
+      {activeTab === 'home' || activeTab === 'street' ? null : activeTab === 'official' ? (
         <section className="space-y-3">
           <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-4">
             <p className="text-xs font-black text-amber-300">WIN OFFICIAL SHOP</p>
@@ -226,6 +275,15 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
                       {item.inStock ? `คงเหลือ ${item.stockCount}` : 'หมด'}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    disabled={!item.inStock || !officialWalletId}
+                    onClick={() => setOfficialPurchase(item)}
+                    className="w-full rounded-xl bg-amber-400 px-3 py-2.5 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ShoppingBag className="mr-1 inline h-4 w-4" />
+                    {item.inStock ? 'ซื้อสินค้า' : 'สินค้าหมด'}
+                  </button>
                 </div>
               </article>
             ))}
@@ -415,6 +473,18 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {officialPurchase && (
+        <CustomerPaymentQrCodeModal
+          isOpen={Boolean(officialPurchase)}
+          onClose={() => setOfficialPurchase(null)}
+          customerName="WINRIDER.AI OFFICIAL"
+          defaultItemTitle={officialPurchase.name}
+          defaultAmount={officialPurchase.price}
+          customerWalletId={officialWalletId}
+          audioEnabled={audioEnabled !== false}
+        />
       )}
 
       {purchaseProduct && (
