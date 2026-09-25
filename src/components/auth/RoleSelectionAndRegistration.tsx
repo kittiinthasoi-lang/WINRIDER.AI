@@ -59,7 +59,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
     firebaseUser?.providerData.find((provider) => provider.providerId === 'google.com')?.email || '';
   const [displayName, setDisplayName] = useState(firebaseUser?.displayName || '');
   const [contactEmail, setContactEmail] = useState(
-    initialGoogleEmail && !initialGoogleEmail.endsWith('@auth.winrider.local') ? initialGoogleEmail.toLowerCase() : ''
+    (initialGoogleEmail || firebaseUser?.email || '').toLowerCase()
   );
   const [phone, setPhone] = useState('');
   const [province, setProvince] = useState('กรุงเทพมหานคร');
@@ -314,7 +314,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-400 hidden sm:inline">
-            WIN UID: <strong className="text-slate-200">{firebaseUser?.email?.split('@')[0] || '-'}</strong>
+            อีเมล: <strong className="text-slate-200">{firebaseUser?.email || '-'}</strong>
           </span>
           <button
             onClick={() => signOut()}
