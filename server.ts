@@ -2684,7 +2684,9 @@ async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | 
   ]);
 
   const updated = await userRef.get();
-  return { promoted: true, user: updated.exists ? updated.data() : profile };
+  const updatedProfile = updated.exists ? updated.data() : profile;
+  await ensureFiveRoleDocumentsForUid(uid, updatedProfile || profile);
+  return { promoted: true, user: updatedProfile };
 }
 
 app.post("/api/auth/ensure-owner-admin", rateLimit(20), async (req, res) => {
