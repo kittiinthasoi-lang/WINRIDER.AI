@@ -2135,7 +2135,7 @@ async function createFirebaseRegistration(
       province: profile.province,
       district: profile.district,
       registration: profile,
-      status: "pending_review",
+      status: "active",
       isAdmin: false,
       level: 1,
       xp: 0,
@@ -2172,7 +2172,7 @@ async function createFirebaseRegistration(
         vehicleType: profile.vehicleType || "motorcycle",
         plateNumber: profile.plateNumber || "",
         licenseNumber: profile.publicLicenseNumber || "",
-        kycStatus: "pending",
+        kycStatus: "approved",
         isFoundingKnight,
         certifications: [],
         documents: {
@@ -2541,13 +2541,19 @@ app.post("/api/auth/register-profile", rateLimit(30), async (req, res) => {
 
     const result = await createFirebaseRegistration(decoded.uid, winUid, role, profile);
 
+    const ownerResult = await ensureOwnerSuperAdminForUid(decoded.uid, decoded.email || profile.email || null);
     const userSnap = await ordersDb.collection("users").doc(decoded.uid).get();
+    const registeredUser = ownerResult.user || userSnap.data();
+    const ownerPromoted = ownerResult.promoted === true || (
+      registeredUser?.isAdmin === true && registeredUser?.adminLevel === "super"
+    );
     return res.status(201).json({
-      user: userSnap.data(),
-      approvalRequired: true,
-      fiveRoleAccess: false,
-      adminLevel: null,
-      forceTokenRefresh: false,
+      user: registeredUser,
+      approvalRequired: false,
+      fiveRoleAccess: ownerPromoted,
+      adminLevel: ownerPromoted ? "super" : null,
+      forceTokenRefresh: ownerPromoted,
+      ownerPromoted,
       ...result
     });
   } catch (error: any) {
@@ -4619,10 +4625,6 @@ async function requireFirebaseUser(req: express.Request, res: express.Response) 
     }
 
     const fullUser = { ...user, ...(profile || {}), uid: user.uid, email: user.email || profile?.email || "" };
-    if (!isSuperAdminToken(user) && profile?.status === "pending_review") {
-      res.status(403).json({ error: "Account pending admin approval", code: "ACCOUNT_PENDING_REVIEW" });
-      return null;
-    }
     if (!isSuperAdminToken(user) && profile?.status === "suspended") {
       res.status(403).json({ error: "Account suspended", code: "ACCOUNT_SUSPENDED" });
       return null;
