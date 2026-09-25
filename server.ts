@@ -604,6 +604,7 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
       const recordArray = (value: unknown) => Array.isArray(value)
         ? value.filter((item) => item && typeof item === "object").slice(0, 50)
         : [];
+      const walletIdentity = await ensureWalletIdentityId(entry.uid, role);
       return {
         id: `${entry.uid}:${role}`,
         ownerUid: entry.uid,
@@ -614,6 +615,7 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
         avatarEmoji: String(custom.avatarEmoji || entry.avatarEmoji || (role === "merchant" ? "🏪" : "🏢")),
         address: String(roleData.address || [entry.district, entry.province].filter(Boolean).join(" ") || "").trim(),
         phone: String(entry.phone || roleData.phone || ""),
+        walletId: walletIdentity.walletId,
         category: String(roleData.shopType || roleData.orgType || roleData.category || ""),
         products: recordArray(roleData.products),
         services: recordArray(roleData.services),
@@ -2119,6 +2121,10 @@ async function createFirebaseRegistration(
         gpRate: 10,
         level: 1,
         xp: 0,
+        products: [],
+        services: [],
+        promotions: [],
+        highlights: [],
         createdAt: now,
       });
     } else {
@@ -2136,6 +2142,10 @@ async function createFirebaseRegistration(
         gpRate: 10,
         level: 1,
         xp: 0,
+        products: [],
+        services: [],
+        promotions: [],
+        highlights: [],
         createdAt: now,
       });
     }
@@ -2573,8 +2583,6 @@ async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | 
       phone: ownerPhone,
       province: ownerProvince,
       district: ownerDistrict,
-      level: 1,
-      xp: 0,
       status: "active",
       updatedAt: now,
       createdAt: profile.createdAt || now,
@@ -2586,8 +2594,6 @@ async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | 
       phone: ownerPhone,
       province: ownerProvince,
       district: ownerDistrict,
-      level: 1,
-      xp: 0,
       products: [],
       services: [],
       promotions: [],
