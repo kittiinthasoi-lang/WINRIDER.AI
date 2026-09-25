@@ -153,7 +153,7 @@ async function submitRegistration(
     if (existing?.role) {
       return {
         user: existing,
-        approvalRequired: false,
+        approvalRequired: existing.status === 'pending_review',
         recovered: true,
       };
     }
@@ -241,7 +241,7 @@ async function persistRegistrationDirectly(
     province: input.province,
     district: input.district,
     role: input.role,
-    status: 'active',
+    status: 'pending_review',
     isAdmin: false,
     level: 1,
     xp: 0,
