@@ -443,6 +443,7 @@ export async function getAdminDashboardMetrics() {
       if (data && typeof data.totalUsersCount === 'number') {
         return {
           totalUsersCount: Number(data.totalUsersCount || 1),
+          adminUsersCount: Number(data.adminUsersCount || 0),
           newUsersToday: Number(data.newUsersToday || 1),
           pendingKycCount: Number(data.pendingKycCount || 0),
           knightsOnline: Number(data.knightsOnline || 0),
@@ -458,6 +459,7 @@ export async function getAdminDashboardMetrics() {
 
   // 2. ดึงผ่าน Client Firestore SDK พร้อมระบบป้องกันสิทธิ์ขาด (Permission Fallback)
   let totalUsersCount = 1;
+  let adminUsersCount = 0;
   let newUsersToday = 1;
   let pendingKycCount = 0;
   let knightsOnline = 0;
@@ -478,6 +480,9 @@ export async function getAdminDashboardMetrics() {
       const data = d.data();
       if (data.status === 'pending_review') {
         pendingKycCount++;
+      }
+      if (data.isAdmin === true && ['super', 'reviewer', 'support'].includes(String(data.adminLevel || ''))) {
+        adminUsersCount++;
       }
       const cDate = data.createdAt ? new Date(data.createdAt.seconds ? data.createdAt.seconds * 1000 : data.createdAt) : null;
       if (cDate && cDate >= startOfToday) {
@@ -506,6 +511,9 @@ export async function getAdminDashboardMetrics() {
       combinedMap.forEach((data) => {
         if (data.status === 'pending_review') {
           pendingKycCount++;
+        }
+        if (data.isAdmin === true && ['super', 'reviewer', 'support'].includes(String(data.adminLevel || ''))) {
+          adminUsersCount++;
         }
         const cDate = data.createdAt ? new Date(data.createdAt) : null;
         if (cDate && cDate >= startOfToday) {
@@ -563,6 +571,7 @@ export async function getAdminDashboardMetrics() {
 
   return {
     totalUsersCount,
+    adminUsersCount,
     newUsersToday,
     pendingKycCount,
     knightsOnline,
