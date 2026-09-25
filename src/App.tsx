@@ -82,7 +82,7 @@ export default function App() {
   // (ลูกค้า พี่วิน ร้านค้า พาร์ทเนอร์ และ Admin)
   // โดยยังคงชื่อและ Firebase UID ของเจ้าของบัญชีนั้นเอง
   const isOwnerAdmin = Boolean(
-    userData?.isAdmin === true ||
+    userData?.isAdmin === true &&
     userData?.adminLevel === 'super'
   );
 
