@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { WIN_IMAGES } from '../../data/imageRegistry';
 import { AlertTriangle, CheckCircle2, CircleX, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { auth } from '../../firebase';
+import { getAdminAuthHeaders } from '../../services/adminService';
 
 type HealthStatus = 'ok' | 'warning' | 'error';
 interface HealthCheck { id: string; name: string; status: HealthStatus; detail: string; actionUrl?: string; guideKey?: string; }
@@ -35,9 +36,8 @@ export const AdminSystemHealthView: React.FC = () => {
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const token = await auth.currentUser?.getIdToken(true);
-      if (!token) throw new Error('กรุณาเข้าสู่ระบบ Super Admin ใหม่');
-      const response = await fetch('/api/admin/system-health', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+      const headers = await getAdminAuthHeaders();
+      const response = await fetch('/api/admin/system-health', { headers, cache: 'no-store' });
       const payload = await readJsonSafely(response);
       if (!response.ok) throw new Error(String(payload?.error || 'ตรวจระบบไม่สำเร็จ'));
       if (!payload?.summary || !Array.isArray(payload?.checks)) throw new Error('ข้อมูล System Health ไม่ครบถ้วน');

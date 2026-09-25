@@ -1,5 +1,6 @@
 import React from 'react';
 import { WIN_IMAGES } from '../data/imageRegistry';
+import { DREAM_RIDE_IMAGES } from '../data/dreamRideImages';
 
 export interface CyberGraphicProps {
   emoji?: string;
@@ -448,12 +449,16 @@ export function getDreamRideImage(categoryOrVehicle?: any): string {
   if (!categoryOrVehicle) return WIN_IMAGES.vehicles.cyber;
   if (typeof categoryOrVehicle === 'object') {
     if (categoryOrVehicle.imageUrl) return categoryOrVehicle.imageUrl;
+    if (categoryOrVehicle.id && DREAM_RIDE_IMAGES[categoryOrVehicle.id]) {
+      return DREAM_RIDE_IMAGES[categoryOrVehicle.id];
+    }
     const cat = categoryOrVehicle.category;
     if (cat === 'standard') return WIN_IMAGES.vehicles.standard;
     if (cat === 'sport') return WIN_IMAGES.vehicles.sport;
     if (cat === 'classic') return WIN_IMAGES.vehicles.classic;
   } else if (typeof categoryOrVehicle === 'string') {
     const c = categoryOrVehicle.toLowerCase().trim();
+    if (DREAM_RIDE_IMAGES[categoryOrVehicle]) return DREAM_RIDE_IMAGES[categoryOrVehicle];
     if (c === 'standard' || c.includes('standard') || c.includes('ทั่วไป')) return WIN_IMAGES.vehicles.standard;
     if (c === 'sport' || c.includes('sport') || c.includes('สปอร์ต') || c.includes('ซูเปอร์')) return WIN_IMAGES.vehicles.sport;
     if (c === 'classic' || c.includes('classic') || c.includes('คลาสสิค') || c.includes('ครุยเซอร์')) return WIN_IMAGES.vehicles.classic;

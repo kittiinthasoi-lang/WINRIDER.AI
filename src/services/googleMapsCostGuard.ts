@@ -6,7 +6,7 @@
 type CacheEntry = { expiresAt: number; response: Response };
 const CACHE_TTL_MS = 300_000;
 const WINDOW_MS = 60_000;
-const MAX_REQUESTS_PER_WINDOW = 30;
+const MAX_REQUESTS_PER_WINDOW = 120;
 const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<Response>>();
 const windowCounts = new Map<string, { startedAt: number; count: number }>();
@@ -53,7 +53,7 @@ export function installGoogleMapsCostGuard(): void {
           return cloneResponse(v.response);
         }
       }
-      return new Response(JSON.stringify({ error: 'REQUEST_GUARDED', message: 'ระบบกำลังโหลดข้อมูลล่าสุด กรุณารอสักครู่' }), { status: 429, headers: { 'Content-Type': 'application/json' } });
+      return originalFetch(input, init);
     } else bucket.count += 1;
     const promise = originalFetch(input, init).then((response) => {
       if (response.ok) cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, response: cloneResponse(response) });

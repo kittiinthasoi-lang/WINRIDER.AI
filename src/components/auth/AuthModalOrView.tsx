@@ -200,13 +200,24 @@ export const AuthModalOrView: React.FC = () => {
       setError('กรุณาระบุเขตหรืออำเภอ');
       return;
     }
-    if (password.length < 8) {
-      setError('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน');
-      return;
+    if (!googleOnboarding) {
+      if (password.length < 8) {
+        setError('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน');
+        return;
+      }
+    } else {
+      if (password && password.length < 8) {
+        setError('หากต้องการตั้งรหัสผ่านสำรอง ต้องมีอย่างน้อย 8 ตัวอักษร');
+        return;
+      }
+      if (password && password !== confirmPassword) {
+        setError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน');
+        return;
+      }
     }
 
     setRegStep(2);
@@ -773,16 +784,18 @@ export const AuthModalOrView: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className="block">
-                      <span className="mb-1 block text-xs font-bold text-slate-300">รหัสผ่าน (อย่างน้อย 8 ตัว) *</span>
+                      <span className="mb-1 block text-xs font-bold text-slate-300">
+                        {googleOnboarding ? 'รหัสผ่านสำรอง WIN UID (ไม่บังคับ)' : 'รหัสผ่าน (อย่างน้อย 8 ตัว) *'}
+                      </span>
                       <div className="relative">
                         <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cyan-400" />
                         <input
                           type={showPassword ? 'text' : 'password'}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          required
+                          required={!googleOnboarding}
                           minLength={8}
-                          placeholder="รหัสผ่าน 8 ตัวขึ้นไป"
+                          placeholder={googleOnboarding ? 'ตั้งรหัสผ่านสำรอง (ไม่บังคับ)' : 'รหัสผ่าน 8 ตัวขึ้นไป'}
                           className="w-full rounded-xl border border-white/10 bg-black/40 py-2.5 pl-9 pr-10 text-sm text-white outline-none focus:border-cyan-400/70"
                         />
                         <button
@@ -796,14 +809,16 @@ export const AuthModalOrView: React.FC = () => {
                     </label>
 
                     <label className="block">
-                      <span className="mb-1 block text-xs font-bold text-slate-300">ยืนยันรหัสผ่าน *</span>
+                      <span className="mb-1 block text-xs font-bold text-slate-300">
+                        {googleOnboarding ? 'ยืนยันรหัสผ่านสำรอง' : 'ยืนยันรหัสผ่าน *'}
+                      </span>
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                        minLength={8}
-                        placeholder="กรอกรหัสผ่านซ้ำอีกครั้ง"
+                        required={!googleOnboarding && !!password}
+                        minLength={password ? 8 : 0}
+                        placeholder={googleOnboarding ? 'ยืนยันรหัสผ่านสำรอง (ถ้าตั้ง)' : 'กรอกรหัสผ่านซ้ำอีกครั้ง'}
                         className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white outline-none focus:border-cyan-400/70"
                       />
                     </label>

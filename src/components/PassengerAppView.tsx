@@ -1995,9 +1995,17 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                             LV.{currentMatchedDriver?.level || 0} SOVEREIGN 👑
                           </span>
                         </div>
-                        <p className="text-xs text-cyan-300 font-semibold mt-0.5">
-                          🏍️ ยานยนต์ในฝัน: {selectedDreamRide.thaiName}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1.5 p-1.5 rounded-xl bg-black/40 border border-white/10">
+                          <DreamRideVehicleImage vehicle={selectedDreamRide} size="md" rounded="rounded-lg" glowColor="#FFD700" />
+                          <div className="min-w-0">
+                            <p className="text-xs text-cyan-300 font-semibold leading-tight truncate">
+                              🏍️ รถในฝัน: {selectedDreamRide.thaiName}
+                            </p>
+                            <p className="text-[10px] text-amber-300 font-mono truncate">
+                              {selectedDreamRide.specs.brandAndModel}
+                            </p>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 font-mono">
                           <span className="text-[#FFD700] font-bold">⭐ {currentMatchedDriver?.rating || 5.0} (ยอดเยี่ยม)</span>
                           <span className="text-emerald-400">• เครดิต 850/850 (AAA)</span>

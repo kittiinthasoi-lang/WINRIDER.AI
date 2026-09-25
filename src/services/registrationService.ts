@@ -7,6 +7,7 @@ import { uploadKycDocument } from '../utils/imageUpload';
 
 export interface BaseRegistrationPayload {
   uid: string;
+  winUid?: string;
   displayName: string;
   email: string;
   phone: string;
@@ -165,6 +166,7 @@ async function submitRegistration(
 
 function common(payload: BaseRegistrationPayload) {
   return {
+    winUid: payload.winUid,
     fullName: payload.displayName,
     email: payload.email.trim().toLowerCase(),
     phone: payload.phone,
@@ -398,41 +400,38 @@ export async function registerFullAccountWithFirestore(
     await updateProfile(user, { displayName: fullName }).catch(() => {});
   }
 
-  // Google is an additional sign-in method, not a replacement for WIN UID.
-  // For a first-time Google user, convert the same Firebase UID into a dual-provider
-  // account by assigning the hidden WIN UID email + password on the server.
+  // Google is an official, first-class sign-in method.
+  // If the user provided an optional password, attempt to link the secondary password provider,
+  // but never fail or block registration if the user registers with Google.
   if (
     user &&
     user.providerData.some((provider) => provider.providerId === 'google.com') &&
-    !internalEmailToWinUid(user.email)
+    !internalEmailToWinUid(user.email) &&
+    input.password
   ) {
-    if (!input.password) throw new Error('กรุณาตั้งรหัสผ่าน WIN UID ก่อนยืนยันการสมัคร');
-    onProgress?.('กำลังเชื่อมบัญชี Google กับ WIN UID เดียวกัน...');
-    const token = await user.getIdToken();
-    const response = await fetch('/api/auth/complete-google-identity', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        winUid: normalizedUid,
-        password: input.password,
-        displayName: fullName,
-        contactEmail: input.email.trim().toLowerCase(),
-      }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const error = new Error(payload?.error || 'เชื่อม Google กับ WIN UID ไม่สำเร็จ');
-      (error as any).code = payload?.code || `HTTP_${response.status}`;
-      throw error;
+    try {
+      onProgress?.('กำลังผูกบัญชี Google กับระบบ...');
+      const token = await user.getIdToken();
+      await fetch('/api/auth/complete-google-identity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          winUid: normalizedUid,
+          password: input.password,
+          displayName: fullName,
+          contactEmail: input.email.trim().toLowerCase(),
+        }),
+      });
+      await user.reload().catch(() => {});
+      await user.getIdToken(true).catch(() => {});
+      user = auth.currentUser || user;
+    } catch (e) {
+      console.warn('Optional secondary password link for Google skipped:', e);
     }
-
-    await user.reload();
-    await user.getIdToken(true);
-    user = auth.currentUser || user;
   }
 
 
@@ -458,6 +457,7 @@ export async function registerFullAccountWithFirestore(
     if (input.role === 'knight') {
       result = await registerKnight({
         uid: user.uid,
+        winUid: normalizedUid,
         displayName: fullName || user.displayName || 'อัศวินไรเดอร์',
         email: input.email.trim().toLowerCase(),
         phone: input.phone,
@@ -473,6 +473,7 @@ export async function registerFullAccountWithFirestore(
     } else if (input.role === 'citizen') {
       result = await registerCitizen({
         uid: user.uid,
+        winUid: normalizedUid,
         displayName: fullName || user.displayName || 'พลเมืองอัศวิน',
         email: input.email.trim().toLowerCase(),
         phone: input.phone,
@@ -485,6 +486,7 @@ export async function registerFullAccountWithFirestore(
     } else if (input.role === 'merchant') {
       result = await registerMerchant({
         uid: user.uid,
+        winUid: normalizedUid,
         displayName: fullName || user.displayName || 'ร้านค้าพันธมิตร',
         email: input.email.trim().toLowerCase(),
         phone: input.phone,
@@ -499,6 +501,7 @@ export async function registerFullAccountWithFirestore(
     } else if (input.role === 'partner') {
       result = await registerPartner({
         uid: user.uid,
+        winUid: normalizedUid,
         displayName: fullName || user.displayName || 'องค์กรพาร์ทเนอร์',
         email: input.email.trim().toLowerCase(),
         phone: input.phone,

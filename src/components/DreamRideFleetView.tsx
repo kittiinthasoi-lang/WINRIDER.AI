@@ -510,6 +510,26 @@ export const DreamRideFleetView: React.FC<DreamRideFleetViewProps> = ({
               {/* EXPANDED SECTION (Shown only when isExpanded is true) */}
               {isExpanded && (
                 <div className="space-y-3.5 pt-2 border-t border-white/10 animate-fadeIn">
+                  {/* Motorcycle Full Preview Image Matching Exact Brand & Model */}
+                  <div className="relative w-full h-44 sm:h-52 rounded-2xl overflow-hidden border border-white/15 bg-black/60 shadow-inner group">
+                    <img
+                      src={vehicle.imageUrl || getDreamRideImage(vehicle)}
+                      alt={vehicle.thaiName}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 select-none"
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-[11px] font-mono">
+                      <span className="px-2 py-0.5 rounded-lg bg-black/80 text-amber-300 font-bold border border-amber-400/30 backdrop-blur-sm">
+                        {vehicle.specs.brandAndModel}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-lg bg-black/80 text-cyan-300 border border-cyan-400/30 backdrop-blur-sm">
+                        {vehicle.specs.displacement}
+                      </span>
+                    </div>
+                  </div>
+
                   <p className="text-xs text-slate-300 leading-relaxed">
                     {vehicle.description}
                   </p>
@@ -797,6 +817,25 @@ export const DreamRideFleetView: React.FC<DreamRideFleetViewProps> = ({
               >
                 ✕
               </button>
+            </div>
+
+            {/* Vehicle Hero Image Showcase */}
+            <div className="relative w-full h-48 sm:h-60 rounded-2xl overflow-hidden border border-white/15 bg-black/60 shadow-lg group">
+              <img 
+                src={detailModalVehicle.imageUrl || getDreamRideImage(detailModalVehicle)} 
+                alt={detailModalVehicle.thaiName} 
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 select-none" 
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0A1428] via-transparent to-transparent pointer-events-none" />
+              <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-xs font-mono">
+                <span className="px-2.5 py-1 rounded-lg bg-black/80 text-amber-300 font-bold border border-amber-400/30 backdrop-blur-sm">
+                  {detailModalVehicle.specs.brand} • {detailModalVehicle.specs.brandAndModel}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-black/80 text-cyan-300 font-bold border border-cyan-400/30 backdrop-blur-sm">
+                  ความเร็วสูงสุด {detailModalVehicle.specs.topSpeed}
+                </span>
+              </div>
             </div>
 
             {/* Overview Box */}

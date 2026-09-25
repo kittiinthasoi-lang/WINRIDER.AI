@@ -1,4 +1,5 @@
 import { DreamRideVehicle } from '../types';
+import { DREAM_RIDE_IMAGES } from './dreamRideImages';
 
 export const DREAM_RIDES_FLEET: DreamRideVehicle[] = [
   // =========================================================================
@@ -1576,4 +1577,10 @@ export const DREAM_RIDES_FLEET: DreamRideVehicle[] = [
     colorTheme: 'from-rose-800 via-slate-900 to-black'
   }
 ];
+
+// Attach distinct high-fidelity generated images matching each vehicle's exact model and brand
+DREAM_RIDES_FLEET.forEach((vehicle) => {
+  vehicle.imageUrl = DREAM_RIDE_IMAGES[vehicle.id] || vehicle.imageUrl;
+});
+
 

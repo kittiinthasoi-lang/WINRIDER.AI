@@ -156,6 +156,7 @@ export interface DreamRideVehicle {
   recommendedFor: string;
   knightRankRequired: string;
   colorTheme: string;
+  imageUrl?: string;
 }
 
 export interface AmenityOption {

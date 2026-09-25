@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Loader2, RefreshCw, X, Landmark, ArrowUpRight, MessageCircle, WalletCards } from 'lucide-react';
-import { auth } from '../../firebase';
+import { getAdminAuthHeaders } from '../../services/adminService';
 
 async function readJsonSafely(response: Response): Promise<any> {
   const text = await response.text();
@@ -10,12 +10,6 @@ async function readJsonSafely(response: Response): Promise<any> {
   } catch {
     throw new Error(response.ok ? 'เซิร์ฟเวอร์ส่งข้อมูลที่ไม่ใช่ JSON' : `เซิร์ฟเวอร์ไม่พร้อม (${response.status})`);
   }
-}
-
-async function getAdminToken() {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('กรุณาเข้าสู่ระบบ Super Admin ใหม่');
-  return token;
 }
 
 export const AdminTopupReviewView: React.FC = () => {
@@ -34,9 +28,9 @@ export const AdminTopupReviewView: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const token = await getAdminToken();
+      const headers = await getAdminAuthHeaders();
       const response = await fetch('/api/admin/withdrawal-requests', {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        headers,
       });
       const data = await readJsonSafely(response);
       if (!response.ok) throw new Error(data.error || 'โหลดรายการถอนเงินไม่สำเร็จ');
