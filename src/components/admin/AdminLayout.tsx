@@ -54,6 +54,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onSwitchAdminLevel,
   onSelectOwnerPersona
 }) => {
+  const effectiveAdminLevel: AdminLevel = 'super';
   const [activeTab, setActiveTab] = useState<'dashboard' | 'operations' | 'health' | 'verification' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'>('dashboard');
 
   const tabs: { id: 'dashboard' | 'operations' | 'health' | 'verification' | 'kyc' | 'users' | 'payment-profiles' | 'public-data' | 'wallet' | 'topups' | 'fees' | 'audit'; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -152,31 +153,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
           {/* Role badge & Admin level switcher for testing + Exit button */}
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            {/* Admin Level Badge & Switcher */}
-            <div className="flex items-center gap-1.5 bg-slate-900/80 px-2 py-1 rounded-xl border border-slate-700 text-xs font-mono flex-1 sm:flex-none justify-between">
+            {/* Super Admin badge */}
+            <div className="flex items-center gap-1.5 bg-slate-900/80 px-2 py-1 rounded-xl border border-amber-500/40 text-xs font-mono flex-1 sm:flex-none justify-between">
               <span className="text-slate-400 text-[10px] hidden sm:inline">สิทธิ์:</span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                adminLevel === 'super' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
-                adminLevel === 'reviewer' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' :
-                'bg-slate-700 text-slate-300'
-              }`}>
-                {adminLevel === 'super' ? 'SUPER ADMIN' : adminLevel.toUpperCase()}
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                SUPER ADMIN
               </span>
-
-              {onSwitchAdminLevel && (
-                <select
-                  value={adminLevel}
-                  onChange={(e: any) => onSwitchAdminLevel(e.target.value)}
-                  className="bg-transparent text-[10px] text-slate-400 hover:text-white cursor-pointer focus:outline-none"
-                  title="ทดสอบสลับระดับสิทธิ์แอดมิน"
-                >
-                  <option value="super">Super</option>
-                  <option value="reviewer">Reviewer</option>
-                  <option value="support">Support</option>
-                </select>
-              )}
             </div>
-
             {/* Back to App User Experience */}
             <button
               onClick={onExitAdmin}
@@ -281,24 +264,24 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {activeTab === 'health' && <AdminSystemHealthView />}
         {activeTab === 'verification' && <AdminVerificationQueueView />}
         {activeTab === 'kyc' && (
-          <AdminKycView adminLevel={adminLevel} />
+          <AdminKycView adminLevel={effectiveAdminLevel} />
         )}
         {activeTab === 'users' && (
-          <AdminUsersView adminLevel={adminLevel} />
+          <AdminUsersView adminLevel={effectiveAdminLevel} />
         )}
         {activeTab === 'public-data' && <AdminPublicDataView />}
         {activeTab === 'payment-profiles' && (
-          <AdminPaymentProfilesView adminLevel={adminLevel} />
+          <AdminPaymentProfilesView adminLevel={effectiveAdminLevel} />
         )}
         {activeTab === 'wallet' && (
-          <AdminWalletView adminLevel={adminLevel} />
+          <AdminWalletView adminLevel={effectiveAdminLevel} />
         )}
         {activeTab === 'topups' && <AdminTopupReviewView />}
         {activeTab === 'fees' && (
-          <AdminFeeRulesView adminLevel={adminLevel} />
+          <AdminFeeRulesView adminLevel={effectiveAdminLevel} />
         )}
         {activeTab === 'audit' && (
-          <AdminAuditLogsView adminLevel={adminLevel} />
+          <AdminAuditLogsView adminLevel={effectiveAdminLevel} />
         )}
       </main>
     </div>
