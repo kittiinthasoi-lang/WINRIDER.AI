@@ -2,7 +2,7 @@ import { doc, getDoc, onSnapshot, serverTimestamp, writeBatch } from 'firebase/f
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import type { UserDoc, UserRole } from '../types/auth';
-import { winUidToInternalEmail, normalizeWinUid, internalEmailToWinUid } from '../auth/winUid';
+import { normalizeWinUid } from '../auth/winUid';
 import { uploadKycDocument } from '../utils/imageUpload';
 
 export interface BaseRegistrationPayload {
@@ -234,7 +234,7 @@ async function persistRegistrationDirectly(
     uid: user.uid,
     winUid: normalizedUid,
     email: input.email.trim().toLowerCase(),
-    authEmail: user.email || winUidToInternalEmail(normalizedUid),
+    authEmail: user.email || input.email.trim().toLowerCase(),
     displayName: fullName || user.displayName || normalizedUid,
     fullName,
     phone: input.phone,
@@ -375,11 +375,12 @@ export async function registerFullAccountWithFirestore(
     if (!input.password) {
       throw new Error('กรุณาระบุรหัสผ่านสำหรับการสมัครบัญชีใหม่');
     }
-    onProgress?.('กำลังสร้างบัญชีผู้ใช้ WIN UID ในระบบ...');
+    onProgress?.('กำลังสร้างบัญชีด้วยอีเมลจริงของผู้สมัคร...');
     try {
+      const normalizedEmail = input.email.trim().toLowerCase();
       const credential = await createUserWithEmailAndPassword(
         auth,
-        winUidToInternalEmail(normalizedUid),
+        normalizedEmail,
         input.password
       );
       user = credential.user;
@@ -390,7 +391,7 @@ export async function registerFullAccountWithFirestore(
     } catch (authError: any) {
       const errStr = String(authError?.code || authError?.message || '');
       if (errStr.includes('operation-not-allowed')) {
-        const error = new Error('ต้องเปิด Email/Password ใน Firebase Authentication ของโปรเจกต์ decoded-robot-6lkcn เพื่อใช้ WIN UID + รหัสผ่าน');
+        const error = new Error('ต้องเปิด Email/Password ใน Firebase Authentication ของโปรเจกต์ decoded-robot-6lkcn เพื่อใช้อีเมลจริง + รหัสผ่าน');
         (error as any).code = 'EMAIL_PASSWORD_PROVIDER_REQUIRED';
         throw error;
       }
@@ -406,7 +407,6 @@ export async function registerFullAccountWithFirestore(
   if (
     user &&
     user.providerData.some((provider) => provider.providerId === 'google.com') &&
-    !internalEmailToWinUid(user.email) &&
     input.password
   ) {
     try {
