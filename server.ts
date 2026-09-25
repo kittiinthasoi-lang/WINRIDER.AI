@@ -6528,6 +6528,16 @@ async function startServer() {
   // Clean production mode check: NODE_ENV === "production"
   const isProduction = process.env.NODE_ENV === "production";
 
+  // API routes are registered above this point. Any unmatched /api request must
+  // stay JSON and must never fall through to Vite/SPA index.html.
+  app.use("/api", (req, res) => {
+    return res.status(404).json({
+      error: "API endpoint not found",
+      code: "API_ROUTE_NOT_FOUND",
+      path: req.originalUrl,
+    });
+  });
+
   if (!isProduction) {
     try {
       const { createServer: createViteServer } = await import("vite");
