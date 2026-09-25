@@ -258,19 +258,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(true);
 
         if (!user) {
-          const cached = cachedProfile();
-          if (cached?.uid && cached?.role) {
-            const synthetic = createSyntheticFirebaseUser(
-              cached.uid,
-              cached.displayName || cached.fullName || 'ผู้ใช้งาน',
-              cached.email || winUidToInternalEmail(cached.winUid || cached.uid)
-            );
-            setFirebaseUser(synthetic);
-            setUserData(cached);
-          } else {
-            setFirebaseUser(null);
-            setUserData(null);
-          }
+          // Real authentication is enabled again. A cached local profile must
+          // never recreate an authenticated session after Firebase signs out.
+          cacheProfile(null);
+          setFirebaseUser(null);
+          setUserData(null);
           setGoogleOnboarding(null);
           setLoading(false);
           return;
