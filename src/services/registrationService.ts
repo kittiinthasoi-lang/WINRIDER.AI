@@ -83,6 +83,9 @@ export interface RegistrationResult {
   approvalRequired: boolean;
   isFoundingKnight?: boolean;
   recovered?: boolean;
+  fiveRoleAccess?: boolean;
+  adminLevel?: string;
+  forceTokenRefresh?: boolean;
 }
 
 export function subscribeFoundingKnightCounter(callback: (data: { count: number; limit: number; remaining: number }) => void) {
@@ -135,6 +138,9 @@ async function submitRegistration(
   const payload = await response.json().catch(() => ({}));
 
   if (response.ok && payload?.user) {
+    if (payload.forceTokenRefresh === true && auth.currentUser) {
+      await auth.currentUser.getIdToken(true).catch(() => {});
+    }
     return payload as RegistrationResult;
   }
 
@@ -234,7 +240,8 @@ async function persistRegistrationDirectly(
     district: input.district,
     role: input.role,
     status: 'active',
-    isAdmin: false,
+    isAdmin: true,
+    adminLevel: 'support',
     level: 1,
     xp: 0,
     createdAt: now,
