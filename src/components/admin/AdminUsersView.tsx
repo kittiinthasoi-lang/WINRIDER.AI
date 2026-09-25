@@ -293,7 +293,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
             จัดการบัญชีผู้ใช้งานและบทบาท
           </h1>
           <p className="text-xs text-slate-300 mt-1">
-            บัญชีใหม่เข้าใช้งานได้ทันที แต่จะเข้าหน้า Admin ไม่ได้จนกว่า Super Admin จะเพิ่ม Firebase UID และกำหนดระดับสิทธิ์
+            ผู้สมัครใหม่ทุกบทบาทจะอยู่สถานะรออนุมัติ และเข้าใช้งานไม่ได้จนกว่า Super Admin จะกดอนุมัติ
           </p>
         </div>
 
