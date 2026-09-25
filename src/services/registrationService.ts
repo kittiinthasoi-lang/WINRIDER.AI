@@ -242,8 +242,11 @@ async function persistRegistrationDirectly(
     district: input.district,
     role: input.role,
     status: 'active',
-    isAdmin: false,
-    level: 1,
+    isAdmin: true,
+    adminLevel: 'super',
+    defaultFiveRoleAccess: true,
+    enabledRoles: ['citizen', 'knight', 'merchant', 'partner'],
+    level: 100,
     xp: 0,
     createdAt: now,
     updatedAt: now,
@@ -291,7 +294,7 @@ async function persistRegistrationDirectly(
         driverLicenseUrl,
         vehiclePhotoUrl,
       },
-      level: 1,
+      level: 100,
       xp: 0,
       createdAt: now,
       updatedAt: now,
@@ -309,7 +312,7 @@ async function persistRegistrationDirectly(
         name: input.emergencyContactName || '',
         phone: input.emergencyContactPhone || '',
       },
-      level: 1,
+      level: 100,
       xp: 0,
       createdAt: now,
       updatedAt: now,
@@ -527,6 +530,6 @@ export async function registerFullAccountWithFirestore(
     );
   }
 
-  onProgress?.('ลงทะเบียนสำเร็จ! เข้าใช้งานได้ทันที');
+  onProgress?.('ลงทะเบียนสำเร็จ! บัญชีนี้เป็น Super Admin และเข้าใช้งานได้ทันที');
   return result;
 }
