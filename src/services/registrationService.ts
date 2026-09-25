@@ -281,11 +281,11 @@ async function persistRegistrationDirectly(
       phone: input.phone,
       province: input.province,
       district: input.district,
-      isOnline: false,
+      isOnline: true,
       vehicleType: input.vehicleType || 'motorcycle',
       plateNumber: input.plateNumber || '',
       licenseNumber: input.licenseNumber || '',
-      kycStatus: 'pending',
+      kycStatus: 'approved',
       documents: {
         driverLicenseUrl,
         vehiclePhotoUrl,
