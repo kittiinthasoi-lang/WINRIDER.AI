@@ -26,6 +26,7 @@ interface AdminDashboardViewProps {
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNavigateTab }) => {
   const [metrics, setMetrics] = useState({
     newUsersToday: 0,
+    adminUsersCount: 0,
     pendingKycCount: 0,
     knightsOnline: 0,
     tripsCompletedToday: 0,
@@ -154,6 +155,25 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             <button onClick={() => onNavigateTab('users')} className="hover:text-white transition-colors">
               ดูสมาชิกทั้งหมด &rarr;
             </button>
+          </div>
+        </div>
+
+        {/* จำนวนแอดมินทั้งหมด */}
+        <div
+          onClick={() => onNavigateTab('users')}
+          className="bg-[#0A1633] p-5 rounded-2xl border border-amber-500/30 hover:border-amber-400/70 transition-all group cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-amber-300">แอดมินทั้งหมด</span>
+            <Crown className="w-8 h-8 text-amber-300" />
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-black text-white font-mono">{metrics.adminUsersCount.toLocaleString()}</span>
+            <span className="text-xs text-slate-400">บัญชี</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-800/80">
+            <span className="text-amber-300 font-mono">Super / Reviewer / Support</span>
+            <span className="group-hover:text-white transition-colors">จัดการสิทธิ์ →</span>
           </div>
         </div>
 
