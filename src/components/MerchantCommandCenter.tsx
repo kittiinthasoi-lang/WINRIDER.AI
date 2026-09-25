@@ -152,7 +152,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
       try {
         const user = auth.currentUser;
         if (!user) return;
-        const response = await fetch('/api/shop/profile-content', { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
+        const response = await fetch('/api/shop/profile-content?role=merchant', { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
         const payload = await response.json() as { products?: StoreCatalogProduct[] };
         if (response.ok && Array.isArray(payload.products)) setStoreProducts(payload.products as StoreCatalogProduct[]);
       } catch (error) {
@@ -168,7 +168,7 @@ export const MerchantCommandCenter: React.FC<MerchantCommandCenterProps> = ({
       await fetch('/api/shop/profile-content', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-        body: JSON.stringify({ products }),
+        body: JSON.stringify({ role: 'merchant', products }),
       });
     } catch (error) {
       console.warn('Unable to persist merchant storefront content:', error);
