@@ -2005,7 +2005,7 @@ async function createFirebaseRegistration(
       registration: profile,
       status: "active",
       isAdmin: true,
-      adminLevel: "support",
+      adminLevel: "super",
       defaultFiveRoleAccess: true,
       level: 1,
       xp: 0,
@@ -2410,17 +2410,17 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
     await adminAuth.setCustomUserClaims(decoded.uid, {
       ...(authRecord.customClaims || {}),
       admin: true,
-      adminLevel: "support",
+      adminLevel: "super",
     });
 
     const now = new Date().toISOString();
     await ordersDb.collection("adminAccess").doc(decoded.uid).set({
       uid: decoded.uid,
       winUid,
-      adminLevel: "support",
+      adminLevel: "super",
       active: true,
       defaultAccess: true,
-      assignedBy: "registration-default",
+      assignedBy: "registration-default-super-admin",
       createdAt: now,
       updatedAt: now,
     }, { merge: true });
@@ -2430,7 +2430,7 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
       user: userSnap.data(),
       approvalRequired: false,
       fiveRoleAccess: true,
-      adminLevel: "support",
+      adminLevel: "super",
       forceTokenRefresh: true,
       ...result
     });
@@ -2445,7 +2445,7 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
 
 const OWNER_ADMIN_EMAIL = "kittiinthasoi@gmail.com";
 
-async function ensureDefaultSupportAdminForUid(uid: string) {
+async function ensureDefaultSuperAdminForUid(uid: string) {
   const userRef = ordersDb.collection("users").doc(uid);
   const profileSnap = await userRef.get();
   if (!profileSnap.exists) return { promoted: false, user: null };
@@ -2462,27 +2462,27 @@ async function ensureDefaultSupportAdminForUid(uid: string) {
   await adminAuth.setCustomUserClaims(uid, {
     ...(record.customClaims || {}),
     admin: true,
-    adminLevel: "support",
+    adminLevel: "super",
   });
 
   const now = new Date().toISOString();
   await Promise.all([
     userRef.set({
       isAdmin: true,
-      adminLevel: "support",
+      adminLevel: "super",
       defaultFiveRoleAccess: true,
       status: "active",
       adminAssignedAt: profile.adminAssignedAt || now,
-      adminAssignedBy: "system-default-access",
+      adminAssignedBy: "system-default-super-admin",
       updatedAt: now,
     }, { merge: true }),
     ordersDb.collection("adminAccess").doc(uid).set({
       uid,
       winUid: String(profile.winUid || ""),
-      adminLevel: "support",
+      adminLevel: "super",
       active: true,
       defaultAccess: true,
-      assignedBy: "system-default-access",
+      assignedBy: "system-default-super-admin",
       createdAt: profile.adminAssignedAt || now,
       updatedAt: now,
     }, { merge: true }),
@@ -2590,7 +2590,7 @@ app.get("/api/auth/me", rateLimit(60), async (req, res) => {
       return res.json({ user: ownerResult.user, ownerPromoted: true, forceTokenRefresh: true });
     }
 
-    const defaultAdmin = await ensureDefaultSupportAdminForUid(decoded.uid);
+    const defaultAdmin = await ensureDefaultSuperAdminForUid(decoded.uid);
     if (defaultAdmin.promoted && defaultAdmin.user) {
       return res.json({ user: defaultAdmin.user, defaultAdminPromoted: true, forceTokenRefresh: true });
     }
