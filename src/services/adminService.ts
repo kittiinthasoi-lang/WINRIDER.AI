@@ -460,8 +460,8 @@ export async function updateFeeRule(ruleId: string, patch: any, reason?: string)
 /**
  * 7. setAdminRole
  */
-export async function setAdminRole(targetWinUid: string, level: AdminLevel, reason?: string) {
-  const result = await callAdminEndpoint('setAdminRole', '/api/admin/set-role', { targetWinUid, level, reason });
+export async function setAdminRole(targetUid: string, level: AdminLevel, reason?: string) {
+  const result = await callAdminEndpoint('setAdminRole', '/api/admin/set-role', { targetUid, level, reason });
   if (result?.forceTokenRefresh === true && auth.currentUser) {
     await auth.currentUser.getIdToken(true);
   }
