@@ -30,6 +30,7 @@ import { playTactileBlip } from './utils/audio';
 import { useAuth } from './context/AuthContext';
 import { AuthModalOrView } from './components/auth/AuthModalOrView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { PendingReviewView } from './components/auth/PendingReviewView';
 import { AdminRoute } from './components/admin/AdminRoute';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { getAdminBootstrapStatus, getAdminPortalStatus } from './services/adminService';
@@ -389,6 +390,15 @@ export default function App() {
         <main className="flex-1 flex items-center justify-center p-4">
           <AuthModalOrView />
         </main>
+      </div>
+    );
+  }
+
+  // 3. Registered but waiting for Super Admin approval -> block the app.
+  if (userData?.status === 'pending_review' && !isOwnerAdmin) {
+    return (
+      <div className="min-h-screen bg-[#070D1E] text-slate-100 font-sans">
+        <PendingReviewView />
       </div>
     );
   }
