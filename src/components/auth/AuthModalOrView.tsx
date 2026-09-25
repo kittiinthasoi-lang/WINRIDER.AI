@@ -62,9 +62,9 @@ const PROVINCES = [
 
 function friendlyError(error: any) {
   const code = String(error?.code || error?.message || '');
-  if (code.includes('unauthorized-domain')) {
+  if (code.includes('unauthorized-domain') || code.toLowerCase().includes('requested action is invalid')) {
     const host = typeof window !== 'undefined' ? window.location.hostname : '';
-    return `โดเมน ${host || 'ปัจจุบัน'} ยังไม่ได้รับอนุญาตใน Firebase Authentication ของโปรเจกต์ decoded-robot-6lkcn`;
+    return `Google Sign-In ถูกปฏิเสธจากการตั้งค่า Firebase/OAuth ของโดเมน ${host || 'ปัจจุบัน'} กรุณาเพิ่มโดเมนนี้ใน Firebase Authentication > Settings > Authorized domains และตรวจสอบ Web API key / OAuth redirect ของโปรเจกต์ decoded-robot-6lkcn`;
   }
   if (code.includes('operation-not-allowed')) {
     return 'Firebase Authentication Provider ที่เรียกใช้ยังไม่ได้เปิดในโปรเจกต์ decoded-robot-6lkcn';
