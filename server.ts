@@ -2058,7 +2058,7 @@ async function createFirebaseRegistration(
       province: profile.province,
       district: profile.district,
       registration: profile,
-      status: "active",
+      status: "pending_review",
       isAdmin: false,
       level: 1,
       xp: 0,
@@ -2095,7 +2095,7 @@ async function createFirebaseRegistration(
         vehicleType: profile.vehicleType || "motorcycle",
         plateNumber: profile.plateNumber || "",
         licenseNumber: profile.publicLicenseNumber || "",
-        kycStatus: "approved",
+        kycStatus: "pending",
         isFoundingKnight,
         certifications: [],
         documents: {
@@ -2467,7 +2467,7 @@ app.post("/api/auth/register-profile", rateLimit(30), async (req, res) => {
     const userSnap = await ordersDb.collection("users").doc(decoded.uid).get();
     return res.status(201).json({
       user: userSnap.data(),
-      approvalRequired: false,
+      approvalRequired: true,
       fiveRoleAccess: false,
       adminLevel: null,
       forceTokenRefresh: false,
@@ -4499,6 +4499,10 @@ async function requireFirebaseUser(req: express.Request, res: express.Response) 
     }
 
     const fullUser = { ...user, ...(profile || {}), uid: user.uid, email: user.email || profile?.email || "" };
+    if (!isSuperAdminToken(user) && profile?.status === "pending_review") {
+      res.status(403).json({ error: "Account pending admin approval", code: "ACCOUNT_PENDING_REVIEW" });
+      return null;
+    }
     if (!isSuperAdminToken(user) && profile?.status === "suspended") {
       res.status(403).json({ error: "Account suspended", code: "ACCOUNT_SUSPENDED" });
       return null;
