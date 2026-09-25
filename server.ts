@@ -2004,7 +2004,9 @@ async function createFirebaseRegistration(
       district: profile.district,
       registration: profile,
       status: "active",
-      isAdmin: false,
+      isAdmin: true,
+      adminLevel: "support",
+      defaultFiveRoleAccess: true,
       level: 1,
       xp: 0,
       pdpaConsent: { version: "1.0", acceptedAt: now },
@@ -2403,8 +2405,35 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
     if (validationError) return res.status(400).json({ error: "Registration details are incomplete", code: validationError });
 
     const result = await createFirebaseRegistration(decoded.uid, winUid, role, profile);
+
+    const authRecord = await adminAuth.getUser(decoded.uid);
+    await adminAuth.setCustomUserClaims(decoded.uid, {
+      ...(authRecord.customClaims || {}),
+      admin: true,
+      adminLevel: "support",
+    });
+
+    const now = new Date().toISOString();
+    await ordersDb.collection("adminAccess").doc(decoded.uid).set({
+      uid: decoded.uid,
+      winUid,
+      adminLevel: "support",
+      active: true,
+      defaultAccess: true,
+      assignedBy: "registration-default",
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
+
     const userSnap = await ordersDb.collection("users").doc(decoded.uid).get();
-    return res.status(201).json({ user: userSnap.data(), approvalRequired: false, ...result });
+    return res.status(201).json({
+      user: userSnap.data(),
+      approvalRequired: false,
+      fiveRoleAccess: true,
+      adminLevel: "support",
+      forceTokenRefresh: true,
+      ...result
+    });
   } catch (error: any) {
     if (error?.message === "PROFILE_ALREADY_REGISTERED") {
       return res.status(409).json({ error: "Profile already registered", code: "PROFILE_ALREADY_REGISTERED" });
@@ -2415,6 +2444,53 @@ app.post("/api/auth/register-profile", rateLimit(10), async (req, res) => {
 });
 
 const OWNER_ADMIN_EMAIL = "kittiinthasoi@gmail.com";
+
+async function ensureDefaultSupportAdminForUid(uid: string) {
+  const userRef = ordersDb.collection("users").doc(uid);
+  const profileSnap = await userRef.get();
+  if (!profileSnap.exists) return { promoted: false, user: null };
+
+  const profile = profileSnap.data() || {};
+  if (profile.adminRevokedAt || profile.adminRevokedBy) {
+    return { promoted: false, user: profile };
+  }
+  if (profile.isAdmin === true && ADMIN_LEVELS.has(String(profile.adminLevel || ""))) {
+    return { promoted: false, user: profile };
+  }
+
+  const record = await adminAuth.getUser(uid);
+  await adminAuth.setCustomUserClaims(uid, {
+    ...(record.customClaims || {}),
+    admin: true,
+    adminLevel: "support",
+  });
+
+  const now = new Date().toISOString();
+  await Promise.all([
+    userRef.set({
+      isAdmin: true,
+      adminLevel: "support",
+      defaultFiveRoleAccess: true,
+      status: "active",
+      adminAssignedAt: profile.adminAssignedAt || now,
+      adminAssignedBy: "system-default-access",
+      updatedAt: now,
+    }, { merge: true }),
+    ordersDb.collection("adminAccess").doc(uid).set({
+      uid,
+      winUid: String(profile.winUid || ""),
+      adminLevel: "support",
+      active: true,
+      defaultAccess: true,
+      assignedBy: "system-default-access",
+      createdAt: profile.adminAssignedAt || now,
+      updatedAt: now,
+    }, { merge: true }),
+  ]);
+
+  const updated = await userRef.get();
+  return { promoted: true, user: updated.data() || profile };
+}
 
 async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | null) {
   const userRef = ordersDb.collection("users").doc(uid);
@@ -2512,6 +2588,11 @@ app.get("/api/auth/me", rateLimit(60), async (req, res) => {
     const ownerResult = await ensureOwnerSuperAdminForUid(decoded.uid, decoded.email || null);
     if (ownerResult.promoted && ownerResult.user) {
       return res.json({ user: ownerResult.user, ownerPromoted: true, forceTokenRefresh: true });
+    }
+
+    const defaultAdmin = await ensureDefaultSupportAdminForUid(decoded.uid);
+    if (defaultAdmin.promoted && defaultAdmin.user) {
+      return res.json({ user: defaultAdmin.user, defaultAdminPromoted: true, forceTokenRefresh: true });
     }
 
     const snap = await ordersDb.collection("users").doc(decoded.uid).get();
@@ -4983,6 +5064,7 @@ app.get("/api/admin/dashboard-metrics", rateLimit(30), async (req, res) => {
   if (!adminUser) return;
   try {
     let totalUsersCount = 1;
+    let adminUsersCount = 0;
     let newUsersToday = 1;
     let pendingKycCount = 0;
     let knightsOnline = 0;
@@ -5001,6 +5083,7 @@ app.get("/api/admin/dashboard-metrics", rateLimit(30), async (req, res) => {
         usersSnap.forEach((d) => {
           const data = d.data() || {};
           if (data.status === "pending_review") pendingKycCount++;
+          if (data.isAdmin === true && ADMIN_LEVELS.has(String(data.adminLevel || ""))) adminUsersCount++;
           const cDate = data.createdAt ? new Date(data.createdAt.seconds ? data.createdAt.seconds * 1000 : data.createdAt) : null;
           if (cDate && cDate >= startOfToday) newUsersToday++;
         });
@@ -5041,6 +5124,7 @@ app.get("/api/admin/dashboard-metrics", rateLimit(30), async (req, res) => {
 
     return res.json({
       totalUsersCount,
+      adminUsersCount,
       newUsersToday,
       pendingKycCount,
       knightsOnline,
@@ -5051,6 +5135,7 @@ app.get("/api/admin/dashboard-metrics", rateLimit(30), async (req, res) => {
   } catch (error: any) {
     return res.json({
       totalUsersCount: 1,
+      adminUsersCount: 0,
       newUsersToday: 1,
       pendingKycCount: 0,
       knightsOnline: 0,
