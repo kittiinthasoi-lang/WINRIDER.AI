@@ -218,7 +218,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-cyan-300" />
                   <h2 className="text-sm font-black text-white">ศูนย์สลับ 5 บทบาท</h2>
-                  <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-300">REAL ACCOUNT</span>
                 </div>
                 <p className="mt-1 text-[10px] text-slate-400">บัญชี Admin เดียวสลับดู ลูกค้า / พี่วิน / ร้านค้า / พาร์ทเนอร์ / Admin โดยไม่สร้างบัญชีจำลองเพิ่ม</p>
               </div>
