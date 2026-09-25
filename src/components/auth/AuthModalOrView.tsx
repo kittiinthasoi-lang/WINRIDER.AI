@@ -70,9 +70,9 @@ function friendlyError(error: any) {
     return 'Firebase Authentication Provider ที่เรียกใช้ยังไม่ได้เปิดในโปรเจกต์ decoded-robot-6lkcn';
   }
   if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) {
-    return 'WIN UID หรือรหัสผ่านไม่ถูกต้อง';
+    return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
   }
-  if (code.includes('email-already-in-use')) return 'WIN UID นี้ถูกใช้งานแล้ว กรุณาตั้ง UID ใหม่';
+  if (code.includes('email-already-in-use')) return 'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบหรือใช้อีเมลอื่น';
   if (code.includes('weak-password')) return 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร';
   if (code.includes('api-key-not-valid') || code.includes('invalid-api-key')) return 'Firebase Web API Key ยังไม่พร้อมใช้งาน';
   if (code.includes('Quota limit exceeded') || code.includes('resource-exhausted')) {
@@ -82,7 +82,7 @@ function friendlyError(error: any) {
 }
 
 export const AuthModalOrView: React.FC = () => {
-  const { signInWithWinUid, signInWithGoogle, googleOnboarding, adoptUserData } = useAuth();
+  const { signInWithEmail, signInWithGoogle, googleOnboarding, adoptUserData } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
 
   // Multi-step Registration: Step 1 (Info), Step 2 (Select Role), Step 3 (Role Details), Step 4 (Confirm & Save)
@@ -379,9 +379,9 @@ export const AuthModalOrView: React.FC = () => {
     setError('');
     playTactileBlip(900);
 
-    const normalizedUid = normalizeWinUid(winUid);
-    if (!isValidWinUid(normalizedUid)) {
-      setError('WIN UID ต้องมี 4-30 ตัว ใช้ a-z, 0-9, จุด, ขีดกลาง หรือขีดล่าง');
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError('กรุณากรอกอีเมลจริงให้ถูกต้อง');
       return;
     }
     if (password.length < 8) {
@@ -391,7 +391,7 @@ export const AuthModalOrView: React.FC = () => {
 
     setWorking(true);
     try {
-      await signInWithWinUid(normalizedUid, password);
+      await signInWithEmail(normalizedEmail, password);
     } catch (cause) {
       setError(friendlyError(cause));
       setWorking(false);
@@ -541,7 +541,7 @@ export const AuthModalOrView: React.FC = () => {
             )}
             <div className="my-4 flex items-center gap-3 text-[10px] font-bold text-slate-500">
               <div className="h-px flex-1 bg-white/10" />
-              <span>{googleOnboarding ? 'ตั้ง WIN UID ต่อด้านล่าง' : 'หรือใช้ WIN UID'}</span>
+              <span>{googleOnboarding ? 'ตั้ง WIN UID ต่อด้านล่าง' : 'หรือใช้อีเมลจริง'}</span>
               <div className="h-px flex-1 bg-white/10" />
             </div>
           </div>
@@ -552,19 +552,22 @@ export const AuthModalOrView: React.FC = () => {
           {mode === 'login' && (
             <form onSubmit={handleSignIn} className="space-y-4 max-w-md mx-auto">
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-300">WIN UID</span>
-                <input
-                  value={winUid}
-                  onChange={(e) => setWinUid(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
-                  required
-                  minLength={4}
-                  maxLength={30}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="เช่น somchai01"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 font-mono text-sm text-white outline-none focus:border-cyan-400/70"
-                />
+                <span className="mb-1.5 block text-xs font-bold text-slate-300">อีเมล</span>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-400" />
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    placeholder="เช่น name@gmail.com"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 py-3 pl-10 pr-4 text-sm text-white outline-none focus:border-cyan-400/70"
+                  />
+                </div>
               </label>
 
               <label className="block">
@@ -593,7 +596,7 @@ export const AuthModalOrView: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={working || !winUid.trim() || password.length < 8}
+                disabled={working || !email.trim() || password.length < 8}
                 className="w-full mt-2 rounded-xl border border-cyan-200/50 bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 px-5 py-3.5 text-slate-950 font-bold text-sm shadow-[0_0_20px_rgba(34,211,238,0.3)] hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 {working ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
