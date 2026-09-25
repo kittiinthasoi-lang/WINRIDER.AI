@@ -2350,14 +2350,12 @@ app.post("/api/auth/complete-google-identity", rateLimit(10), async (req, res) =
       return res.status(403).json({ error: "บัญชีนี้ไม่ได้เข้าสู่ระบบด้วย Google", code: "GOOGLE_PROVIDER_REQUIRED" });
     }
 
-    const internalEmail = `${winUid}${WIN_UID_EMAIL_SUFFIX}`;
-    try {
-      const existingByEmail = await adminAuth.getUserByEmail(internalEmail);
-      if (existingByEmail.uid !== decoded.uid) {
-        return res.status(409).json({ error: "WIN UID นี้ถูกใช้งานแล้ว", code: "WIN_UID_ALREADY_USED" });
-      }
-    } catch (lookupError: any) {
-      if (lookupError?.code !== "auth/user-not-found") throw lookupError;
+    const googleEmail = String(googleProvider.email || decoded.email || "").trim().toLowerCase();
+    if (!googleEmail || contactEmail !== googleEmail) {
+      return res.status(400).json({
+        error: "อีเมลสมัครต้องเป็นอีเมลจริงของ Google Account ที่กำลังใช้งาน",
+        code: "GOOGLE_EMAIL_MISMATCH",
+      });
     }
 
     const existingProfile = await ordersDb.collection("users").where("winUid", "==", winUid).limit(1).get();
@@ -2365,8 +2363,10 @@ app.post("/api/auth/complete-google-identity", rateLimit(10), async (req, res) =
       return res.status(409).json({ error: "WIN UID นี้ถูกใช้งานแล้ว", code: "WIN_UID_ALREADY_USED" });
     }
 
+    // Keep the applicant's real Google email. Adding a password must never
+    // rewrite the Firebase account to an internal/generated email address.
     await adminAuth.updateUser(decoded.uid, {
-      email: internalEmail,
+      email: googleEmail,
       emailVerified: true,
       password,
       ...(displayName ? { displayName } : {}),
@@ -2375,8 +2375,8 @@ app.post("/api/auth/complete-google-identity", rateLimit(10), async (req, res) =
     await ordersDb.collection("auth_identity_links").doc(decoded.uid).set({
       uid: decoded.uid,
       winUid,
-      googleEmail: String(googleProvider.email || decoded.email || "").toLowerCase(),
-      contactEmail,
+      googleEmail,
+      contactEmail: googleEmail,
       providers: ["google.com", "password"],
       updatedAt: FieldValue.serverTimestamp(),
       createdAt: FieldValue.serverTimestamp(),
