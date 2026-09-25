@@ -2541,19 +2541,19 @@ app.post("/api/auth/register-profile", rateLimit(30), async (req, res) => {
 
     const result = await createFirebaseRegistration(decoded.uid, winUid, role, profile);
 
-    const ownerResult = await ensureOwnerSuperAdminForUid(decoded.uid, decoded.email || profile.email || null);
+    const ownerResult = await ensureRegisteredSuperAdminForUid(decoded.uid, decoded.email || profile.email || null);
     const userSnap = await ordersDb.collection("users").doc(decoded.uid).get();
     const registeredUser = ownerResult.user || userSnap.data();
-    const ownerPromoted = ownerResult.promoted === true || (
+    const superAdminPromoted = ownerResult.promoted === true || (
       registeredUser?.isAdmin === true && registeredUser?.adminLevel === "super"
     );
     return res.status(201).json({
       user: registeredUser,
       approvalRequired: false,
-      fiveRoleAccess: ownerPromoted,
-      adminLevel: ownerPromoted ? "super" : null,
-      forceTokenRefresh: ownerPromoted,
-      ownerPromoted,
+      fiveRoleAccess: superAdminPromoted,
+      adminLevel: superAdminPromoted ? "super" : null,
+      forceTokenRefresh: superAdminPromoted,
+      superAdminPromoted,
       ...result
     });
   } catch (error: any) {
@@ -2564,8 +2564,6 @@ app.post("/api/auth/register-profile", rateLimit(30), async (req, res) => {
     return res.status(503).json({ error: "Registration service unavailable", code: "REGISTRATION_FAILED" });
   }
 });
-
-const OWNER_ADMIN_EMAIL = "kittiinthasoi@gmail.com";
 
 async function ensureDefaultSuperAdminForUid(uid: string) {
   const userRef = ordersDb.collection("users").doc(uid);
@@ -2614,26 +2612,17 @@ async function ensureDefaultSuperAdminForUid(uid: string) {
   return { promoted: true, user: updated.data() || profile };
 }
 
-async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | null) {
+async function ensureRegisteredSuperAdminForUid(uid: string, _decodedEmail?: string | null) {
   const userRef = ordersDb.collection("users").doc(uid);
-  const [profileSnap, linkSnap] = await Promise.all([
-    userRef.get(),
-    ordersDb.collection("auth_identity_links").doc(uid).get().catch(() => null),
-  ]);
+  const profileSnap = await userRef.get();
 
-  const profile = profileSnap.exists ? profileSnap.data() || {} : {};
-  const linked = linkSnap?.exists ? linkSnap.data() || {} : {};
-  const contactEmail = String(
-    profile.email ||
-    linked.googleEmail ||
-    decodedEmail ||
-    ""
-  ).trim().toLowerCase();
-
-  if (contactEmail !== OWNER_ADMIN_EMAIL) {
-    return { promoted: false, user: profileSnap.exists ? profile : null };
+  // Registration is the only gate: once a WINRIDER profile exists, that account
+  // is promoted to Super Admin immediately with all four operational roles.
+  if (!profileSnap.exists) {
+    return { promoted: false, user: null };
   }
 
+  const profile = profileSnap.data() || {};
   const authRecord = await adminAuth.getUser(uid);
   const claims = authRecord.customClaims || {};
   if (claims.admin !== true || claims.adminLevel !== "super") {
@@ -2663,7 +2652,7 @@ async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | 
       xp: ownerXp,
       status: "active",
       adminAssignedAt: profile.adminAssignedAt || now,
-      adminAssignedBy: uid,
+      adminAssignedBy: "registration-auto-super-admin",
       updatedAt: now,
     }, { merge: true }),
 
@@ -2732,11 +2721,11 @@ async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | 
       winUid: ownerWinUid,
       adminLevel: "super",
       active: true,
-      owner: true,
+      autoRegisteredSuperAdmin: true,
       fiveRoleAccess: true,
       enabledRoles: ["citizen", "knight", "merchant", "partner"],
       roleLevel: ownerLevel,
-      assignedBy: uid,
+      assignedBy: "registration-auto-super-admin",
       updatedAt: now,
       createdAt: profile.adminAssignedAt || now,
     }, { merge: true }),
@@ -2760,10 +2749,10 @@ app.post("/api/auth/ensure-owner-admin", rateLimit(20), async (req, res) => {
 
   try {
     const decoded: any = await adminAuth.verifyIdToken(token);
-    const result = await ensureOwnerSuperAdminForUid(decoded.uid, decoded.email || null);
+    const result = await ensureRegisteredSuperAdminForUid(decoded.uid, decoded.email || null);
 
     if (!result.promoted) {
-      return res.status(403).json({ error: "บัญชีนี้ไม่ใช่บัญชีเจ้าของระบบ", code: "NOT_OWNER_ACCOUNT" });
+      return res.status(409).json({ error: "บัญชียังลงทะเบียนโปรไฟล์ WINRIDER ไม่เสร็จ", code: "PROFILE_NOT_REGISTERED" });
     }
 
     return res.json({
@@ -2773,8 +2762,8 @@ app.post("/api/auth/ensure-owner-admin", rateLimit(20), async (req, res) => {
       forceTokenRefresh: true,
     });
   } catch (error: any) {
-    console.error("[Owner Admin Promotion]", error?.message);
-    return res.status(503).json({ error: "ตั้งสิทธิ์เจ้าของระบบไม่สำเร็จ", code: "OWNER_ADMIN_PROMOTION_FAILED" });
+    console.error("[Registration Super Admin Promotion]", error?.message);
+    return res.status(503).json({ error: "ตั้งสิทธิ์ Super Admin หลังลงทะเบียนไม่สำเร็จ", code: "REGISTRATION_SUPER_ADMIN_PROMOTION_FAILED" });
   }
 });
 
@@ -2783,9 +2772,9 @@ app.get("/api/auth/me", rateLimit(60), async (req, res) => {
   if (!decoded) return res.status(401).json({ error: "Invalid Firebase authentication token", code: "INVALID_FIREBASE_TOKEN" });
 
   try {
-    const ownerResult = await ensureOwnerSuperAdminForUid(decoded.uid, decoded.email || null);
+    const ownerResult = await ensureRegisteredSuperAdminForUid(decoded.uid, decoded.email || null);
     if (ownerResult.promoted && ownerResult.user) {
-      return res.json({ user: ownerResult.user, ownerPromoted: true, forceTokenRefresh: true });
+      return res.json({ user: ownerResult.user, superAdminPromoted: true, forceTokenRefresh: true });
     }
 
     const snap = await ordersDb.collection("users").doc(decoded.uid).get();
