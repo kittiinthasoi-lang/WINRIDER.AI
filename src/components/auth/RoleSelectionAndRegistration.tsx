@@ -403,7 +403,7 @@ export const RoleSelectionAndRegistration: React.FC<Props> = ({ onCompleted }) =
                     <User className="w-7 h-7" />
                   </div>
                   <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-semibold">
-                    รอแอดมินอนุมัติ
+                    ใช้งานได้ทันที
                   </span>
                 </div>
 
