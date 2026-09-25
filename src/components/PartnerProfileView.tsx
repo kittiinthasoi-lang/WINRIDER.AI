@@ -160,7 +160,7 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
       try {
         const user = auth.currentUser;
         if (!user) return;
-        const response = await fetch('/api/shop/profile-content', { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
+        const response = await fetch('/api/shop/profile-content?role=partner', { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
         const payload = await response.json() as { promotions?: PartnerPromotion[] };
         if (response.ok && Array.isArray(payload.promotions)) {
           setOwnerPromotions(prev => ({ ...prev, [selectedPartner.id]: payload.promotions || [] }));
@@ -178,7 +178,7 @@ export const PartnerProfileView: React.FC<PartnerProfileViewProps> = ({
       await fetch('/api/shop/profile-content', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-        body: JSON.stringify({ promotions }),
+        body: JSON.stringify({ role: 'partner', promotions }),
       });
     } catch (error) {
       console.warn('Unable to persist partner storefront content:', error);
