@@ -9,6 +9,7 @@ import { MarketItem } from '../types';
 import { useRealGeolocation } from '../hooks/useRealGeolocation';
 import { WinStreetMarketView } from './WinStreetMarketView';
 import { getExternalGoogleMapsNavUrl } from '../services/googleRoutesService';
+import { WIN_SHOP_ITEMS } from '../data/winShopItems';
 
 interface ShopProfile {
   id: string;
@@ -53,7 +54,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
   audioEnabled, customerListedItems, onAddNewCustomerItem, onBackToMain, onRideToDestination, onOpenBusinessProfile,
 }) => {
   const geo = useRealGeolocation(true);
-  const [activeTab, setActiveTab] = useState<'merchants' | 'partners' | 'community'>('merchants');
+  const [activeTab, setActiveTab] = useState<'official' | 'merchants' | 'partners' | 'community'>('official');
   const [profiles, setProfiles] = useState<ShopProfile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<ShopProfile | null>(null);
   const [query, setQuery] = useState('');
@@ -86,6 +87,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
   }, []);
 
   const filteredProfiles = useMemo(() => {
+    if (activeTab === 'official' || activeTab === 'community') return [];
     const role = activeTab === 'merchants' ? 'merchant' : 'partner';
     const search = query.trim().toLowerCase();
     return profiles.filter((profile) => {
@@ -176,8 +178,9 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
             {onBackToMain && <button type="button" onClick={onBackToMain} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black text-white hover:bg-white/10">← กลับหน้าหลัก</button>}
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-2">
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {([
+              ['official', 'WIN Official', 'สินค้าที่แอปขายเอง', ShieldCheck],
               ['merchants', 'ร้านค้า', 'ดูสินค้าหน้าร้าน', Store],
               ['partners', 'พาร์ทเนอร์', 'ดูบริการ/สิทธิพิเศษ', Building2],
               ['community', 'WIN Street Market', 'ของที่ประชาชนขาย', ShoppingBag],
@@ -193,7 +196,39 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
         </div>
       </section>
 
-      {activeTab === 'community' ? (
+      {activeTab === 'official' ? (
+        <section className="space-y-3">
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-4">
+            <p className="text-xs font-black text-amber-300">WIN OFFICIAL SHOP</p>
+            <p className="mt-1 text-sm text-slate-300">สินค้าที่ WINRIDER.AI จำหน่ายเอง แยกจากร้านค้า พาร์ทเนอร์ และ WIN Street Market ชัดเจน</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {WIN_SHOP_ITEMS.map((item) => (
+              <article key={item.id} className="overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-b from-[#0B1830] to-[#071126] shadow-lg">
+                <div className="h-44 bg-slate-950">
+                  <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                </div>
+                <div className="space-y-2 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[9px] font-black text-amber-300">WIN OFFICIAL</span>
+                      <h3 className="mt-2 text-sm font-black text-white">{item.name}</h3>
+                    </div>
+                    <span className="shrink-0 text-sm font-black text-amber-300">฿{item.price.toLocaleString()}</span>
+                  </div>
+                  <p className="line-clamp-2 text-xs leading-relaxed text-slate-300">{item.description}</p>
+                  <div className="flex items-center justify-between border-t border-white/5 pt-3 text-[10px]">
+                    <span className="text-cyan-300">{item.categoryTh}</span>
+                    <span className={item.inStock ? 'font-black text-emerald-300' : 'font-black text-rose-300'}>
+                      {item.inStock ? `คงเหลือ ${item.stockCount}` : 'หมด'}
+                    </span>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : activeTab === 'community' ? (
         <WinStreetMarketView
           audioEnabled={audioEnabled}
           customerListedItems={customerListedItems}
