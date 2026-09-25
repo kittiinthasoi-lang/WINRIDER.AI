@@ -71,7 +71,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   // Set Role Dialog
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [targetAdminLevel, setTargetAdminLevel] = useState<'super' | 'reviewer' | 'support'>('reviewer');
-  const [manualAdminWinUid, setManualAdminWinUid] = useState('');
+  const [manualAdminUid, setManualAdminUid] = useState('');
   const [manualAdminLevel, setManualAdminLevel] = useState<AdminLevel>('support');
   const [adminPortalOpen, setAdminPortalOpenState] = useState(false);
   const [adminRequests, setAdminRequests] = useState<AdminAccessRequest[]>([]);
@@ -201,10 +201,10 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   };
 
   const handleConfirmSetAdminRole = async () => {
-    if (!selectedUser?.winUid) return;
+    if (!selectedUser?.uid) return;
     setActionLoading(true);
     try {
-      await setAdminRole(selectedUser.winUid, targetAdminLevel, `แต่งตั้งสิทธิ์ระดับ ${targetAdminLevel}`);
+      await setAdminRole(selectedUser.uid, targetAdminLevel, `แต่งตั้งสิทธิ์ระดับ ${targetAdminLevel} ด้วย Firebase UID`);
       alert(`แต่งตั้งสิทธิ์ ${targetAdminLevel} ให้แก่ ${selectedUser.displayName} เรียบร้อยแล้ว`);
       setShowRoleModal(false);
       fetchUsers();
@@ -217,13 +217,13 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   };
 
   const handleManualSetAdmin = async () => {
-    const winUid = manualAdminWinUid.trim().toLowerCase();
-    if (!winUid) return;
+    const uid = manualAdminUid.trim();
+    if (!uid) return;
     setActionLoading(true);
     try {
-      await setAdminRole(winUid, manualAdminLevel, `แต่งตั้ง Admin ด้วย WIN UID ระดับ ${manualAdminLevel}`);
-      alert(`ตั้ง WIN UID ${winUid} เป็น Admin ระดับ ${manualAdminLevel} เรียบร้อยแล้ว`);
-      setManualAdminWinUid('');
+      await setAdminRole(uid, manualAdminLevel, `แต่งตั้ง Admin ด้วย Firebase UID ระดับ ${manualAdminLevel}`);
+      alert(`ตั้ง Firebase UID ${uid} เป็น Admin ระดับ ${manualAdminLevel} เรียบร้อยแล้ว`);
+      setManualAdminUid('');
       await fetchUsers();
     } catch (err: any) {
       alert(`ตั้ง Admin ไม่สำเร็จ: ${err?.message || 'เกิดข้อผิดพลาด'}`);
@@ -247,10 +247,10 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   };
 
   const handleApproveAdminRequest = async (request: AdminAccessRequest, level: AdminLevel) => {
-    if (!request.winUid) return;
+    if (!request.uid) return;
     setActionLoading(true);
     try {
-      await setAdminRole(request.winUid, level, `อนุมัติคำขอ Admin ระดับ ${level}`);
+      await setAdminRole(request.uid, level, `อนุมัติคำขอ Admin ระดับ ${level} ด้วย Firebase UID`);
       await Promise.all([fetchUsers(), fetchAdminAccessControl()]);
       alert(`ตั้ง WIN UID ${request.winUid} เป็น Admin ระดับ ${level} เรียบร้อยแล้ว`);
     } catch (err: any) {
@@ -293,7 +293,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
             จัดการบัญชีผู้ใช้งานและบทบาท
           </h1>
           <p className="text-xs text-slate-300 mt-1">
-            บัญชีใหม่เข้าใช้งานได้ทันที ส่วน Super Admin สามารถกำหนดผู้ช่วย Admin ด้วย WIN UID และระดับสิทธิ์
+            บัญชีใหม่เข้าใช้งานได้ทันที แต่จะเข้าหน้า Admin ไม่ได้จนกว่า Super Admin จะเพิ่ม Firebase UID และกำหนดระดับสิทธิ์
           </p>
         </div>
 
@@ -340,16 +340,16 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
           <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-500/10 to-yellow-500/5 p-5">
             <div className="flex items-center gap-2 mb-1">
               <Crown className="w-5 h-5 text-amber-300" />
-              <h2 className="text-base font-black text-white">ตั้ง Admin ด้วย WIN UID</h2>
+              <h2 className="text-base font-black text-white">ตั้ง Admin ด้วย Firebase UID</h2>
             </div>
             <p className="text-xs text-slate-400 mb-4">
-              กรอก WIN UID ของบัญชีที่สมัครแล้ว เลือกระดับสิทธิ์ แล้วกดตั้ง Admin บัญชีนั้นจะใช้ได้ครบ 5 โหมด: ลูกค้า / พี่วิน / ร้านค้า / พาร์ทเนอร์ / Admin
+              กรอก Firebase UID ของบัญชีที่สมัครแล้วเท่านั้น เลือกระดับสิทธิ์ แล้วกดตั้ง Admin ผู้สมัครใหม่จะไม่มีสิทธิ์ Admin จนกว่าจะถูกเพิ่ม UID จากหน้านี้
             </p>
             <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
               <input
-                value={manualAdminWinUid}
-                onChange={(e) => setManualAdminWinUid(e.target.value.toLowerCase())}
-                placeholder="WIN UID เช่น kitti001"
+                value={manualAdminUid}
+                onChange={(e) => setManualAdminUid(e.target.value.trim())}
+                placeholder="Firebase UID ของบัญชีผู้ใช้"
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-xs font-mono text-white outline-none focus:border-amber-400"
               />
               <select
@@ -364,7 +364,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
               <button
                 type="button"
                 onClick={handleManualSetAdmin}
-                disabled={actionLoading || !manualAdminWinUid.trim()}
+                disabled={actionLoading || !manualAdminUid.trim()}
                 className="rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-slate-950 disabled:opacity-50"
               >
                 ตั้ง Admin
