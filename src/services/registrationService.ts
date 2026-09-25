@@ -241,7 +241,7 @@ async function persistRegistrationDirectly(
     role: input.role,
     status: 'active',
     isAdmin: true,
-    adminLevel: 'support',
+    adminLevel: 'super',
     level: 1,
     xp: 0,
     createdAt: now,
