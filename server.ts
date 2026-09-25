@@ -582,11 +582,22 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
   if (!user) return;
   try {
     const snapshot = await ordersDb.collection("users").limit(300).get();
-    const eligible = snapshot.docs
+    const activeUsers = snapshot.docs
       .map((doc) => ({ uid: doc.id, ...doc.data() } as any))
-      .filter((entry) => entry.status === "active" && (entry.role === "merchant" || entry.role === "partner"));
+      .filter((entry) => entry.status === "active");
+    const eligible = activeUsers.flatMap((entry) => {
+      const roles: Array<"merchant" | "partner"> = [];
+      if (entry.role === "merchant") roles.push("merchant");
+      if (entry.role === "partner") roles.push("partner");
+      if (entry.isAdmin === true && entry.adminLevel === "super") {
+        if (!roles.includes("merchant")) roles.push("merchant");
+        if (!roles.includes("partner")) roles.push("partner");
+      }
+      return roles.map((role) => ({ ...entry, publicShopRole: role }));
+    });
     const profiles = await Promise.all(eligible.map(async (entry) => {
-      const roleCollection = entry.role === "merchant" ? "merchants" : "partners";
+      const role = entry.publicShopRole as "merchant" | "partner";
+      const roleCollection = role === "merchant" ? "merchants" : "partners";
       const roleData = (await ordersDb.collection(roleCollection).doc(entry.uid).get()).data() || {};
       const custom = roleData.profileCustomization || entry.profileCustomization || {};
       const stringArray = (value: unknown) => Array.isArray(value) ? value.filter((item) => typeof item === "string").slice(0, 30) : [];
@@ -594,12 +605,13 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
         ? value.filter((item) => item && typeof item === "object").slice(0, 50)
         : [];
       return {
-        id: entry.uid,
-        role: entry.role,
+        id: `${entry.uid}:${role}`,
+        ownerUid: entry.uid,
+        role,
         name: String(custom.displayName || roleData.shopName || roleData.orgName || entry.displayName || "").trim(),
         description: String(custom.bioStatus || roleData.description || "").trim(),
         avatarUrl: String(custom.avatarUrl || entry.avatarUrl || ""),
-        avatarEmoji: String(custom.avatarEmoji || entry.avatarEmoji || (entry.role === "merchant" ? "🏪" : "🏢")),
+        avatarEmoji: String(custom.avatarEmoji || entry.avatarEmoji || (role === "merchant" ? "🏪" : "🏢")),
         address: String(roleData.address || [entry.district, entry.province].filter(Boolean).join(" ") || "").trim(),
         phone: String(entry.phone || roleData.phone || ""),
         category: String(roleData.shopType || roleData.orgType || roleData.category || ""),
@@ -623,7 +635,13 @@ app.get("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"
   if (!user) return;
   try {
     const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
-    const role = userData.role === "partner" ? "partner" : userData.role === "merchant" ? "merchant" : null;
+    const requestedRole = String(req.query?.role || "").trim();
+    const isMultiRoleAdmin = userData.isAdmin === true && userData.adminLevel === "super";
+    const role = isMultiRoleAdmin && (requestedRole === "merchant" || requestedRole === "partner")
+      ? requestedRole
+      : userData.role === "partner" ? "partner"
+      : userData.role === "merchant" ? "merchant"
+      : null;
     if (!role) return res.status(403).json({ error: "บัญชีนี้ไม่มีสิทธิ์จัดการโปรไฟล์ร้านค้า/พาร์ทเนอร์" });
     const collectionName = role === "merchant" ? "merchants" : "partners";
     const roleSnapshot = await ordersDb.collection(collectionName).doc(user.uid).get();
@@ -646,7 +664,13 @@ app.put("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"
   if (!user) return;
   try {
     const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
-    const role = userData.role === "partner" ? "partner" : userData.role === "merchant" ? "merchant" : null;
+    const requestedRole = String(req.body?.role || "").trim();
+    const isMultiRoleAdmin = userData.isAdmin === true && userData.adminLevel === "super";
+    const role = isMultiRoleAdmin && (requestedRole === "merchant" || requestedRole === "partner")
+      ? requestedRole
+      : userData.role === "partner" ? "partner"
+      : userData.role === "merchant" ? "merchant"
+      : null;
     if (!role) return res.status(403).json({ error: "บัญชีนี้ไม่มีสิทธิ์จัดการโปรไฟล์ร้านค้า/พาร์ทเนอร์" });
     const collectionName = role === "merchant" ? "merchants" : "partners";
     const cleanArray = (value: unknown, max: number) => Array.isArray(value) ? value.filter((item) => item && typeof item === "object").slice(0, max) : [];
@@ -669,8 +693,10 @@ app.post("/api/shop/profile-content/product-submissions", rateLimit(20), async (
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
   const userData = (await ordersDb.collection("users").doc(user.uid).get()).data() || {};
-  if (String(userData.role || (user as any).role || "") !== "merchant") {
-    return res.status(403).json({ error: "เฉพาะบัญชีร้านค้าที่อนุมัติแล้วเท่านั้น" });
+  const canManageMerchant = String(userData.role || (user as any).role || "") === "merchant"
+    || (userData.isAdmin === true && userData.adminLevel === "super");
+  if (!canManageMerchant) {
+    return res.status(403).json({ error: "เฉพาะบัญชีร้านค้าหรือ Super Admin เท่านั้น" });
   }
 
   const input = req.body || {};
@@ -2016,7 +2042,7 @@ async function createFirebaseRegistration(
       uid,
       winUid,
       email: profile.email,
-      authEmail: `${winUid}${WIN_UID_EMAIL_SUFFIX}`,
+      authEmail: profile.email,
       role,
       displayName: profile.fullName,
       phone: profile.phone,
@@ -2024,9 +2050,7 @@ async function createFirebaseRegistration(
       district: profile.district,
       registration: profile,
       status: "active",
-      isAdmin: true,
-      adminLevel: "super",
-      defaultFiveRoleAccess: true,
+      isAdmin: false,
       level: 1,
       xp: 0,
       pdpaConsent: { version: "1.0", acceptedAt: now },
@@ -2423,34 +2447,13 @@ app.post("/api/auth/register-profile", rateLimit(30), async (req, res) => {
 
     const result = await createFirebaseRegistration(decoded.uid, winUid, role, profile);
 
-    try {
-      const authRecord = await adminAuth.getUser(decoded.uid);
-      await adminAuth.setCustomUserClaims(decoded.uid, {
-        ...(authRecord.customClaims || {}),
-        admin: true,
-        adminLevel: "super",
-      });
-    } catch {}
-
-    const now = new Date().toISOString();
-    await ordersDb.collection("adminAccess").doc(decoded.uid).set({
-      uid: decoded.uid,
-      winUid,
-      adminLevel: "super",
-      active: true,
-      defaultAccess: true,
-      assignedBy: "registration-default-super-admin",
-      createdAt: now,
-      updatedAt: now,
-    }, { merge: true });
-
     const userSnap = await ordersDb.collection("users").doc(decoded.uid).get();
     return res.status(201).json({
       user: userSnap.data(),
       approvalRequired: false,
-      fiveRoleAccess: true,
-      adminLevel: "super",
-      forceTokenRefresh: true,
+      fiveRoleAccess: false,
+      adminLevel: null,
+      forceTokenRefresh: false,
       ...result
     });
   } catch (error: any) {
@@ -2542,14 +2545,59 @@ async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | 
   }
 
   const now = new Date().toISOString();
+  const ownerDisplayName = String(profile.displayName || profile.fullName || authRecord.displayName || "WINRIDER Admin");
+  const ownerPhone = String(profile.phone || "");
+  const ownerProvince = String(profile.province || "");
+  const ownerDistrict = String(profile.district || "");
   await Promise.all([
     userRef.set({
       isAdmin: true,
       adminLevel: "super",
+      defaultFiveRoleAccess: true,
       status: "active",
       adminAssignedAt: profile.adminAssignedAt || now,
       adminAssignedBy: uid,
       updatedAt: now,
+    }, { merge: true }),
+    ordersDb.collection("merchants").doc(uid).set({
+      uid,
+      displayName: ownerDisplayName,
+      ownerName: ownerDisplayName,
+      shopName: String(profile.registration?.shopName || profile.merchantShopName || ownerDisplayName),
+      shopType: String(profile.registration?.shopType || "ร้านค้า WINRIDER"),
+      address: String(profile.registration?.shopAddress || [ownerDistrict, ownerProvince].filter(Boolean).join(" ")),
+      phone: ownerPhone,
+      province: ownerProvince,
+      district: ownerDistrict,
+      level: 1,
+      xp: 0,
+      products: [],
+      services: [],
+      promotions: [],
+      highlights: [],
+      status: "active",
+      updatedAt: now,
+      createdAt: profile.createdAt || now,
+    }, { merge: true }),
+    ordersDb.collection("partners").doc(uid).set({
+      uid,
+      displayName: ownerDisplayName,
+      contactPerson: ownerDisplayName,
+      orgName: String(profile.registration?.orgName || profile.partnerOrgName || ownerDisplayName),
+      orgType: String(profile.registration?.orgType || "พาร์ทเนอร์ WINRIDER"),
+      address: String(profile.registration?.orgAddress || [ownerDistrict, ownerProvince].filter(Boolean).join(" ")),
+      phone: ownerPhone,
+      province: ownerProvince,
+      district: ownerDistrict,
+      level: 1,
+      xp: 0,
+      products: [],
+      services: [],
+      promotions: [],
+      highlights: [],
+      status: "active",
+      updatedAt: now,
+      createdAt: profile.createdAt || now,
     }, { merge: true }),
     ordersDb.collection("adminAccess").doc(uid).set({
       uid,
@@ -2606,11 +2654,6 @@ app.get("/api/auth/me", rateLimit(60), async (req, res) => {
     const ownerResult = await ensureOwnerSuperAdminForUid(decoded.uid, decoded.email || null);
     if (ownerResult.promoted && ownerResult.user) {
       return res.json({ user: ownerResult.user, ownerPromoted: true, forceTokenRefresh: true });
-    }
-
-    const defaultAdmin = await ensureDefaultSuperAdminForUid(decoded.uid);
-    if (defaultAdmin.promoted && defaultAdmin.user) {
-      return res.json({ user: defaultAdmin.user, defaultAdminPromoted: true, forceTokenRefresh: true });
     }
 
     const snap = await ordersDb.collection("users").doc(decoded.uid).get();
@@ -3224,23 +3267,23 @@ app.post("/api/admin/set-role", rateLimit(20), async (req, res) => {
   const admin = await requireSuperAdmin(req, res);
   if (!admin) return;
 
-  const targetWinUid = normalizeWinUidServer(req.body?.targetWinUid);
+  const targetUid = String(req.body?.targetUid || "").trim();
   const level = String(req.body?.level || "").trim();
   const validLevels = new Set(["super", "reviewer", "support"]);
 
-  if (!targetWinUid) return res.status(400).json({ error: "ต้องระบุ WIN UID ผู้ใช้", code: "TARGET_WIN_UID_REQUIRED" });
+  if (!targetUid) return res.status(400).json({ error: "ต้องระบุ Firebase UID ผู้ใช้", code: "TARGET_UID_REQUIRED" });
   if (!validLevels.has(level)) {
     return res.status(400).json({ error: "ระดับ Admin ไม่ถูกต้อง", code: "INVALID_ADMIN_LEVEL" });
   }
 
   try {
-    const match = await ordersDb.collection("users").where("winUid", "==", targetWinUid).limit(1).get();
-    if (match.empty) {
-      return res.status(404).json({ error: "ไม่พบ WIN UID นี้ใน WINRIDER", code: "WIN_UID_NOT_FOUND" });
+    const userDoc = await ordersDb.collection("users").doc(targetUid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "ไม่พบ Firebase UID นี้ใน WINRIDER", code: "UID_NOT_FOUND" });
     }
 
-    const userDoc = match.docs[0];
     const firebaseUid = userDoc.id;
+    const targetWinUid = String(userDoc.data()?.winUid || "");
     const record = await adminAuth.getUser(firebaseUid);
 
     await adminAuth.setCustomUserClaims(firebaseUid, {
