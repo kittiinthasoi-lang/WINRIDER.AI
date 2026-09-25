@@ -896,17 +896,60 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
                     </button>
                   </div>
 
-                  {/* MOBILE KNIGHT PROFILE ARTWORK — visual layer only; existing controls remain unchanged */}
+                  {/* MOBILE KNIGHT PROFILE QUICK ACTIONS */}
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      ['/ui/profile-actions/knight-honor.svg', 'เกียรติยศพี่วิน'],
-                      ['/ui/profile-actions/knight-receive.svg', 'รับเงิน WIN Wallet'],
-                      ['/ui/profile-actions/knight-vehicle.svg', 'ยานพาหนะรับงาน'],
-                      ['/ui/profile-actions/knight-armor.svg', 'ชุดเกราะพี่อัศวิน'],
-                    ].map(([image, alt]) => (
-                      <div key={image} className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_0_18px_rgba(255,215,0,0.08)]">
-                        <img src={image} alt={alt} className="block h-20 w-full object-fill" />
-                      </div>
+                      {
+                        image: '/ui/profile-actions/knight-honor.svg',
+                        alt: 'เกียรติยศพี่วิน',
+                        action: () => {
+                          if (audioEnabled) playTactileBlip(950);
+                          setTiersModalInitialRole('knight');
+                          setShowTiersModal(true);
+                        },
+                      },
+                      {
+                        image: '/ui/profile-actions/knight-receive.svg',
+                        alt: 'รับเงิน WIN Wallet',
+                        action: () => {
+                          if (audioEnabled) playTactileBlip(950);
+                          setShowDriverQrModal(true);
+                        },
+                      },
+                      {
+                        image: '/ui/profile-actions/knight-vehicle.svg',
+                        alt: 'ยานพาหนะรับงาน',
+                        action: () => {
+                          if (audioEnabled) playTactileBlip(800);
+                          setActiveDriverTab('garage');
+                        },
+                      },
+                      {
+                        image: '/ui/profile-actions/knight-armor.svg',
+                        alt: 'ชุดเกราะพี่อัศวิน',
+                        action: () => {
+                          if (audioEnabled) playTactileBlip(800);
+                          setActiveDriverTab('cabinet');
+                        },
+                      },
+                    ].map(({ image, alt, action }) => (
+                      <button
+                        type="button"
+                        key={image}
+                        onClick={action}
+                        aria-label={alt}
+                        className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_0_18px_rgba(255,215,0,0.08)] transition hover:border-cyan-400/50 hover:brightness-110 active:scale-[0.98]"
+                      >
+                        <img
+                          src={image}
+                          alt={alt}
+                          className="block h-20 w-full object-fill"
+                          onError={(event) => {
+                            event.currentTarget.style.display = 'none';
+                          }}
+                        />
+                        <span className="sr-only">{alt}</span>
+                      </button>
                     ))}
                   </div>
 
