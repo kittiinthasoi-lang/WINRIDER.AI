@@ -95,8 +95,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (isAdminSession) {
       return {
         name: currentUserSession?.name || userData?.displayName || 'Super Admin',
-        title: `ผู้ดูแลระบบ (${userData?.adminLevel || 'support'}): ${userData?.winUid || currentUserSession?.winUid || 'Admin'}`,
-        roleLabel: userData?.adminLevel === 'super' ? 'Super Admin' : userData?.adminLevel === 'reviewer' ? 'Reviewer Admin' : 'Support Admin',
+        title: `ผู้ดูแลระบบ (Super Admin): ${userData?.winUid || currentUserSession?.winUid || 'Admin'}`,
+        roleLabel: 'Super Admin',
         avatar: '/avatars/partner.jpg',
         badgeBorder: 'border-amber-400 shadow-[0_0_12px_rgba(255,201,60,0.6)]',
         buttonClass: 'bg-gradient-to-r from-amber-500/25 to-yellow-500/25 hover:from-amber-500/35 hover:to-yellow-500/35 text-amber-300 border-amber-400/70 shadow-[0_0_15px_rgba(255,201,60,0.35)]',
