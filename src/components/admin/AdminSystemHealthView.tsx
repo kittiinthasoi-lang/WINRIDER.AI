@@ -17,10 +17,19 @@ const statusUi = {
 } as const;
 
 async function readJsonSafely(response: Response): Promise<any> {
+  const contentType = response.headers.get('content-type') || '';
   const text = await response.text();
-  if (!text.trim()) return {};
-  try { return JSON.parse(text); } catch {
-    throw new Error(response.ok ? 'เซิร์ฟเวอร์ส่งข้อมูลที่ไม่ใช่ JSON' : `เซิร์ฟเวอร์ไม่พร้อม (${response.status})`);
+  if (!text.trim()) {
+    throw new Error(`System Health API ไม่ส่งข้อมูลกลับมา (HTTP ${response.status})`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    const looksLikeHtml = /<!doctype html|<html[\s>]/i.test(text);
+    if (looksLikeHtml) {
+      throw new Error('System Health API ถูกส่งไปหน้าเว็บแทน API — ต้อง deploy backend เวอร์ชันล่าสุดที่มี /api/admin/system-health');
+    }
+    throw new Error(`System Health API ตอบกลับไม่ใช่ JSON (HTTP ${response.status}, ${contentType || 'unknown content-type'})`);
   }
 }
 function safeHttpUrl(value?: string): string | null {
@@ -36,15 +45,17 @@ export const AdminSystemHealthView: React.FC = () => {
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const headers = await getAdminAuthHeaders();
-      const response = await fetch('/api/admin/system-health', { headers, cache: 'no-store' });
+      const headers = await getAdminAuthHeaders({ Accept: 'application/json' });
+      const response = await fetch(`/api/admin/system-health?_=${Date.now()}`, { headers, cache: 'no-store' });
       const payload = await readJsonSafely(response);
       if (!response.ok) throw new Error(String(payload?.error || 'ตรวจระบบไม่สำเร็จ'));
       if (!payload?.summary || !Array.isArray(payload?.checks)) throw new Error('ข้อมูล System Health ไม่ครบถ้วน');
       setData(payload as HealthPayload);
     } catch (e: any) {
       const message = String(e?.message || 'ตรวจระบบไม่สำเร็จ');
-      setError(message === 'The string did not match the expected pattern.' ? 'เซิร์ฟเวอร์ส่งข้อมูลไม่ถูกต้องหรือไม่ได้ส่ง JSON — ระบบถูกปรับให้ตรวจรูปแบบข้อมูลก่อนแสดงผลแล้ว กรุณากดตรวจใหม่' : message);
+      setError(message === 'The string did not match the expected pattern.'
+        ? 'System Health API ตอบกลับไม่ถูกต้อง กรุณา deploy backend เวอร์ชันล่าสุดแล้วกดตรวจใหม่'
+        : message);
     } finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, []);
