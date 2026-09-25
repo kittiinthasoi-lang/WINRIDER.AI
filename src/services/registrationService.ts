@@ -153,7 +153,7 @@ async function submitRegistration(
     if (existing?.role) {
       return {
         user: existing,
-        approvalRequired: existing.status === 'pending_review',
+        approvalRequired: false,
         recovered: true,
       };
     }
@@ -241,7 +241,7 @@ async function persistRegistrationDirectly(
     province: input.province,
     district: input.district,
     role: input.role,
-    status: 'pending_review',
+    status: 'active',
     isAdmin: false,
     level: 1,
     xp: 0,
@@ -282,11 +282,11 @@ async function persistRegistrationDirectly(
       phone: input.phone,
       province: input.province,
       district: input.district,
-      isOnline: false,
+      isOnline: true,
       vehicleType: input.vehicleType || 'motorcycle',
       plateNumber: input.plateNumber || '',
       licenseNumber: input.licenseNumber || '',
-      kycStatus: 'pending',
+      kycStatus: 'approved',
       documents: {
         driverLicenseUrl,
         vehiclePhotoUrl,
@@ -326,7 +326,7 @@ async function persistRegistrationDirectly(
       shopType: input.shopType || '',
       address: input.shopAddress || '',
       taxId: input.taxId || '',
-      status: 'pending_review',
+      status: 'active',
       createdAt: now,
       updatedAt: now,
     }, { merge: true });
@@ -342,7 +342,7 @@ async function persistRegistrationDirectly(
       orgType: input.orgType || '',
       contactPerson: input.contactPerson || '',
       estimatedUsers: input.estimatedUsers || 100,
-      status: 'pending_review',
+      status: 'active',
       createdAt: now,
       updatedAt: now,
     }, { merge: true });
@@ -357,7 +357,7 @@ async function persistRegistrationDirectly(
 
   return {
     user: saved.data() as UserDoc,
-    approvalRequired: true,
+    approvalRequired: false,
   };
 }
 
@@ -527,6 +527,6 @@ export async function registerFullAccountWithFirestore(
     );
   }
 
-  onProgress?.('ลงทะเบียนสำเร็จ! รอ Super Admin อนุมัติก่อนเข้าใช้งาน');
+  onProgress?.('ลงทะเบียนสำเร็จ! เข้าใช้งานได้ทันที');
   return result;
 }
