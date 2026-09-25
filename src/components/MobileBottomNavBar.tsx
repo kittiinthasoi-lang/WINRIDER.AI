@@ -130,7 +130,7 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
   // 1. หน้าหลัก -> นำสู่หน้าหลักของแอปเพื่อเข้าถึงบริการ 8 เสาหลัก (WINRIDER Core Services)
   // 2. ห้องรับงาน -> นำสู่หน้าจอเรดาร์รับงาน/งานสแตนด์บาย (Jobs & Radar)
   // 3. แผนที่นำทาง -> GPS Turn-by-Turn / กล้องสด AR / Google Maps
-  // 4. WIN SHOP -> สินค้าและอุปกรณ์ทางการที่แอปขายเอง (WIN Official Shop) แบบเดียวกับ Navbar ของลูกค้า
+  // 4. WIN SHOP -> เปิด WIN SHOP hub โดยตรง แล้วเห็น WIN SHOP OFFICIAL และ WIN Street Market ทันที
   // 5. โหมด/หน้าจอ -> รวมทุกโหมดและบริการ
   // 
   // สำหรับบทบาทลูกค้า ร้านค้า พาร์ทเนอร์:
@@ -176,8 +176,7 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
       badge: 'DEALS',
       onClick: () => {
         setIsModesDrawerOpen(false);
-        onSelectMode('passenger');
-        onSelectPassengerTab('shop');
+        onSelectMode('market');
       }
     },
     { 
@@ -245,8 +244,7 @@ export const MobileBottomNavBar: React.FC<MobileBottomNavBarProps> = ({
       badge: 'DEALS',
       onClick: () => {
         setIsModesDrawerOpen(false);
-        onSelectMode('passenger');
-        onSelectPassengerTab('shop');
+        onSelectMode('market');
       }
     },
     { 
