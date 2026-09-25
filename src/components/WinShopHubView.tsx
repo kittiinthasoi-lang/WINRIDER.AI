@@ -113,7 +113,7 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
   }, [profiles, activeTab, query]);
 
   useEffect(() => {
-    const addressProfiles = filteredProfiles.filter((profile) => profile.address).slice(0, 20);
+    const addressProfiles = filteredProfiles.filter((profile) => profile.address);
     if (!geo.isRealGps || geo.latitude === null || geo.longitude === null || addressProfiles.length === 0) {
       setRoutes({});
       return;
@@ -123,22 +123,27 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
       try {
         const user = auth.currentUser;
         if (!user) return;
-        const response = await fetch('/api/places/resolve-routes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-          body: JSON.stringify({
-            latitude: geo.latitude,
-            longitude: geo.longitude,
-            places: addressProfiles.map((profile) => ({
-              key: profile.id,
-              query: `${profile.name} ${profile.address} ประเทศไทย`,
-            })),
-          }),
-        });
-        const payload = await response.json() as { routes?: Array<{ key: string; distanceKm: number; etaMinutes: number | null }> };
-        if (!cancelled && response.ok) {
-          setRoutes(Object.fromEntries((payload.routes || []).map((route) => [route.key, route])));
+        const token = await user.getIdToken();
+        const resolved: Record<string, { distanceKm: number; etaMinutes: number | null }> = {};
+        for (let offset = 0; offset < addressProfiles.length; offset += 20) {
+          const batch = addressProfiles.slice(offset, offset + 20);
+          const response = await fetch('/api/places/resolve-routes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              latitude: geo.latitude,
+              longitude: geo.longitude,
+              places: batch.map((profile) => ({
+                key: profile.id,
+                query: `${profile.name} ${profile.address} ประเทศไทย`,
+              })),
+            }),
+          });
+          const payload = await response.json() as { routes?: Array<{ key: string; distanceKm: number; etaMinutes: number | null }> };
+          if (!response.ok) continue;
+          for (const route of payload.routes || []) resolved[route.key] = route;
         }
+        if (!cancelled) setRoutes(resolved);
       } catch {
         if (!cancelled) setRoutes({});
       }
@@ -185,9 +190,9 @@ export const WinShopHubView: React.FC<WinShopHubViewProps> = ({
                 <ShoppingBag className="h-4 w-4" /> WIN SHOP
                 <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-amber-300">LOCAL COMMERCE</span>
               </div>
-              <h2 className="text-2xl font-black tracking-tight text-white">ร้านค้า • พาร์ทเนอร์ • WIN Street Market</h2>
+              <h2 className="text-2xl font-black tracking-tight text-white">WIN SHOP</h2>
               <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-300">
-                ศูนย์รวมโปรไฟล์ธุรกิจในระบบ WIN และสินค้าที่ประชาชนลงขายเอง — เรียงตามระยะเส้นตรงโดยประมาณจากตำแหน่งคุณก่อน
+                เลือก WIN SHOP OFFICIAL สำหรับสินค้าทางการของแอป หรือ WIN Street Market สำหรับร้านค้า พาร์ทเนอร์ และตลาดชุมชน
               </p>
             </div>
             {onBackToMain && <button type="button" onClick={onBackToMain} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black text-white hover:bg-white/10">← กลับหน้าหลัก</button>}
