@@ -632,6 +632,27 @@ app.get("/api/shop/directory", rateLimit(RATE_LIMITS["/api/shop/directory"]), as
   }
 });
 
+app.get("/api/shop/official-wallet", rateLimit(30), async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  try {
+    const ownerSnapshot = await ordersDb.collection("users").where("email", "==", OWNER_ADMIN_EMAIL).limit(1).get();
+    if (ownerSnapshot.empty) {
+      return res.status(503).json({ error: "ยังไม่พบบัญชีเจ้าของ WIN SHOP", code: "OFFICIAL_SHOP_OWNER_NOT_FOUND" });
+    }
+    const ownerDoc = ownerSnapshot.docs[0];
+    const identity = await ensureWalletIdentityId(ownerDoc.id, "merchant");
+    return res.json({
+      walletId: identity.walletId,
+      ownerUid: ownerDoc.id,
+      displayName: "WINRIDER.AI OFFICIAL",
+    });
+  } catch (error: any) {
+    console.error("[Official Shop Wallet]", error?.message);
+    return res.status(503).json({ error: "โหลดกระเป๋ารับเงิน WIN SHOP ไม่สำเร็จ", code: "OFFICIAL_SHOP_WALLET_FAILED" });
+  }
+});
+
 app.get("/api/shop/profile-content", rateLimit(RATE_LIMITS["/api/shop/directory"]), async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
