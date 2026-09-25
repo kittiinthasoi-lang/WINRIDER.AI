@@ -3,7 +3,7 @@ import { WIN_IMAGES } from '../data/imageRegistry';
 import { auth, db } from '../firebase';
 import { emitQuestMetric } from '../services/questService';
 import { createSosIncident } from '../services/sosIncidentService';
-import { WIN_SHOP_ITEMS, WinShopItem } from '../data/winShopItems';
+import { WinShopItem } from '../data/winShopItems';
 import { DREAM_RIDES_FLEET } from '../data/dreamRidesData';
 import { AMENITIES_CATALOG, calculateAmenitiesSummary, isHelmetAmenity } from '../data/amenitiesData';
 import { DreamRideFleetView } from './DreamRideFleetView';
@@ -2278,10 +2278,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
               </div>
             )}
 
-            {/* 4. WIN SHOP TAB */}
+            {/* 4. WIN SHOP TAB — central catalog only, no duplicate products here */}
             {activeTab === 'shop' && (
               <div className="space-y-4">
-                {/* Top Back to Home Action Bar */}
                 <div className="flex items-center justify-between p-2.5 rounded-2xl bg-black/40 border border-white/10">
                   <button
                     type="button"
@@ -2289,168 +2288,34 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       if (audioEnabled) playTactileBlip(900);
                       setActiveTab('home');
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold font-mono flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm"
+                    className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold font-mono transition-all active:scale-95"
                   >
-                    <span>← กลับหน้าหลัก (Home)</span>
+                    ← กลับหน้าหลัก
                   </button>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    🛡️ WIN OFFICIAL SHOP
-                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">WIN SHOP</span>
                 </div>
 
-                {/* WIN SHOP is reserved for official equipment. Community commerce has its own market. */}
-                <div className="flex items-center gap-2 rounded-2xl bg-black/40 p-1 border border-white/10">
-                  <button
-                    onClick={() => {
-                      if (audioEnabled) playTactileBlip(800);
-                      setShopSubTab('official');
-                    }}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold font-mono transition-all ${
-                      shopSubTab === 'official'
-                        ? 'bg-[#00D2FF] text-slate-950 shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    🛡️ อุปกรณ์ทางการ (WIN OFFICIAL)
-                  </button>
-                  <button onClick={onNavigateToMarket} className="flex-1 rounded-xl border border-amber-400/40 py-2 text-xs font-bold text-amber-300 hover:bg-amber-400/10">
-                    🛍️ เปิด WIN Street Market
-                  </button>
-                </div>
-
-                {/* Official Gear Catalog */}
-                {shopSubTab === 'official' && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {WIN_SHOP_ITEMS.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            if (audioEnabled) playTactileBlip(900);
-                            setSelectedShopItem(item);
-                          }}
-                          className="p-3.5 rounded-2xl bg-[#09152C] border border-white/10 hover:border-[#00D2FF]/60 transition-all cursor-pointer space-y-2 flex flex-col justify-between group"
-                        >
-                          <div>
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="w-14 h-14 rounded-xl bg-black/60 border border-white/15 overflow-hidden flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                                {item.imageUrl ? (
-                                  <img
-                                    src={item.imageUrl}
-                                    alt={item.name}
-                                    className="w-full h-full object-cover"
-                                    referrerPolicy="no-referrer"
-                                    onError={(e) => {
-                                      e.currentTarget.onerror = null;
-                                      e.currentTarget.src = WIN_IMAGES.shop.commIntercom;
-                                    }}
-                                  />
-                                ) : (
-                                  <span className="text-2xl">{item.iconEmoji}</span>
-                                )}
-                              </div>
-                              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-right">
-                                {item.category}
-                              </span>
-                            </div>
-                            <h4 className="text-xs font-bold text-white mt-2 leading-tight">{item.name}</h4>
-                            <p className="text-[10px] text-slate-400 line-clamp-2 mt-1">{item.description}</p>
-                          </div>
-
-                          <div className="pt-2 border-t border-white/5 flex items-center justify-between font-mono">
-                            <div>
-                              <span className="text-[9px] text-slate-400 block">ราคาทางการ</span>
-                              <span className="text-xs font-bold text-amber-400">฿{item.price.toLocaleString()}</span>
-                            </div>
-                            <span className="text-[10px] text-[#00D2FF] font-bold">ดูรายละเอียด →</span>
-                          </div>
-                        </div>
-                      ))}
+                <section className="rounded-3xl border border-cyan-400/25 bg-gradient-to-br from-[#10213D] via-[#09162D] to-[#070D1E] p-5 sm:p-6">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-2xl">🛍️</div>
+                    <div>
+                      <h3 className="text-lg font-black text-white">WIN SHOP & WIN Street Market</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-slate-300">
+                        สินค้าทางการ WINRIDER แสดงที่ WIN SHOP เพียงจุดเดียว ส่วนสินค้าพลเมืองอยู่ใน WIN Street Market ภายในศูนย์เดียวกัน
+                      </p>
                     </div>
                   </div>
-                )}
-
-                {/* C2C / P2P Marketplace */}
-                {shopSubTab === 'c2c' && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <Flame className="w-3.5 h-3.5 text-amber-400" />
-                          <span>ตลาดสินค้าชุมชน C2C</span>
-                        </h4>
-                        <span className="text-[10px] text-slate-400 font-mono">ซื้อขายตรงกับเพื่อนบ้านในพื้นที่</span>
-                      </div>
-
-                      <button
-                        onClick={() => setShowAddC2cModal(true)}
-                        className="px-3 py-1.5 rounded-xl bg-[#FFD700] hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>ลงขายของ +</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {c2cItems.map((item) => (
-                        <div key={item.id} className="p-3.5 rounded-2xl bg-[#09152C] border border-white/10 space-y-2 flex flex-col justify-between">
-                          <div>
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="w-12 h-12 rounded-xl bg-black/60 border border-white/15 overflow-hidden flex items-center justify-center flex-shrink-0">
-                                {item.imageUrl ? (
-                                  <img
-                                    src={item.imageUrl}
-                                    alt={item.name}
-                                    className="w-full h-full object-cover"
-                                    referrerPolicy="no-referrer"
-                                    onError={(e) => {
-                                      e.currentTarget.onerror = null;
-                                      e.currentTarget.src = WIN_IMAGES.cyber.coins;
-                                    }}
-                                  />
-                                ) : (
-                                  <CyberGraphic emoji={item.icon} size="md" />
-                                )}
-                              </div>
-                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-amber-300">
-                                {item.tag}
-                              </span>
-                            </div>
-                            <h4 className="text-xs font-bold text-white mt-1 leading-tight">{item.name}</h4>
-                          </div>
-
-                          <div className="pt-2 border-t border-white/5 flex items-center justify-between font-mono">
-                            <span className="text-xs font-bold text-amber-400">฿{item.price.toLocaleString()}</span>
-                            <button
-                              onClick={() => {
-                                if (audioEnabled) playTactileBlip(1000);
-                                alert(`🛍️ สั่งซื้อ '${item.name}' สำเร็จ! อัศวินจะไปรับสินค้าจากผู้ขายมาส่งถึงมือท่าน`);
-                                confetti({ particleCount: 30, spread: 50 });
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-[#00D2FF] text-slate-950 text-[10px] font-bold"
-                            >
-                              สั่งซื้อด่วน
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Bottom Back to Home Button */}
-                <div className="pt-2">
                   <button
                     type="button"
                     onClick={() => {
                       if (audioEnabled) playTactileBlip(900);
-                      setActiveTab('home');
+                      onNavigateToMarket?.();
                     }}
-                    className="w-full py-3 rounded-2xl bg-black/60 hover:bg-slate-900 border border-cyan-500/40 text-cyan-300 font-bold text-xs font-mono flex items-center justify-center gap-2 transition-all active:scale-98 shadow-sm"
+                    className="mt-5 w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-3 text-sm font-black text-slate-950 shadow-[0_0_20px_rgba(0,210,255,0.25)]"
                   >
-                    <span>← กลับสู่หน้าหลัก (Home)</span>
+                    เปิด WIN SHOP
                   </button>
-                </div>
+                </section>
               </div>
             )}
 
