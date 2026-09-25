@@ -2649,56 +2649,102 @@ async function ensureOwnerSuperAdminForUid(uid: string, decodedEmail?: string | 
   const ownerPhone = String(profile.phone || "");
   const ownerProvince = String(profile.province || "");
   const ownerDistrict = String(profile.district || "");
+  const ownerWinUid = String(profile.winUid || "");
+  const ownerLevel = 100;
+  const ownerXp = Math.max(Number(profile.xp || 0), 0);
+
   await Promise.all([
     userRef.set({
       isAdmin: true,
       adminLevel: "super",
       defaultFiveRoleAccess: true,
+      enabledRoles: ["citizen", "knight", "merchant", "partner"],
+      level: ownerLevel,
+      xp: ownerXp,
       status: "active",
       adminAssignedAt: profile.adminAssignedAt || now,
       adminAssignedBy: uid,
       updatedAt: now,
     }, { merge: true }),
+
+    ordersDb.collection("citizens").doc(uid).set({
+      uid,
+      displayName: ownerDisplayName,
+      winUid: ownerWinUid,
+      phone: ownerPhone,
+      province: ownerProvince,
+      district: ownerDistrict,
+      level: ownerLevel,
+      xp: ownerXp,
+      status: "active",
+      updatedAt: now,
+      createdAt: profile.createdAt || now,
+    }, { merge: true }),
+
+    ordersDb.collection("knights").doc(uid).set({
+      uid,
+      displayName: ownerDisplayName,
+      winUid: ownerWinUid,
+      phone: ownerPhone,
+      province: ownerProvince,
+      district: ownerDistrict,
+      level: ownerLevel,
+      xp: ownerXp,
+      status: "active",
+      kycStatus: "approved",
+      isOnline: false,
+      updatedAt: now,
+      createdAt: profile.createdAt || now,
+    }, { merge: true }),
+
     ordersDb.collection("merchants").doc(uid).set({
       uid,
       displayName: ownerDisplayName,
       ownerName: ownerDisplayName,
+      winUid: ownerWinUid,
       phone: ownerPhone,
       province: ownerProvince,
       district: ownerDistrict,
+      level: ownerLevel,
+      xp: ownerXp,
       status: "active",
       updatedAt: now,
       createdAt: profile.createdAt || now,
     }, { merge: true }),
+
     ordersDb.collection("partners").doc(uid).set({
       uid,
       displayName: ownerDisplayName,
       contactPerson: ownerDisplayName,
+      winUid: ownerWinUid,
       phone: ownerPhone,
       province: ownerProvince,
       district: ownerDistrict,
-      products: [],
-      services: [],
-      promotions: [],
-      highlights: [],
+      level: ownerLevel,
+      xp: ownerXp,
       status: "active",
       updatedAt: now,
       createdAt: profile.createdAt || now,
     }, { merge: true }),
+
     ordersDb.collection("adminAccess").doc(uid).set({
       uid,
-      winUid: String(profile.winUid || ""),
+      winUid: ownerWinUid,
       adminLevel: "super",
       active: true,
       owner: true,
+      fiveRoleAccess: true,
+      enabledRoles: ["citizen", "knight", "merchant", "partner"],
+      roleLevel: ownerLevel,
       assignedBy: uid,
       updatedAt: now,
       createdAt: profile.adminAssignedAt || now,
     }, { merge: true }),
+
     ordersDb.collection("system_config").doc("admin_bootstrap").set({
       status: "active",
       firstAdminUid: uid,
-      firstAdminWinUid: String(profile.winUid || ""),
+      firstAdminWinUid: ownerWinUid,
       completedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true }),
