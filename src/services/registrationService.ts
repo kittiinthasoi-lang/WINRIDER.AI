@@ -282,11 +282,11 @@ async function persistRegistrationDirectly(
       phone: input.phone,
       province: input.province,
       district: input.district,
-      isOnline: true,
+      isOnline: false,
       vehicleType: input.vehicleType || 'motorcycle',
       plateNumber: input.plateNumber || '',
       licenseNumber: input.licenseNumber || '',
-      kycStatus: 'approved',
+      kycStatus: 'pending',
       documents: {
         driverLicenseUrl,
         vehiclePhotoUrl,
@@ -326,7 +326,7 @@ async function persistRegistrationDirectly(
       shopType: input.shopType || '',
       address: input.shopAddress || '',
       taxId: input.taxId || '',
-      status: 'active',
+      status: 'pending_review',
       createdAt: now,
       updatedAt: now,
     }, { merge: true });
@@ -342,7 +342,7 @@ async function persistRegistrationDirectly(
       orgType: input.orgType || '',
       contactPerson: input.contactPerson || '',
       estimatedUsers: input.estimatedUsers || 100,
-      status: 'active',
+      status: 'pending_review',
       createdAt: now,
       updatedAt: now,
     }, { merge: true });
@@ -357,7 +357,7 @@ async function persistRegistrationDirectly(
 
   return {
     user: saved.data() as UserDoc,
-    approvalRequired: false,
+    approvalRequired: true,
   };
 }
 
@@ -527,6 +527,6 @@ export async function registerFullAccountWithFirestore(
     );
   }
 
-  onProgress?.('บันทึกลง Cloud Firestore สำเร็จ! กำลังเข้าสู่ระบบ...');
+  onProgress?.('ลงทะเบียนสำเร็จ! รอ Super Admin อนุมัติก่อนเข้าใช้งาน');
   return result;
 }
