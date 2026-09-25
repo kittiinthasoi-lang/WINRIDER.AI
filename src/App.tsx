@@ -28,6 +28,7 @@ import { PushNotificationManagerModal } from './components/PushNotificationManag
 import { MobileBottomNavBar } from './components/MobileBottomNavBar';
 import { playTactileBlip } from './utils/audio';
 import { useAuth } from './context/AuthContext';
+import { AuthModalOrView } from './components/auth/AuthModalOrView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/admin/AdminRoute';
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -57,7 +58,7 @@ const CHAPTERS: { id: ChapterId; label: string; icon: React.ReactNode; num: stri
 ];
 
 export default function App() {
-  const { firebaseUser, userData, loading: authLoading, signOut, adoptUserData } = useAuth();
+  const { firebaseUser, userData, loading: authLoading, signOut } = useAuth();
 
   // Mode & Tabs
   const [activeMode, setActiveMode] = useState<AppMode>('passenger');
@@ -352,30 +353,6 @@ export default function App() {
     await signOut();
   };
 
-  const handleTemporarySuperAdminEntry = () => {
-    playTactileBlip(1000);
-    const now = new Date().toISOString();
-    adoptUserData({
-      uid: 'kitti-super-admin',
-      winUid: 'kitti',
-      firstName: 'กิตติ',
-      lastName: 'อินทะสร้อย',
-      fullName: 'กิตติ อินทะสร้อย',
-      role: 'knight',
-      displayName: 'กิตติ อินทะสร้อย',
-      phone: '',
-      status: 'active',
-      isAdmin: true,
-      adminLevel: 'super',
-      isFoundingKnight: true,
-      level: 100,
-      xp: 0,
-      rating: 5,
-      avatarEmoji: '👑',
-      createdAt: now,
-      updatedAt: now,
-    });
-  };
 
   // 1. Loading state
   if (authLoading) {
@@ -410,25 +387,7 @@ export default function App() {
           onToggleDriverPersona={() => {}}
         />
         <main className="flex-1 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-3xl border border-amber-400/30 bg-[#0B132B] p-6 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-400/10">
-              <Crown className="h-8 w-8 text-amber-300" />
-            </div>
-            <h1 className="text-2xl font-black text-white">WINRIDER.AI</h1>
-            <p className="mt-2 text-sm text-slate-400">
-              โหมดจัดการระบบชั่วคราว — ระบบล็อกอินจริงพักไว้ก่อน
-            </p>
-            <button
-              type="button"
-              onClick={handleTemporarySuperAdminEntry}
-              className="mt-6 w-full rounded-2xl bg-amber-400 px-5 py-4 text-base font-black text-slate-950 shadow-[0_0_25px_rgba(251,191,36,0.25)] transition hover:bg-amber-300 active:scale-[0.98]"
-            >
-              เข้าสู่ระบบ
-            </button>
-            <p className="mt-3 text-xs text-amber-200/70">
-              กดครั้งเดียวเพื่อเข้าแอปด้วยสิทธิ์ Super Admin
-            </p>
-          </div>
+          <AuthModalOrView />
         </main>
       </div>
     );
