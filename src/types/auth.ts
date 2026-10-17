@@ -1,5 +1,41 @@
 export type UserRole = 'knight' | 'citizen' | 'merchant' | 'partner';
 export type UserStatus = 'pending_review' | 'active' | 'suspended';
+export type RequestableRole = 'knight' | 'merchant' | 'partner';
+
+export interface RoleRequestItem {
+  id: string;
+  uid: string;
+  winUid: string;
+  displayName: string;
+  email: string;
+  phone: string;
+  targetRole: RequestableRole;
+  details: {
+    // Knight
+    vehicleType?: 'motorcycle' | 'car';
+    plateNumber?: string;
+    licenseNumber?: string;
+    driverLicenseUrl?: string;
+    vehiclePhotoUrl?: string;
+    // Merchant
+    shopName?: string;
+    shopType?: string;
+    shopAddress?: string;
+    taxId?: string;
+    // Partner
+    orgName?: string;
+    orgType?: string;
+    contactPerson?: string;
+    estimatedUsers?: number;
+    [key: string]: any;
+  };
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface RegistrationProfile {
   fullName: string;
@@ -54,6 +90,8 @@ export interface UserDoc {
   status: UserStatus;
   isAdmin?: boolean;
   adminLevel?: string;
+  defaultFiveRoleAccess?: boolean;
+  enabledRoles?: string[];
   isFoundingKnight?: boolean;
   pdpaConsent?: PdpaConsent;
   level?: number;

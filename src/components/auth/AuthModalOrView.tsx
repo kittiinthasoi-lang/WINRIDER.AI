@@ -35,7 +35,7 @@ import {
 import { UserRole } from '../../types/auth';
 
 type Mode = 'login' | 'register';
-type RegisterStep = 1 | 2 | 3 | 4;
+type RegisterStep = 1 | 2;
 
 const PROVINCES = [
   'กรุงเทพมหานคร',
@@ -100,8 +100,8 @@ export const AuthModalOrView: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Selected Role
-  const [selectedRole, setSelectedRole] = useState<UserRole>('knight');
+  // Selected Role (Default passenger for all new accounts)
+  const [selectedRole, setSelectedRole] = useState<UserRole>('citizen');
 
   // Role: Knight Specific
   const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car'>('motorcycle');
@@ -223,61 +223,12 @@ export const AuthModalOrView: React.FC = () => {
     setRegStep(2);
   };
 
-  // Step 2 Validation -> Next to Step 3 (Role Details)
-  const handleProceedToRoleDetails = () => {
-    setError('');
-    playTactileBlip(850);
-    setRegStep(3);
+  const handleProceedToConfirm = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setRegStep(2);
   };
 
-  // Step 3 Validation -> Next to Step 4 (Confirm)
-  const handleProceedToConfirm = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    playTactileBlip(900);
-
-    if (selectedRole === 'knight') {
-      if (!plateNumber.trim()) {
-        setError('กรุณาระบุหมายเลขทะเบียนรถ (เช่น 1กข 9999 กทม.)');
-        return;
-      }
-      if (!licenseNumber.trim()) {
-        setError('กรุณาระบุเลขที่ใบอนุญาตขับขี่สาธารณะหรือใบขับขี่');
-        return;
-      }
-    } else if (selectedRole === 'citizen') {
-      if (!emergencyName.trim()) {
-        setError('กรุณาระบุชื่อผู้ติดต่อฉุกเฉิน');
-        return;
-      }
-      if (!validatePhone(emergencyPhone)) {
-        setError('เบอร์โทรศัพท์ผู้ติดต่อฉุกเฉินต้องเป็นตัวเลข 10 หลัก (เช่น 0891234567)');
-        return;
-      }
-    } else if (selectedRole === 'merchant') {
-      if (!shopName.trim()) {
-        setError('กรุณาระบุชื่อร้านค้า');
-        return;
-      }
-      if (!shopAddress.trim()) {
-        setError('กรุณาระบุที่ตั้งร้านค้า');
-        return;
-      }
-    } else if (selectedRole === 'partner') {
-      if (!orgName.trim()) {
-        setError('กรุณาระบุชื่อองค์กรหรือหน่วยงาน');
-        return;
-      }
-      if (!contactPerson.trim()) {
-        setError('กรุณาระบุชื่อผู้ประสานงาน');
-        return;
-      }
-    }
-
-    setRegStep(4);
-  };
-
-  // Step 4 Final Submit -> Save to Cloud Firestore -> Enter App!
+  // Step 2 Final Submit -> Save as Passenger -> Enter App!
   const handleFinalSubmit = async () => {
     if (working) return;
     setError('');
@@ -288,8 +239,13 @@ export const AuthModalOrView: React.FC = () => {
       return;
     }
 
+    if (emergencyPhone && !validatePhone(emergencyPhone)) {
+      setError('เบอร์โทรศัพท์ผู้ติดต่อฉุกเฉินต้องเป็นตัวเลข 10 หลัก (เช่น 0891234567)');
+      return;
+    }
+
     setWorking(true);
-    setProgressMsg('กำลังเตรียมบันทึกข้อมูล...');
+    setProgressMsg('กำลังสร้างบัญชีผู้โดยสารและบันทึกข้อมูล...');
 
     try {
       const normalizedUid = normalizeWinUid(winUid);
@@ -304,33 +260,16 @@ export const AuthModalOrView: React.FC = () => {
           password,
           province,
           district: district.trim(),
-          role: selectedRole,
+          role: 'citizen',
           pdpaConsentAccepted: true,
-          // Knight
-          vehicleType,
-          plateNumber: plateNumber.trim(),
-          licenseNumber: licenseNumber.trim(),
-          licenseFile,
-          vehicleFile,
-          // Citizen
           emergencyContactName: emergencyName.trim(),
           emergencyContactPhone: emergencyPhone.trim(),
-          // Merchant
-          shopName: shopName.trim(),
-          shopType,
-          shopAddress: shopAddress.trim(),
-          taxId: taxId.trim(),
-          // Partner
-          orgName: orgName.trim(),
-          orgType,
-          contactPerson: contactPerson.trim(),
-          estimatedUsers,
         },
         (msg) => setProgressMsg(msg)
       );
 
       if (result?.user) {
-        setProgressMsg('บันทึกสำเร็จ! เข้าสู่ระบบ...');
+        setProgressMsg('ลงทะเบียนสำเร็จ! เข้าสู่ระบบ...');
         adoptUserData(result.user);
       } else {
         throw new Error('บันทึกข้อมูลเรียบร้อย แต่ไม่ได้รับโปรไฟล์กลับมา กรุณาลองใหม่');
@@ -616,52 +555,28 @@ export const AuthModalOrView: React.FC = () => {
           )}
 
           {/* ======================================================== */}
-          {/* REGISTRATION FLOW (4 STEPS) */}
+          {/* REGISTRATION FLOW (2 STEPS: PASSENGER DEFAULT) */}
           {/* ======================================================== */}
           {mode === 'register' && (
             <div className="space-y-6">
-              {/* Step Indicator Header */}
-              <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                <div className={`p-2 rounded-xl border transition-all ${
+              {/* Step Indicator Header (2 Steps: Account Info & Passenger Confirmation) */}
+              <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                <div className={`p-2.5 rounded-xl border transition-all ${
                   regStep === 1 
-                    ? 'border-amber-400 bg-amber-400/15 text-amber-300 font-bold shadow-[0_0_10px_rgba(255,201,60,0.2)]'
-                    : regStep > 1 
-                    ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300' 
-                    : 'border-white/5 bg-black/20 text-slate-500'
+                    ? 'border-cyan-400 bg-cyan-400/15 text-cyan-300 font-bold shadow-[0_0_10px_rgba(0,212,255,0.2)]'
+                    : 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300'
                 }`}>
-                  <span className="block font-mono text-[10px]">ขั้นที่ 1</span>
-                  <span className="truncate block font-semibold">1. กรอกข้อมูล</span>
+                  <span className="block font-mono text-[10px]">ขั้นตอนที่ 1</span>
+                  <span className="truncate block font-semibold">1. กรอกข้อมูลบัญชี</span>
                 </div>
 
-                <div className={`p-2 rounded-xl border transition-all ${
+                <div className={`p-2.5 rounded-xl border transition-all ${
                   regStep === 2 
-                    ? 'border-amber-400 bg-amber-400/15 text-amber-300 font-bold shadow-[0_0_10px_rgba(255,201,60,0.2)]'
-                    : regStep > 2 
-                    ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300' 
+                    ? 'border-cyan-400 bg-cyan-400/15 text-cyan-300 font-bold shadow-[0_0_10px_rgba(0,212,255,0.2)]'
                     : 'border-white/5 bg-black/20 text-slate-500'
                 }`}>
-                  <span className="block font-mono text-[10px]">ขั้นที่ 2</span>
-                  <span className="truncate block font-semibold">2. เลือกบทบาท</span>
-                </div>
-
-                <div className={`p-2 rounded-xl border transition-all ${
-                  regStep === 3 
-                    ? 'border-amber-400 bg-amber-400/15 text-amber-300 font-bold shadow-[0_0_10px_rgba(255,201,60,0.2)]'
-                    : regStep > 3 
-                    ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300' 
-                    : 'border-white/5 bg-black/20 text-slate-500'
-                }`}>
-                  <span className="block font-mono text-[10px]">ขั้นที่ 3</span>
-                  <span className="truncate block font-semibold">3. ข้อมูลบทบาท</span>
-                </div>
-
-                <div className={`p-2 rounded-xl border transition-all ${
-                  regStep === 4 
-                    ? 'border-amber-400 bg-amber-400/15 text-amber-300 font-bold shadow-[0_0_10px_rgba(255,201,60,0.2)]'
-                    : 'border-white/5 bg-black/20 text-slate-500'
-                }`}>
-                  <span className="block font-mono text-[10px]">ขั้นที่ 4</span>
-                  <span className="truncate block font-semibold">4. กดยืนยัน</span>
+                  <span className="block font-mono text-[10px]">ขั้นตอนที่ 2</span>
+                  <span className="truncate block font-semibold">2. ยืนยันผู้โดยสาร & PDPA</span>
                 </div>
               </div>
 
@@ -830,9 +745,9 @@ export const AuthModalOrView: React.FC = () => {
                   <div className="pt-3">
                     <button
                       type="submit"
-                      className="w-full rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 py-3.5 px-4 text-slate-950 font-bold text-sm shadow-[0_0_20px_rgba(255,201,60,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full rounded-xl bg-gradient-to-r from-cyan-400 via-[#00D4FF] to-blue-500 hover:from-cyan-300 hover:to-blue-400 py-3.5 px-4 text-slate-950 font-bold text-sm shadow-[0_0_20px_rgba(0,212,255,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <span>ถัดไป: เลือกบทบาท</span>
+                      <span>ถัดไป: ยืนยันข้อมูลผู้โดยสาร</span>
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -840,162 +755,158 @@ export const AuthModalOrView: React.FC = () => {
               )}
 
               {/* ---------------------------------------------------- */}
-              {/* STEP 2: เลือกบทบาท */}
+              {/* STEP 2: บทบาทผู้โดยสารเริ่มต้น */}
               {/* ---------------------------------------------------- */}
               {regStep === 2 && (
                 <div className="space-y-4">
                   <div className="border-b border-white/10 pb-2">
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
-                      <span>ขั้นตอนที่ 2: เลือกบทบาทของคุณใน WINRIDER.AI</span>
+                      <Sparkles className="w-4 h-4 text-cyan-400" />
+                      <span>ขั้นตอนที่ 2: บทบาทผู้โดยสาร (Passenger / พลเมือง)</span>
                     </h3>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      แตะเลือกบทบาทที่คุณต้องการเปิดใช้งาน
+                      ทุกไอดีที่ลงทะเบียนใหม่จะเริ่มต้นเป็นผู้โดยสารทุกคนทันที
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {/* Role 1: Knight */}
-                    <div
-                      onClick={() => {
-                        playTactileBlip(800);
-                        setSelectedRole('knight');
-                      }}
-                      className={`cursor-pointer rounded-2xl p-4 border transition-all relative ${
-                        selectedRole === 'knight'
-                          ? 'border-cyan-400 bg-cyan-500/15 shadow-[0_0_20px_rgba(34,211,238,0.25)]'
-                          : 'border-white/10 bg-black/30 hover:border-cyan-400/50'
-                      }`}
-                    >
-                      {selectedRole === 'knight' && (
-                        <div className="absolute top-3 right-3 h-5 w-5 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      )}
+                  <div className="rounded-2xl border border-cyan-400/40 bg-gradient-to-br from-cyan-950/40 via-slate-900/60 to-blue-950/40 p-5 space-y-4 shadow-lg">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-cyan-400/20 text-cyan-300">
-                          <Bike className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-white text-sm">อัศวินไรเดอร์ (Knight)</h4>
-                          <span className="text-[11px] text-amber-300 font-semibold">ล็อก 2 บ. โควตาเหลือ {foundingRemaining} ที่</span>
-                        </div>
-                      </div>
-                      <p className="mt-2.5 text-xs text-slate-300 leading-relaxed">
-                        พี่วินมอเตอร์ไซค์/ไรเดอร์รับงานอิสระ ค่าธรรมเนียม 2 บาท รับค่าโดยสารเต็ม
-                      </p>
-                    </div>
-
-                    {/* Role 2: Citizen */}
-                    <div
-                      onClick={() => {
-                        playTactileBlip(800);
-                        setSelectedRole('citizen');
-                      }}
-                      className={`cursor-pointer rounded-2xl p-4 border transition-all relative ${
-                        selectedRole === 'citizen'
-                          ? 'border-emerald-400 bg-emerald-500/15 shadow-[0_0_20px_rgba(52,211,153,0.25)]'
-                          : 'border-white/10 bg-black/30 hover:border-emerald-400/50'
-                      }`}
-                    >
-                      {selectedRole === 'citizen' && (
-                        <div className="absolute top-3 right-3 h-5 w-5 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-emerald-400/20 text-emerald-300">
+                        <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300">
                           <User className="w-6 h-6" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-white text-sm">พลเมืองอัศวิน (Citizen)</h4>
-                          <span className="text-[11px] text-emerald-400 font-semibold">ผู้โดยสาร · อนุมัติทันที</span>
+                          <div className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider">DEFAULT ROLE</div>
+                          <h4 className="font-bold text-white text-base font-thai">ผู้โดยสาร (Passenger / พลเมือง)</h4>
+                          <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            อนุมัติเปิดใช้งานทันที
+                          </span>
                         </div>
                       </div>
-                      <p className="mt-2.5 text-xs text-slate-300 leading-relaxed">
-                        ประชาชนทั่วไป เรียกรถมอเตอร์ไซค์วิน สั่งซื้อสินค้า เดินทางปลอดภัย
+                      <div className="w-7 h-7 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center">
+                        <Check className="w-4 h-4 stroke-[3]" />
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 text-xs text-slate-300 space-y-2">
+                      <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>สิทธิ์การใช้งานบัญชีของคุณ:</span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-slate-300">
+                        • ใช้งานบริการเรียกรถมอเตอร์ไซค์วิน รถยนต์ สั่งซื้อสินค้า WIN SHOP และขอความช่วยเหลือฉุกเฉินได้ทันที<br />
+                        • หากต้องการเปิดบทบาทเป็น <strong className="text-amber-300">พี่วิน (ไรเดอร์)</strong>, <strong className="text-pink-300">ร้านค้า</strong>, หรือ <strong className="text-purple-300">องค์กรพาร์ทเนอร์</strong> สามารถกดปุ่ม <strong className="text-cyan-300">"ขอเพิ่มบทบาท"</strong> ในหน้าโปรไฟล์เพื่อส่งให้แอดมินอนุมัติได้ตลอดเวลา
                       </p>
                     </div>
 
-                    {/* Role 3: Merchant */}
-                    <div
-                      onClick={() => {
-                        playTactileBlip(800);
-                        setSelectedRole('merchant');
-                      }}
-                      className={`cursor-pointer rounded-2xl p-4 border transition-all relative ${
-                        selectedRole === 'merchant'
-                          ? 'border-amber-400 bg-amber-500/15 shadow-[0_0_20px_rgba(251,191,36,0.25)]'
-                          : 'border-white/10 bg-black/30 hover:border-amber-400/50'
-                      }`}
-                    >
-                      {selectedRole === 'merchant' && (
-                        <div className="absolute top-3 right-3 h-5 w-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-amber-400/20 text-amber-300">
-                          <Store className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-white text-sm">ร้านค้าพันธมิตร (Merchant)</h4>
-                          <span className="text-[11px] text-amber-400 font-semibold">ร้านอาหาร & ร้านค้าชุมชน</span>
-                        </div>
+                    {/* Optional Emergency contact */}
+                    <div className="pt-2 border-t border-white/10 space-y-2">
+                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>เบอร์ติดต่อฉุกเฉิน (ทางเลือกเสริม - ปลอดภัยยิ่งขึ้น):</span>
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <input
+                          type="text"
+                          value={emergencyName}
+                          onChange={(e) => setEmergencyName(e.target.value)}
+                          placeholder="ชื่อผู้ติดต่อฉุกเฉิน (ไม่บังคับ)"
+                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                        <input
+                          type="tel"
+                          value={emergencyPhone}
+                          onChange={(e) => setEmergencyPhone(e.target.value)}
+                          placeholder="เบอร์โทรฉุกเฉิน (10 หลัก - ไม่บังคับ)"
+                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
                       </div>
-                      <p className="mt-2.5 text-xs text-slate-300 leading-relaxed">
-                        ร้านอาหาร เครื่องดื่ม สินค้าชุมชน วินช่วยส่งถึงมือลูกค้า ค่า GP ยุติธรรม
-                      </p>
-                    </div>
-
-                    {/* Role 4: Partner */}
-                    <div
-                      onClick={() => {
-                        playTactileBlip(800);
-                        setSelectedRole('partner');
-                      }}
-                      className={`cursor-pointer rounded-2xl p-4 border transition-all relative ${
-                        selectedRole === 'partner'
-                          ? 'border-purple-400 bg-purple-500/15 shadow-[0_0_20px_rgba(192,132,252,0.25)]'
-                          : 'border-white/10 bg-black/30 hover:border-purple-400/50'
-                      }`}
-                    >
-                      {selectedRole === 'partner' && (
-                        <div className="absolute top-3 right-3 h-5 w-5 rounded-full bg-purple-400 text-slate-950 flex items-center justify-center">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-purple-400/20 text-purple-300">
-                          <Building2 className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-white text-sm">องค์กรพาร์ทเนอร์ (Partner)</h4>
-                          <span className="text-[11px] text-purple-400 font-semibold">โรงพยาบาล สถาบัน องค์กร</span>
-                        </div>
-                      </div>
-                      <p className="mt-2.5 text-xs text-slate-300 leading-relaxed">
-                        หน่วยงาน องค์กร โรงเรียน โรงพยาบาล เชื่อมโยงระบบขนส่งและสวัสดิการ
-                      </p>
                     </div>
                   </div>
+
+                  {/* PDPA Consents */}
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-3.5 space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white">ข้อตกลงและนโยบายความเป็นส่วนตัว (PDPA)</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPdpaConsent(true);
+                          setGpsConsent(true);
+                          setTermsConsent(true);
+                        }}
+                        className="text-[11px] text-cyan-300 hover:underline cursor-pointer"
+                      >
+                        ยอมรับทั้งหมด
+                      </button>
+                    </div>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={pdpaConsent}
+                        onChange={(e) => setPdpaConsent(e.target.checked)}
+                        className="mt-0.5 accent-cyan-400"
+                      />
+                      <span>ยินยอมให้ประมวลผลข้อมูลส่วนบุคคลตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562</span>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={gpsConsent}
+                        onChange={(e) => setGpsConsent(e.target.checked)}
+                        className="mt-0.5 accent-cyan-400"
+                      />
+                      <span>ยินยอมการเปิดเผยตำแหน่งพิกัด GPS เพื่อความปลอดภัยและการจับคู่งาน</span>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={termsConsent}
+                        onChange={(e) => setTermsConsent(e.target.checked)}
+                        className="mt-0.5 accent-cyan-400"
+                      />
+                      <span>ยอมรับระเบียบกองทุนอธิปไตยและการจัดสรรค่าธรรมเนียมที่เป็นธรรม</span>
+                    </label>
+                  </div>
+
+                  {/* Progress feedback */}
+                  {working && (
+                    <div className="rounded-xl border border-cyan-400/40 bg-cyan-500/10 p-3 text-xs text-cyan-200 flex items-center gap-3 animate-pulse">
+                      <Loader2 className="w-5 h-5 animate-spin text-cyan-400 shrink-0" />
+                      <div className="flex-1 font-semibold">{progressMsg || 'กำลังดำเนินการ...'}</div>
+                    </div>
+                  )}
 
                   <div className="pt-3 flex gap-3">
                     <button
                       type="button"
+                      disabled={working}
                       onClick={() => setRegStep(1)}
-                      className="px-4 py-3 rounded-xl border border-white/10 bg-black/30 hover:bg-black/50 text-slate-300 text-sm font-semibold flex items-center gap-1.5"
+                      className="px-4 py-3.5 rounded-xl border border-white/10 bg-black/30 hover:bg-black/50 text-slate-300 text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50"
                     >
                       <ArrowLeft className="w-4 h-4" />
                       <span>ย้อนกลับ</span>
                     </button>
                     <button
                       type="button"
-                      onClick={handleProceedToRoleDetails}
-                      className="flex-1 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 py-3.5 px-4 text-slate-950 font-bold text-sm shadow-[0_0_20px_rgba(255,201,60,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2"
+                      disabled={working || !pdpaConsent || !gpsConsent || !termsConsent}
+                      onClick={handleFinalSubmit}
+                      className="flex-1 rounded-xl border border-cyan-300/40 bg-gradient-to-r from-cyan-400 via-[#00D4FF] to-blue-500 hover:from-cyan-300 hover:to-blue-400 py-3.5 px-4 text-slate-950 font-bold text-sm shadow-[0_0_20px_rgba(0,212,255,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      <span>ถัดไป: กรอกข้อมูลบทบาท</span>
-                      <ChevronRight className="w-4 h-4" />
+                      {working ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Database className="w-5 h-5" />
+                      )}
+                      <span>
+                        {working
+                          ? 'กำลังลงทะเบียนผู้โดยสารและบันทึกลงระบบ...'
+                          : '⚡ กดยืนยัน สมัครสมาชิกผู้โดยสารและเข้าใช้งาน'}
+                      </span>
                     </button>
                   </div>
                 </div>

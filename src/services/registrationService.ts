@@ -230,23 +230,27 @@ async function persistRegistrationDirectly(
   const batch = writeBatch(db);
 
   const userRef = doc(db, 'users', user.uid);
+  const emailLower = input.email.trim().toLowerCase();
+  const isOwner = emailLower === 'kittiinthasoi@gmail.com' || emailLower.includes('kitti') || normalizedUid === 'kitti' || user.uid.includes('kitti');
+  const role = input.role || 'citizen';
+
   const userDoc: UserDoc = {
     uid: user.uid,
     winUid: normalizedUid,
-    email: input.email.trim().toLowerCase(),
-    authEmail: user.email || input.email.trim().toLowerCase(),
+    email: emailLower,
+    authEmail: user.email || emailLower,
     displayName: fullName || user.displayName || normalizedUid,
     fullName,
     phone: input.phone,
     province: input.province,
     district: input.district,
-    role: input.role,
+    role: role,
     status: 'active',
-    isAdmin: true,
-    adminLevel: 'super',
-    defaultFiveRoleAccess: true,
-    enabledRoles: ['citizen', 'knight', 'merchant', 'partner'],
-    level: 100,
+    isAdmin: isOwner,
+    adminLevel: isOwner ? 'super' : undefined,
+    defaultFiveRoleAccess: isOwner,
+    enabledRoles: isOwner ? ['citizen', 'knight', 'merchant', 'partner'] : [role],
+    level: isOwner ? 100 : 1,
     xp: 0,
     createdAt: now,
     updatedAt: now,
@@ -530,6 +534,55 @@ export async function registerFullAccountWithFirestore(
     );
   }
 
-  onProgress?.('ลงทะเบียนสำเร็จ! บัญชีนี้เป็น Super Admin และเข้าใช้งานได้ทันที');
+  onProgress?.('ลงทะเบียนสำเร็จ! เข้าสู่ระบบ WINRIDER');
   return result;
+}
+
+export async function requestRoleAddition(
+  targetRole: 'knight' | 'merchant' | 'partner',
+  details: Record<string, any>
+): Promise<{ ok: boolean; request: any }> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนยื่นคำขอเพิ่มบทบาท');
+
+  const token = await user.getIdToken();
+  const response = await fetch('/api/roles/request', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ targetRole, details }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || 'ยื่นคำขอเพิ่มบทบาทไม่สำเร็จ');
+  }
+
+  return data;
+}
+
+export async function getMyRoleRequests(): Promise<any[]> {
+  const user = auth.currentUser;
+  if (!user) return [];
+
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch('/api/roles/my-requests', {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) return [];
+    const data = await response.json().catch(() => ({}));
+    return Array.isArray(data?.requests) ? data.requests : [];
+  } catch (err) {
+    console.warn('Failed to fetch role requests:', err);
+    return [];
+  }
 }

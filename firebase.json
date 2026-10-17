@@ -1,12 +1,8 @@
 {
-  "functions": {
-    "source": "functions",
-    "runtime": "nodejs22",
-    "predeploy": [
-      "npm --prefix functions run build"
-    ]
-  },
-  "firestore": {
-    "rules": "firestore.rules"
-  }
+  "firestore": [
+    {
+      "database": "ai-studio-winriderai-96f1b3b6-26ee-4fca-ba51-662b278eea8d",
+      "rules": "firestore.rules"
+    }
+  ]
 }

@@ -13,7 +13,10 @@ export interface PetHospitalClinic {
   openHours: string[];
   is24Hours: boolean;
   googleMapsUri: string;
-  routeSource: 'straight_line_estimate' | null;
+  bearingDeg?: number;
+  routeSource?: 'straight_line_estimate' | 'straight_line_public_data' | null;
+  placeType?: 'hospital' | 'clinic' | 'veterinary';
+  categoryLabel?: string;
 }
 
 export interface NearbyPetCareResponse {

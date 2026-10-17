@@ -97,6 +97,32 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    match /wallet_identities/{id} {
+      allow read: if signedIn();
+      allow write: if signedIn() || isAdmin();
+    }
+
+    match /wallet_ids/{id} {
+      allow read: if signedIn();
+      allow write: if signedIn() || isAdmin();
+    }
+
+    match /manual_topups/{id} {
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /withdrawal_requests/{id} {
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /withdrawal_daily_counters/{id} {
+      allow read, write: if signedIn() || isAdmin();
+    }
+
     // Ledger is server/admin controlled.
     match /ledger/{entryId} {
       allow read: if isAdmin();
@@ -148,6 +174,23 @@ service cloud.firestore {
         )
       );
       allow create, update, delete: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (
+        signedIn() && (
+          resource.data.passengerUserId == request.auth.uid
+          || resource.data.driverUserId == request.auth.uid
+          || resource.data.offeredDriverId == request.auth.uid
+        )
+      );
+      allow create: if signedIn();
+      allow update: if signedIn() && (
+        resource.data.passengerUserId == request.auth.uid
+        || resource.data.driverUserId == request.auth.uid
+        || isAdmin()
+      );
+      allow delete: if isAdmin();
     }
 
     // Driver GPS is backend-ingested only; clients cannot forge or delete location history.
@@ -238,6 +281,13 @@ service cloud.firestore {
     // Connection-test collection is disabled in production.
     match /_connection_test/{docId} {
       allow read, write: if false;
+    }
+
+    // Role upgrade requests
+    match /roleUpgradeRequests/{requestId} {
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
 
     // Deny every collection not explicitly listed above.

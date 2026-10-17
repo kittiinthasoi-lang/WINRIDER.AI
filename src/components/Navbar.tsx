@@ -36,6 +36,7 @@ import {
 import { PWAInstallButton } from './PWAInstallButton';
 import { UserSession, isDriverAccount, isDriverInCitizenMode } from '../utils/userSession';
 import { useAuth } from '../context/AuthContext';
+import { RoleRequestModal } from './auth/RoleRequestModal';
 
 interface NavbarProps {
   activeMode: AppMode;
@@ -77,6 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [nfcSynced, setNfcSynced] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [showRoleInfoModal, setShowRoleInfoModal] = useState(false);
+  const [showRoleRequestModal, setShowRoleRequestModal] = useState(false);
   const [voiceTarget, setVoiceTarget] = useState<'customer' | 'knight'>('customer');
   const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
@@ -845,12 +847,44 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-400/30 text-xs text-amber-200/90 leading-relaxed font-mono">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-300 mb-1">
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>ระบบรักษาความปลอดภัยบทบาท (Role Lock)</span>
+                <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#0D2447] to-[#08152B] border border-cyan-400/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold text-cyan-300 text-xs">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>บทบาทที่เปิดใช้งานแล้วของคุณ (Enabled Roles)</span>
+                    </div>
                   </div>
-                  พลเมืองไม่สามารถเปลี่ยนบทบาทเป็นพี่วินได้โดยตรง เนื่องจากต้องผ่านการตรวจสอบประวัติและมีใบอนุญาตขับขี่สาธารณะ
+
+                  <div className="flex flex-wrap gap-2">
+                    {Array.isArray(userData?.enabledRoles) && userData.enabledRoles.length > 0 ? (
+                      userData.enabledRoles.map((r: string) => (
+                        <span key={r} className="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 text-xs font-bold font-mono">
+                          {r === 'knight' ? '🏍️ พี่วิน' : r === 'merchant' ? '🏪 ร้านค้า' : r === 'partner' ? '🏢 พาร์ทเนอร์' : '🛡️ ผู้โดยสาร'}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 text-xs font-bold font-mono">
+                        🛡️ ผู้โดยสาร (เริ่มต้น)
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    ทุกไอดีสมัครใหม่เป็นผู้โดยสาร หากต้องการเป็นพี่วิน ร้านค้า หรือพาร์ทเนอร์ สามารถกดปุ่มขอเพิ่มบทบาทด้านล่างเพื่อส่งข้อมูลให้แอดมินอนุมัติได้ทันที
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (audioEnabled) playTactileBlip(900);
+                      setShowRoleInfoModal(false);
+                      setShowRoleRequestModal(true);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-400 via-[#00D4FF] to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-xs transition-all shadow-[0_0_15px_rgba(0,212,255,0.3)] flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <UserPlus className="w-4 h-4 text-slate-950" />
+                    <span>⚡ ขอเพิ่มบทบาท (เป็นพี่วิน / ร้านค้า / พาร์ทเนอร์)</span>
+                  </button>
                 </div>
               )}
 
@@ -892,6 +926,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       )}
+
+      {/* Role Request Modal */}
+      <RoleRequestModal
+        isOpen={showRoleRequestModal}
+        onClose={() => setShowRoleRequestModal(false)}
+      />
     </header>
   );
 };

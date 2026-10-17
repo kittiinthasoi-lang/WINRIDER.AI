@@ -23,7 +23,8 @@ import {
   Crown,
   Power,
   UserPlus,
-  ShieldOff
+  ShieldOff,
+  Building2,
 } from 'lucide-react';
 import {
   approveRegistration,
@@ -37,6 +38,8 @@ import {
   setAdminPortalOpen,
   getAdminAccessRequests,
   AdminAccessRequest,
+  getAdminRoleRequests,
+  reviewAdminRoleRequest,
 } from '../../services/adminService';
 import { AdminUserSummary, AdminLevel, LedgerTransaction } from '../../types/admin';
 
@@ -76,6 +79,8 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
   const [adminPortalOpen, setAdminPortalOpenState] = useState(false);
   const [adminRequests, setAdminRequests] = useState<AdminAccessRequest[]>([]);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [roleRequests, setRoleRequests] = useState<any[]>([]);
+  const [roleRequestsLoading, setRoleRequestsLoading] = useState(false);
 
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -91,22 +96,66 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
     }
   };
 
+  const fetchRoleRequests = async () => {
+    setRoleRequestsLoading(true);
+    try {
+      const list = await getAdminRoleRequests();
+      setRoleRequests(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.warn('fetchRoleRequests error:', err);
+      setRoleRequests([]);
+    } finally {
+      setRoleRequestsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchUsers();
+    void fetchUsers();
+    void fetchRoleRequests();
   }, []);
+
+  const handleApproveRoleRequest = async (reqItem: any) => {
+    setActionLoading(true);
+    try {
+      await reviewAdminRoleRequest(reqItem.id, 'approve');
+      await Promise.all([fetchRoleRequests(), fetchUsers()]);
+    } catch (err: any) {
+      alert(err?.message || 'อนุมัติคำขอไม่สำเร็จ');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectRoleRequest = async (reqItem: any, reason?: string) => {
+    setActionLoading(true);
+    try {
+      await reviewAdminRoleRequest(reqItem.id, 'reject', reason || 'ข้อมูลไม่ครบถ้วน');
+      await fetchRoleRequests();
+    } catch (err: any) {
+      alert(err?.message || 'ปฏิเสธคำขอไม่สำเร็จ');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const fetchAdminAccessControl = async () => {
     if (adminLevel !== 'super') return;
     setPortalLoading(true);
     try {
       const [portal, requests] = await Promise.all([
-        getAdminPortalStatus(),
-        getAdminAccessRequests(),
+        getAdminPortalStatus().catch((err) => {
+          console.warn('[getAdminPortalStatus] fallback:', err);
+          return { applicationsOpen: false, isAdmin: true, adminLevel: 'super', requestStatus: null };
+        }),
+        getAdminAccessRequests().catch((err) => {
+          console.warn('[getAdminAccessRequests] fallback:', err);
+          return [];
+        }),
       ]);
-      setAdminPortalOpenState(portal.applicationsOpen === true);
-      setAdminRequests(requests);
+      setAdminPortalOpenState(portal?.applicationsOpen === true);
+      setAdminRequests(Array.isArray(requests) ? requests : []);
     } catch (err) {
-      console.error('fetchAdminAccessControl error:', err);
+      console.warn('fetchAdminAccessControl fallback handled:', err);
     } finally {
       setPortalLoading(false);
     }
@@ -404,6 +453,125 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ adminLevel }) =>
               </div>
             </div>
           )}
+
+          {/* Role Addition Requests (Pending admin review) */}
+          <div className="rounded-2xl border border-cyan-400/30 bg-cyan-950/20 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-cyan-300" />
+                <h2 className="text-base font-black text-white">
+                  คำขอเพิ่มบทบาท (Role Addition Requests) ({roleRequests.filter((r) => r.status === 'pending').length} รออนุมัติ)
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => void fetchRoleRequests()}
+                disabled={roleRequestsLoading}
+                className="px-2.5 py-1 text-xs rounded-lg border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/10 flex items-center gap-1 transition-all"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${roleRequestsLoading ? 'animate-spin' : ''}`} />
+                <span>รีเฟรชคำขอ</span>
+              </button>
+            </div>
+
+            {roleRequests.length === 0 ? (
+              <div className="text-xs text-slate-400 py-3 text-center bg-black/20 rounded-xl border border-white/5">
+                ยังไม่มีคำขอเพิ่มบทบาทใหม่ในระบบ
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {roleRequests.map((req) => (
+                  <div key={req.id} className="rounded-xl border border-white/10 bg-slate-950/70 p-4 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        {req.targetRole === 'knight' ? (
+                          <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-bold flex items-center gap-1.5">
+                            <Bike className="w-3.5 h-3.5" />
+                            <span>ขอเป็นพี่วิน (อัศวินไรเดอร์)</span>
+                          </span>
+                        ) : req.targetRole === 'merchant' ? (
+                          <span className="px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 text-xs font-bold flex items-center gap-1.5">
+                            <Store className="w-3.5 h-3.5" />
+                            <span>ขอเป็นร้านค้าพันธมิตร</span>
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-lg bg-teal-500/20 border border-teal-400/40 text-teal-300 text-xs font-bold flex items-center gap-1.5">
+                            <Building2 className="w-3.5 h-3.5" />
+                            <span>ขอเป็นองค์กรพาร์ทเนอร์</span>
+                          </span>
+                        )}
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                          req.status === 'approved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : req.status === 'rejected' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                        }`}>
+                          {req.status === 'approved' ? '✓ อนุมัติแล้ว' : req.status === 'rejected' ? '✕ ปฏิเสธแล้ว' : '⏳ รอแอดมินอนุมัติ'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-mono">
+                        ส่งเมื่อ: {req.createdAt ? new Date(req.createdAt).toLocaleString('th-TH') : '-'}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <div className="text-slate-400 text-[11px]">ข้อมูลผู้ยื่นคำขอ:</div>
+                        <div className="text-white font-bold">{req.displayName || 'ผู้ใช้งาน'} (WIN UID: <span className="text-cyan-300 font-mono">{req.winUid || '-'}</span>)</div>
+                        <div className="text-slate-300 text-[11px]">โทร: {req.phone || '-'} • อีเมล: {req.email || '-'}</div>
+                      </div>
+
+                      <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1">
+                        <div className="text-slate-400 text-[11px] font-semibold">รายละเอียดที่ยื่นขอ:</div>
+                        {req.targetRole === 'knight' && (
+                          <div className="text-slate-200 text-[11px] space-y-0.5">
+                            <div>ยานพาหนะ: <span className="text-cyan-300">{req.details?.vehicleType === 'car' ? '🚗 รถยนต์' : '🏍️ รถจักรยานยนต์'}</span></div>
+                            <div>ป้ายทะเบียน: <strong className="text-white">{req.details?.plateNumber || '-'}</strong></div>
+                            <div>เลขใบขับขี่: <span className="font-mono text-amber-300">{req.details?.licenseNumber || '-'}</span></div>
+                          </div>
+                        )}
+                        {req.targetRole === 'merchant' && (
+                          <div className="text-slate-200 text-[11px] space-y-0.5">
+                            <div>ชื่อร้าน: <strong className="text-white">{req.details?.shopName || '-'}</strong> ({req.details?.shopType || 'ทั่วไป'})</div>
+                            <div>ที่ตั้งร้าน: <span className="text-slate-300">{req.details?.shopAddress || '-'}</span></div>
+                            {req.details?.taxId && <div>เลขประจำตัวผู้เสียภาษี: <span className="font-mono">{req.details.taxId}</span></div>}
+                          </div>
+                        )}
+                        {req.targetRole === 'partner' && (
+                          <div className="text-slate-200 text-[11px] space-y-0.5">
+                            <div>ชื่อองค์กร: <strong className="text-white">{req.details?.orgName || '-'}</strong> ({req.details?.orgType || 'ทั่วไป'})</div>
+                            <div>ผู้ประสานงาน: <span className="text-slate-300">{req.details?.contactPerson || '-'}</span></div>
+                            <div>จำนวนผู้ใช้คาดการณ์: <span className="text-pink-300 font-mono">{req.details?.estimatedUsers || 100}</span> คน</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {req.status === 'pending' && (
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                        <button
+                          type="button"
+                          onClick={() => void handleRejectRoleRequest(req)}
+                          disabled={actionLoading}
+                          className="px-3 py-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-bold transition-all disabled:opacity-50"
+                        >
+                          ✕ ปฏิเสธคำขอ
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleApproveRoleRequest(req)}
+                          disabled={actionLoading}
+                          className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span>✓ อนุมัติบทบาท</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -71,13 +71,13 @@ export const AdminTopupReviewView: React.FC = () => {
 
     setBusyId('manual-topup');
     try {
-      const token = await getAdminToken();
+      const authHeaders = await getAdminAuthHeaders();
       const response = await fetch('/api/admin/manual-topup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({
           walletId: cleanWalletId,
@@ -117,13 +117,13 @@ export const AdminTopupReviewView: React.FC = () => {
     setError('');
     setNotice('');
     try {
-      const token = await getAdminToken();
+      const authHeaders = await getAdminAuthHeaders();
       const response = await fetch('/api/admin/withdrawal-review', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: JSON.stringify({ withdrawalId, decision, bankReference: bankRef }),
       });

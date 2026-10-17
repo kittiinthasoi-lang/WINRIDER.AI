@@ -582,6 +582,7 @@ export default function App() {
               audioEnabled={audioEnabled}
               onOpenWinBuddy={() => setIsBuddyModalOpen(true)}
               onRideToDestination={handleRideToDestination}
+              onBackToMain={() => setActiveMode('passenger')}
             />
           </ProtectedRoute>
         )}

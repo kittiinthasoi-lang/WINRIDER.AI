@@ -257,11 +257,55 @@ export async function requestAdminAccess(note?: string): Promise<{ ok: boolean; 
 }
 
 export async function getAdminAccessRequests(): Promise<AdminAccessRequest[]> {
-  const headers = await getAdminAuthHeaders();
-  const res = await fetch('/api/admin/access-requests', { headers, cache: 'no-store' });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'โหลดคำขอ Admin ไม่สำเร็จ');
-  return Array.isArray(data.requests) ? data.requests : [];
+  try {
+    const headers = await getAdminAuthHeaders();
+    const res = await fetch('/api/admin/access-requests', { headers, cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.warn('[getAdminAccessRequests] non-ok response status:', res.status, data?.error);
+      return [];
+    }
+    return Array.isArray(data.requests) ? data.requests : [];
+  } catch (err) {
+    console.warn('[getAdminAccessRequests] fallback error:', err);
+    return [];
+  }
+}
+
+export async function getAdminRoleRequests(): Promise<any[]> {
+  try {
+    const headers = await getAdminAuthHeaders();
+    const res = await fetch('/api/admin/roles/requests', { headers, cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.warn('[getAdminRoleRequests] non-ok response status:', res.status, data?.error);
+      return [];
+    }
+    return Array.isArray(data.requests) ? data.requests : [];
+  } catch (err) {
+    console.warn('[getAdminRoleRequests] fallback error:', err);
+    return [];
+  }
+}
+
+export async function reviewAdminRoleRequest(
+  requestId: string,
+  action: 'approve' | 'reject',
+  reason?: string
+): Promise<{ ok: boolean; request: any }> {
+  return callAdminEndpoint('reviewAdminRoleRequest', `/api/admin/roles/requests/${requestId}/review`, {
+    action,
+    reason,
+  });
+}
+
+export async function setUserEnabledRoles(
+  uid: string,
+  enabledRoles: string[]
+): Promise<{ ok: boolean }> {
+  return callAdminEndpoint('setUserEnabledRoles', `/api/admin/users/${uid}/manage-roles`, {
+    enabledRoles,
+  });
 }
 
 export async function revokeAdminRole(targetWinUid: string, reason?: string) {
