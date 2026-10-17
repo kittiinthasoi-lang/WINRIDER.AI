@@ -3576,9 +3576,10 @@ app.get("/api/supabase/status", async (req, res) => {
   return res.json({
     enabled: isSupabaseServerEnabled(),
     url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
-    serviceRoleConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-    anonKeyConfigured: Boolean(process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY),
-    schemaAvailable: true,
+    serviceRoleConfigured: Boolean(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY),
+    anonKeyConfigured: Boolean(process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY),
+    schemaAvailable: null, // Configuration alone does not verify database schema.
+    authProvider: "firebase", // Supabase Auth migration has not been enabled.
   });
 });
 

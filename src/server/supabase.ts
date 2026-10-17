@@ -1,20 +1,14 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { isSupabaseUrl } from '../core/supabaseConfig';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
 const supabaseKey =
+  process.env.SUPABASE_SECRET_KEY ||
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
   '';
 
 export const isSupabaseServerEnabled = (): boolean => {
-  return Boolean(
-    supabaseUrl &&
-    supabaseKey &&
-    supabaseUrl.startsWith('https://') &&
-    supabaseUrl.includes('supabase.co') &&
-    !supabaseUrl.includes('your-project')
-  );
+  return Boolean(isSupabaseUrl(supabaseUrl) && supabaseKey);
 };
 
 let _supabaseAdmin: SupabaseClient | null = null;

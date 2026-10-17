@@ -1,16 +1,11 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { isSupabaseUrl, isPublicSupabaseKey } from '../core/supabaseConfig';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const isSupabaseConfigured = (): boolean => {
-  return Boolean(
-    supabaseUrl &&
-    supabaseAnonKey &&
-    supabaseUrl.startsWith('https://') &&
-    supabaseUrl.includes('supabase.co') &&
-    !supabaseUrl.includes('your-project')
-  );
+  return isSupabaseUrl(supabaseUrl) && isPublicSupabaseKey(supabaseAnonKey);
 };
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured()
@@ -32,7 +27,7 @@ export interface SupabaseConfigStatus {
 export function getSupabaseConfigStatus(): SupabaseConfigStatus {
   return {
     configured: isSupabaseConfigured(),
-    url: supabaseUrl ? supabaseUrl.replace(/^(https:\/\/[^.]+).*/, '$1.supabase.co') : '',
+    url: isSupabaseUrl(supabaseUrl) ? new URL(supabaseUrl).origin : '',
     hasAnonKey: Boolean(supabaseAnonKey),
     provider: 'supabase',
   };
