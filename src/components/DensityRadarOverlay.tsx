@@ -31,6 +31,7 @@ interface DensityRadarOverlayProps {
   audioEnabled?: boolean;
   onSelectEntity?: (entity: RadarEntity) => void;
   onBookRideWithRider?: (rider: RadarEntity) => void;
+  onAcceptJobFromCustomer?: (customer: MapRadarEntity) => void;
   onSelectDestinationForRide?: (entity: MapRadarEntity) => void | Promise<void>;
   isCompact?: boolean;
   className?: string;
@@ -51,6 +52,7 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
   audioEnabled = true,
   onSelectEntity,
   onBookRideWithRider,
+  onAcceptJobFromCustomer,
   onSelectDestinationForRide,
   className = '',
   onBackToHome
@@ -59,14 +61,14 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
   const mappedPerspective = targetPerspective === 'passenger' ? 'customer' : targetPerspective;
 
   return (
-    <div className={`relative rounded-3xl overflow-hidden ${className}`}>
+    <div className={`relative rounded-2xl sm:rounded-3xl overflow-hidden w-full h-full max-w-full flex flex-col ${className}`}>
       <GoogleMapsRadarView
         targetPerspective={mappedPerspective as any}
         venueName={venueName}
         venueIcon={venueIcon}
         venueCategory={venueCategory}
         radiusKm={radiusKm}
-        height="560px"
+        height="100%"
         audioEnabled={audioEnabled}
         onSelectEntity={(e: MapRadarEntity) => {
           if (onSelectEntity) {
@@ -78,6 +80,7 @@ export const DensityRadarOverlay: React.FC<DensityRadarOverlayProps> = ({
             onBookRideWithRider(r as any);
           }
         }}
+        onAcceptJobFromCustomer={onAcceptJobFromCustomer}
         onSelectDestinationForRide={onSelectDestinationForRide}
         onBackToHome={onBackToHome}
       />

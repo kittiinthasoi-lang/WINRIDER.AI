@@ -183,23 +183,24 @@ export const PersonalNavigationScreen: React.FC<PersonalNavigationScreenProps> =
         )}
       </div>
 
-      {destination && gpsState.isRealGps ? (
-        <GoogleMapsNavigationScreen
-          role={role}
-          initialPhase="in_transit"
-          pickupAddress={gpsState.addressLabel}
-          pickupCoords={{ lat: gpsState.latitude, lng: gpsState.longitude }}
-          dropoffAddress={destination.address || destination.name}
-          dropoffCoords={{ lat: destination.lat, lng: destination.lng }}
-          audioEnabled={audioEnabled}
-          onArrivedAtDropoff={() => setError('ถึงปลายทางแล้ว')}
-        />
-      ) : (
-        <div className="rounded-2xl border border-white/10 bg-black/30 p-5 text-center text-xs text-slate-400">
-          <Navigation className="w-7 h-7 mx-auto mb-2 text-cyan-300" />
-          {destination ? 'GPS พร้อมแล้ว • เปิด Google Maps เพื่อรับเส้นทางถนนจริง' : 'เลือกปลายทางเพื่อค้นหาพิกัดจริง'}
-        </div>
-      )}
+      {/* Real Interactive Navigation Map */}
+      <GoogleMapsNavigationScreen
+        role={role}
+        initialPhase="in_transit"
+        pickupAddress={gpsState.addressLabel || 'ตำแหน่งปัจจุบัน'}
+        pickupCoords={{
+          lat: Number(gpsState.latitude) || 13.7563,
+          lng: Number(gpsState.longitude) || 100.5018,
+        }}
+        dropoffAddress={destination ? (destination.address || destination.name) : POPULAR_BANGKOK_DESTINATIONS[0].name}
+        dropoffCoords={{
+          lat: destination ? destination.lat : POPULAR_BANGKOK_DESTINATIONS[0].lat,
+          lng: destination ? destination.lng : POPULAR_BANGKOK_DESTINATIONS[0].lng,
+        }}
+        audioEnabled={audioEnabled}
+        onArrivedAtDropoff={() => setError('ถึงปลายทางแล้ว')}
+        onClose={onClose}
+      />
     </div>
   );
 };

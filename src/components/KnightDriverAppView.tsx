@@ -3,7 +3,8 @@ import { WIN_IMAGES } from '../data/imageRegistry';
 import { emitQuestMetric } from '../services/questService';
 import { Vehicle } from '../types';
 import { KNIGHT_ARMOR_SUITS, ArmorSuit } from '../data/armorSuits';
-import { playTactileBlip, playLevelUpFanfare, playRadarScan, playEngineRev } from '../utils/audio';
+import { playTactileBlip, playLevelUpFanfare, playRadarScan, playEngineRev, speakThaiText } from '../utils/audio';
+import { acceptLiveOrder, advanceLiveOrderStep } from '../utils/dispatchSync';
 import confetti from 'canvas-confetti';
 import { TwoBahtEmpireCalculator } from './TwoBahtEmpireCalculator';
 import { ArmorInstallmentFourBahtModel } from './ArmorInstallmentFourBahtModel';
@@ -2044,12 +2045,37 @@ export const KnightDriverAppView: React.FC<KnightDriverAppViewProps> = ({
 
       {/* 3D DENSITY RADAR OVERLAY MODAL (2.5 KM) FOR DRIVER */}
       {showDriverRadarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-hidden">
+          <div className="w-full max-w-4xl h-[90vh] max-h-[90vh] flex flex-col overflow-hidden rounded-3xl border border-cyan-400/40 shadow-2xl">
             <DensityRadarOverlay
               targetPerspective="driver"
               radiusKm={2.5}
               audioEnabled={audioEnabled}
+              onAcceptJobFromCustomer={async (customer) => {
+                const orderId = customer.id.replace('customer:', '');
+                setShowDriverRadarModal(false);
+                try {
+                  const accepted = await acceptLiveOrder(orderId, {
+                    driverUserId: currentUserSession?.id,
+                    driverName: driverProfileData.displayName || 'พี่วิน',
+                    driverLevel: driverLevel || 1,
+                    driverPlate: activeVehicle?.plateNumber || '',
+                    driverAvatarEmoji: '🛵',
+                    driverVehicle: activeVehicle?.name || 'มอเตอร์ไซค์รับจ้าง',
+                  });
+                  if (accepted) {
+                    await advanceLiveOrderStep(orderId, 'heading_pickup');
+                    setActiveDriverTab('jobs');
+                    if (audioEnabled) {
+                      playEngineRev();
+                      speakThaiText('รับงานสำเร็จ กำลังนำทางไปหาผู้โดยสาร');
+                    }
+                  }
+                } catch (err) {
+                  console.warn('Accept from radar error:', err);
+                  setActiveDriverTab('jobs');
+                }
+              }}
               onBackToHome={() => setShowDriverRadarModal(false)}
             />
           </div>

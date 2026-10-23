@@ -97,7 +97,7 @@ export const VirtualArOverlay: React.FC<VirtualArOverlayProps> = ({
             <span className={`w-2 h-2 rounded-full ${cameraActive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400 animate-pulse'}`} />
             <span className="text-[10px] font-mono font-black text-white flex items-center gap-1">
               <Camera className="w-3 h-3 text-cyan-400" />
-              <span>{cameraActive ? 'กล้องสดมือถือ (LIVE AR)' : 'ภาพจำลองถนนจริง (POV SIM)'}</span>
+              <span>{cameraActive ? 'กล้องสดมือถือ (LIVE AR)' : 'มุมมองถนนจริง (POV VIEW)'}</span>
             </span>
             <span className="text-[9px] text-cyan-300 font-mono hidden sm:inline">
               ({cameraFacing === 'environment' ? 'กล้องหลัง' : 'กล้องหน้า'})

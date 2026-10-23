@@ -457,7 +457,7 @@ export default function App() {
 
   // 4. Active User Dashboard / Admin View
   return (
-    <div className="min-h-screen bg-[#070D1E] text-slate-100 flex flex-col font-sans pb-24 md:pb-0">
+    <div className="min-h-screen bg-[#070D1E] text-slate-100 flex flex-col font-sans pb-24 md:pb-0 w-full max-w-full overflow-x-hidden">
       {/* Sovereign Navigation Bar */}
       <Navbar
         activeMode={activeMode}
@@ -477,7 +477,7 @@ export default function App() {
       />
 
       {/* Main Viewport Content with ProtectedRoute */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-6 py-4">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-2.5 sm:px-6 py-4 overflow-x-hidden">
         {activeMode === 'passenger' && (
           <ProtectedRoute 
             allowedRoles={['citizen', 'knight', 'merchant', 'partner']}

@@ -145,7 +145,7 @@ export const DriverStandbyAndIncomingJob: React.FC<DriverStandbyAndIncomingJobPr
         && order.status === 'pending'
         && order.passengerUserId
         && order.passengerUserId !== currentUserId
-        && order.offeredDriverId === currentUserId
+        && (!order.offeredDriverId || order.offeredDriverId === currentUserId)
         && order.id !== lastDeclinedJobId
         && isOnDuty
       ) {

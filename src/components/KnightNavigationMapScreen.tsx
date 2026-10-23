@@ -1043,7 +1043,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
         </div>
       ) : navDisplayMode === 'google_maps' ? (
         <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">
-          {activeJob?.pickupCoord && (driverLegPhase === 'to_pickup' ? Boolean(activeJob?.dropoffCoord) : Boolean(selectedDestination.lat && selectedDestination.lng)) ? <GoogleMapsNavigationScreen
+          <GoogleMapsNavigationScreen
             role="driver"
             initialPhase={driverLegPhase === 'to_pickup' ? 'approaching' : 'in_transit'}
             rideId={activeJob?.id}
@@ -1051,12 +1051,20 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             driverAvatar={activeVehicle?.imageEmoji || '🛵'}
             driverPlate={(activeVehicle as any)?.plateNumber || ''}
             driverVehicle={activeVehicle?.model || ''}
-            passengerName={selectedJob?.customerName || ''}
-            pickupAddress={activeJob?.pickupLocation || ''}
-            pickupCoords={activeJob.pickupCoord}
-            dropoffAddress={driverLegPhase === 'to_destination' ? (selectedDestination.address || selectedDestination.name) : (activeJob?.dropoffLocation || '')}
-            dropoffCoords={driverLegPhase === 'to_destination' && selectedDestination.lat && selectedDestination.lng ? { lat: selectedDestination.lat, lng: selectedDestination.lng } : activeJob.dropoffCoord}
-            fareBaht={activeJob.netFare || activeJob.baseFare || 0}
+            passengerName={selectedJob?.customerName || 'ผู้โดยสาร'}
+            pickupAddress={activeJob?.pickupLocation || gpsState.addressLabel || 'จุดรับผู้โดยสาร'}
+            pickupCoords={activeJob?.pickupCoord || { lat: Number(gpsState.latitude) || 13.7563, lng: Number(gpsState.longitude) || 100.5018 }}
+            dropoffAddress={
+              driverLegPhase === 'to_destination' && selectedDestination.name
+                ? (selectedDestination.address || selectedDestination.name)
+                : (activeJob?.dropoffLocation || POPULAR_BANGKOK_DESTINATIONS[0].name)
+            }
+            dropoffCoords={
+              driverLegPhase === 'to_destination' && selectedDestination.lat && selectedDestination.lng
+                ? { lat: selectedDestination.lat, lng: selectedDestination.lng }
+                : (activeJob?.dropoffCoord || { lat: POPULAR_BANGKOK_DESTINATIONS[0].lat, lng: POPULAR_BANGKOK_DESTINATIONS[0].lng })
+            }
+            fareBaht={activeJob?.netFare || activeJob?.baseFare || 0}
             audioEnabled={audioEnabled}
             onRouteUpdate={setLiveRoute}
             onArrivedAtPickup={() => {
@@ -1074,13 +1082,7 @@ export const KnightNavigationMapScreen: React.FC<KnightNavigationMapScreenProps>
             }}
             onClose={onClose}
             onOpenChat={() => setShowDirectChatModal(true)}
-          /> : (
-            <div className="min-h-[420px] flex items-center justify-center p-8 text-center text-sm text-slate-300 bg-slate-950">
-              {driverLegPhase === 'to_destination' && !selectedDestination.lat
-                ? 'ถึงจุดรับแล้ว — กรุณาค้นหาหรือเลือกปลายทางด้านบน เพื่อดูข้อมูลปลายทาง'
-                : 'ยังไม่มีงานจริงที่มีพิกัดจุดรับและปลายทาง จึงไม่แสดงเส้นทางจำลอง'}
-            </div>
-          )}
+          />
         </div>
       ) : navDisplayMode === 'mapbox' ? (
         <div className="relative w-full rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-[0_0_40px_rgba(0,210,255,0.25)]">

@@ -1124,7 +1124,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
     setShowDriverMatchingModal(true);
     if (audioEnabled) {
       playTactileBlip(1000);
-      speakThaiText('เลือกกิจกรรมแล้ว กรุณากดเริ่มจับคู่เพื่อค้นหาพี่วินไปยังสถานที่จริง');
+      speakThaiText(`Win Alert เราไปส่งได้นะ! เรียกพี่วินไปงาน ${event.title} ค่ะ`);
     }
   };
   const handleConfirmRide = async () => {
@@ -1401,9 +1401,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
       </div>
 
       {/* Outer Mobile App Container */}
-      <div className={`mx-auto transition-all ${deviceFrameMode ? 'w-full sm:max-w-md' : 'w-full max-w-4xl'}`}>
+      <div className={`mx-auto transition-all w-full max-w-full overflow-hidden ${deviceFrameMode ? 'sm:max-w-md' : 'max-w-4xl'}`}>
         <div 
-          className={`relative bg-gradient-to-b from-[#071126] via-[#050C1B] to-[#030710] transition-all duration-300 ${
+          className={`relative bg-gradient-to-b from-[#071126] via-[#050C1B] to-[#030710] transition-all duration-300 w-full max-w-full overflow-hidden ${
             deviceFrameMode 
               ? 'rounded-2xl sm:rounded-[40px] border border-cyan-500/30 sm:border-4 sm:border-slate-700/60 p-2.5 sm:p-4' 
               : 'rounded-2xl sm:rounded-3xl border border-white/10 p-2.5 sm:p-6'
@@ -1603,7 +1603,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   </span>
                 </div>
 
-                {/* 3D DENSITY RADAR (2.5 KM) CUSTOMER REAL-TIME DETECTION BANNER */}
+                {/* REAL MAP RADAR (BTS/MRT STATIONS, DRIVERS, CUSTOMERS, SHOPS, PARTNERS) */}
                 <div 
                   onClick={() => {
                     if (audioEnabled) playTactileBlip(950);
@@ -1615,9 +1615,9 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   }}
                   className="p-3.5 rounded-2xl bg-gradient-to-r from-[#061429] via-[#081C38] to-[#040E1E] border-2 flex items-center justify-between cursor-pointer hover:brightness-110 transition-all group active:scale-98"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div 
-                      className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-950 font-black text-xl transition-transform group-hover:scale-110"
+                      className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-950 font-black text-xl transition-transform group-hover:scale-110 shrink-0"
                       style={{ 
                         backgroundColor: currentTheme.hex,
                         boxShadow: `0 0 16px ${currentTheme.glowRgba}`
@@ -1625,8 +1625,8 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     >
                       <Radio className="w-6 h-6 animate-pulse" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span 
                           className="text-[9px] font-mono px-2 py-0.5 rounded-full font-bold border"
                           style={{ 
@@ -1635,21 +1635,21 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                             color: currentTheme.hex 
                           }}
                         >
-                          HOLOGRAPHIC RADAR (2.5 KM)
+                          GOOGLE MAPS REAL RADAR (2.5 KM)
                         </span>
                         <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: currentTheme.hex }} />
                       </div>
-                      <h4 className="text-xs font-black text-white leading-tight mt-1">
-                        เรดาร์ 3D สแกนพี่วิน, ร้านค้า & พาร์ทเนอร์รอบตัว
+                      <h4 className="text-xs font-black text-white leading-tight mt-1 truncate">
+                        เรดาร์แผนที่จริง: สถานีรอบตัว (BTS/MRT), พี่วิน, ลูกค้า & ร้านค้า
                       </h4>
-                      <p className="text-[10px] text-slate-300 font-mono">
-                        ตรวจจับแบบเรียลไทม์ 360° รัศมี 2.5 กม. ในพิกัดของคุณ
+                      <p className="text-[10px] text-slate-300 font-mono truncate">
+                        แผนที่จริงเต็มรูปแบบ แสดงทุกสถานี ข้อมูลพิกัดสดรอบตัวคุณ
                       </p>
                     </div>
                   </div>
 
                   <span 
-                    className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs font-mono shadow-md group-hover:scale-105 transition-transform flex items-center gap-1 flex-shrink-0"
+                    className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs font-mono shadow-md group-hover:scale-105 transition-transform flex items-center gap-1 flex-shrink-0 ml-2"
                     style={{ 
                       backgroundColor: currentTheme.hex,
                       boxShadow: `0 0 12px ${currentTheme.glowRgba}`
@@ -1659,6 +1659,7 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
+
 
                 {/* 8 CORE SERVICES ARCHITECTURE (Neon Contrast on Deep Navy with Unique Color IDs & Outer Glow) */}
                 <div className="space-y-2.5">
@@ -1806,12 +1807,6 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
                 <PublicDataDiscoveryCard />
 
-                {/* PROACTIVE WIN-ALERT EVENT CARDS (Mall Sales, Pop-up Markets, Concerts, Festivals) */}
-                <WinAlertEventsCard
-                  audioEnabled={audioEnabled}
-                  onBookEventRide={handleSelectWinAlertEvent}
-                />
-
                 {/* DESTINATION CAROUSEL — PLACE DATA ONLY */}
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center justify-between">
@@ -1879,6 +1874,14 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                   </div>
                 </div>
 
+                {/* WIN ALERT AT THE BOTTOM OF HOME — ALL REAL THAILAND EVENTS */}
+                <div id="home-win-alert-bottom" className="pt-2">
+                  <WinAlertEventsCard
+                    audioEnabled={audioEnabled}
+                    onBookEventRide={handleSelectWinAlertEvent}
+                  />
+                </div>
+
                 {/* MASSIVE GLOWING EMERGENCY SOS BUTTON */}
                 <div className="p-4 rounded-3xl bg-gradient-to-b from-rose-950/40 via-red-900/30 to-[#070D1E] border-2 border-rose-500/60 shadow-[0_0_30px_rgba(244,63,94,0.3)] text-center space-y-3">
                   <div className="flex items-center justify-center gap-2">
@@ -1940,29 +1943,50 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                     driverName={currentMatchedDriver?.name || "กำลังรอพี่วิน"}
                     driverLevel={currentMatchedDriver?.level || 0}
                     driverEmoji={currentMatchedDriver?.avatarEmoji || "🛵"}
+                    driverPhone={currentMatchedDriver?.phone}
+                    driverPlate={currentMatchedDriver?.plateNumber}
+                    driverVehicle={currentMatchedDriver?.vehicleModel}
+                    rideStatus={activeLiveOrder.status}
+                    ridePhase={ridePhase}
+                    fare={activeLiveOrder.fare}
                     etaMinutes={ridePhase === 'picking_up' ? pickupEtaMinutes : destEtaMinutes}
                     onEmergencyClick={handleTriggerSos}
+                    onOpenChat={() => setShowInRideChatModal(true)}
+                    audioEnabled={audioEnabled}
                   />
                 ) : (
                   <div className="rounded-3xl border-2 border-cyan-500/40 bg-gradient-to-b from-[#0A1633] via-[#071126] to-[#030710] p-6 text-center shadow-[0_0_35px_rgba(0,210,255,0.12)]">
                     <div className="mx-auto w-20 h-20 rounded-3xl bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center shadow-[0_0_25px_rgba(0,210,255,0.18)]">
-                      <Activity className="w-10 h-10 text-cyan-300" />
+                      <Bike className="w-10 h-10 text-cyan-300 animate-pulse" />
                     </div>
-                    <h3 className="mt-4 text-lg font-black text-white">รอรถ 3D</h3>
+                    <h3 className="mt-4 text-lg font-black text-white">แผนที่รอรถ & สแกนพี่วินรอบตัว</h3>
                     <p className="mt-2 text-sm text-slate-300 leading-relaxed">
-                      หน้านี้เปิดดูได้ตลอด แม้ยังไม่ได้เรียกรถ
+                      หน้านี้ทำงานประสานกับแผนที่รับงานของพี่วินแบบเรียลไทม์
                     </p>
                     <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                      เมื่อมีงานที่กำลังรอพี่วิน ระบบจะแสดงแผนที่ ตำแหน่ง และสถานะการเดินทางจริงที่นี่
+                      เมื่อเริ่มเรียกรถ แผนที่จะแสดงตำแหน่งพี่วินที่รับงาน การเดินทาง และสถานะประสานกันทันที
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('home')}
-                      className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_18px_rgba(0,210,255,0.35)] active:scale-95 transition-all"
-                    >
-                      <Bike className="w-4 h-4" />
-                      ไปหน้าเรียกรถ
-                    </button>
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (audioEnabled) playTactileBlip(950);
+                          setShowCustomerRadarModal(true);
+                        }}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/40 bg-cyan-500/20 px-5 py-3 text-sm font-black text-cyan-200 hover:bg-cyan-500/30 shadow-[0_0_18px_rgba(0,210,255,0.25)] active:scale-95 transition-all"
+                      >
+                        <Radio className="w-4 h-4 text-cyan-300" />
+                        <span>เปิดเรดาร์สแกนพี่วิน & ร้านค้า</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('home')}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_18px_rgba(0,210,255,0.35)] active:scale-95 transition-all"
+                      >
+                        <Bike className="w-4 h-4" />
+                        <span>ไปหน้าเรียกรถ</span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -1978,20 +2002,20 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
                 {/* Knight Driver & Chosen Dream Ride Card (ข้อมูลโปรไฟล์พี่วิน & รถในฝัน) */}
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0D1C38] via-[#09142B] to-[#070D1E] border border-[#FFD700]/50 space-y-3 shadow-[0_0_20px_rgba(255,215,0,0.15)]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between min-w-0 max-w-full">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <NeonProfileAvatar 
                         level={currentMatchedDriver?.level || 0} 
                         emoji={currentMatchedDriver?.avatarEmoji || "🛵"} 
                         role="driver" 
                         size="md" 
                       />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="text-sm font-bold text-white flex items-center gap-1">
-                            <span>{currentMatchedDriver?.name || "กำลังรอพี่วิน"}</span>
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="text-sm font-bold text-white truncate max-w-[150px] sm:max-w-xs">
+                            {currentMatchedDriver?.name || "กำลังรอพี่วิน"}
                           </h3>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/50 font-black shadow-[0_0_8px_rgba(255,215,0,0.3)]">
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/50 font-black shadow-[0_0_8px_rgba(255,215,0,0.3)] shrink-0">
                             LV.{currentMatchedDriver?.level || 0} SOVEREIGN 👑
                           </span>
                         </div>
@@ -2219,19 +2243,19 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                       </button>
                     </div>
                   </div>
-                  <div className="space-y-2 font-mono">
+                  <div className="space-y-2 font-mono w-full max-w-full">
                     {/* In-Ride Tactical Actions: Chat, PromptPay QR, Real GPS Navigation */}
-                    <div className="grid grid-cols-3 gap-2 pt-2">
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-2 w-full max-w-full">
                       <button
                         type="button"
                         onClick={() => {
                           if (audioEnabled) playTactileBlip(880);
                           setShowInRideChatModal(true);
                         }}
-                        className="p-2.5 rounded-2xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(0,210,255,0.15)]"
+                        className="p-2 sm:p-2.5 rounded-2xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(0,210,255,0.15)] min-w-0"
                       >
-                        <MessageSquare className="w-4 h-4 text-cyan-400" />
-                        <span className="text-[11px] whitespace-nowrap">แชทกับพี่วิน</span>
+                        <MessageSquare className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <span className="text-[10px] sm:text-[11px] truncate w-full text-center">แชทกับพี่วิน</span>
                       </button>
 
                       <button
@@ -2240,10 +2264,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           if (audioEnabled) playTactileBlip(920);
                           setShowReceiptModal(true);
                         }}
-                        className="p-2.5 rounded-2xl bg-gradient-to-r from-blue-600/20 to-cyan-500/20 hover:from-blue-600/30 hover:to-cyan-500/30 border border-blue-400/40 text-blue-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(59,130,246,0.15)]"
+                        className="p-2 sm:p-2.5 rounded-2xl bg-gradient-to-r from-blue-600/20 to-cyan-500/20 hover:from-blue-600/30 hover:to-cyan-500/30 border border-blue-400/40 text-blue-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(59,130,246,0.15)] min-w-0"
                       >
-                        <Coins className="w-4 h-4 text-cyan-300" />
-                        <span className="text-[11px] whitespace-nowrap">WIN Wallet</span>
+                        <Coins className="w-4 h-4 text-cyan-300 shrink-0" />
+                        <span className="text-[10px] sm:text-[11px] truncate w-full text-center">WIN Wallet</span>
                       </button>
 
                       <button
@@ -2252,10 +2276,10 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
                           if (audioEnabled) playTactileBlip(950);
                           setShowRealGpsModal(true);
                         }}
-                        className="p-2.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                        className="p-2 sm:p-2.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 text-xs font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(16,185,129,0.15)] min-w-0"
                       >
-                        <Compass className="w-4 h-4 text-emerald-400" />
-                        <span className="text-[11px] whitespace-nowrap">GPS จริง</span>
+                        <Compass className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="text-[10px] sm:text-[11px] truncate w-full text-center">GPS จริง</span>
                       </button>
                     </div>
 
@@ -3630,13 +3654,38 @@ export const PassengerAppView: React.FC<PassengerAppViewProps> = ({
 
       {/* 3D DENSITY RADAR OVERLAY MODAL (2.5 KM) FOR CUSTOMER */}
       {showCustomerRadarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-hidden">
+          <div className="w-full max-w-4xl h-[90vh] max-h-[90vh] flex flex-col overflow-hidden rounded-3xl border border-cyan-400/40 shadow-2xl">
             <DensityRadarOverlay
               targetPerspective="passenger"
               radiusKm={2.5}
               audioEnabled={audioEnabled}
               onSelectDestinationForRide={handleSelectRadarDestination}
+              onBookRideWithRider={(rider) => {
+                setShowCustomerRadarModal(false);
+                setCurrentMatchedDriver({
+                  id: rider.id.replace('driver:', ''),
+                  name: rider.name,
+                  nameEn: rider.name,
+                  nickname: rider.name,
+                  gender: 'male',
+                  level: rider.level || 1,
+                  tierName: `Knight Level ${rider.level || 1}`,
+                  rating: rider.rating || 5,
+                  totalTrips: 0,
+                  phone: '',
+                  avatarEmoji: rider.avatar || '🛵',
+                  vehicleModel: 'มอเตอร์ไซค์รับจ้าง',
+                  plateNumber: '',
+                  certifications: [],
+                  specialtyTags: [],
+                  distanceKm: (rider.distanceMeters || 0) / 1000,
+                  etaMinutes: rider.etaMin || 3,
+                  bio: '',
+                  serviceMatchScore: 98,
+                });
+                setShowBookingModal(true);
+              }}
               onBackToHome={() => setShowCustomerRadarModal(false)}
             />
           </div>

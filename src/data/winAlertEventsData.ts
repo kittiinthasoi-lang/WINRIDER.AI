@@ -1,4 +1,4 @@
-export type WinAlertCategory = 'sale' | 'market' | 'concert' | 'sports' | 'festival' | 'community' | 'other';
+export type WinAlertCategory = 'concert' | 'sports' | 'sale' | 'market' | 'festival' | 'community' | 'other';
 
 export interface WinAlertEvent {
   id: string;
@@ -19,6 +19,11 @@ export interface WinAlertEvent {
   providerEventId: string;
   attendance?: number;
   rank?: number;
+  distanceKm?: number;
+  travelTip?: string;
+  badgeText?: string;
+  trafficLevel?: 'high' | 'medium' | 'normal';
+  estimatedFare?: number;
 }
 
 export interface NearbyEventsResponse {
